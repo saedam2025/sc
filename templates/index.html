@@ -3,57 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>새담 업무 시스템 - PRO v2.0</title>
+    <title>새담 업무 시스템 - PRO v2.5</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         :root { --primary: #4e73df; --success: #1cc88a; --info: #36b9cc; --danger: #e74a3b; --bg: #f8f9fc; --gray: #858796; }
-        
         body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #5a5c69; }
         .main-layout { display: grid; grid-template-columns: 320px 1fr; gap: 25px; max-width: 1700px; margin: auto; }
-        
-        /* 사이드바 스타일 */
-        .sidebar { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15); height: fit-content; position: sticky; top: 20px; }
-        .sidebar h4 { color: var(--primary); font-weight: 800; margin: 0 0 20px 0; font-size: 1.2rem; border-bottom: 2px solid #f1f3f9; padding-bottom: 15px; text-align: center; }
-        .owner-list { list-style: none; padding: 0; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
-        .owner-list li { padding: 10px; border-bottom: 1px solid #f1f3f9; font-weight: 500; display: flex; align-items: center; }
-        .owner-list li::before { content: "👤"; margin-right: 10px; font-size: 0.9rem; }
-
-        /* 달력 카드 스타일 */
-        .calendar-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1); }
-        
-        /* 사각형 높이 고정 로직 */
+        .sidebar { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58,59,69,0.15); height: fit-content; position: sticky; top: 20px; }
+        .sidebar h4 { color: var(--primary); font-weight: 800; margin: 0 0 20px 0; text-align: center; border-bottom: 2px solid #f1f3f9; padding-bottom: 15px; }
+        .owner-list { list-style: none; padding: 0; margin-bottom: 20px; max-height: 180px; overflow-y: auto; }
+        .owner-list li { padding: 10px; border-bottom: 1px solid #f1f3f9; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        .pos-badge { font-size: 0.7rem; background: #eee; padding: 2px 6px; border-radius: 4px; color: #666; }
+        .calendar-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58,59,69,0.1); }
         .fc-daygrid-day-frame { height: 130px !important; overflow: hidden !important; } 
-        .fc-daygrid-day-events { max-height: 90px !important; overflow-y: auto !important; }
-        .fc-daygrid-event { margin-top: 2px !important; padding: 2px 5px !important; border-radius: 4px !important; border: none !important; }
-
-        /* 버튼 공통 */
-        .btn { border-radius: 8px; border: none; padding: 12px; font-weight: 700; width: 100%; cursor: pointer; margin-bottom: 10px; transition: all 0.2s ease; font-size: 0.9rem; }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn { border-radius: 8px; border: none; padding: 12px; font-weight: 700; width: 100%; cursor: pointer; margin-bottom: 8px; transition: all 0.2s; font-size: 0.85rem; }
         .btn-primary { background: var(--primary); color: white; }
         .btn-success { background: var(--success); color: white; }
-        .btn-info { background: var(--info); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
         .btn-dark { background: #5a5c69; color: white; }
-
-        /* 요일별 색상 및 공휴일 */
-        .fc-day-sun a { color: var(--danger) !important; }
-        .fc-day-sat a { color: var(--primary) !important; }
-        .holiday-label { font-size: 0.75rem; color: white; background: var(--danger); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 700; vertical-align: middle; }
-        
-        /* 모달 스타일 */
+        .holiday-label { font-size: 0.75rem; color: white; background: var(--danger); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 700; }
         .modal { display: none; position: fixed; z-index: 2000; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
-        .modal-content { background: white; margin: 2% auto; padding: 35px; width: 600px; border-radius: 20px; box-shadow: 0 1rem 3rem rgba(0,0,0,0.2); position: relative; max-height: 90vh; overflow-y: auto; }
-        
-        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px; margin-top: 8px; box-sizing: border-box; font-family: inherit; font-size: 0.95rem; }
-        input:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25); }
-        label { font-size: 0.85rem; font-weight: 800; color: #4e73df; margin-top: 15px; display: block; }
-        
-        .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 11px; color: white; margin-right: 3px; font-weight: 700; }
-        .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .summary-table th { background: #f8f9fc; padding: 12px; border: 1px solid #e3e6f0; font-size: 0.85rem; }
-        .summary-table td { padding: 12px; border: 1px solid #e3e6f0; font-size: 0.85rem; vertical-align: top; }
+        .modal-content { background: white; margin: 2% auto; padding: 30px; width: 600px; border-radius: 20px; box-shadow: 0 1rem 3rem rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        input, textarea, select { width: 100%; padding: 11px; border: 1px solid #d1d3e2; border-radius: 8px; margin-top: 8px; box-sizing: border-box; font-family: inherit; }
+        label { font-size: 0.8rem; font-weight: 800; color: var(--primary); margin-top: 12px; display: block; }
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        .summary-table th, .summary-table td { padding: 12px; border: 1px solid #e3e6f0; text-align: center; }
     </style>
 </head>
 <body>
@@ -61,301 +38,209 @@
 <div class="main-layout">
     <div class="sidebar">
         <h4>SaeDam Admin</h4>
-        <div style="font-size: 0.8rem; color: var(--gray); margin-bottom: 5px;">등록된 담당자</div>
+        <div style="font-size: 0.75rem; color: var(--gray); margin-bottom: 5px;">인력 현황</div>
         <ul id="ownerList" class="owner-list"></ul>
         
-        <div style="background: #f8f9fc; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <input type="text" id="newOwnerName" placeholder="성함 입력">
-            <input type="password" id="newOwnerPass" placeholder="개인 비밀번호">
-            <button class="btn btn-primary" onclick="addOwner()" style="margin-top:10px;">👤 담당자 신규 등록</button>
+        <div style="background: #f8f9fc; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+            <input type="text" id="newOwnerName" placeholder="성함">
+            <input type="password" id="newOwnerPass" placeholder="비밀번호">
+            <select id="newOwnerPos">
+                <option value="담당자">담당자</option>
+                <option value="이사">이사</option>
+                <option value="대표이사">대표이사</option>
+            </select>
+            <button class="btn btn-primary" onclick="addOwner()" style="margin-top:10px;">👤 신규 인원 등록</button>
         </div>
         
+        <button class="btn btn-danger" onclick="openAttendModal()">📅 근태 신청서 작성</button>
+        <button class="btn btn-dark" onclick="viewAttendList()">⚖️ 근태 승인 관리</button>
+        <hr>
         <button class="btn btn-success" onclick="viewAdvancedStats()">📊 방문 통합 통계</button>
-        <button class="btn btn-info" onclick="viewSchoolList()">🏫 학교 방문 리스트</button>
-        <a href="/download" style="text-decoration:none;"><button class="btn btn-dark">📥 전체 데이터 백업(Excel)</button></a>
+        <button class="btn btn-dark" onclick="viewSchoolList()">🏫 학교 방문 리스트</button>
     </div>
-
-    <div class="calendar-card">
-        <div id='calendar'></div>
-    </div>
+    <div class="calendar-card"><div id='calendar'></div></div>
 </div>
 
 <div id="taskModal" class="modal">
     <div class="modal-content">
-        <h2 id="modalTitle" style="margin-top:0; color:var(--primary);">업무 작성</h2>
-        <hr style="border:0; border-top:1px solid #f1f3f9; margin-bottom:20px;">
-        
-        <input type="hidden" id="taskId">
-        <input type="hidden" id="selectedDate">
-        
-        <div id="ownerField">
-            <label>담당자 선택</label>
-            <select id="ownerSelect"></select>
+        <h2 id="modalTitle" style="color:var(--primary); margin-top:0;">업무 작성</h2>
+        <input type="hidden" id="taskId"><input type="hidden" id="selectedDate">
+        <div id="ownerField"><label>담당자 선택</label><select id="ownerSelect"></select></div>
+        <div id="editHeader" style="display:none; padding:10px; background:#f8f9fc; border-radius:8px; margin-bottom:10px;">
+            <strong>수정:</strong> <span id="displayInfo"></span>
         </div>
-        
-        <div id="editHeader" style="display:none; padding:15px; background:#f8f9fc; border-radius:10px; margin-bottom:15px; border-left:5px solid var(--primary);">
-            <strong>수정 중:</strong> <span id="displayInfo"></span>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            <div><label>🏠 내근</label><textarea id="inside" style="height:100px;"></textarea></div>
+            <div><label>🚗 외근(학교명)</label><textarea id="outside" style="height:100px;"></textarea></div>
         </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
-            <div>
-                <label>🏠 내근업무</label>
-                <textarea id="inside" style="height:120px;" placeholder="사무실 내 주요 업무"></textarea>
-            </div>
-            <div>
-                <label>🚗 외근업무 (학교명 필수)</label>
-                <textarea id="outside" style="height:120px;" placeholder="학교명은 줄바꿈하여 여러 개 입력 가능"></textarea>
-            </div>
+        <label>📝 기타/회의</label><input type="text" id="meeting"><input type="text" id="note" placeholder="비고"><input type="text" id="etc" placeholder="기타">
+        <div id="authArea" style="display:none; margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;">
+            <label style="color:var(--danger)">🔒 본인 확인 비밀번호</label><input type="password" id="ownerPassInput">
         </div>
-
-        <label>📝 기타 사항 (회의/비고)</label>
-        <input type="text" id="meeting" placeholder="회의명 및 주요 안건">
-        <input type="text" id="note" placeholder="비고 사항">
-        <input type="text" id="etc" placeholder="추가 전달 사항">
-
-        <div id="authArea" style="display:none; margin-top:20px; border-top:2px dashed #eee; padding-top:20px;">
-            <label style="color:var(--danger)">🔒 본인 확인 비밀번호</label>
-            <input type="password" id="ownerPassInput" style="background:#fffcfc; border:1px solid var(--danger);">
+        <div style="margin-top:20px; text-align:right;">
+            <button class="btn" style="width:80px; background:#eee;" onclick="closeModal('taskModal')">취소</button>
+            <button id="saveBtn" class="btn btn-primary" style="width:120px;">저장</button>
         </div>
+    </div>
+</div>
 
-        <div style="margin-top:30px; display:flex; gap:10px; justify-content: flex-end;">
-            <button class="btn" style="width:100px; background:#eee;" onclick="closeModal('taskModal')">취소</button>
-            <button id="saveBtn" class="btn btn-primary" style="width:150px;">데이터 저장</button>
+<div id="attendModal" class="modal">
+    <div class="modal-content">
+        <h2 style="color:var(--danger); margin-top:0;">근태 신청서</h2>
+        <label>신청자 성함</label><select id="attOwnerSelect"></select>
+        <label>비밀번호 확인</label><input type="password" id="attPass">
+        <label>구분</label>
+        <select id="attType">
+            <option value="휴가원">휴가원</option>
+            <option value="조퇴">조퇴</option>
+            <option value="결근계">결근계</option>
+            <option value="기타">기타</option>
+        </select>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div><label>시작일</label><input type="date" id="attStart"></div>
+            <div><label>종료일</label><input type="date" id="attEnd"></div>
+        </div>
+        <label>사유</label><textarea id="attReason" style="height:80px;"></textarea>
+        <div style="margin-top:20px; text-align:right;">
+            <button class="btn" style="width:80px; background:#eee;" onclick="closeModal('attendModal')">취소</button>
+            <button class="btn btn-danger" style="width:120px;" onclick="submitAttendance()">신청하기</button>
         </div>
     </div>
 </div>
 
 <div id="viewModal" class="modal">
-    <div class="modal-content" style="width: 900px;">
+    <div class="modal-content" style="width: 850px;">
         <h2 id="viewTitle" style="margin-top:0;">상세 정보</h2>
         <div id="viewContent"></div>
-        <div style="text-align:right; margin-top:25px;"><button class="btn btn-dark" style="width:120px;" onclick="closeModal('viewModal')">닫기</button></div>
+        <div style="text-align:right; margin-top:20px;"><button class="btn btn-dark" style="width:100px;" onclick="closeModal('viewModal')">닫기</button></div>
     </div>
 </div>
 
 <script>
     var calendar;
-    // [2026년 공휴일 데이터 수정] 
-    const holidays = {
-        "01-01": "신정", 
-        "03-01": "삼일절", "03-02": "대체공휴일", 
-        "05-05": "어린이날", "05-24": "부처님오신날", "05-25": "대체공휴일", 
-        "06-03": "지방선거일", "06-06": "현충일", 
-        "08-15": "광복절", "08-17": "대체공휴일", 
-        "09-24": "추석", "09-25": "추석", "09-26": "추석", "09-28": "대체공휴일",
-        "10-03": "개천절", "10-05": "대체공휴일", "10-09": "한글날", 
-        "12-25": "성탄절"
-    };
+    const holidays = {"01-01":"신정","03-01":"삼일절","03-02":"대체","05-05":"어린이날","05-24":"석탄일","05-25":"대체","06-06":"현충일","08-15":"광복절","08-17":"대체","09-24":"추석","09-25":"추석","09-26":"추석","09-28":"대체","10-03":"개천절","10-05":"대체","10-09":"한글날","12-25":"성탄절"};
 
     document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'ko',
-            height: 800,
-            expandRows: true,
-            dayMaxEvents: 3, 
+        calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+            initialView: 'dayGridMonth', locale: 'ko', height: 800, expandRows: true,
             events: '/get_tasks',
-            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
-            dateClick: function(info) {
-                openTaskModal('reg', info.dateStr);
-            },
+            dateClick: function(info) { openTaskModal('reg', info.dateStr); },
+            eventClick: function(info) { openTaskModal('edit', null, info.event); },
             dayCellDidMount: function(info) {
-                // [버그 수정 핵심 포인트] toISOString() 대신 로컬 연/월/일 값 사용
-                const year = info.date.getFullYear();
-                const month = String(info.date.getMonth() + 1).padStart(2, '0');
-                const day = String(info.date.getDate()).padStart(2, '0');
-                const d = `${month}-${day}`;
-
-                if (holidays[d]) {
-                    let label = document.createElement('span');
-                    label.className = 'holiday-label';
-                    label.innerText = holidays[d];
-                    
-                    const topSection = info.el.querySelector('.fc-daygrid-day-top');
-                    if (topSection) topSection.appendChild(label);
+                const d = info.date.toLocaleDateString('ko-KR', {month:'2-digit', day:'2-digit'}).replace(/\. /g, '-').replace('.','');
+                if(holidays[d]) {
+                    let span = document.createElement('span'); span.className='holiday-label'; span.innerText=holidays[d];
+                    info.el.querySelector('.fc-daygrid-day-top').appendChild(span);
                 }
             },
             eventContent: function(arg) {
                 let p = arg.event.extendedProps;
-                let html = `<div style="overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">`;
-                html += `<b style="color:var(--primary)">${p.owner}</b> `;
-                if(p.inside) html += `<span class="badge" style="background:var(--success)">내</span>`;
-                if(p.outside) html += `<span class="badge" style="background:var(--danger)">외</span>`;
-                html += `</div>`;
-                return { html: html };
-            },
-            eventClick: function(info) {
-                openTaskModal('edit', null, info.event);
+                return { html: `<div style="font-size:0.8rem;"><b>${p.owner}</b> ${p.inside?'<span style="color:green">내</span>':''} ${p.outside?'<span style="color:red">외</span>':''}</div>` };
             }
         });
         calendar.render();
         refreshOwners();
     });
 
-    function openTaskModal(mode, date, event) {
-        const modal = document.getElementById('taskModal');
-        modal.style.display = 'block';
-        
-        document.getElementById('taskId').value = '';
-        document.getElementById('inside').value = '';
-        document.getElementById('outside').value = '';
-        document.getElementById('meeting').value = '';
-        document.getElementById('note').value = '';
-        document.getElementById('etc').value = '';
-        document.getElementById('ownerPassInput').value = '';
-
-        if(mode === 'reg') {
-            document.getElementById('modalTitle').innerText = date + " 업무 등록";
-            document.getElementById('selectedDate').value = date;
-            document.getElementById('ownerField').style.display = 'block';
-            document.getElementById('editHeader').style.display = 'none';
-            document.getElementById('authArea').style.display = 'none';
-            document.getElementById('saveBtn').innerText = "데이터 저장";
-            document.getElementById('saveBtn').onclick = saveTask;
-        } else {
-            const p = event.extendedProps;
-            document.getElementById('modalTitle').innerText = "업무 내용 수정";
-            document.getElementById('taskId').value = event.id;
-            document.getElementById('ownerField').style.display = 'none';
-            document.getElementById('editHeader').style.display = 'block';
-            document.getElementById('displayInfo').innerText = event.startStr + " | " + p.owner;
-            document.getElementById('inside').value = p.inside;
-            document.getElementById('outside').value = p.outside;
-            document.getElementById('meeting').value = p.meeting;
-            document.getElementById('note').value = p.note;
-            document.getElementById('etc').value = p.etc;
-            document.getElementById('authArea').style.display = 'block';
-            document.getElementById('saveBtn').innerText = "수정 완료";
-            document.getElementById('saveBtn').onclick = updateTask;
-        }
-    }
-
-    async function addOwner() {
-        const admin_pass = prompt("관리자 암호를 입력하세요:");
-        const name = document.getElementById('newOwnerName').value;
-        const owner_pass = document.getElementById('newOwnerPass').value;
-        if(!name || !owner_pass) return alert("담당자 정보와 비밀번호를 모두 입력해주세요.");
-        
-        const res = await fetch('/add_owner', { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify({name, owner_pass, admin_pass}) 
-        });
-        const data = await res.json();
-        if(res.ok) { 
-            refreshOwners(); 
-            alert("새로운 담당자가 등록되었습니다."); 
-            document.getElementById('newOwnerName').value = '';
-            document.getElementById('newOwnerPass').value = '';
-        } else alert(data.message);
-    }
-
     async function refreshOwners() {
         const res = await fetch('/get_owners');
         const owners = await res.json();
         const listEl = document.getElementById('ownerList');
-        const selectEl = document.getElementById('ownerSelect');
-        listEl.innerHTML = ''; selectEl.innerHTML = '';
-        owners.forEach(name => {
-            let li = document.createElement('li'); li.innerText = name; listEl.appendChild(li);
-            let opt = document.createElement('option'); opt.value = name; opt.innerText = name; selectEl.appendChild(opt);
+        const selects = [document.getElementById('ownerSelect'), document.getElementById('attOwnerSelect')];
+        listEl.innerHTML = ''; selects.forEach(s => s.innerHTML = '');
+        owners.forEach(o => {
+            let li = document.createElement('li'); li.innerHTML = `${o.이름} <span class="pos-badge">${o.직책}</span>`;
+            listEl.appendChild(li);
+            selects.forEach(s => { let opt = document.createElement('option'); opt.value = o.이름; opt.innerText = o.이름; s.appendChild(opt); });
         });
     }
 
-    async function saveTask() {
-        const payload = {
-            date: document.getElementById('selectedDate').value,
-            owner: document.getElementById('ownerSelect').value,
-            inside: document.getElementById('inside').value,
-            outside: document.getElementById('outside').value,
-            meeting: document.getElementById('meeting').value,
-            note: document.getElementById('note').value,
-            etc: document.getElementById('etc').value
-        };
-        if(!payload.owner) return alert("담당자를 먼저 등록/선택해주세요.");
-        const res = await fetch('/save_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) {
-            closeModal('taskModal');
-            calendar.refetchEvents();
-            location.reload();
+    async function addOwner() {
+        const admin_pass = prompt("관리자 암호(1900):");
+        const payload = { name: document.getElementById('newOwnerName').value, owner_pass: document.getElementById('newOwnerPass').value, position: document.getElementById('newOwnerPos').value, admin_pass };
+        if(!payload.name || !payload.owner_pass) return alert("정보를 입력하세요.");
+        const res = await fetch('/add_owner', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if(res.ok) { alert("등록 완료"); location.reload(); } else { const d = await res.json(); alert(d.message); }
+    }
+
+    function openTaskModal(mode, date, event) {
+        document.getElementById('taskModal').style.display = 'block';
+        if(mode === 'reg') {
+            document.getElementById('modalTitle').innerText = date + " 업무 등록";
+            document.getElementById('selectedDate').value = date;
+            document.getElementById('ownerField').style.display='block'; document.getElementById('editHeader').style.display='none';
+            document.getElementById('authArea').style.display='none'; document.getElementById('saveBtn').onclick = saveTask;
+        } else {
+            const p = event.extendedProps;
+            document.getElementById('modalTitle').innerText = "업무 수정";
+            document.getElementById('taskId').value = event.id;
+            document.getElementById('ownerField').style.display='none'; document.getElementById('editHeader').style.display='block';
+            document.getElementById('displayInfo').innerText = event.startStr + " | " + p.owner;
+            document.getElementById('inside').value = p.inside; document.getElementById('outside').value = p.outside;
+            document.getElementById('meeting').value = p.meeting; document.getElementById('note').value = p.note; document.getElementById('etc').value = p.etc;
+            document.getElementById('authArea').style.display='block'; document.getElementById('saveBtn').onclick = updateTask;
         }
     }
 
-    async function updateTask() {
-        const payload = {
-            id: document.getElementById('taskId').value,
-            owner: document.getElementById('displayInfo').innerText.split('|')[1].trim(),
-            inside: document.getElementById('inside').value,
-            outside: document.getElementById('outside').value,
-            meeting: document.getElementById('meeting').value,
-            note: document.getElementById('note').value,
-            etc: document.getElementById('etc').value,
-            password: document.getElementById('ownerPassInput').value
-        };
-        if(!payload.password) return alert("비밀번호를 입력해야 수정이 가능합니다.");
-        const res = await fetch('/update_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) { 
-            alert("수정 완료!"); 
-            closeModal('taskModal');
-            calendar.refetchEvents();
-            location.reload(); 
-        } 
-        else { const d = await res.json(); alert(d.message); }
+    async function saveTask() {
+        const payload = { date: document.getElementById('selectedDate').value, owner: document.getElementById('ownerSelect').value, inside: document.getElementById('inside').value, outside: document.getElementById('outside').value, meeting: document.getElementById('meeting').value, note: document.getElementById('note').value, etc: document.getElementById('etc').value };
+        const res = await fetch('/save_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if(res.ok) location.reload();
     }
 
-    async function viewAdvancedStats() {
+    async function updateTask() {
+        const payload = { id: document.getElementById('taskId').value, owner: document.getElementById('displayInfo').innerText.split('|')[1].trim(), inside: document.getElementById('inside').value, outside: document.getElementById('outside').value, meeting: document.getElementById('meeting').value, note: document.getElementById('note').value, etc: document.getElementById('etc').value, password: document.getElementById('ownerPassInput').value };
+        const res = await fetch('/update_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if(res.ok) location.reload(); else { const d = await res.json(); alert(d.message); }
+    }
+
+    function openAttendModal() { document.getElementById('attendModal').style.display = 'block'; }
+
+    async function submitAttendance() {
+        const payload = { owner: document.getElementById('attOwnerSelect').value, password: document.getElementById('attPass').value, type: document.getElementById('attType').value, start_date: document.getElementById('attStart').value, end_date: document.getElementById('attEnd').value, reason: document.getElementById('attReason').value };
+        if(!payload.password || !payload.start_date) return alert("필수 정보를 입력하세요.");
+        const res = await fetch('/submit_attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        if(res.ok) { alert("신청 완료"); location.reload(); } else { const d = await res.json(); alert(d.message); }
+    }
+
+    async function viewAttendList() {
+        const res = await fetch('/get_attendance');
+        const list = await res.json();
+        let html = `<table class="summary-table"><thead><tr><th>신청일</th><th>담당자</th><th>구분</th><th>기간</th><th>상태</th><th>처리</th></tr></thead><tbody>`;
+        list.forEach(i => {
+            html += `<tr><td>${i.신청일}</td><td>${i.담당자}</td><td>${i.구분}</td><td>${i.시작일}~${i.종료일}</td>
+            <td style="color:${i.승인상태==='승인'?'blue':'red'}"><b>${i.승인상태}</b></td>
+            <td><button onclick="approveRequest(${i.idx}, '승인')" style="font-size:11px;">승인</button> <button onclick="approveRequest(${i.idx}, '반려')" style="font-size:11px;">반려</button></td></tr>`;
+        });
+        html += `</tbody></table>`;
+        document.getElementById('viewTitle').innerText = "⚖️ 근태 신청 승인 관리";
+        document.getElementById('viewContent').innerHTML = list.length > 0 ? html : "신청 내역이 없습니다.";
         document.getElementById('viewModal').style.display = 'block';
-        document.getElementById('viewTitle').innerText = "📊 통합 업무 분석 결과";
-        const res = await fetch('/get_school_stats');
-        const data = await res.json();
-        if(data.status === "empty") { document.getElementById('viewContent').innerHTML = "<p style='text-align:center; padding:50px;'>분석할 외근 학교 데이터가 아직 없습니다.</p>"; return; }
-        
-        document.getElementById('viewContent').innerHTML = `
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:25px;">
-                <div style="background:linear-gradient(45deg, #4e73df, #224abe); color:white; padding:25px; border-radius:15px; text-align:center;">
-                    <small>누적 학교 방문</small><br><span style="font-size:35px; font-weight:800;">${data.total_visits}건</span>
-                </div>
-                <div style="background:linear-gradient(45deg, #1cc88a, #13855c); color:white; padding:25px; border-radius:15px; text-align:center;">
-                    <small>방문한 유니크 학교</small><br><span style="font-size:35px; font-weight:800;">${data.unique_schools}곳</span>
-                </div>
-                <div style="height:280px;"><canvas id="pieChart"></canvas></div>
-                <div style="height:280px;"><canvas id="barChart"></canvas></div>
-                <div style="grid-column:1/-1; height:250px;"><canvas id="ownerChart"></canvas></div>
-            </div>`;
-        
-        setTimeout(() => {
-            new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: data.pie, options: { maintainAspectRatio: false, plugins: { title: { display: true, text: '학교별 방문 비중' } } } });
-            new Chart(document.getElementById('barChart'), { type: 'bar', data: data.top5, options: { maintainAspectRatio: false, plugins: { title: { display: true, text: '최다 방문 학교 Top 5' } } } });
-            new Chart(document.getElementById('ownerChart'), { type: 'bar', data: data.owner, options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { title: { display: true, text: '개인별 학교 외근 성과' } } } });
-        }, 100);
+    }
+
+    async function approveRequest(idx, status) {
+        const admin_name = prompt("승인자 성함:");
+        const admin_password = prompt("승인자 비밀번호:");
+        if(!admin_name || !admin_password) return;
+        const res = await fetch('/approve_attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ idx, status, admin_name, admin_password }) });
+        if(res.ok) { alert(status + " 처리되었습니다."); viewAttendList(); } else { const d = await res.json(); alert(d.message); }
     }
 
     async function viewSchoolList() {
         const res = await fetch('/get_tasks');
         const tasks = await res.json();
-        const keyword = ['초','중','고','학교'];
-        const list = tasks.filter(t => keyword.some(k => (t.extendedProps.outside||'').includes(k)));
-        
-        let table = `<table class="summary-table"><thead><tr><th width="15%">날짜</th><th width="15%">담당자</th><th>방문 학교 상세</th></tr></thead><tbody>`;
-        list.sort((a,b) => b.start.localeCompare(a.start)).forEach(t => {
-            const outsideStr = (t.extendedProps.outside || '').replace(/\n/g, '<br>');
-            table += `<tr><td>${t.start}</td><td>${t.extendedProps.owner}</td><td>${outsideStr}</td></tr>`;
+        const list = tasks.filter(t => ['초','중','고','학교'].some(k => (t.extendedProps.outside||'').includes(k)));
+        let table = `<table class="summary-table"><thead><tr><th>날짜</th><th>담당자</th><th>방문학교</th></tr></thead><tbody>`;
+        list.sort((a,b)=>b.start.localeCompare(a.start)).forEach(t => {
+            table += `<tr><td>${t.start}</td><td>${t.extendedProps.owner}</td><td>${t.extendedProps.outside.replace(/\n/g,'<br>')}</td></tr>`;
         });
-        table += `</tbody></table>`;
-        
-        document.getElementById('viewTitle').innerText = "🏫 학교 방문 전체 이력";
-        document.getElementById('viewContent').innerHTML = list.length > 0 ? table : '<p style="padding:40px; text-align:center;">학교 방문 기록이 없습니다.</p>';
-        document.getElementById('viewModal').style.display = 'block';
+        document.getElementById('viewTitle').innerText = "🏫 학교 방문 이력";
+        document.getElementById('viewContent').innerHTML = list.length>0 ? table+"</tbody></table>" : "기록 없음";
+        document.getElementById('viewModal').style.display='block';
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-    window.onclick = function(event) {
-        if (event.target.className === 'modal') {
-            event.target.style.display = 'none';
-        }
-    }
+    window.onclick = function(e) { if(e.target.className==='modal') e.target.style.display='none'; }
 </script>
 </body>
 </html>
