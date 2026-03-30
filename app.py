@@ -5,21 +5,20 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# --- [저장 경로 설정: Render 전용 디스크 적용] ---
-MOUNT_PATH = '/mnt/data'
-EXCEL_FILE = os.path.join(MOUNT_PATH, 'tasks.xlsx')
+# --- [저장 경로 설정: 무료 티어 환경에 맞게 현재 폴더로 변경] ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+EXCEL_FILE = os.path.join(BASE_DIR, 'tasks.xlsx')
 
-# 엑셀 파일 및 폴더 초기화
+# 엑셀 파일 초기화
 def init_excel():
-    if not os.path.exists(MOUNT_PATH):
-        try:
-            os.makedirs(MOUNT_PATH)
-        except:
-            pass # 로컬 테스트 환경 배려
-            
+    # 파일이 없을 경우에만 새로 생성
     if not os.path.exists(EXCEL_FILE):
-        df = pd.DataFrame(columns=['연도', '날짜', '담당자', '구분', '업무내용', '비고', '기타'])
-        df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+        try:
+            df = pd.DataFrame(columns=['연도', '날짜', '담당자', '구분', '업무내용', '비고', '기타'])
+            df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+            print(f"새 엑셀 파일 생성됨: {EXCEL_FILE}")
+        except Exception as e:
+            print(f"파일 생성 에러: {e}")
 
 @app.route('/')
 def index():
@@ -56,6 +55,7 @@ def get_tasks():
 def save_task():
     data = request.json
     try:
+        # 파일이 있으면 불러오고, 없으면 새로 생성
         if os.path.exists(EXCEL_FILE):
             df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
         else:
@@ -85,9 +85,10 @@ def save_task():
 def download_file():
     if os.path.exists(EXCEL_FILE):
         return send_file(EXCEL_FILE, as_attachment=True)
-    return "파일이 아직 없습니다.", 404
+    return "파일이 아직 생성되지 않았습니다. 일정을 먼저 등록해 주세요.", 404
 
 if __name__ == '__main__':
     init_excel()
+    # Render의 PORT 환경변수를 따르되 기본값은 5000 사용
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
