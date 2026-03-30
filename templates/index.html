@@ -1,71 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
+    <meta charset="UTF-8">
+    <title>업무보고 달력</title>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
     <style>
-        body { font-family: Arial, sans-serif; }
-        #calendar { max-width: 900px; margin: 40px auto; }
-        /* 담당자별 색상 구분 예시 */
-        .fc-event { cursor: pointer; padding: 2px; }
+        body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f8f9fa; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        #calendar { margin-top: 20px; }
+        .header-box { display: flex; justify-content: space-between; align-items: center; }
+        .btn-download { padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id='calendar'></div>
+    <div class="container">
+        <div class="header-box">
+            <h2>🗓️ 월간 업무보고표</h2>
+            <a href="/download" class="btn-download">📥 엑셀 다운로드</a>
+        </div>
+        <div id='calendar'></div>
+    </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'ko',
-            // 서버에서 일정을 가져오는 주소
-            events: '/get_tasks', 
-            
-            // 날짜 클릭 시 (새 일정 등록)
-            dateClick: async function(info) {
-                let owner = prompt("담당자 이름을 입력하세요:");
-                if (!owner) return; // 취소 시 중단
-                
-                let title = prompt("업무 내용을 입력하세요:");
-                if (!title) return; // 취소 시 중단
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'ko',
+                events: '/get_tasks',
+                dateClick: async function(info) {
+                    let owner = prompt("담당자 성함을 입력하세요:");
+                    if(!owner) return;
+                    let title = prompt("업무내용을 입력하세요:");
+                    let category = prompt("구분 (예: 교육, 행정, 기타):");
+                    let note = prompt("비고:");
+                    let etc = prompt("기타사항:");
 
-                // 서버에 데이터 전송
-                try {
-                    const response = await fetch('/save_task', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            title: title, 
-                            date: info.dateStr, 
-                            owner: owner
-                        })
-                    });
+                    try {
+                        const response = await fetch('/save_task', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                date: info.dateStr,
+                                owner: owner,
+                                title: title,
+                                category: category,
+                                note: note,
+                                etc: etc
+                            })
+                        });
 
-                    if (response.ok) {
-                        // 저장이 성공하면 달력 데이터만 갱신 (화면 전체 새로고침보다 부드러움)
-                        calendar.refetchEvents();
-                        alert("일정이 등록되었습니다.");
-                    } else {
-                        alert("서버 저장에 실패했습니다.");
+                        if (response.ok) {
+                            calendar.refetchEvents();
+                            alert("엑셀 디스크에 저장되었습니다.");
+                        } else {
+                            alert("저장 실패! 서버 로그를 확인하세요.");
+                        }
+                    } catch (e) {
+                        alert("네트워크 오류가 발생했습니다.");
                     }
-                } catch (error) {
-                    console.error("Error:", error);
-                    alert("네트워크 오류가 발생했습니다.");
+                },
+                eventClick: function(info) {
+                    let p = info.event.extendedProps;
+                    alert(`[상세 업무 보고]\n\n날짜: ${info.event.startStr}\n담당자: ${p.owner}\n구분: ${p.category}\n내용: ${info.event.title}\n비고: ${p.note}\n기타: ${p.etc}`);
                 }
-            },
-
-            // 등록된 일정 클릭 시 (내용 확인)
-            eventClick: function(info) {
-                // info.event.title에는 "[담당자] 업무내용"이 들어있습니다.
-                alert("상세 업무: " + info.event.title);
-            }
+            });
+            calendar.render();
         });
-
-        calendar.render();
-    });
-</script>
-
+    </script>
 </body>
 </html>
