@@ -13,31 +13,59 @@
 <body>
     <div id='calendar'></div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var calendarEl = document.getElementById('calendar');
-            var calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                locale: 'ko',
-                events: '/get_tasks',
-                dateClick: function(info) {
-                    let owner = prompt("담당자 이름을 입력하세요:");
-                    let title = prompt("업무 내용을 입력하세요:");
-                    if (title && owner) {
-                        fetch('/save_task', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({title: title, date: info.dateStr, owner: owner})
-                        }).then(() => calendar.refetchEvents());
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            // 서버에서 일정을 가져오는 주소
+            events: '/get_tasks', 
+            
+            // 날짜 클릭 시 (새 일정 등록)
+            dateClick: async function(info) {
+                let owner = prompt("담당자 이름을 입력하세요:");
+                if (!owner) return; // 취소 시 중단
+                
+                let title = prompt("업무 내용을 입력하세요:");
+                if (!title) return; // 취소 시 중단
+
+                // 서버에 데이터 전송
+                try {
+                    const response = await fetch('/save_task', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            title: title, 
+                            date: info.dateStr, 
+                            owner: owner
+                        })
+                    });
+
+                    if (response.ok) {
+                        // 저장이 성공하면 달력 데이터만 갱신 (화면 전체 새로고침보다 부드러움)
+                        calendar.refetchEvents();
+                        alert("일정이 등록되었습니다.");
+                    } else {
+                        alert("서버 저장에 실패했습니다.");
                     }
-                },
-                eventClick: function(info) {
-                    alert("업무: " + info.event.title);
-                    // 여기서 수정 로직 추가 가능
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert("네트워크 오류가 발생했습니다.");
                 }
-            });
-            calendar.render();
+            },
+
+            // 등록된 일정 클릭 시 (내용 확인)
+            eventClick: function(info) {
+                // info.event.title에는 "[담당자] 업무내용"이 들어있습니다.
+                alert("상세 업무: " + info.event.title);
+            }
         });
-    </script>
+
+        calendar.render();
+    });
+</script>
+
 </body>
 </html>
