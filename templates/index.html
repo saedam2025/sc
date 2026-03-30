@@ -3,176 +3,236 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>새담 업무 관리 시스템 - 시각화 분석 모드</title>
+    <title>새담 업무 시스템 - PRO v2.0</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
     <style>
-        :root { --primary: #0d6efd; --sunday: #e74c3c; --saturday: #3498db; }
-        body { font-family: 'Pretendard', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-        .main-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; max-width: 1600px; margin: auto; }
-        .sidebar { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); height: fit-content; }
-        .sidebar h4 { margin: 0 0 15px 0; font-size: 16px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; }
-        .owner-list { list-style: none; padding: 0; margin-bottom: 15px; max-height: 200px; overflow-y: auto; }
-        .owner-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-size: 13px; border-radius: 4px; }
-        .owner-item:hover { background: #f0f7ff; color: var(--primary); font-weight: bold; }
-        .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; margin-bottom: 8px; transition: 0.2s; }
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        :root { --primary: #4e73df; --success: #1cc88a; --info: #36b9cc; --danger: #e74a3b; --bg: #f8f9fc; --gray: #858796; }
+        
+        body { font-family: 'Pretendard', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #5a5c69; }
+        .main-layout { display: grid; grid-template-columns: 320px 1fr; gap: 25px; max-width: 1700px; margin: auto; }
+        
+        /* 사이드바 스타일 */
+        .sidebar { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15); height: fit-content; position: sticky; top: 20px; }
+        .sidebar h4 { color: var(--primary); font-weight: 800; margin: 0 0 20px 0; font-size: 1.2rem; border-bottom: 2px solid #f1f3f9; padding-bottom: 15px; text-align: center; }
+        .owner-list { list-style: none; padding: 0; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
+        .owner-list li { padding: 10px; border-bottom: 1px solid #f1f3f9; font-weight: 500; display: flex; align-items: center; }
+        .owner-list li::before { content: "👤"; margin-right: 10px; font-size: 0.9rem; }
+
+        /* 달력 카드 스타일 */
+        .calendar-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1); }
+        
+        /* [중요] 사각형 높이 고정 로직 */
+        .fc-daygrid-day-frame { height: 130px !important; overflow: hidden !important; } 
+        .fc-daygrid-day-events { max-height: 90px !important; overflow-y: auto !important; }
+        .fc-daygrid-event { margin-top: 2px !important; padding: 2px 5px !important; border-radius: 4px !important; }
+
+        /* 버튼 공통 */
+        .btn { border-radius: 8px; border: none; padding: 12px; font-weight: 700; width: 100%; cursor: pointer; margin-bottom: 10px; transition: all 0.2s ease; font-size: 0.9rem; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
         .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: #198754; color: white; }
-        .btn-info { background: #0dcaf0; color: white; }
-        .btn-dark { background: #343a40; color: white; }
-        .calendar-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .fc-day-sun a { color: var(--sunday) !important; }
-        .fc-day-sat a { color: var(--saturday) !important; }
-        .holiday-label { font-size: 10px; color: var(--sunday); margin-left: 5px; font-weight: bold; }
-        .fc-daygrid-day-top { flex-direction: row !important; }
-        .badge { padding: 1px 3px; border-radius: 3px; font-size: 9px; color: white; margin-left: 2px; }
-        .modal { display: none; position: fixed; z-index: 9999; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
-        .modal-content { background: white; margin: 2% auto; padding: 25px; width: 500px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
-        h3 { margin-top: 0; padding-bottom: 10px; border-bottom: 1px solid #eee; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; }
-        textarea { height: 80px; resize: none; width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 13px; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 13px; }
-        .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-        .summary-table th, .summary-table td { border: 1px solid #eee; padding: 10px; text-align: left; }
-        .summary-table th { background: #f8f9fa; }
-        .stats-dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
-        .stats-card { background: white; border: 1px solid #eee; border-radius: 8px; padding: 15px; }
-        .stats-title { font-size: 13px; font-weight: bold; color: #666; margin-bottom: 10px; }
-        .stats-value { font-size: 24px; font-weight: bold; color: var(--primary); }
-        .chart-container { height: 230px; position: relative; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-info { background: var(--info); color: white; }
+        .btn-dark { background: #5a5c69; color: white; }
+
+        /* 요일별 색상 및 공휴일 */
+        .fc-day-sun a { color: var(--danger) !important; }
+        .fc-day-sat a { color: var(--primary) !important; }
+        .holiday-label { font-size: 0.75rem; color: white; background: var(--danger); padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: 700; vertical-align: middle; }
+        
+        /* 모달 스타일 */
+        .modal { display: none; position: fixed; z-index: 2000; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+        .modal-content { background: white; margin: 2% auto; padding: 35px; width: 600px; border-radius: 20px; box-shadow: 0 1rem 3rem rgba(0,0,0,0.2); position: relative; max-height: 90vh; overflow-y: auto; }
+        
+        input, textarea, select { width: 100%; padding: 12px; border: 1px solid #d1d3e2; border-radius: 8px; margin-top: 8px; box-sizing: border-box; font-family: inherit; font-size: 0.95rem; }
+        input:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 0.2rem rgba(78, 115, 223, 0.25); }
+        label { font-size: 0.85rem; font-weight: 800; color: #4e73df; margin-top: 15px; display: block; }
+        
+        .badge { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 11px; color: white; margin-right: 3px; font-weight: 700; }
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .summary-table th { background: #f8f9fc; padding: 12px; border: 1px solid #e3e6f0; font-size: 0.85rem; }
+        .summary-table td { padding: 12px; border: 1px solid #e3e6f0; font-size: 0.85rem; vertical-align: top; }
     </style>
 </head>
 <body>
 
 <div class="main-layout">
     <div class="sidebar">
-        <h4>👥 담당자 목록</h4>
+        <h4>SaeDam Admin</h4>
+        <div style="font-size: 0.8rem; color: var(--gray); margin-bottom: 5px;">등록된 담당자</div>
         <ul id="ownerList" class="owner-list"></ul>
-        <div style="margin-bottom:10px;">
-            <input type="text" id="newOwnerInput" placeholder="신규 담당자명" style="margin-bottom:5px;">
-            <input type="password" id="ownerPassInput" placeholder="개인 암호 설정" style="margin-bottom:5px;">
+        
+        <div style="background: #f8f9fc; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+            <input type="text" id="newOwnerName" placeholder="성함 입력">
+            <input type="password" id="newOwnerPass" placeholder="개인 비밀번호">
+            <button class="btn btn-primary" onclick="addOwner()" style="margin-top:10px;">👤 담당자 신규 등록</button>
         </div>
-        <button class="btn btn-primary" onclick="addOwnerWithAuth()">담당자 등록</button>
-        <hr>
-        <button class="btn btn-success" onclick="viewSchoolSummary()">🏫 학교방문 요약 리스트</button>
-        <button class="btn btn-info" onclick="viewAdvancedSchoolStats()">📊 학교방문요약통계표</button>
-        <a href="/download" style="text-decoration:none;"><button class="btn btn-dark">📥 엑셀 다운로드</button></a>
+        
+        <button class="btn btn-success" onclick="viewAdvancedStats()">📊 방문 통합 통계</button>
+        <button class="btn btn-info" onclick="viewSchoolList()">🏫 학교 방문 리스트</button>
+        <a href="/download" style="text-decoration:none;"><button class="btn btn-dark">📥 전체 데이터 백업(Excel)</button></a>
     </div>
-    <div class="calendar-card"><div id='calendar'></div></div>
+
+    <div class="calendar-card">
+        <div id='calendar'></div>
+    </div>
 </div>
 
-<div id="inputModal" class="modal">
+<div id="taskModal" class="modal">
     <div class="modal-content">
-        <h3>업무 등록</h3>
+        <h2 id="modalTitle" style="margin-top:0; color:var(--primary);">업무 작성</h2>
+        <hr style="border:0; border-top:1px solid #f1f3f9; margin-bottom:20px;">
+        
+        <input type="hidden" id="taskId">
         <input type="hidden" id="selectedDate">
-        <div class="form-group"><label>담당자 선택</label><select id="ownerSelect"></select></div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-            <div><label>내근업무</label><textarea id="inside"></textarea></div>
-            <div><label>외근업무</label><textarea id="outside" placeholder="예: 이의초 방문"></textarea></div>
+        
+        <div id="ownerField">
+            <label>담당자 선택</label>
+            <select id="ownerSelect"></select>
         </div>
-        <div class="form-group"><label>회의/면접</label><textarea id="meeting" style="height:50px;"></textarea></div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
-            <div><label>비고</label><input type="text" id="note"></div>
-            <div><label>기타</label><input type="text" id="etc"></div>
+        
+        <div id="editHeader" style="display:none; padding:15px; background:#f8f9fc; border-radius:10px; margin-bottom:15px; border-left:5px solid var(--primary);">
+            <strong>수정 중:</strong> <span id="displayInfo"></span>
         </div>
-        <div style="text-align:right; margin-top:20px;">
-            <button class="btn btn-dark" style="width:auto;" onclick="closeModal('inputModal')">취소</button>
-            <button class="btn btn-primary" style="width:auto;" onclick="saveTask()">데이터 저장</button>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <div>
+                <label>🏠 내근업무</label>
+                <textarea id="inside" style="height:120px;" placeholder="사무실 내 주요 업무"></textarea>
+            </div>
+            <div>
+                <label>🚗 외근업무 (학교명 필수)</label>
+                <textarea id="outside" style="height:120px;" placeholder="학교명은 줄바꿈하여 여러 개 입력 가능"></textarea>
+            </div>
+        </div>
+
+        <label>📝 기타 사항 (회의/비고)</label>
+        <input type="text" id="meeting" placeholder="회의명 및 주요 안건">
+        <input type="text" id="note" placeholder="비고 사항">
+        <input type="text" id="etc" placeholder="추가 전달 사항">
+
+        <div id="authArea" style="display:none; margin-top:20px; border-top:2px dashed #eee; padding-top:20px;">
+            <label style="color:var(--danger)">🔒 본인 확인 비밀번호</label>
+            <input type="password" id="ownerPassInput" style="background:#fffcfc; border:1px solid var(--danger);">
+        </div>
+
+        <div style="margin-top:30px; display:flex; gap:10px; justify-content: flex-end;">
+            <button class="btn" style="width:100px; background:#eee;" onclick="closeModal('taskModal')">취소</button>
+            <button id="saveBtn" class="btn btn-primary" style="width:150px;" onclick="saveTask()">데이터 저장</button>
         </div>
     </div>
 </div>
 
-<div id="editModal" class="modal">
-    <div class="modal-content">
-        <h3>업무 수정</h3>
-        <input type="hidden" id="editTaskId">
-        <div class="form-group">
-            <label>날짜 / 담당자</label>
-            <div id="editInfo" style="background:#f8f9fa; padding:10px; border-radius:4px; font-size:13px;"></div>
-        </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
-            <div><label>내근업무</label><textarea id="editInside"></textarea></div>
-            <div><label>외근업무</label><textarea id="editOutside"></textarea></div>
-        </div>
-        <div class="form-group"><label>회의/면접</label><textarea id="editMeeting" style="height:50px;"></textarea></div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
-            <div><label>비고</label><input type="text" id="editNote"></div>
-            <div><label>기타</label><input type="text" id="editEtc"></div>
-        </div>
-        <div class="form-group" style="margin-top:15px;">
-            <label style="color:var(--sunday);">본인 인증 암호</label>
-            <input type="password" id="editOwnerPassword" placeholder="개인 암호 입력" style="border: 2px solid var(--sunday);">
-        </div>
-        <div style="text-align:right; margin-top:10px;">
-            <button class="btn btn-dark" style="width:auto;" onclick="closeModal('editModal')">닫기</button>
-            <button class="btn btn-success" style="width:auto;" onclick="updateTask()">수정 완료</button>
-        </div>
-    </div>
-</div>
-
-<div id="summaryModal" class="modal">
-    <div class="modal-content" style="width: 850px;">
-        <h3 id="summaryTitle">조회</h3>
-        <div id="summaryContent"></div>
-        <div style="text-align:right; margin-top:20px;"><button class="btn btn-dark" style="width:auto;" onclick="closeModal('summaryModal')">창 닫기</button></div>
+<div id="viewModal" class="modal">
+    <div class="modal-content" style="width: 900px;">
+        <h2 id="viewTitle" style="margin-top:0;">상세 정보</h2>
+        <div id="viewContent"></div>
+        <div style="text-align:right; margin-top:25px;"><button class="btn btn-dark" style="width:120px;" onclick="closeModal('viewModal')">닫기</button></div>
     </div>
 </div>
 
 <script>
-    var calendar, pieChart, barChart, ownerChart;
+    var calendar;
+    // 2026년 공휴일 데이터 완벽 교정
     const holidays = {
-        "01-01": "신정", "03-01": "삼일절", "03-02": "대체공휴일",
-        "05-01": "노동절", "05-05": "어린이날", "05-24": "부처님오신날", "05-25": "대체공휴일",
-        "06-06": "현충일", "08-15": "광복절", "08-17": "대체공휴일",
-        "09-24": "추석", "09-25": "추석", "09-26": "추석",
+        "01-01": "신정", "03-01": "삼일절", "03-02": "대체공휴일", "05-05": "어린이날", 
+        "05-24": "부처님오신날", "05-25": "대체공휴일", "06-06": "현충일", "08-15": "광복절", 
+        "08-17": "대체공휴일", "09-24": "추석", "09-25": "추석", "09-26": "추석", 
         "10-03": "개천절", "10-05": "대체공휴일", "10-09": "한글날", "12-25": "성탄절"
     };
 
-    document.addEventListener('DOMContentLoaded', function() { initCalendar(); refreshOwners(); });
-
-    function initCalendar() {
+    document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth', locale: 'ko', events: '/get_tasks',
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            height: 800,
+            expandRows: true,
+            dayMaxEvents: 3, // 3개 넘으면 +more 표시
+            events: '/get_tasks',
+            headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
             dateClick: function(info) {
-                document.getElementById('selectedDate').value = info.dateStr;
-                document.querySelectorAll('#inputModal textarea, #inputModal input:not([type=hidden])').forEach(el=>el.value='');
-                document.getElementById('inputModal').style.display = 'block';
+                openTaskModal('reg', info.dateStr);
             },
             dayCellDidMount: function(info) {
-                let dateStr = info.date.toISOString().split('T')[0].substring(5, 10);
-                if (holidays[dateStr]) {
-                    let holidaySpan = document.createElement('span');
-                    holidaySpan.className = 'holiday-label'; holidaySpan.innerText = holidays[dateStr];
-                    info.el.querySelector('.fc-daygrid-day-top').appendChild(holidaySpan);
-                    info.el.querySelector('.fc-daygrid-day-number').style.color = 'var(--sunday)';
+                let d = info.date.toISOString().split('T')[0].substring(5, 10);
+                if (holidays[d]) {
+                    let label = document.createElement('span');
+                    label.className = 'holiday-label';
+                    label.innerText = holidays[d];
+                    info.el.querySelector('.fc-daygrid-day-top').appendChild(label);
                 }
             },
             eventContent: function(arg) {
                 let p = arg.event.extendedProps;
-                let html = `<div style="padding:1px;"><b style="font-size:11px;">${p.owner}</b>`;
-                if(p.inside) html += `<span class="badge" style="background:#0d6efd">내</span>`;
-                if(p.outside) html += `<span class="badge" style="background:#dc3545">외</span>`;
-                if(p.meeting) html += `<span class="badge" style="background:#6610f2">회</span>`;
+                let html = `<div style="overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">`;
+                html += `<b style="color:var(--primary)">${p.owner}</b> `;
+                if(p.inside) html += `<span class="badge" style="background:var(--success)">내</span>`;
+                if(p.outside) html += `<span class="badge" style="background:var(--danger)">외</span>`;
                 html += `</div>`;
                 return { html: html };
             },
             eventClick: function(info) {
-                const p = info.event.extendedProps;
-                document.getElementById('editTaskId').value = info.event.id;
-                document.getElementById('editInfo').innerText = `${info.event.startStr} | ${p.owner}`;
-                document.getElementById('editInside').value = p.inside || '';
-                document.getElementById('editOutside').value = p.outside || '';
-                document.getElementById('editMeeting').value = p.meeting || '';
-                document.getElementById('editNote').value = p.note || '';
-                document.getElementById('editEtc').value = p.etc || '';
-                document.getElementById('editOwnerPassword').value = '';
-                document.getElementById('editModal').style.display = 'block';
+                openTaskModal('edit', null, info.event);
             }
         });
         calendar.render();
+        refreshOwners();
+    });
+
+    function openTaskModal(mode, date, event) {
+        const modal = document.getElementById('taskModal');
+        modal.style.display = 'block';
+        
+        // 필드 초기화
+        document.getElementById('taskId').value = '';
+        document.getElementById('inside').value = '';
+        document.getElementById('outside').value = '';
+        document.getElementById('meeting').value = '';
+        document.getElementById('note').value = '';
+        document.getElementById('etc').value = '';
+        document.getElementById('ownerPassInput').value = '';
+
+        if(mode === 'reg') {
+            document.getElementById('modalTitle').innerText = date + " 업무 등록";
+            document.getElementById('selectedDate').value = date;
+            document.getElementById('ownerField').style.display = 'block';
+            document.getElementById('editHeader').style.display = 'none';
+            document.getElementById('authArea').style.display = 'none';
+            document.getElementById('saveBtn').onclick = saveTask;
+        } else {
+            const p = event.extendedProps;
+            document.getElementById('modalTitle').innerText = "업무 내용 수정";
+            document.getElementById('taskId').value = event.id;
+            document.getElementById('ownerField').style.display = 'none';
+            document.getElementById('editHeader').style.display = 'block';
+            document.getElementById('displayInfo').innerText = event.startStr + " | " + p.owner;
+            document.getElementById('inside').value = p.inside;
+            document.getElementById('outside').value = p.outside;
+            document.getElementById('meeting').value = p.meeting;
+            document.getElementById('note').value = p.note;
+            document.getElementById('etc').value = p.etc;
+            document.getElementById('authArea').style.display = 'block';
+            document.getElementById('saveBtn').onclick = updateTask;
+        }
+    }
+
+    async function addOwner() {
+        const admin_pass = prompt("관리자 암호(1900)를 입력하세요:");
+        const name = document.getElementById('newOwnerName').value;
+        const owner_pass = document.getElementById('newOwnerPass').value;
+        if(!name || !owner_pass) return alert("담당자 정보와 비밀번호를 모두 입력해주세요.");
+        
+        const res = await fetch('/add_owner', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({name, owner_pass, admin_pass}) 
+        });
+        const data = await res.json();
+        if(res.ok) { refreshOwners(); alert("새로운 담당자가 등록되었습니다."); } 
+        else alert(data.message);
     }
 
     async function refreshOwners() {
@@ -180,75 +240,11 @@
         const owners = await res.json();
         const listEl = document.getElementById('ownerList');
         const selectEl = document.getElementById('ownerSelect');
-        listEl.innerHTML = ''; selectEl.innerHTML = '<option value="">담당자 선택</option>';
+        listEl.innerHTML = ''; selectEl.innerHTML = '';
         owners.forEach(name => {
-            const li = document.createElement('li'); li.className = 'owner-item'; li.innerText = name;
-            li.onclick = () => viewOwnerHistory(name); listEl.appendChild(li);
-            const opt = document.createElement('option'); opt.value = name; opt.innerText = name; selectEl.appendChild(opt);
+            let li = document.createElement('li'); li.innerText = name; listEl.appendChild(li);
+            let opt = document.createElement('option'); opt.value = name; opt.innerText = name; selectEl.appendChild(opt);
         });
-    }
-
-    async function addOwnerWithAuth() {
-        const name = document.getElementById('newOwnerInput').value;
-        const owner_pass = document.getElementById('ownerPassInput').value;
-        const admin_pass = prompt("관리자 암호를 입력하세요:");
-        if(!admin_pass) return;
-        const res = await fetch('/add_owner', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name, owner_pass, admin_pass})
-        });
-        if(res.ok) { refreshOwners(); alert("등록되었습니다."); }
-        else { const err = await res.json(); alert(err.message); }
-    }
-
-    async function viewAdvancedSchoolStats() {
-        document.getElementById('summaryModal').style.display = 'block';
-        document.getElementById('summaryTitle').innerText = `📊 학교방문요약 통합 대시보드`;
-        const res = await fetch('/get_school_stats');
-        const data = await res.json();
-        if(data.status === "empty") { document.getElementById('summaryContent').innerHTML = "학교 방문 기록이 없습니다."; return; }
-        
-        document.getElementById('summaryContent').innerHTML = `
-            <div class="stats-dashboard">
-                <div class="stats-card" style="grid-column: 1 / -1; display:flex; justify-content:space-around;">
-                    <div><div class="stats-title">총 방문</div><div class="stats-value">${data.total_visits}건</div></div>
-                    <div><div class="stats-title">방문 학교 수</div><div class="stats-value">${data.unique_schools}개교</div></div>
-                </div>
-                <div class="stats-card"><div class="stats-title">🎨 학교별 방문 점유율</div><div class="chart-container"><canvas id="schoolPieChart"></canvas></div></div>
-                <div class="stats-card"><div class="stats-title">🏆 TOP 5 방문 학교</div><div class="chart-container"><canvas id="top5BarChart"></canvas></div></div>
-                <div class="stats-card" style="grid-column: 1 / -1;"><div class="stats-title">👤 담당자별 학교 방문 현황</div><div class="chart-container"><canvas id="ownerBarChart"></canvas></div></div>
-            </div>`;
-        
-        setTimeout(() => {
-            if (pieChart) pieChart.destroy(); if (barChart) barChart.destroy(); if (ownerChart) ownerChart.destroy();
-            pieChart = new Chart(document.getElementById('schoolPieChart'), { type: 'doughnut', data: data.pie, options: { maintainAspectRatio: false } });
-            barChart = new Chart(document.getElementById('top5BarChart'), { type: 'bar', data: data.top5, options: { maintainAspectRatio: false } });
-            ownerChart = new Chart(document.getElementById('ownerBarChart'), { type: 'bar', data: data.owner, options: { maintainAspectRatio: false, indexAxis: 'y' } });
-        }, 100);
-    }
-
-    async function viewSchoolSummary() {
-        const res = await fetch('/get_tasks');
-        const tasks = await res.json();
-        const schools = tasks.filter(t => ['초','중','고','학교'].some(k => (t.extendedProps.outside||'').includes(k)));
-        let html = `<table class="summary-table"><thead><tr><th>날짜</th><th>외근업무 상세</th><th>담당자</th></tr></thead><tbody>`;
-        schools.forEach(t => { html += `<tr><td>${t.start}</td><td>${t.extendedProps.outside}</td><td>${t.extendedProps.owner}</td></tr>`; });
-        html += `</tbody></table>`;
-        document.getElementById('summaryTitle').innerText = `🏫 학교방문 요약 리스트`;
-        document.getElementById('summaryContent').innerHTML = schools.length > 0 ? html : '기록 없음';
-        document.getElementById('summaryModal').style.display = 'block';
-    }
-
-    async function viewOwnerHistory(name) {
-        const res = await fetch('/get_tasks');
-        const tasks = await res.json();
-        const filtered = tasks.filter(t => t.extendedProps.owner === name);
-        let html = `<table class="summary-table"><thead><tr><th>날짜</th><th>내근</th><th>외근</th><th>비고</th></tr></thead><tbody>`;
-        filtered.forEach(t => { const p = t.extendedProps; html += `<tr><td>${t.start}</td><td>${p.inside}</td><td>${p.outside}</td><td>${p.note}</td></tr>`; });
-        html += `</tbody></table>`;
-        document.getElementById('summaryTitle').innerText = `${name} 님의 업무 기록`;
-        document.getElementById('summaryContent').innerHTML = filtered.length > 0 ? html : '기록 없음';
-        document.getElementById('summaryModal').style.display = 'block';
     }
 
     async function saveTask() {
@@ -261,26 +257,70 @@
             note: document.getElementById('note').value,
             etc: document.getElementById('etc').value
         };
-        if(!payload.owner) return alert("담당자를 선택해 주세요.");
+        if(!payload.owner) return alert("담당자를 먼저 등록/선택해주세요.");
         const res = await fetch('/save_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
         if(res.ok) location.reload();
     }
 
     async function updateTask() {
         const payload = {
-            id: document.getElementById('editTaskId').value,
-            owner: document.getElementById('editInfo').innerText.split('|')[1].trim(),
-            inside: document.getElementById('editInside').value,
-            outside: document.getElementById('editOutside').value,
-            meeting: document.getElementById('editMeeting').value,
-            note: document.getElementById('editNote').value,
-            etc: document.getElementById('editEtc').value,
-            password: document.getElementById('editOwnerPassword').value
+            id: document.getElementById('taskId').value,
+            owner: document.getElementById('displayInfo').innerText.split('|')[1].trim(),
+            inside: document.getElementById('inside').value,
+            outside: document.getElementById('outside').value,
+            meeting: document.getElementById('meeting').value,
+            note: document.getElementById('note').value,
+            etc: document.getElementById('etc').value,
+            password: document.getElementById('ownerPassInput').value
         };
-        if(!payload.password) return alert("암호를 입력하세요.");
+        if(!payload.password) return alert("비밀번호를 입력해야 수정이 가능합니다.");
         const res = await fetch('/update_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) { alert("수정되었습니다."); location.reload(); }
-        else { const err = await res.json(); alert("에러: " + err.message); }
+        if(res.ok) { alert("수정 완료!"); location.reload(); } 
+        else { const d = await res.json(); alert(d.message); }
+    }
+
+    async function viewAdvancedStats() {
+        document.getElementById('viewModal').style.display = 'block';
+        document.getElementById('viewTitle').innerText = "📊 통합 업무 분석 결과";
+        const res = await fetch('/get_school_stats');
+        const data = await res.json();
+        if(data.status === "empty") { document.getElementById('viewContent').innerHTML = "<p>분석할 외근 학교 데이터가 아직 없습니다.</p>"; return; }
+        
+        document.getElementById('viewContent').innerHTML = `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:25px;">
+                <div style="background:linear-gradient(45deg, #4e73df, #224abe); color:white; padding:25px; border-radius:15px; text-align:center;">
+                    <small>누적 학교 방문</small><br><span style="font-size:35px; font-weight:800;">${data.total_visits}건</span>
+                </div>
+                <div style="background:linear-gradient(45deg, #1cc88a, #13855c); color:white; padding:25px; border-radius:15px; text-align:center;">
+                    <small>방문한 유니크 학교</small><br><span style="font-size:35px; font-weight:800;">${data.unique_schools}곳</span>
+                </div>
+                <div style="height:280px;"><canvas id="pieChart"></canvas></div>
+                <div style="height:280px;"><canvas id="barChart"></canvas></div>
+                <div style="grid-column:1/-1; height:250px;"><canvas id="ownerChart"></canvas></div>
+            </div>`;
+        
+        setTimeout(() => {
+            new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: data.pie, options: { maintainAspectRatio: false, plugins: { title: { display: true, text: '학교별 방문 비중' } } } });
+            new Chart(document.getElementById('barChart'), { type: 'bar', data: data.top5, options: { maintainAspectRatio: false, plugins: { title: { display: true, text: '최다 방문 학교 Top 5' } } } });
+            new Chart(document.getElementById('ownerChart'), { type: 'bar', data: data.owner, options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { title: { display: true, text: '개인별 학교 외근 성과' } } } });
+        }, 100);
+    }
+
+    async function viewSchoolList() {
+        const res = await fetch('/get_tasks');
+        const tasks = await res.json();
+        const keyword = ['초','중','고','학교'];
+        const list = tasks.filter(t => keyword.some(k => (t.extendedProps.outside||'').includes(k)));
+        
+        let table = `<table class="summary-table"><thead><tr><th width="15%">날짜</th><th width="15%">담당자</th><th>방문 학교 상세</th></tr></thead><tbody>`;
+        list.sort((a,b) => b.start.localeCompare(a.start)).forEach(t => {
+            table += `<tr><td>${t.start}</td><td>${t.extendedProps.owner}</td><td>${t.extendedProps.outside.replace(/\n/g, '<br>')}</td></tr>`;
+        });
+        table += `</tbody></table>`;
+        
+        document.getElementById('viewTitle').innerText = "🏫 학교 방문 전체 이력";
+        document.getElementById('viewContent').innerHTML = list.length > 0 ? table : '<p style="padding:40px; text-align:center;">학교 방문 기록이 없습니다.</p>';
+        document.getElementById('viewModal').style.display = 'block';
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }

@@ -1,30 +1,28 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 import os
+import re
 from datetime import datetime
-from collections import Counter
 
 app = Flask(__name__)
 
-# [설정] Render 유료 디스크 마운트 경로
+# [경로 설정] Render 환경 및 로컬 환경 호환
 STORAGE_DIR = '/mnt/data'
 if not os.path.exists(STORAGE_DIR):
     STORAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 EXCEL_FILE = os.path.join(STORAGE_DIR, 'tasks.xlsx')
 OWNER_FILE = os.path.join(STORAGE_DIR, 'owners.xlsx')
-
-# 관리자 암호 (신규 담당자 등록 시에만 필요)
-ADMIN_PASSWORD = "1900"
+ADMIN_PASSWORD = "1900" # 관리자 암호
 
 def init_files():
-    """서버 시작 시 파일이 없으면 자동 생성"""
+    """파일 초기화: 필요한 컬럼이 모두 포함된 상태로 생성"""
     if not os.path.exists(EXCEL_FILE):
         df = pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '면접', '비고', '기타'])
-        df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+        df.to_excel(EXCEL_FILE, index=False)
     if not os.path.exists(OWNER_FILE):
         df = pd.DataFrame(columns=['이름', '암호'])
-        df.to_excel(OWNER_FILE, index=False, engine='openpyxl')
+        df.to_excel(OWNER_FILE, index=False)
 
 @app.route('/')
 def index():
@@ -32,50 +30,39 @@ def index():
 
 @app.route('/get_owners')
 def get_owners():
-    if not os.path.exists(OWNER_FILE): init_files()
     try:
-        df = pd.read_excel(OWNER_FILE, engine='openpyxl').fillna('')
+        df = pd.read_excel(OWNER_FILE).fillna('')
         return jsonify(df['이름'].tolist())
     except: return jsonify([])
 
 @app.route('/add_owner', methods=['POST'])
 def add_owner():
     data = request.json
-    name = data.get('name')
-    owner_pass = data.get('owner_pass') 
-    admin_pass = data.get('admin_pass') 
-    
-    if admin_pass != ADMIN_PASSWORD:
-        return jsonify({"status": "error", "message": "관리자 암호가 틀렸습니다."}), 403
-    
-    if not name or not owner_pass:
-        return jsonify({"status": "error", "message": "이름과 암호를 모두 입력하세요."})
-    
+    if data.get('admin_pass') != ADMIN_PASSWORD:
+        return jsonify({"status": "error", "message": "관리자 암호 불일치"}), 403
     try:
-        df = pd.read_excel(OWNER_FILE, engine='openpyxl')
-        if name in df['이름'].values:
-            return jsonify({"status": "error", "message": "이미 등록된 담당자입니다."})
-            
-        new_row = pd.DataFrame([{'이름': name, '암호': str(owner_pass)}])
+        df = pd.read_excel(OWNER_FILE)
+        if data['name'] in df['이름'].values:
+            return jsonify({"status": "error", "message": "이미 존재하는 이름입니다."})
+        new_row = pd.DataFrame([{'이름': data['name'], '암호': str(data['owner_pass'])}])
         df = pd.concat([df, new_row], ignore_index=True)
-        df.to_excel(OWNER_FILE, index=False, engine='openpyxl')
+        df.to_excel(OWNER_FILE, index=False)
         return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/get_tasks')
 def get_tasks():
-    if not os.path.exists(EXCEL_FILE): init_files()
     try:
-        df = pd.read_excel(EXCEL_FILE, engine='openpyxl').fillna('')
+        if not os.path.exists(EXCEL_FILE): return jsonify([])
+        df = pd.read_excel(EXCEL_FILE).fillna('')
         tasks = []
-        for index, row in df.iterrows():
+        for idx, row in df.iterrows():
             tasks.append({
-                "id": str(index), 
+                "id": str(idx),
                 "start": str(row['날짜']),
                 "extendedProps": {
                     "owner": row['담당자'], "inside": row['내근업무'], "outside": row['외근업무'],
-                    "meeting": row['회의'], "interview": row['면접'], "note": row['비고'], "etc": row['기타']
+                    "meeting": row['회의'], "note": row['비고'], "etc": row.get('기타', '')
                 }
             })
         return jsonify(tasks)
@@ -83,125 +70,86 @@ def get_tasks():
 
 @app.route('/get_school_stats')
 def get_school_stats():
-    """학교 방문 빈도 및 담당자별 방문 통계 데이터 생성"""
-    if not os.path.exists(EXCEL_FILE): return jsonify({})
+    """외근 업무에서 여러 학교를 줄바꿈/쉼표로 카운트하는 핵심 로직"""
+    if not os.path.exists(EXCEL_FILE): return jsonify({"status":"empty"})
     try:
-        df = pd.read_excel(EXCEL_FILE, engine='openpyxl').fillna('')
+        df = pd.read_excel(EXCEL_FILE).fillna('')
         school_keywords = ['초', '중', '고', '학교']
-        
-        # 학교 언급이 있는 데이터만 필터링
-        school_tasks = df[df['외근업무'].apply(lambda x: any(k in str(x) for k in school_keywords))]
-        
-        if school_tasks.empty: return jsonify({"status":"empty"})
+        all_schools = []
+        owner_visit_counts = {}
 
-        def extract_school(text):
-            text = str(text)
-            for k in school_keywords:
-                if k in text:
-                    idx = text.find(k)
-                    pre_text = text[:idx].strip().split()
-                    if pre_text: return pre_text[-1] + k
-            return "기타"
-
-        school_tasks = school_tasks.copy()
-        school_tasks['학교명'] = school_tasks['외근업무'].apply(extract_school)
+        for _, row in df.iterrows():
+            outside_text = str(row['외근업무'])
+            owner = str(row['담당자'])
+            # 줄바꿈(\n) 또는 쉼표(,)로 분리
+            entries = re.split(r'[\n,]', outside_text)
+            for entry in entries:
+                entry = entry.strip()
+                if not entry: continue
+                # 학교 키워드 추출
+                found = False
+                for k in school_keywords:
+                    if k in entry:
+                        idx = entry.find(k)
+                        words = entry[:idx+len(k)].split()
+                        if words:
+                            school_name = words[-1]
+                            all_schools.append(school_name)
+                            owner_visit_counts[owner] = owner_visit_counts.get(owner, 0) + 1
+                            found = True
+                            break
         
-        # 1. 학교별 방문 횟수 (도넛 차트용)
-        school_counts = school_tasks['학교명'].value_counts()
-        pie_data = {
-            "labels": school_counts.index.tolist(),
-            "datasets": [{
-                "data": school_counts.values.tolist(),
-                "backgroundColor": ['#ff9f43', '#0abde3', '#ee5253', '#10ac84', '#5f27cd', '#c8d6e5', '#576574']
-            }]
-        }
-
-        # 2. TOP 5 학교 (바 차트용)
-        top5 = school_counts.head(5)
-        top5_data = {
-            "labels": top5.index.tolist(),
-            "datasets": [{
-                "label": "방문 횟수",
-                "data": top5.values.tolist(),
-                "backgroundColor": '#1dd1a1'
-            }]
-        }
+        if not all_schools: return jsonify({"status":"empty"})
         
-        # 3. [추가] 담당자별 학교 방문 횟수
-        owner_counts = school_tasks['담당자'].value_counts()
-        owner_data = {
-            "labels": owner_counts.index.tolist(),
-            "datasets": [{
-                "label": "방문 건수",
-                "data": owner_counts.values.tolist(),
-                "backgroundColor": '#48dbfb'
-            }]
-        }
-        
+        school_series = pd.Series(all_schools).value_counts()
         return jsonify({
-            "pie": pie_data, 
-            "top5": top5_data, 
-            "owner": owner_data,
-            "total_visits": int(school_counts.sum()),
-            "unique_schools": int(len(school_counts))
+            "pie": {"labels": school_series.index.tolist(), "datasets": [{"data": school_series.values.tolist(), "backgroundColor": ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69']}]},
+            "top5": {"labels": school_series.head(5).index.tolist(), "datasets": [{"label": "방문횟수", "data": school_series.head(5).values.tolist(), "backgroundColor": '#4e73df'}]},
+            "owner": {"labels": list(owner_visit_counts.keys()), "datasets": [{"label": "개인별 방문 합계", "data": list(owner_visit_counts.values()), "backgroundColor": '#f6c23e'}]},
+            "total_visits": len(all_schools),
+            "unique_schools": len(school_series)
         })
-    except Exception as e:
-        return jsonify({"status":"error", "message": str(e)})
+    except Exception as e: return jsonify({"status":"error", "message": str(e)})
 
 @app.route('/save_task', methods=['POST'])
 def save_task():
     data = request.json
-    if not os.path.exists(EXCEL_FILE): init_files()
     try:
-        df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
-        date_obj = datetime.strptime(data['date'], '%Y-%m-%d')
-        new_row = {
-            '연도': date_obj.year, '날짜': data['date'], '담당자': data['owner'],
+        df = pd.read_excel(EXCEL_FILE)
+        new_row = pd.DataFrame([{
+            '연도': data['date'][:4], '날짜': data['date'], '담당자': data['owner'],
             '내근업무': data['inside'], '외근업무': data['outside'],
-            '회의': data['meeting'], '면접': data.get('interview', ''),
-            '비고': data['note'], '기타': data.get('etc', '')
-        }
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-        df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+            '회의': data['meeting'], '비고': data['note'], '기타': data.get('etc', '')
+        }])
+        df = pd.concat([df, new_row], ignore_index=True)
+        df.to_excel(EXCEL_FILE, index=False)
         return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/update_task', methods=['POST'])
 def update_task():
     data = request.json
-    task_id = int(data.get('id'))
-    owner = data.get('owner')
-    password = data.get('password')
-    
     try:
-        owners_df = pd.read_excel(OWNER_FILE, engine='openpyxl')
-        owner_data = owners_df[owners_df['이름'] == owner]
-        
-        if owner_data.empty or str(owner_data.iloc[0]['암호']) != str(password):
-            return jsonify({"status": "error", "message": "담당자 암호가 일치하지 않습니다."}), 403
+        owners_df = pd.read_excel(OWNER_FILE)
+        target_owner = owners_df[owners_df['이름'] == data['owner']]
+        if target_owner.empty or str(target_owner.iloc[0]['암호']) != str(data['password']):
+            return jsonify({"status": "error", "message": "본인 인증 암호가 일치하지 않습니다."}), 403
             
-        tasks_df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
-        tasks_df = tasks_df.astype(object) # 오류 방지 핵심 로직
-        
-        tasks_df.at[task_id, '내근업무'] = data.get('inside', '')
-        tasks_df.at[task_id, '외근업무'] = data.get('outside', '')
-        tasks_df.at[task_id, '회의'] = data.get('meeting', '')
-        tasks_df.at[task_id, '면접'] = data.get('interview', '')
-        tasks_df.at[task_id, '비고'] = data.get('note', '')
-        tasks_df.at[task_id, '기타'] = data.get('etc', '')
-        
-        tasks_df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+        df = pd.read_excel(EXCEL_FILE).astype(object)
+        idx = int(data['id'])
+        df.at[idx, '내근업무'] = data['inside']
+        df.at[idx, '외근업무'] = data['outside']
+        df.at[idx, '회의'] = data['meeting']
+        df.at[idx, '비고'] = data['note']
+        df.at[idx, '기타'] = data['etc']
+        df.to_excel(EXCEL_FILE, index=False)
         return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/download')
-def download_file():
-    if os.path.exists(EXCEL_FILE): return send_file(EXCEL_FILE, as_attachment=True)
-    return "파일 없음", 404
+def download():
+    return send_file(EXCEL_FILE, as_attachment=True)
 
 if __name__ == '__main__':
     init_files()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
