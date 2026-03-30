@@ -5,25 +5,19 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# [해결] Render 환경에서 파일 경로를 확실하게 잡기 위해 절대경로 사용
+# [경로 설정] Render 환경 및 로컬 환경 호환을 위한 절대경로 설정
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_FILE = os.path.join(BASE_DIR, 'tasks.xlsx')
 OWNER_FILE = os.path.join(BASE_DIR, 'owners.xlsx')
 
 def init_files():
-    """서버 시작 시 또는 파일이 없을 때 엑셀 파일을 자동 생성"""
-    try:
-        if not os.path.exists(EXCEL_FILE):
-            df = pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '면접', '비고', '기타'])
-            df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
-            print(f"✅ 업무 저장 파일 생성 완료: {EXCEL_FILE}")
-            
-        if not os.path.exists(OWNER_FILE):
-            df = pd.DataFrame(columns=['이름'])
-            df.to_excel(OWNER_FILE, index=False, engine='openpyxl')
-            print(f"✅ 담당자 명단 파일 생성 완료: {OWNER_FILE}")
-    except Exception as e:
-        print(f"❌ 파일 초기화 에러: {e}")
+    """서버 시작 시 파일이 없으면 자동 생성"""
+    if not os.path.exists(EXCEL_FILE):
+        df = pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '면접', '비고', '기타'])
+        df.to_excel(EXCEL_FILE, index=False, engine='openpyxl')
+    if not os.path.exists(OWNER_FILE):
+        df = pd.DataFrame(columns=['이름'])
+        df.to_excel(OWNER_FILE, index=False, engine='openpyxl')
 
 @app.route('/')
 def index():
@@ -43,9 +37,7 @@ def get_owners():
 def add_owner():
     name = request.json.get('name')
     if not name: return jsonify({"status": "error", "message": "이름 누락"})
-    
     if not os.path.exists(OWNER_FILE): init_files()
-    
     try:
         df = pd.read_excel(OWNER_FILE, engine='openpyxl')
         if name not in df['이름'].values:
@@ -79,7 +71,6 @@ def get_tasks():
 def save_task():
     data = request.json
     if not os.path.exists(EXCEL_FILE): init_files()
-    
     try:
         df = pd.read_excel(EXCEL_FILE, engine='openpyxl')
         date_obj = datetime.strptime(data['date'], '%Y-%m-%d')
@@ -99,7 +90,7 @@ def save_task():
 def download_file():
     if os.path.exists(EXCEL_FILE):
         return send_file(EXCEL_FILE, as_attachment=True)
-    return "파일이 없습니다.", 404
+    return "파일 없음", 404
 
 if __name__ == '__main__':
     init_files()
