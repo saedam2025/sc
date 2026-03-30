@@ -11,6 +11,18 @@
         #calendar { margin-top: 20px; }
         .header-box { display: flex; justify-content: space-between; align-items: center; }
         .btn-download { padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        
+        /* 커스텀 모달 스타일 */
+        #inputModal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 10% auto; padding: 20px; width: 400px; border-radius: 10px; }
+        .modal-content input, .modal-content textarea { width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+        .modal-content textarea { height: 100px; resize: vertical; }
+        .btn-group { text-align: right; }
+        .btn-save { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-cancel { background: #6c757d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        
+        /* 달력 내 줄바꿈 허용 */
+        .fc-event-title { white-space: pre-wrap !important; font-size: 0.85em; }
     </style>
 </head>
 <body>
@@ -22,52 +34,95 @@
         <div id='calendar'></div>
     </div>
 
+    <div id="inputModal">
+        <div class="modal-content">
+            <h3>업무 등록</h3>
+            <input type="hidden" id="selectedDate">
+            <label>담당자</label>
+            <input type="text" id="owner" placeholder="성함 입력">
+            <label>구분</label>
+            <input type="text" id="category" placeholder="예: 행정, 교육">
+            <label>업무내용 (Enter로 줄바꿈 가능)</label>
+            <textarea id="title" placeholder="상세 업무 내용을 입력하세요"></textarea>
+            <label>비고</label>
+            <input type="text" id="note">
+            <label>기타</label>
+            <input type="text" id="etc">
+            <div class="btn-group">
+                <button class="btn-cancel" onclick="closeModal()">취소</button>
+                <button class="btn-save" onclick="saveData()">저장하기</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        var calendar;
+
         document.addEventListener('DOMContentLoaded', function() {
             var calendarEl = document.getElementById('calendar');
-            var calendar = new FullCalendar.Calendar(calendarEl, {
+            calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 locale: 'ko',
                 events: '/get_tasks',
-                dateClick: async function(info) {
-                    let owner = prompt("담당자 성함을 입력하세요:");
-                    if(!owner) return;
-                    let title = prompt("업무내용을 입력하세요:");
-                    let category = prompt("구분 (예: 교육, 행정, 기타):");
-                    let note = prompt("비고:");
-                    let etc = prompt("기타사항:");
-
-                    try {
-                        const response = await fetch('/save_task', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                date: info.dateStr,
-                                owner: owner,
-                                title: title,
-                                category: category,
-                                note: note,
-                                etc: etc
-                            })
-                        });
-
-                        if (response.ok) {
-                            calendar.refetchEvents();
-                            alert("엑셀 디스크에 저장되었습니다.");
-                        } else {
-                            alert("저장 실패! 서버 로그를 확인하세요.");
-                        }
-                    } catch (e) {
-                        alert("네트워크 오류가 발생했습니다.");
-                    }
+                dateClick: function(info) {
+                    document.getElementById('selectedDate').value = info.dateStr;
+                    document.getElementById('inputModal').style.display = 'block';
                 },
                 eventClick: function(info) {
                     let p = info.event.extendedProps;
-                    alert(`[상세 업무 보고]\n\n날짜: ${info.event.startStr}\n담당자: ${p.owner}\n구분: ${p.category}\n내용: ${info.event.title}\n비고: ${p.note}\n기타: ${p.etc}`);
+                    alert(`[상세 업무 보고]\n\n날짜: ${info.event.startStr}\n담당자: ${p.owner}\n구분: ${p.category}\n내용:\n${info.event.title.replace(/^\[.*?\] /, '')}\n\n비고: ${p.note}\n기타: ${p.etc}`);
                 }
             });
             calendar.render();
         });
+
+        function closeModal() {
+            document.getElementById('inputModal').style.display = 'none';
+            // 입력필드 초기화
+            document.getElementById('owner').value = '';
+            document.getElementById('title').value = '';
+            document.getElementById('category').value = '';
+            document.getElementById('note').value = '';
+            document.getElementById('etc').value = '';
+        }
+
+        async function saveData() {
+            const date = document.getElementById('selectedDate').value;
+            const owner = document.getElementById('owner').value;
+            const title = document.getElementById('title').value;
+            const category = document.getElementById('category').value;
+            const note = document.getElementById('note').value;
+            const etc = document.getElementById('etc').value;
+
+            if(!owner || !title) {
+                alert("담당자와 업무내용은 필수입니다.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/save_task', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        date: date,
+                        owner: owner,
+                        title: title,
+                        category: category,
+                        note: note,
+                        etc: etc
+                    })
+                });
+
+                if (response.ok) {
+                    calendar.refetchEvents();
+                    closeModal();
+                } else {
+                    alert("저장 실패!");
+                }
+            } catch (e) {
+                alert("에러 발생!");
+            }
+        }
     </script>
 </body>
 </html>
