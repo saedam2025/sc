@@ -140,7 +140,7 @@
         "01-01": "신정", 
         "03-01": "삼일절", "03-02": "대체공휴일", 
         "05-05": "어린이날", "05-24": "부처님오신날", "05-25": "대체공휴일", 
-        "06-06": "현충일", 
+        "06-03": "지방선거일", "06-06": "현충일", 
         "08-15": "광복절", "08-17": "대체공휴일", 
         "09-24": "추석", "09-25": "추석", "09-26": "추석", "09-28": "대체공휴일",
         "10-03": "개천절", "10-05": "대체공휴일", "10-09": "한글날", 
@@ -232,7 +232,7 @@
     }
 
     async function addOwner() {
-        const admin_pass = prompt("관리자 암호(1900)를 입력하세요:");
+        const admin_pass = prompt("관리자 암호를 입력하세요:");
         const name = document.getElementById('newOwnerName').value;
         const owner_pass = document.getElementById('newOwnerPass').value;
         if(!name || !owner_pass) return alert("담당자 정보와 비밀번호를 모두 입력해주세요.");
