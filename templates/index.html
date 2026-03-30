@@ -27,7 +27,7 @@
         /* [중요] 사각형 높이 고정 로직 */
         .fc-daygrid-day-frame { height: 130px !important; overflow: hidden !important; } 
         .fc-daygrid-day-events { max-height: 90px !important; overflow-y: auto !important; }
-        .fc-daygrid-event { margin-top: 2px !important; padding: 2px 5px !important; border-radius: 4px !important; }
+        .fc-daygrid-event { margin-top: 2px !important; padding: 2px 5px !important; border-radius: 4px !important; border: none !important; }
 
         /* 버튼 공통 */
         .btn { border-radius: 8px; border: none; padding: 12px; font-weight: 700; width: 100%; cursor: pointer; margin-bottom: 10px; transition: all 0.2s ease; font-size: 0.9rem; }
@@ -120,7 +120,7 @@
 
         <div style="margin-top:30px; display:flex; gap:10px; justify-content: flex-end;">
             <button class="btn" style="width:100px; background:#eee;" onclick="closeModal('taskModal')">취소</button>
-            <button id="saveBtn" class="btn btn-primary" style="width:150px;" onclick="saveTask()">데이터 저장</button>
+            <button id="saveBtn" class="btn btn-primary" style="width:150px;">데이터 저장</button>
         </div>
     </div>
 </div>
@@ -135,12 +135,16 @@
 
 <script>
     var calendar;
-    // 2026년 공휴일 데이터 완벽 교정
+    // [교정 완료] 2026년 공휴일 데이터 - 실제 달력 기준
     const holidays = {
-        "01-01": "신정", "03-01": "삼일절", "03-02": "대체공휴일", "05-05": "어린이날", 
-        "05-24": "부처님오신날", "05-25": "대체공휴일", "06-06": "현충일", "08-15": "광복절", 
-        "08-17": "대체공휴일", "09-24": "추석", "09-25": "추석", "09-26": "추석", 
-        "10-03": "개천절", "10-05": "대체공휴일", "10-09": "한글날", "12-25": "성탄절"
+        "01-01": "신정", 
+        "03-01": "삼일절", "03-02": "대체공휴일", 
+        "05-05": "어린이날", "05-24": "부처님오신날", "05-25": "대체공휴일", 
+        "06-06": "현충일", 
+        "08-15": "광복절", "08-17": "대체공휴일", 
+        "09-24": "추석", "09-25": "추석", "09-26": "추석", "09-28": "대체공휴일",
+        "10-03": "개천절", "10-05": "대체공휴일", "10-09": "한글날", 
+        "12-25": "성탄절"
     };
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -150,7 +154,7 @@
             locale: 'ko',
             height: 800,
             expandRows: true,
-            dayMaxEvents: 3, // 3개 넘으면 +more 표시
+            dayMaxEvents: 3, 
             events: '/get_tasks',
             headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
             dateClick: function(info) {
@@ -201,6 +205,7 @@
             document.getElementById('ownerField').style.display = 'block';
             document.getElementById('editHeader').style.display = 'none';
             document.getElementById('authArea').style.display = 'none';
+            document.getElementById('saveBtn').innerText = "데이터 저장";
             document.getElementById('saveBtn').onclick = saveTask;
         } else {
             const p = event.extendedProps;
@@ -215,6 +220,7 @@
             document.getElementById('note').value = p.note;
             document.getElementById('etc').value = p.etc;
             document.getElementById('authArea').style.display = 'block';
+            document.getElementById('saveBtn').innerText = "수정 완료";
             document.getElementById('saveBtn').onclick = updateTask;
         }
     }
@@ -231,8 +237,12 @@
             body: JSON.stringify({name, owner_pass, admin_pass}) 
         });
         const data = await res.json();
-        if(res.ok) { refreshOwners(); alert("새로운 담당자가 등록되었습니다."); } 
-        else alert(data.message);
+        if(res.ok) { 
+            refreshOwners(); 
+            alert("새로운 담당자가 등록되었습니다."); 
+            document.getElementById('newOwnerName').value = '';
+            document.getElementById('newOwnerPass').value = '';
+        } else alert(data.message);
     }
 
     async function refreshOwners() {
@@ -259,7 +269,11 @@
         };
         if(!payload.owner) return alert("담당자를 먼저 등록/선택해주세요.");
         const res = await fetch('/save_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) location.reload();
+        if(res.ok) {
+            closeModal('taskModal');
+            calendar.refetchEvents();
+            location.reload();
+        }
     }
 
     async function updateTask() {
@@ -275,7 +289,12 @@
         };
         if(!payload.password) return alert("비밀번호를 입력해야 수정이 가능합니다.");
         const res = await fetch('/update_task', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
-        if(res.ok) { alert("수정 완료!"); location.reload(); } 
+        if(res.ok) { 
+            alert("수정 완료!"); 
+            closeModal('taskModal');
+            calendar.refetchEvents();
+            location.reload(); 
+        } 
         else { const d = await res.json(); alert(d.message); }
     }
 
@@ -284,7 +303,7 @@
         document.getElementById('viewTitle').innerText = "📊 통합 업무 분석 결과";
         const res = await fetch('/get_school_stats');
         const data = await res.json();
-        if(data.status === "empty") { document.getElementById('viewContent').innerHTML = "<p>분석할 외근 학교 데이터가 아직 없습니다.</p>"; return; }
+        if(data.status === "empty") { document.getElementById('viewContent').innerHTML = "<p style='text-align:center; padding:50px;'>분석할 외근 학교 데이터가 아직 없습니다.</p>"; return; }
         
         document.getElementById('viewContent').innerHTML = `
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:25px;">
@@ -314,7 +333,8 @@
         
         let table = `<table class="summary-table"><thead><tr><th width="15%">날짜</th><th width="15%">담당자</th><th>방문 학교 상세</th></tr></thead><tbody>`;
         list.sort((a,b) => b.start.localeCompare(a.start)).forEach(t => {
-            table += `<tr><td>${t.start}</td><td>${t.extendedProps.owner}</td><td>${t.extendedProps.outside.replace(/\n/g, '<br>')}</td></tr>`;
+            const outsideStr = (t.extendedProps.outside || '').replace(/\n/g, '<br>');
+            table += `<tr><td>${t.start}</td><td>${t.extendedProps.owner}</td><td>${outsideStr}</td></tr>`;
         });
         table += `</tbody></table>`;
         
@@ -324,6 +344,13 @@
     }
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // 배경 클릭 시 모달 닫기
+    window.onclick = function(event) {
+        if (event.target.className === 'modal') {
+            event.target.style.display = 'none';
+        }
+    }
 </script>
 </body>
 </html>

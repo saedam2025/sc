@@ -6,7 +6,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# [경로 설정] Render 환경 및 로컬 환경 호환
+# [경로 설정] Render 및 로컬 환경 대응
 STORAGE_DIR = '/mnt/data'
 if not os.path.exists(STORAGE_DIR):
     STORAGE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,9 +16,9 @@ OWNER_FILE = os.path.join(STORAGE_DIR, 'owners.xlsx')
 ADMIN_PASSWORD = "1900" # 관리자 암호
 
 def init_files():
-    """파일 초기화: 필요한 컬럼이 모두 포함된 상태로 생성"""
+    """엑셀 파일 초기 생성 및 컬럼 구성"""
     if not os.path.exists(EXCEL_FILE):
-        df = pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '면접', '비고', '기타'])
+        df = pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '비고', '기타'])
         df.to_excel(EXCEL_FILE, index=False)
     if not os.path.exists(OWNER_FILE):
         df = pd.DataFrame(columns=['이름', '암호'])
@@ -43,7 +43,7 @@ def add_owner():
     try:
         df = pd.read_excel(OWNER_FILE)
         if data['name'] in df['이름'].values:
-            return jsonify({"status": "error", "message": "이미 존재하는 이름입니다."})
+            return jsonify({"status": "error", "message": "이미 등록된 사용자입니다."})
         new_row = pd.DataFrame([{'이름': data['name'], '암호': str(data['owner_pass'])}])
         df = pd.concat([df, new_row], ignore_index=True)
         df.to_excel(OWNER_FILE, index=False)
@@ -68,49 +68,6 @@ def get_tasks():
         return jsonify(tasks)
     except: return jsonify([])
 
-@app.route('/get_school_stats')
-def get_school_stats():
-    """외근 업무에서 여러 학교를 줄바꿈/쉼표로 카운트하는 핵심 로직"""
-    if not os.path.exists(EXCEL_FILE): return jsonify({"status":"empty"})
-    try:
-        df = pd.read_excel(EXCEL_FILE).fillna('')
-        school_keywords = ['초', '중', '고', '학교']
-        all_schools = []
-        owner_visit_counts = {}
-
-        for _, row in df.iterrows():
-            outside_text = str(row['외근업무'])
-            owner = str(row['담당자'])
-            # 줄바꿈(\n) 또는 쉼표(,)로 분리
-            entries = re.split(r'[\n,]', outside_text)
-            for entry in entries:
-                entry = entry.strip()
-                if not entry: continue
-                # 학교 키워드 추출
-                found = False
-                for k in school_keywords:
-                    if k in entry:
-                        idx = entry.find(k)
-                        words = entry[:idx+len(k)].split()
-                        if words:
-                            school_name = words[-1]
-                            all_schools.append(school_name)
-                            owner_visit_counts[owner] = owner_visit_counts.get(owner, 0) + 1
-                            found = True
-                            break
-        
-        if not all_schools: return jsonify({"status":"empty"})
-        
-        school_series = pd.Series(all_schools).value_counts()
-        return jsonify({
-            "pie": {"labels": school_series.index.tolist(), "datasets": [{"data": school_series.values.tolist(), "backgroundColor": ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#858796', '#5a5c69']}]},
-            "top5": {"labels": school_series.head(5).index.tolist(), "datasets": [{"label": "방문횟수", "data": school_series.head(5).values.tolist(), "backgroundColor": '#4e73df'}]},
-            "owner": {"labels": list(owner_visit_counts.keys()), "datasets": [{"label": "개인별 방문 합계", "data": list(owner_visit_counts.values()), "backgroundColor": '#f6c23e'}]},
-            "total_visits": len(all_schools),
-            "unique_schools": len(school_series)
-        })
-    except Exception as e: return jsonify({"status":"error", "message": str(e)})
-
 @app.route('/save_task', methods=['POST'])
 def save_task():
     data = request.json
@@ -130,21 +87,46 @@ def save_task():
 def update_task():
     data = request.json
     try:
-        owners_df = pd.read_excel(OWNER_FILE)
+        owners_df = pd.read_excel(OWNER_FILE).fillna('')
         target_owner = owners_df[owners_df['이름'] == data['owner']]
         if target_owner.empty or str(target_owner.iloc[0]['암호']) != str(data['password']):
-            return jsonify({"status": "error", "message": "본인 인증 암호가 일치하지 않습니다."}), 403
+            return jsonify({"status": "error", "message": "비밀번호가 일치하지 않습니다."}), 403
             
-        df = pd.read_excel(EXCEL_FILE).astype(object)
+        # [수정] dtype='object'를 사용하여 float64 변환 오류 방지
+        df = pd.read_excel(EXCEL_FILE).astype(object).fillna('')
         idx = int(data['id'])
         df.at[idx, '내근업무'] = data['inside']
         df.at[idx, '외근업무'] = data['outside']
         df.at[idx, '회의'] = data['meeting']
         df.at[idx, '비고'] = data['note']
-        df.at[idx, '기타'] = data['etc']
+        df.at[idx, '기타'] = data.get('etc', '')
         df.to_excel(EXCEL_FILE, index=False)
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/get_school_stats')
+def get_school_stats():
+    """학교 방문 데이터 분석 로직 (줄바꿈/쉼표 구분 대응)"""
+    try:
+        df = pd.read_excel(EXCEL_FILE).fillna('')
+        school_keywords = ['초', '중', '고', '학교']
+        all_schools = []
+        for _, row in df.iterrows():
+            entries = re.split(r'[\n,]', str(row['외근업무']))
+            for entry in entries:
+                entry = entry.strip()
+                for k in school_keywords:
+                    if k in entry:
+                        all_schools.append(entry.split()[-1]) # 마지막 단어 추출
+                        break
+        
+        if not all_schools: return jsonify({"status":"empty"})
+        counts = pd.Series(all_schools).value_counts()
+        return jsonify({
+            "top5": {"labels": counts.head(5).index.tolist(), "datasets": [{"label": "방문수", "data": counts.head(5).values.tolist(), "backgroundColor": '#4e73df'}]},
+            "total": len(all_schools)
+        })
+    except: return jsonify({"status":"empty"})
 
 @app.route('/download')
 def download():
