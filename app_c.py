@@ -24,7 +24,6 @@ def init_files():
             pd.DataFrame(columns=['연도', '날짜', '담당자', '내근업무', '외근업무', '회의', '비고', '기타']).to_excel(EXCEL_FILE, index=False, engine='openpyxl')
         
         if not os.path.exists(OWNER_FILE):
-            # '직책' 컬럼 추가 (이사, 대표이사 등)
             pd.DataFrame(columns=['이름', '암호', '직책']).to_excel(OWNER_FILE, index=False, engine='openpyxl')
 
         if not os.path.exists(ATTEND_FILE):
@@ -52,17 +51,24 @@ def add_owner():
         return jsonify({"status": "error", "message": "관리자 암호 불일치"}), 403
     try:
         df = pd.read_excel(OWNER_FILE, engine='openpyxl')
-        if data['name'] in df['이름'].values:
-            return jsonify({"status": "error", "message": "이미 등록된 사용자입니다."})
         
-        new_row = pd.DataFrame([{
-            '이름': data['name'], 
-            '암호': str(data['owner_pass']),
-            '직책': data.get('position', '담당자')
-        }])
-        df = pd.concat([df, new_row], ignore_index=True)
+        # [핵심] 이미 등록된 이름이 있으면 정보를 업데이트(대표이사 등 직책 변경 가능)
+        if data['name'] in df['이름'].values:
+            idx = df[df['이름'] == data['name']].index[0]
+            df.at[idx, '직책'] = data.get('position', '담당자')
+            df.at[idx, '암호'] = str(data['owner_pass'])
+            msg = "사용자 정보가 성공적으로 수정되었습니다."
+        else:
+            new_row = pd.DataFrame([{
+                '이름': data['name'], 
+                '암호': str(data['owner_pass']),
+                '직책': data.get('position', '담당자')
+            }])
+            df = pd.concat([df, new_row], ignore_index=True)
+            msg = "신규 인원이 등록되었습니다."
+            
         df.to_excel(OWNER_FILE, index=False, engine='openpyxl')
-        return jsonify({"status": "success"})
+        return jsonify({"status": "success", "message": msg})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/get_tasks')
@@ -151,7 +157,6 @@ def get_attendance():
     try:
         df = pd.read_excel(ATTEND_FILE, engine='openpyxl').fillna('')
         data = df.to_dict(orient='records')
-        # 리스트에 인덱스 번호를 추가하여 승인 시 참조 가능케 함
         for i, item in enumerate(data): item['idx'] = i
         return jsonify(data)
     except: return jsonify([])
@@ -165,7 +170,7 @@ def approve_attendance():
         admin = owners_df[(owners_df['이름'] == data['admin_name']) & (owners_df['암호'].astype(str) == str(data['admin_password']))]
         
         if admin.empty or admin.iloc[0]['직책'] not in ['이사', '대표이사']:
-            return jsonify({"status": "error", "message": "승인 권한이 없습니다."}), 403
+            return jsonify({"status": "error", "message": "승인 권한이 없습니다 (이사 이상 가능)."}), 403
 
         df = pd.read_excel(ATTEND_FILE, engine='openpyxl')
         idx = int(data['idx'])
@@ -173,30 +178,6 @@ def approve_attendance():
         df.to_excel(ATTEND_FILE, index=False, engine='openpyxl')
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/get_school_stats')
-def get_school_stats():
-    init_files()
-    try:
-        df = pd.read_excel(EXCEL_FILE, engine='openpyxl').fillna('')
-        school_keywords = ['초', '중', '고', '학교']
-        all_schools = []
-        for _, row in df.iterrows():
-            entries = re.split(r'[\n,]', str(row['외근업무']))
-            for entry in entries:
-                entry = entry.strip()
-                if not entry: continue
-                for k in school_keywords:
-                    if k in entry:
-                        all_schools.append(entry.split()[-1])
-                        break
-        if not all_schools: return jsonify({"status":"empty"})
-        counts = pd.Series(all_schools).value_counts()
-        return jsonify({
-            "top5": {"labels": counts.head(5).index.tolist(), "datasets": [{"label": "방문수", "data": counts.head(5).values.tolist(), "backgroundColor": '#4e73df'}]},
-            "total": len(all_schools)
-        })
-    except: return jsonify({"status":"empty"})
 
 @app.route('/download')
 def download():
