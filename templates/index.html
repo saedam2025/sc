@@ -2,41 +2,48 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>업무보고 달력 시스템</title>
+    <title>업무보고 시스템</title>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
     <style>
-        body { font-family: 'Pretendard', 'Malgun Gothic', sans-serif; padding: 20px; background-color: #f4f7f9; color: #333; }
-        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
-        .btn-download { padding: 12px 25px; background: #28a745; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
-        .btn-download:hover { background: #218838; }
+        body { font-family: 'Pretendard', sans-serif; padding: 20px; background-color: #f4f7f9; }
+        .container { max-width: 1100px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .btn-download { padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; }
 
-        /* 달력 스타일 커스텀 */
-        #calendar { background: #fff; }
-        .fc-event { border: none !important; padding: 2px 5px; margin-bottom: 2px; border-radius: 4px !important; cursor: pointer; }
-        .fc-event-title { white-space: pre-wrap !important; font-size: 0.82em; line-height: 1.4; }
-        .fc-daygrid-event { background-color: #e7f3ff !important; color: #007bff !important; border-left: 4px solid #007bff !important; }
-
-        /* 공통 모달(입력/상세) 스타일 */
-        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
-        .modal-content { background: white; margin: 7% auto; padding: 25px; width: 450px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; }
-        .modal-header { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.2em; font-weight: bold; color: #007bff; }
+        /* --- [아이콘/배지 스타일] --- */
+        .fc-event { background: transparent !important; border: none !important; cursor: pointer; }
+        .event-container { display: flex; align-items: center; gap: 4px; padding: 2px; }
+        .owner-name { font-weight: bold; font-size: 12px; color: #333; margin-right: 4px; }
         
-        /* 입력창 스타일 */
-        label { display: block; font-size: 0.9em; margin-bottom: 5px; font-weight: bold; color: #666; }
-        input, textarea { width: 100%; margin-bottom: 15px; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
-        textarea { height: 120px; resize: vertical; line-height: 1.5; }
-        
-        /* 상세보기 팝업 스타일 */
-        .detail-row { display: flex; margin-bottom: 12px; border-bottom: 1px dashed #f0f0f0; padding-bottom: 8px; }
-        .detail-label { width: 80px; font-weight: bold; color: #888; font-size: 0.9em; }
-        .detail-value { flex: 1; white-space: pre-wrap; word-break: break-all; color: #333; }
-        .detail-value.content { background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px solid #eee; margin-top: 5px; }
+        .badge { 
+            padding: 2px 5px; 
+            border-radius: 4px; 
+            font-size: 10px; 
+            color: white; 
+            font-weight: bold;
+            display: inline-block;
+        }
+        .bg-work { background-color: #007bff; } /* 업무 - 파랑 */
+        .bg-cat  { background-color: #6f42c1; } /* 구분 - 보라 */
+        .bg-note { background-color: #fd7e14; } /* 비고 - 주황 */
+        .bg-etc  { background-color: #20c997; } /* 기타 - 민트 */
 
-        .btn-group { text-align: right; margin-top: 20px; }
-        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .btn-save { background: #007bff; color: white; margin-left: 10px; }
+        /* 모달 스타일 */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+        .modal-content { background: white; margin: 10% auto; padding: 25px; width: 420px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); }
+        .modal-header { font-size: 1.2em; font-weight: bold; color: #007bff; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        .detail-item { margin-bottom: 12px; display: flex; align-items: flex-start; }
+        .detail-label { width: 70px; font-weight: bold; color: #777; font-size: 0.9em; }
+        .detail-value { flex: 1; white-space: pre-wrap; color: #333; }
+        .detail-box { background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #eee; margin-top: 5px; min-height: 40px; }
+
+        input, textarea { width: 100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        textarea { height: 100px; }
+        .btn-group { text-align: right; margin-top: 15px; }
+        .btn { padding: 8px 18px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-save { background: #007bff; color: white; margin-left: 8px; }
         .btn-close { background: #6c757d; color: white; }
     </style>
 </head>
@@ -44,8 +51,8 @@
 
 <div class="container">
     <div class="header-box">
-        <h2>🗓️ 업무보고 관리 시스템</h2>
-        <a href="/download" class="btn-download">📥 엑셀 파일 다운로드</a>
+        <h2>🗓️ 업무보고 관리 (아이콘 모드)</h2>
+        <a href="/download" class="btn-download">📥 엑셀 다운로드</a>
     </div>
     <div id='calendar'></div>
 </div>
@@ -54,19 +61,14 @@
     <div class="modal-content">
         <div class="modal-header">새 업무 등록</div>
         <input type="hidden" id="selectedDate">
-        <label>담당자</label>
-        <input type="text" id="owner" placeholder="성함 입력">
-        <label>구분</label>
-        <input type="text" id="category" placeholder="예: 행정, 교육">
-        <label>업무내용</label>
-        <textarea id="title" placeholder="상세 업무 내용을 입력하세요 (Enter로 줄바꿈)"></textarea>
-        <label>비고</label>
-        <input type="text" id="note">
-        <label>기타</label>
-        <input type="text" id="etc">
+        <input type="text" id="owner" placeholder="담당자 성함">
+        <input type="text" id="category" placeholder="구분 (예: 행정, 교육)">
+        <textarea id="title" placeholder="상세 업무 내용"></textarea>
+        <input type="text" id="note" placeholder="비고">
+        <input type="text" id="etc" placeholder="기타">
         <div class="btn-group">
             <button class="btn btn-close" onclick="closeModal('inputModal')">취소</button>
-            <button class="btn btn-save" onclick="saveData()">저장하기</button>
+            <button class="btn btn-save" onclick="saveData()">저장</button>
         </div>
     </div>
 </div>
@@ -74,15 +76,13 @@
 <div id="viewModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">업무 상세 정보</div>
-        <div class="detail-row"><div class="detail-label">날짜</div><div id="v-date" class="detail-value"></div></div>
-        <div class="detail-row"><div class="detail-label">담당자</div><div id="v-owner" class="detail-value"></div></div>
-        <div class="detail-row"><div class="detail-label">구분</div><div id="v-category" class="detail-value"></div></div>
-        <div>
-            <div class="detail-label">업무내용</div>
-            <div id="v-title" class="detail-value content"></div>
-        </div>
-        <div id="v-note-row" class="detail-row" style="margin-top:10px;"><div class="detail-label">비고</div><div id="v-note" class="detail-value"></div></div>
-        <div id="v-etc-row" class="detail-row"><div class="detail-label">기타</div><div id="v-etc" class="detail-value"></div></div>
+        <div class="detail-item"><span class="detail-label">날짜:</span><span id="v-date" class="detail-value"></span></div>
+        <div class="detail-item"><span class="detail-label">담당자:</span><span id="v-owner" class="detail-value"></span></div>
+        <div class="detail-item"><span class="detail-label">구분:</span><span id="v-category" class="detail-value"></span></div>
+        <div class="detail-label">상세내용:</div>
+        <div id="v-title" class="detail-value detail-box"></div>
+        <div id="v-note-area" style="margin-top:10px;"><span class="detail-label">비고:</span><span id="v-note" class="detail-value"></span></div>
+        <div id="v-etc-area"><span class="detail-label">기타:</span><span id="v-etc" class="detail-value"></span></div>
         <div class="btn-group">
             <button class="btn btn-close" onclick="closeModal('viewModal')">닫기</button>
         </div>
@@ -98,14 +98,20 @@
             initialView: 'dayGridMonth',
             locale: 'ko',
             events: '/get_tasks',
-            // 데이터 로드 시 미리보기 형식 가공
-            eventDataTransform: function(eventData) {
-                let p = eventData.extendedProps;
-                let displayTitle = `'${p.owner}'[${p.category}][${eventData.title.split('] ').pop()}]`;
-                if(p.note && p.note.trim() !== "") displayTitle += `[${p.note}]`;
-                if(p.etc && p.etc.trim() !== "") displayTitle += `[${p.etc}]`;
-                eventData.title = displayTitle;
-                return eventData;
+            // --- [핵심: 아이콘 형식으로 표시] ---
+            eventContent: function(arg) {
+                let p = arg.event.extendedProps;
+                let html = `<div class="event-container">`;
+                html += `<span class="owner-name">${p.owner}</span>`;
+                
+                // 내용이 있을 때만 아이콘(배지) 추가
+                if(p.category) html += `<span class="badge bg-cat">구분</span>`;
+                if(arg.event.title) html += `<span class="badge bg-work">업무</span>`;
+                if(p.note)     html += `<span class="badge bg-note">비고</span>`;
+                if(p.etc)      html += `<span class="badge bg-etc">기타</span>`;
+                
+                html += `</div>`;
+                return { html: html };
             },
             dateClick: function(info) {
                 document.getElementById('selectedDate').value = info.dateStr;
@@ -113,21 +119,15 @@
             },
             eventClick: function(info) {
                 let p = info.event.extendedProps;
-                // 상세보기 데이터 매핑
                 document.getElementById('v-date').innerText = info.event.startStr;
                 document.getElementById('v-owner').innerText = p.owner;
-                document.getElementById('v-category').innerText = p.category;
+                document.getElementById('v-category').innerText = p.category || '-';
+                document.getElementById('v-title').innerText = info.event.title || '-';
                 
-                // 미리보기용으로 가공되기 전의 실제 타이틀은 서버 데이터에서 가져와야 함 (이 로직은 서버 전달 형식을 따름)
-                // 간단하게 처리하기 위해 브래킷 제거 로직 대신 원본 텍스트 유추
-                document.getElementById('v-title').innerText = info.event.title.split('[')[2]?.replace(']', '') || info.event.title; 
-                
-                // 비고/기타 값이 없으면 숨기기
-                toggleRow('v-note-row', p.note);
-                document.getElementById('v-note').innerText = p.note;
-                
-                toggleRow('v-etc-row', p.etc);
-                document.getElementById('v-etc').innerText = p.etc;
+                document.getElementById('v-note-area').style.display = p.note ? 'block' : 'none';
+                document.getElementById('v-note').innerText = p.note || '';
+                document.getElementById('v-etc-area').style.display = p.etc ? 'block' : 'none';
+                document.getElementById('v-etc').innerText = p.etc || '';
 
                 document.getElementById('viewModal').style.display = 'block';
             }
@@ -135,19 +135,10 @@
         calendar.render();
     });
 
-    function toggleRow(id, value) {
-        document.getElementById(id).style.display = (value && value.trim() !== "") ? "flex" : "none";
-    }
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-        if(id === 'inputModal') {
-            document.querySelectorAll('#inputModal input, #inputModal textarea').forEach(el => el.value = '');
-        }
-    }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     async function saveData() {
-        const payload = {
+        const data = {
             date: document.getElementById('selectedDate').value,
             owner: document.getElementById('owner').value,
             title: document.getElementById('title').value,
@@ -155,23 +146,15 @@
             note: document.getElementById('note').value,
             etc: document.getElementById('etc').value
         };
+        if(!data.owner) return alert("담당자 성함은 필수입니다.");
 
-        if(!payload.owner || !payload.title) return alert("담당자와 업무내용은 필수입니다.");
-
-        const response = await fetch('/save_task', {
+        const res = await fetch('/save_task', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
+            body: JSON.stringify(data)
         });
-
-        if (response.ok) {
-            calendar.refetchEvents();
-            closeModal('inputModal');
-        } else {
-            alert("저장 실패!");
-        }
+        if(res.ok) { calendar.refetchEvents(); closeModal('inputModal'); location.reload(); }
     }
 </script>
-
 </body>
 </html>
