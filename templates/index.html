@@ -24,7 +24,7 @@
         /* 달력 카드 스타일 */
         .calendar-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1); }
         
-        /* [중요] 사각형 높이 고정 로직 */
+        /* 사각형 높이 고정 로직 */
         .fc-daygrid-day-frame { height: 130px !important; overflow: hidden !important; } 
         .fc-daygrid-day-events { max-height: 90px !important; overflow-y: auto !important; }
         .fc-daygrid-event { margin-top: 2px !important; padding: 2px 5px !important; border-radius: 4px !important; border: none !important; }
@@ -135,7 +135,7 @@
 
 <script>
     var calendar;
-    // [교정 완료] 2026년 공휴일 데이터 - 실제 달력 기준
+    // [2026년 공휴일 데이터 수정] 
     const holidays = {
         "01-01": "신정", 
         "03-01": "삼일절", "03-02": "대체공휴일", 
@@ -161,12 +161,19 @@
                 openTaskModal('reg', info.dateStr);
             },
             dayCellDidMount: function(info) {
-                let d = info.date.toISOString().split('T')[0].substring(5, 10);
+                // [버그 수정 핵심 포인트] toISOString() 대신 로컬 연/월/일 값 사용
+                const year = info.date.getFullYear();
+                const month = String(info.date.getMonth() + 1).padStart(2, '0');
+                const day = String(info.date.getDate()).padStart(2, '0');
+                const d = `${month}-${day}`;
+
                 if (holidays[d]) {
                     let label = document.createElement('span');
                     label.className = 'holiday-label';
                     label.innerText = holidays[d];
-                    info.el.querySelector('.fc-daygrid-day-top').appendChild(label);
+                    
+                    const topSection = info.el.querySelector('.fc-daygrid-day-top');
+                    if (topSection) topSection.appendChild(label);
                 }
             },
             eventContent: function(arg) {
@@ -190,7 +197,6 @@
         const modal = document.getElementById('taskModal');
         modal.style.display = 'block';
         
-        // 필드 초기화
         document.getElementById('taskId').value = '';
         document.getElementById('inside').value = '';
         document.getElementById('outside').value = '';
@@ -345,7 +351,6 @@
 
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
-    // 배경 클릭 시 모달 닫기
     window.onclick = function(event) {
         if (event.target.className === 'modal') {
             event.target.style.display = 'none';
