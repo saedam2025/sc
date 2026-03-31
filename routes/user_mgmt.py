@@ -13,12 +13,26 @@ LEVEL_MAP = {
 @user_mgmt_bp.route('/')
 def index():
     try:
-        # 사용자님의 확인된 경로: templates/user_mgmt/user_list.html
         return render_template('user_mgmt/user_list.html')
     except Exception as e:
-        return f"템플릿 에러: {str(e)} <br> 경로 'templates/user_mgmt/user_list.html'가 존재하는지 확인하세요.", 500
+        return f"템플릿 에러: {str(e)}", 500
 
-# 1) 신규 가입 신청
+# 공통 인증 로직 (슈퍼바이저 또는 레벨 2 이하 관리자)
+def verify_admin(admin_pass):
+    # 1. 슈퍼바이저 체크
+    if str(admin_pass) == "1900":
+        return True, "admin"
+    
+    # 2. DB 내 관리자 체크 (이사 이상)
+    df = read_excel_db(OWNER_FILE)
+    if not df.empty:
+        # 암호가 일치하고 레벨이 2(이사) 이하인 사람 검색
+        admin = df[(df['암호'].astype(str) == str(admin_pass)) & (df['레벨'] <= 2)]
+        if not admin.empty:
+            return True, admin.iloc[0]['이름']
+            
+    return False, None
+
 @user_mgmt_bp.route('/register', methods=['POST'])
 def register():
     try:
@@ -46,65 +60,16 @@ def register():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# 2-1) 회원 정보 수정 (관리자 인증창 연동)
-@user_mgmt_bp.route('/update', methods=['POST'])
-def update_user():
-    try:
-        data = request.json
-        df = read_excel_db(OWNER_FILE)
-        
-        # 관리자 인증 (팝업에서 입력받은 admin_name, admin_pass 확인)
-        admin = df[(df['이름'] == data.get('admin_name')) & (df['암호'].astype(str) == str(data.get('admin_pass')))]
-        if admin.empty or admin.iloc[0]['레벨'] > 2:
-            return jsonify({"status": "error", "message": "수정 권한이 없습니다 (이사 이상 가능)."}), 403
-
-        idx = int(data['user_idx'])
-        if idx < len(df):
-            # 수정 데이터 반영
-            df.at[idx, '직급'] = data['edit_position']
-            df.at[idx, '레벨'] = LEVEL_MAP.get(data['edit_position'], 10)
-            df.at[idx, '전화번호'] = data.get('edit_phone', df.at[idx, '전화번호'])
-            df.at[idx, '주민번호'] = data.get('edit_rrn', df.at[idx, '주민번호'])
-            
-            write_excel_db(df, OWNER_FILE)
-            return jsonify({"status": "success", "message": "사용자 정보가 성공적으로 수정되었습니다."})
-        return jsonify({"status": "error", "message": "해당 사용자를 찾을 수 없습니다."}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# 2-2) 회원 삭제 (관리자 인증창 연동)
-@user_mgmt_bp.route('/delete', methods=['POST'])
-def delete_user():
-    try:
-        data = request.json
-        df = read_excel_db(OWNER_FILE)
-        
-        # 관리자 인증
-        admin = df[(df['이름'] == data.get('admin_name')) & (df['암호'].astype(str) == str(data.get('admin_pass')))]
-        if admin.empty or admin.iloc[0]['레벨'] > 2:
-            return jsonify({"status": "error", "message": "삭제 권한이 없습니다 (이사 이상 가능)."}), 403
-
-        idx = int(data['user_idx'])
-        if idx < len(df):
-            df = df.drop(df.index[idx]).reset_index(drop=True)
-            write_excel_db(df, OWNER_FILE)
-            return jsonify({"status": "success", "message": "성공적으로 삭제되었습니다."})
-        return jsonify({"status": "error", "message": "유저를 찾을 수 없습니다."}), 404
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# 3) 승인 처리 (관리자 인증창 연동)
 @user_mgmt_bp.route('/approve', methods=['POST'])
 def approve():
     try:
         data = request.json
-        df = read_excel_db(OWNER_FILE)
+        is_valid, admin_name = verify_admin(data.get('admin_pass'))
         
-        # 관리자 인증
-        admin = df[(df['이름'] == data.get('admin_name')) & (df['암호'].astype(str) == str(data.get('admin_pass')))]
-        if admin.empty or admin.iloc[0]['레벨'] > 2:
-            return jsonify({"status": "error", "message": "승인 권한이 없습니다 (이사 이상 가능)."}), 403
+        if not is_valid:
+            return jsonify({"status": "error", "message": "관리자 암호가 틀리거나 권한이 없습니다."}), 403
 
+        df = read_excel_db(OWNER_FILE)
         idx = int(data['user_idx'])
         approved_pos = data['approved_position']
         
@@ -113,7 +78,25 @@ def approve():
         df.at[idx, '승인상태'] = '승인'
         
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": f"{approved_pos}(으)로 승인 완료되었습니다."})
+        return jsonify({"status": "success", "message": f"{approved_pos}(으)로 처리가 완료되었습니다. (인증: {admin_name})"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@user_mgmt_bp.route('/delete', methods=['POST'])
+def delete_user():
+    try:
+        data = request.json
+        is_valid, _ = verify_admin(data.get('admin_pass'))
+        
+        if not is_valid:
+            return jsonify({"status": "error", "message": "삭제 권한이 없습니다 (관리자 암호 확인)."}), 403
+
+        df = read_excel_db(OWNER_FILE)
+        idx = int(data['user_idx'])
+        df = df.drop(df.index[idx]).reset_index(drop=True)
+        
+        write_excel_db(df, OWNER_FILE)
+        return jsonify({"status": "success", "message": "사용자가 삭제되었습니다."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
