@@ -10,6 +10,62 @@
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
+    <style>
+        /* 가입 신청 모달 전용 스타일 */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 9999; 
+            left: 0; top: 0; 
+            width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 380px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h3 { margin: 0; color: #4a90e2; font-size: 1.3rem; }
+        .close-modal { cursor: pointer; font-size: 24px; color: #aaa; }
+        .close-modal:hover { color: #333; }
+        
+        .modal-form-group { display: flex; flex-direction: column; gap: 15px; }
+        .modal-form-group input, .modal-form-group select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+        .btn-modal-submit {
+            background: #4a90e2;
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        .btn-modal-submit:hover { background: #357abd; }
+        
+        /* 가입신청 메뉴 강조 */
+        .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
+        .menu-register i { color: #4a90e2; }
+    </style>
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -46,6 +102,11 @@
                             <i class="fa-solid fa-file-contract"></i> 전자계약
                         </a>
                     </li>
+                    <li>
+                        <a href="javascript:void(0);" class="menu-item menu-register" onclick="openRegisterModal()">
+                            <i class="fa-solid fa-user-plus"></i> 가입신청
+                        </a>
+                    </li>
                 </ul>
             </nav>
 
@@ -67,6 +128,83 @@
     <footer class="main-footer">
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
+
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen-to-square"></i> 신규 가입 신청</h3>
+                <span class="close-modal" onclick="closeRegisterModal()">&times;</span>
+            </div>
+            <form id="modalRegForm">
+                <div class="modal-form-group">
+                    <input type="text" id="m_name" placeholder="성명" required>
+                    <input type="password" id="m_password" placeholder="비밀번호 (4자리)" required>
+                    <select id="m_position">
+                        <option value="사원">사원</option>
+                        <option value="팀장">팀장</option>
+                        <option value="실장">실장</option>
+                        <option value="계약직">계약직</option>
+                        <option value="안전코디">안전코디</option>
+                        <option value="전담코디">전담코디</option>
+                    </select>
+                    <input type="text" id="m_phone" placeholder="연락처 (010-0000-0000)">
+                    <button type="button" class="btn-modal-submit" onclick="submitModalRegister()">등록 신청하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 모달 제어 스크립트
+        function openRegisterModal() {
+            document.getElementById('registerModal').style.display = "block";
+        }
+
+        function closeRegisterModal() {
+            document.getElementById('registerModal').style.display = "none";
+        }
+
+        async function submitModalRegister() {
+            const data = {
+                name: document.getElementById('m_name').value,
+                password: document.getElementById('m_password').value,
+                position: document.getElementById('m_position').value,
+                phone: document.getElementById('m_phone').value
+            };
+
+            if(!data.name || !data.password) {
+                alert("이름과 비밀번호는 필수 입력 사항입니다.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/user/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                
+                if(res.ok) {
+                    alert("가입 신청이 완료되었습니다! 관리자 승인 후 이용 가능합니다.");
+                    closeRegisterModal();
+                    document.getElementById('modalRegForm').reset();
+                } else {
+                    alert("오류: " + result.message);
+                }
+            } catch (e) {
+                alert("서버와 통신 중 오류가 발생했습니다.");
+            }
+        }
+
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {
+            const modal = document.getElementById('registerModal');
+            if (event.target == modal) {
+                closeRegisterModal();
+            }
+        }
+    </script>
 
     {% block extra_js %}{% endblock %}
 </body>
