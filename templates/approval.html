@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/user_mgmt.css') }}">
+<style>
+    .approval-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .status-wait { background: #fff4e6; color: #d9480f; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-container">
+    <div class="mgmt-header">
+        <h2><i class="fa-solid fa-file-signature"></i> 사내결재 관리</h2>
+        <p>상신된 결재 서류를 확인하고 승인/반려 처리를 진행합니다.</p>
+    </div>
+
+    <div class="approval-card">
+        <table class="approve-table">
+            <thead>
+                <tr>
+                    <th>번호</th>
+                    <th>결재양식</th>
+                    <th>제목</th>
+                    <th>기안자</th>
+                    <th>기안일</th>
+                    <th>상태</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>지출결의서</td>
+                    <td>3월 소모품 구매 건</td>
+                    <td>홍길동</td>
+                    <td>2026-03-31</td>
+                    <td><span class="status-badge status-wait">결재대기</span></td>
+                </tr>
+                </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

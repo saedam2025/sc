@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="content-container">
+    <div class="mgmt-header">
+        <h2><i class="fa-solid fa-file-contract"></i> 전자계약 시스템</h2>
+        <p>강사 계약 및 외부 협력사 계약을 전자 서명으로 체결합니다.</p>
+    </div>
+
+    <div class="mgmt-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>진행 중인 계약 목록</h3>
+            <button class="action-btn btn-approve">+ 새 계약 생성</button>
+        </div>
+        <table class="approve-table">
+            <thead>
+                <tr>
+                    <th>계약명</th>
+                    <th>대상자</th>
+                    <th>계약기간</th>
+                    <th>서명상태</th>
+                    <th>관리</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>2026년 상반기 강사 계약</td>
+                    <td>이몽룡</td>
+                    <td>2026.03 ~ 2026.06</td>
+                    <td><span style="color: #2b8a3e;">서명완료</span></td>
+                    <td><button class="action-btn btn-edit">상세보기</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
