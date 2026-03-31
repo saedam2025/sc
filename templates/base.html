@@ -2,24 +2,72 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>새담 인트라넷</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAEDAM INTRANET</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar">
-        <div class="logo">SAEDAM</div>
-        <ul class="menu">
-            <li><a href="{{ url_for('main.index') }}">main</a></li>
-            <li><a href="{{ url_for('approval.list_approval') }}">사내결재</a></li>
-            <li><a href="{{ url_for('document.index') }}">증명서발급</a></li>
-            <li><a href="{{ url_for('contract.index') }}">전자계약</a></li>
-            <li><a href="{{ url_for('user_mgmt.index') }}">회원관리</a></li>
-        </ul>
-        <div class="user-info">새담님 반갑습니다! | <a href="#">logout</a></div>
-    </nav>
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <i class="fa-solid fa-seedling"></i> SAEDAM
+            </a>
 
-    <main class="container">
-        {% block content %}{% endblock %}
+            <nav class="nav-wrapper">
+                <ul class="menu-list">
+                    <li>
+                        <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
+                            <i class="fa-solid fa-calendar-check"></i> 메인달력
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-users-gear"></i> 회원관리
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/approval" class="menu-item">
+                            <i class="fa-solid fa-file-signature"></i> 사내결재
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/document" class="menu-item">
+                            <i class="fa-solid fa-print"></i> 증명서발급
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/contract" class="menu-item">
+                            <i class="fa-solid fa-file-contract"></i> 전자계약
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="user-section">
+                <span class="user-name"><strong>새담</strong>님 환영합니다</span>
+                <a href="#" class="btn-logout" title="로그아웃">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="content-container">
+            {% block content %}{% endblock %}
+        </div>
     </main>
+
+    <footer class="main-footer">
+        <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

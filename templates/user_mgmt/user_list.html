@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/user_mgmt.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="user-mgmt-container">
+    <div class="mgmt-header">
+        <h2><i class="fa-solid fa-users-gear"></i> 회원 등록 및 승인 관리</h2>
+        <p>새담 구성원의 정보를 등록하고 권한을 부여합니다.</p>
+    </div>
+
+    <div class="mgmt-grid" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px; margin-top: 20px;">
+        <div class="mgmt-card registration-form">
+            <h3><i class="fa-solid fa-pen-to-square"></i> 가입 신청</h3>
+            <hr>
+            <form id="regForm">
+                <div class="input-group">
+                    <input type="text" id="name" placeholder="성명" required>
+                    <input type="password" id="password" placeholder="접속 비밀번호 (4자리)" required>
+                    <select id="position">
+                        <option value="사원">사원</option>
+                        <option value="팀장">팀장</option>
+                        <option value="실장">실장</option>
+                        <option value="이사">이사</option>
+                        <option value="대표이사">대표이사</option>
+                    </select>
+                    <input type="text" id="rrn" placeholder="주민등록번호 (예: 900101-1234567)">
+                    <input type="text" id="phone" placeholder="연락처">
+                    <input type="text" id="address" placeholder="주소">
+                    <textarea id="note" placeholder="기타 특이사항" style="width:100%; height:80px; padding:10px; border-radius:6px; border:1px solid #ddd;"></textarea>
+                </div>
+                <button type="button" class="btn-primary" onclick="registerUser()" style="width:100%; background:#4a90e2; color:white; padding:12px; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">등록 신청</button>
+            </form>
+        </div>
+
+        <div class="mgmt-card approval-list">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3><i class="fa-solid fa-clipboard-check"></i> 승인 대기 목록</h3>
+                <div class="admin-auth-box" style="font-size: 0.8em; background:#f1f3f5; padding:8px; border-radius:6px;">
+                    <input type="text" id="admin_name" placeholder="관리자명" style="width:70px;">
+                    <input type="password" id="admin_pass" placeholder="암호" style="width:70px;">
+                </div>
+            </div>
+            <hr>
+            <table class="approve-table">
+                <thead>
+                    <tr>
+                        <th>이름</th><th>신청직급</th><th>상태</th><th>승인</th>
+                    </tr>
+                </thead>
+                <tbody id="user-list-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function registerUser() {
+    const data = {
+        name: document.getElementById('name').value,
+        password: document.getElementById('password').value,
+        position: document.getElementById('position').value,
+        rrn: document.getElementById('rrn').value,
+        phone: document.getElementById('phone').value,
+        address: document.getElementById('address').value,
+        note: document.getElementById('note').value
+    };
+
+    const res = await fetch('/user/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    alert(result.message);
+    if(res.ok) location.reload();
+}
+
+async function loadUsers() {
+    const res = await fetch('/user/list');
+    const users = await res.json();
+    const body = document.getElementById('user-list-body');
+    body.innerHTML = '';
+
+    users.forEach((user, idx) => {
+        if(user.승인상태 === '대기') {
+            body.innerHTML += `
+                <tr>
+                    <td>${user.이름}</td>
+                    <td>${user.직급}</td>
+                    <td><span style="color:orange; font-weight:bold;">대기</span></td>
+                    <td>
+                        <button onclick="approveUser(${idx}, '${user.직급}')" style="background:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">승인</button>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+}
+
+async function approveUser(idx, pos) {
+    const admin_name = document.getElementById('admin_name').value;
+    const admin_pass = document.getElementById('admin_pass').value;
+
+    if(!admin_name || !admin_pass) return alert("관리자 인증이 필요합니다.");
+
+    const res = await fetch('/user/approve', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            admin_name: admin_name,
+            admin_pass: admin_pass,
+            user_idx: idx,
+            approved_position: pos
+        })
+    });
+    const result = await res.json();
+    alert(result.message);
+    if(res.ok) loadUsers();
+}
+
+window.onload = loadUsers;
+</script>
+{% endblock %}

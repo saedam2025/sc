@@ -4,6 +4,7 @@ import pandas as pd
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
+# 직급별 권한 레벨 정의
 LEVEL_MAP = {
     "대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5,
     "센터장": 6, "전담코디": 7, "안전코디": 8, "계약직": 9, "임시회원": 10
@@ -12,7 +13,8 @@ LEVEL_MAP = {
 @user_mgmt_bp.route('/')
 def index():
     try:
-        return render_template('user_mgmt/index.html')
+        # 파일명을 user_list.html로 변경하여 호출
+        return render_template('user_mgmt/user_list.html')
     except Exception as e:
         return f"템플릿 에러: {str(e)}", 500
 
@@ -43,9 +45,10 @@ def approve():
         data = request.json
         df = read_excel_db(OWNER_FILE)
         
+        # 관리자 인증 및 권한 체크 (이사 이상)
         admin = df[(df['이름'] == data['admin_name']) & (df['암호'].astype(str) == str(data['admin_pass']))]
         if admin.empty or admin.iloc[0]['레벨'] > 2:
-            return jsonify({"status": "error", "message": "승인 권한이 없습니다."}), 403
+            return jsonify({"status": "error", "message": "승인 권한이 없습니다 (이사 이상 가능)."}), 403
 
         idx = int(data['user_idx'])
         approved_pos = data['approved_position']

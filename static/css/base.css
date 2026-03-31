@@ -1,0 +1,72 @@
+/* 기본 폰트 및 배경 */
+:root {
+    --primary-color: #4a90e2;
+    --nav-bg: rgba(255, 255, 255, 0.95);
+    --text-dark: #2c3e50;
+    --accent-color: #00cec9;
+}
+
+body {
+    margin: 0;
+    font-family: 'Pretendard', sans-serif;
+    background-color: #f0f2f5;
+}
+
+/* 세련된 네비게이션 바 */
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--nav-bg);
+    backdrop-filter: blur(10px);
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+}
+
+.logo {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary-color);
+    letter-spacing: -0.5px;
+    text-decoration: none;
+}
+
+.menu-list {
+    display: flex;
+    gap: 15px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.menu-item {
+    text-decoration: none;
+    color: var(--text-dark);
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    font-size: 15px;
+}
+
+.menu-item:hover {
+    background-color: #f1f7ff;
+    color: var(--primary-color);
+}
+
+/* 현재 활성화된 메뉴 강조 */
+.menu-item.active {
+    background-color: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3);
+}
+
+.user-info {
+    font-size: 14px;
+    color: #636e72;
+    font-weight: 500;
+}

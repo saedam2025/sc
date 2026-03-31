@@ -1,0 +1,50 @@
+.user-mgmt-container {
+    padding: 30px;
+    animation: fadeIn 0.5s ease;
+}
+
+.mgmt-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+/* 입력 필드 스타일 */
+.input-group input, .input-group select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    transition: border-color 0.2s;
+}
+
+.input-group input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* 승인 테이블 전용 스타일 */
+.approve-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.approve-table th {
+    text-align: left;
+    padding: 12px;
+    border-bottom: 2px solid #f0f2f5;
+    color: #888;
+    font-size: 13px;
+}
+
+.approve-table td {
+    padding: 15px 12px;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
