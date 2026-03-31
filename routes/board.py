@@ -4,4 +4,8 @@ board_bp = Blueprint('board', __name__)
 
 @board_bp.route('/')
 def index():
-    return render_template('board/index.html')
+    try:
+        # 게시판 메인으로 index.html 연결
+        return render_template('index.html')
+    except Exception as e:
+        return f"템플릿 에러: {str(e)}", 500
