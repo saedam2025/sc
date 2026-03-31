@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>새담 인트라넷</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">SAEDAM</div>
+        <ul class="menu">
+            <li><a href="{{ url_for('main.index') }}">main</a></li>
+            <li><a href="{{ url_for('approval.list_approval') }}">사내결재</a></li>
+            <li><a href="{{ url_for('document.index') }}">증명서발급</a></li>
+            <li><a href="{{ url_for('contract.index') }}">전자계약</a></li>
+            <li><a href="{{ url_for('user_mgmt.index') }}">회원관리</a></li>
+        </ul>
+        <div class="user-info">새담님 반갑습니다! | <a href="#">logout</a></div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
