@@ -16,8 +16,11 @@
     
     .action-btn { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: 0.2s; }
     .btn-edit { background: #e7f5ff; color: #1971c2; }
+    .btn-edit:hover { background: #1971c2; color: white; }
     .btn-delete { background: #fff5f5; color: #c92a2a; }
+    .btn-delete:hover { background: #c92a2a; color: white; }
     .btn-retire { background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; }
+    .btn-retire:hover { background: #343a40; color: white; }
     .btn-approve { background: #28a745; color: white; }
     
     .btn-top { padding: 12px 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: 0.3s; }
@@ -53,7 +56,7 @@
             <label>성명</label><input type="text" id="name" placeholder="실명 입력" required>
         </div>
         <div class="modal-field">
-            <label>비밀번호 (4자리)</label><input type="password" id="password" maxlength="4" placeholder="로그인 비밀번호" required>
+            <label>비밀번호 (10자 이내 영문, 숫자, 특수문자)</label><input type="password" id="password" maxlength="10" placeholder="로그인 비밀번호" required>
         </div>
         <div class="modal-field">
             <label>주민등록번호</label><input type="text" id="rrn" placeholder="000000-0000000" required>
@@ -169,7 +172,7 @@ function openDirectRegisterModal() {
     document.getElementById('modalTitle').innerText = "신규 구성원 직접 등록";
     document.getElementById('modalBody').innerHTML = `
         <div class="modal-field"><label>성명</label><input type="text" id="reg_name"></div>
-        <div class="modal-field"><label>비밀번호 (4자리)</label><input type="password" id="reg_pass" maxlength="4"></div>
+        <div class="modal-field"><label>비밀번호 (10자 이내 복합)</label><input type="password" id="reg_pass" maxlength="10"></div>
         <div class="modal-field"><label>주민등록번호</label><input type="text" id="reg_rrn" placeholder="000000-0000000"></div>
         <div class="modal-field"><label>이메일</label><input type="email" id="reg_email"></div>
         <div class="modal-field"><label>직급</label>
@@ -177,7 +180,7 @@ function openDirectRegisterModal() {
                 <option value="사원">사원</option><option value="팀장">팀장</option><option value="실장">실장</option><option value="센터장">센터장</option><option value="계약직">계약직</option>
             </select>
         </div>
-        <div class="modal-field"><label>연락처</label><input type="text" id="reg_phone"></div>
+        <div class="modal-field"><label>연락처</label><input type="text" id="reg_phone" placeholder="010-0000-0000"></div>
     `;
     document.getElementById('adminArea').style.display = 'none';
     document.getElementById('modalSubmitBtn').innerText = "등록 완료";
@@ -195,6 +198,11 @@ async function submitDirectRegister() {
         phone: document.getElementById('reg_phone').value
     };
     if(!data.name || !data.password || !data.rrn) return alert("필수 정보를 입력하세요.");
+    
+    // 비밀번호 정규식: 10자 이내 (영문, 숫자, 특수문자 허용)
+    const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
+    if(!pwRegex.test(data.password)) return alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
+
     const res = await fetch('/user/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
     const d = await res.json();
     alert(d.message);
@@ -221,11 +229,19 @@ async function submitInvite() {
 
 async function registerUser() {
     const data = {
-        name: document.getElementById('name').value, password: document.getElementById('password').value,
-        rrn: document.getElementById('rrn').value, email: document.getElementById('email').value,
-        position: document.getElementById('position').value, phone: document.getElementById('phone').value
+        name: document.getElementById('name').value, 
+        password: document.getElementById('password').value,
+        rrn: document.getElementById('rrn').value, 
+        email: document.getElementById('email').value,
+        position: document.getElementById('position').value, 
+        phone: document.getElementById('phone').value
     };
     if(!data.name || !data.password || !data.rrn) return alert("필수 정보를 입력하세요.");
+    
+    // 비밀번호 정규식 검증
+    const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
+    if(!pwRegex.test(data.password)) return alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
+
     const res = await fetch('/user/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
     const d = await res.json(); alert(d.message);
     if(res.ok) { document.body.innerHTML = "<div style='text-align:center; padding:100px;'><h2>가입 신청이 완료되었습니다.</h2><p>창을 닫아주세요.</p></div>"; }
