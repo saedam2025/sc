@@ -10,6 +10,15 @@
     .btn-edit { background: #4a90e2; color: white; }
     .btn-delete { background: #fa5252; color: white; }
     .btn-approve { background: #28a745; color: white; }
+    
+    /* 모달 스타일 추가 */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .modal-content { background: white; margin: 10% auto; padding: 25px; width: 450px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+    .modal-content h3 { margin-top: 0; color: #333; }
+    .modal-field { margin-bottom: 15px; }
+    .modal-field label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+    .modal-field input, .modal-field select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+    .modal-footer { text-align: right; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; }
 </style>
 {% endblock %}
 
@@ -28,13 +37,14 @@
                 <div class="input-group">
                     <input type="text" id="name" placeholder="성명" required>
                     <input type="password" id="password" placeholder="접속 비밀번호 (4자리)" required>
-                    <select id="position">
+                    <input type="text" id="rrn" placeholder="주민번호 (예: 000101-3xxxxxx)"> <input type="email" id="email" placeholder="이메일 주소"> <select id="position">
                         <option value="사원">사원</option>
                         <option value="팀장">팀장</option>
                         <option value="실장">실장</option>
                         <option value="이사">이사</option>
                         <option value="대표이사">대표이사</option>
                         <option value="센터장">센터장</option>
+                        <option value="계약직">계약직</option>
                     </select>
                     <input type="text" id="phone" placeholder="연락처">
                     <textarea id="note" placeholder="기타 특이사항" style="width:100%; height:60px; padding:10px; border-radius:6px; border:1px solid #ddd;"></textarea>
@@ -71,10 +81,31 @@
     </div>
 </div>
 
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">정보 관리</h3>
+        <hr>
+        <div id="modalBody">
+            </div>
+        <div class="modal-footer">
+            <input type="password" id="adminPass" placeholder="관리자 암호" style="padding:10px; border:1px solid #ddd; border-radius:6px; margin-bottom:10px; width:100%;">
+            <button class="action-btn" onclick="closeModal()">닫기</button>
+            <button id="modalSubmitBtn" class="action-btn btn-approve">저장 및 확인</button>
+        </div>
+    </div>
+</div>
+
 <script>
+const LEVEL_MAP = {
+    "대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5,
+    "센터장": 6, "전담코디": 7, "안전코디": 8, "계약직": 9, "임시회원": 10
+};
+
+let currentUserData = [];
+
 async function loadAllUsers() {
     const res = await fetch('/user/list');
-    const users = await res.json();
+    currentUserData = await res.json();
     
     const pendingBody = document.getElementById('pending-list-body');
     const memberBody = document.getElementById('member-list-body');
@@ -82,14 +113,14 @@ async function loadAllUsers() {
     pendingBody.innerHTML = '';
     memberBody.innerHTML = '';
 
-    users.forEach((user, idx) => {
+    currentUserData.forEach((user, idx) => {
         if(user.승인상태 === '대기') {
             pendingBody.innerHTML += `
                 <tr>
                     <td>${user.이름}</td>
                     <td>${user.직급}</td>
                     <td><span class="status-badge status-pending">대기</span></td>
-                    <td><button onclick="approveUser(${idx}, '${user.직급}')" class="action-btn btn-approve">승인</button></td>
+                    <td><button onclick="openApproveModal(${idx})" class="action-btn btn-approve">승인</button></td>
                 </tr>`;
         } else {
             memberBody.innerHTML += `
@@ -100,7 +131,7 @@ async function loadAllUsers() {
                     <td>${user.전화번호 || '-'}</td>
                     <td><span class="status-badge status-approved">정상</span></td>
                     <td>
-                        <button onclick="editUser(${idx}, '${user.이름}', '${user.직급}')" class="action-btn btn-edit">수정</button>
+                        <button onclick="openEditModal(${idx})" class="action-btn btn-edit">수정</button>
                         <button onclick="deleteUser(${idx})" class="action-btn btn-delete">삭제</button>
                     </td>
                 </tr>`;
@@ -112,6 +143,8 @@ async function registerUser() {
     const data = {
         name: document.getElementById('name').value,
         password: document.getElementById('password').value,
+        rrn: document.getElementById('rrn').value,
+        email: document.getElementById('email').value,
         position: document.getElementById('position').value,
         phone: document.getElementById('phone').value,
         note: document.getElementById('note').value
@@ -128,46 +161,102 @@ async function registerUser() {
     if(res.ok) location.reload();
 }
 
-// 공통 인증 창 (암호만 입력)
-function getAdminPass() {
-    return prompt("관리자(이사 이상) 암호를 입력하세요.\n(초기 설정 시 슈퍼바이저 암호 입력)");
+// 승인 모달 열기
+function openApproveModal(idx) {
+    const user = currentUserData[idx];
+    document.getElementById('modalTitle').innerText = `${user.이름} 가입 승인`;
+    const body = document.getElementById('modalBody');
+    
+    body.innerHTML = `
+        <div class="modal-field">
+            <label>확정 직급 선택</label>
+            <select id="modal_pos">
+                ${Object.keys(LEVEL_MAP).map(p => `<option value="${p}" ${p === user.직급 ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+        </div>
+        <p style="font-size:0.85em; color:gray;">승인 시 해당 직급에 맞는 권한 레벨이 부여됩니다.</p>
+    `;
+    
+    document.getElementById('modalSubmitBtn').onclick = () => submitApprove(idx);
+    document.getElementById('userModal').style.display = 'block';
 }
 
-async function approveUser(idx, pos) {
-    const adminPass = getAdminPass();
-    if(!adminPass) return;
+// 수정 모달 열기
+function openEditModal(idx) {
+    const user = currentUserData[idx];
+    document.getElementById('modalTitle').innerText = `${user.이름} 정보 수정`;
+    const body = document.getElementById('modalBody');
+    
+    body.innerHTML = `
+        <div class="modal-field">
+            <label>직급</label>
+            <select id="modal_pos">
+                ${Object.keys(LEVEL_MAP).map(p => `<option value="${p}" ${p === user.직급 ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>
+        </div>
+        <div class="modal-field">
+            <label>레벨 (1-10)</label>
+            <input type="number" id="modal_level" value="${user.레벨}">
+        </div>
+        <div class="modal-field">
+            <label>연락처</label>
+            <input type="text" id="modal_phone" value="${user.전화번호 || ''}">
+        </div>
+        <div class="modal-field">
+            <label>이메일</label>
+            <input type="email" id="modal_email" value="${user.이메일 || ''}">
+        </div>
+        <p style="font-size:0.85em; color:gray;">주민번호: ${user.주민번호 || '정보 없음'}</p>
+    `;
+    
+    document.getElementById('modalSubmitBtn').onclick = () => submitUpdate(idx);
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitApprove(idx) {
+    const adminPass = document.getElementById('adminPass').value;
+    if(!adminPass) return alert("관리자 암호를 입력하세요.");
 
     const res = await fetch('/user/approve', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ admin_pass: adminPass, user_idx: idx, approved_position: pos })
+        body: JSON.stringify({ 
+            admin_pass: adminPass, 
+            user_idx: idx, 
+            approved_position: document.getElementById('modal_pos').value 
+        })
     });
     const result = await res.json();
     alert(result.message);
-    if(res.ok) loadAllUsers();
+    if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
-async function editUser(idx, name, currentPos) {
-    const newPos = prompt(`${name} 님의 새로운 직급을 입력하세요:\n(사원, 팀장, 실장, 이사, 대표이사 등)`, currentPos);
-    if(!newPos || newPos === currentPos) return;
+async function submitUpdate(idx) {
+    const adminPass = document.getElementById('adminPass').value;
+    if(!adminPass) return alert("관리자 암호를 입력하세요.");
 
-    const adminPass = getAdminPass();
-    if(!adminPass) return;
+    const data = {
+        admin_pass: adminPass,
+        user_idx: idx,
+        position: document.getElementById('modal_pos').value,
+        level: document.getElementById('modal_level').value,
+        phone: document.getElementById('modal_phone').value,
+        email: document.getElementById('modal_email').value
+    };
 
-    const res = await fetch('/user/approve', {
+    const res = await fetch('/user/update', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ admin_pass: adminPass, user_idx: idx, approved_position: newPos })
+        body: JSON.stringify(data)
     });
     const result = await res.json();
     alert(result.message);
-    if(res.ok) loadAllUsers();
+    if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
 async function deleteUser(idx) {
     if(!confirm("정말로 이 회원을 삭제하시겠습니까?")) return;
-
-    const adminPass = getAdminPass();
+    const adminPass = prompt("삭제 권한 확인을 위해 관리자 암호를 입력하세요.");
     if(!adminPass) return;
 
     const res = await fetch('/user/delete', {
@@ -178,6 +267,11 @@ async function deleteUser(idx) {
     const result = await res.json();
     alert(result.message);
     if(res.ok) loadAllUsers();
+}
+
+function closeModal() {
+    document.getElementById('userModal').style.display = 'none';
+    document.getElementById('adminPass').value = '';
 }
 
 window.onload = loadAllUsers;
