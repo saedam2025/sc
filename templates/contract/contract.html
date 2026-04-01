@@ -435,7 +435,7 @@
         this.innerText = "계약서 생성 및 전송 중...";
 
         const payload = {
-            orig_idx: "{{ data.orig_idx }}",
+            orig_idx: Number("{{ data.orig_idx }}"),
             contract_type: "{{ data.계약구분 }}",
             name: targetName,
             school: "{{ data.수탁학교명 }}",
