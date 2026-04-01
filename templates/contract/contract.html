@@ -447,7 +447,7 @@
             signature: canvas.toDataURL()
         };
 
-        fetch('/save_contract', {
+        fetch('/contract/save_contract', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(payload)
@@ -455,7 +455,7 @@
         .then(res => res.json())
         .then(d => {
             alert(d.message);
-            if(d.status === 'success') location.href = '/list';
+            if(d.status === 'success') location.href = '/contract/list';
             else {
                 this.disabled = false;
                 this.innerText = "계약완료 및 전송받기";
