@@ -33,58 +33,18 @@ def generate_sd_emp_no(df, position):
     if df.empty or '사번' not in df.columns:
         return f"{prefix}001"
     
-    # 해당 그룹코드로 시작하는 기존 사번들 추출
+    # 해당 그룹코드로 시작하는 기존 사번들 추출 (문자열 변환 후 접두사 비교)
     group_emps = df[df['사번'].astype(str).str.startswith(prefix)]
     
     if group_emps.empty:
         return f"{prefix}001"
     
-    # 마지막 순번 추출 후 1 증가
+    # 마지막 순번 추출 후 1 증가 (sd03001 -> 001 추출)
     last_no_str = group_emps['사번'].astype(str).max()[-3:]
     next_no = int(last_no_str) + 1
     return f"{prefix}{next_no:03d}"
 
-# 로그인 페이지 렌더링
-@user_mgmt_bp.route('/login_page')
-def login_page():
-    return render_template('login.html')
-
-# 로그인 처리
-@user_mgmt_bp.route('/login', methods=['POST'])
-def login():
-    try:
-        data = request.json
-        emp_no = data.get('emp_no')
-        password = data.get('password')
-        
-        df = read_excel_db(OWNER_FILE)
-        if df.empty:
-            return jsonify({"status": "error", "message": "사용자 정보가 존재하지 않습니다."}), 404
-
-        # 사번과 암호 일치 여부 확인
-        user = df[(df['사번'].astype(str) == str(emp_no)) & (df['암호'].astype(str) == str(password))]
-        
-        if not user.empty:
-            u_info = user.iloc[0]
-            if u_info['승인상태'] != '승인':
-                return jsonify({"status": "error", "message": "승인 대기 중인 계정입니다."}), 403
-            
-            # 세션에 로그인 정보 기록
-            session['emp_no'] = str(u_info['사번'])
-            session['user_name'] = u_info['이름']
-            session['user_level'] = int(u_info['레벨'])
-            return jsonify({"status": "success"})
-        
-        return jsonify({"status": "error", "message": "사번 또는 비밀번호가 올바르지 않습니다."}), 401
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-# 로그아웃 처리
-@user_mgmt_bp.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('user_mgmt.login_page'))
-
+# 초대 메일 발송용 실제 함수
 def send_real_email(target_email, invite_link):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
@@ -119,10 +79,12 @@ def send_real_email(target_email, invite_link):
     except:
         return False
 
+# 회원 관리 메인 페이지 (로그인 여부는 app.py의 before_request에서 감시)
 @user_mgmt_bp.route('/')
 def index():
     return render_template('user_list.html')
 
+# 초대 링크 페이지 (외부 접근 허용 필요 - app.py EXEMPT_ROUTES에 등록됨)
 @user_mgmt_bp.route('/invite_page/<token>')
 def invite_page(token):
     try:
@@ -131,6 +93,7 @@ def invite_page(token):
     except:
         return "유효하지 않은 링크입니다.", 403
 
+# 초대 메일 발송 라우트
 @user_mgmt_bp.route('/send_invite', methods=['POST'])
 def send_invite():
     try:
@@ -140,25 +103,34 @@ def send_invite():
         invite_link = url_for('user_mgmt.invite_page', token=token, _external=True)
         if send_real_email(email, invite_link):
             return jsonify({"status": "success", "message": "초대 메일이 발송되었습니다."})
-        return jsonify({"status": "error", "message": "발송 실패"}), 500
+        return jsonify({"status": "error", "message": "발송 실패 (서버 설정을 확인하세요)"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 가입 신청 등록 (로그인 전 가입신청 모달/초대링크 공용)
 @user_mgmt_bp.route('/register', methods=['POST'])
 def register():
     try:
         data = request.json
         df = read_excel_db(OWNER_FILE)
         if not df.empty:
+            # 이름과 주민번호로 중복 가입 체크
             dup = df[(df['이름'] == data['name']) & (df['주민번호'] == data.get('rrn', ''))]
             if not dup.empty:
                 return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
 
         new_user = pd.DataFrame([{
-            '사번': '',
-            '이름': data['name'], '암호': str(data['password']), '직급': data['position'],
-            '레벨': 10, '주민번호': data.get('rrn', ''), '이메일': data.get('email', ''),
-            '전화번호': data.get('phone', ''), '입사일': '', '퇴사일': '', '승인상태': '대기'
+            '사번': '', # 승인 시 생성됨
+            '이름': data['name'], 
+            '암호': str(data['password']), 
+            '직급': data['position'],
+            '레벨': 10, 
+            '주민번호': data.get('rrn', ''), 
+            '이메일': data.get('email', ''),
+            '전화번호': data.get('phone', ''), 
+            '입사일': '', 
+            '퇴사일': '', 
+            '승인상태': '대기'
         }])
         df = pd.concat([df, new_user], ignore_index=True)
         write_excel_db(df, OWNER_FILE)
@@ -166,6 +138,7 @@ def register():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 회원 승인 (사번 부여 및 직급 확정)
 @user_mgmt_bp.route('/approve', methods=['POST'])
 def approve():
     try:
@@ -174,7 +147,7 @@ def approve():
         idx = int(data['user_idx'])
         pos = data['approved_position']
         
-        # 승인 시 사번 생성 및 부여
+        # 승인 시 사번 생성 및 인사정보 업데이트
         df.at[idx, '사번'] = generate_sd_emp_no(df, pos)
         df.at[idx, '직급'] = pos
         df.at[idx, '레벨'] = LEVEL_MAP.get(pos, 10)
@@ -186,6 +159,7 @@ def approve():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 퇴사 처리
 @user_mgmt_bp.route('/retire', methods=['POST'])
 def retire_user():
     try:
@@ -198,6 +172,7 @@ def retire_user():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 정보 수정
 @user_mgmt_bp.route('/update', methods=['POST'])
 def update_user():
     try:
@@ -213,6 +188,7 @@ def update_user():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 데이터 삭제
 @user_mgmt_bp.route('/delete', methods=['POST'])
 def delete_user():
     try:
@@ -225,6 +201,7 @@ def delete_user():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# 명단 불러오기
 @user_mgmt_bp.route('/list')
 def get_user_list():
     df = read_excel_db(OWNER_FILE)
