@@ -307,7 +307,14 @@ def save_contract():
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
     if request.method == 'POST':
-        if request.form.get('admin_pw') == ADMIN_PASSWORD:
+        # JSON 요청과 일반 폼 요청 모두 처리 가능하도록 수정
+        admin_pw = None
+        if request.is_json:
+            admin_pw = request.json.get('admin_pw')
+        else:
+            admin_pw = request.form.get('admin_pw')
+
+        if admin_pw == ADMIN_PASSWORD:
             session['contract_admin_logged_in'] = True
             return redirect(url_for('contract.admin_page'))
         return "<script>alert('비밀번호가 틀렸습니다.'); history.back();</script>"
