@@ -119,26 +119,31 @@ def home():
 @contract_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # HTML 폼에서 보낸 데이터(name="...")를 읽어옵니다.
-        name = request.form.get('name')
-        ssn_raw = request.form.get('ssn', '')
+        # 폼 데이터와 JSON 데이터 모두 대응 가능하도록 수정
+        if request.is_json:
+            data = request.json
+            name = data.get('name')
+            ssn_raw = data.get('ssn', '')
+            ssn_last4 = data.get('ssn_last4')
+        else:
+            name = request.form.get('name')
+            ssn_raw = request.form.get('ssn', '')
+            ssn_last4 = request.form.get('ssn_last4')
+
         ssn = ssn_raw.replace("-", "")
-        ssn_last4 = request.form.get('ssn_last4')
         
         try:
             df = pd.read_excel(EXCEL_FILE, dtype=str)
-            # 엑셀의 주민번호와 입력받은 주민번호 비교
+            # 주민번호 비교 시 하이픈 제거 후 비교
             user_rows = df[(df['성명'] == name) & (df['주민번호'].astype(str).str.replace("-", "") == ssn)]
             
             if not user_rows.empty and ssn[-4:] == ssn_last4:
                 session['contract_user_name'] = name
-                session['contract_user_ssn'] = ssn_raw # 하이픈 포함 원본 저장
+                session['contract_user_ssn'] = ssn_raw 
                 return redirect(url_for('contract.contract_list'))
-            
             return "<script>alert('정보가 일치하지 않습니다.'); history.back();</script>"
         except Exception as e:
             return f"에러: {str(e)}"
-            
     return render_template('contract/login.html')
 
 @contract_bp.route('/list')
@@ -322,8 +327,7 @@ def save_contract():
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
     if request.method == 'POST':
-        # JSON 요청과 일반 폼 요청 모두 처리 가능하도록 수정
-        admin_pw = None
+        # JSON 요청인지 일반 폼 요청인지 구분
         if request.is_json:
             admin_pw = request.json.get('admin_pw')
         else:
