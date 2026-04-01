@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, url_for
 from .db_handler import read_excel_db, write_excel_db, OWNER_FILE
 import pandas as pd
+import base64
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
@@ -13,25 +14,53 @@ LEVEL_MAP = {
 @user_mgmt_bp.route('/')
 def index():
     try:
-        # templates/user_list.html 경로로 렌더링
+        # 관리자용 메인 관리 페이지
         return render_template('user_list.html')
     except Exception as e:
         return f"템플릿 에러: {str(e)}", 500
 
+@user_mgmt_bp.route('/invite_page/<token>')
+def invite_page(token):
+    try:
+        # 토큰에서 이메일 복호화 (간이 보안)
+        email = base64.b64decode(token).decode('utf-8')
+        return render_template('user_list.html', invite_email=email, mode='invite')
+    except:
+        return "유효하지 않은 접근입니다.", 403
+
+@user_mgmt_bp.route('/send_invite', methods=['POST'])
+def send_invite():
+    try:
+        data = request.json
+        email = data.get('email')
+        if not email:
+            return jsonify({"status": "error", "message": "이메일을 입력해주세요."}), 400
+        
+        # 이메일을 기반으로 토큰 생성
+        token = base64.b64encode(email.encode('utf-8')).decode('utf-8')
+        invite_link = url_for('user_mgmt.invite_page', token=token, _external=True)
+        
+        # 실제 메일 발송 로직이 들어갈 자리입니다. (현재는 링크 반환으로 시뮬레이션)
+        # print(f"Sending mail to {email}: {invite_link}")
+        
+        return jsonify({
+            "status": "success", 
+            "message": f"[{email}]로 초대 링크가 생성되었습니다.",
+            "link": invite_link # 테스트를 위해 링크를 반환합니다.
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # 공통 인증 로직 (슈퍼바이저 또는 레벨 2 이하 관리자)
 def verify_admin(admin_pass):
-    # 1. 슈퍼바이저 체크
     if str(admin_pass) == "1900":
         return True, "admin"
     
-    # 2. DB 내 관리자 체크 (이사 이상)
     df = read_excel_db(OWNER_FILE)
     if not df.empty:
-        # 암호가 일치하고 레벨이 2(이사) 이하인 사람 검색
         admin = df[(df['암호'].astype(str) == str(admin_pass)) & (df['레벨'] <= 2)]
         if not admin.empty:
             return True, admin.iloc[0]['이름']
-            
     return False, None
 
 @user_mgmt_bp.route('/register', methods=['POST'])
@@ -48,8 +77,8 @@ def register():
             '암호': str(data['password']), 
             '직급': data['position'],
             '레벨': 10, 
-            '주민번호': data.get('rrn', ''), # 주민번호 추가
-            '이메일': data.get('email', ''), # 이메일 추가
+            '주민번호': data.get('rrn', ''),
+            '이메일': data.get('email', ''),
             '전화번호': data.get('phone', ''), 
             '주소': data.get('address', ''), 
             '기타사항': data.get('note', ''), 
@@ -58,7 +87,7 @@ def register():
         
         df = pd.concat([df, new_user], ignore_index=True)
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": "회원 등록 신청이 완료되었습니다."})
+        return jsonify({"status": "success", "message": "회원 등록 신청이 완료되었습니다. 관리자 승인을 기다려주세요."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -96,7 +125,6 @@ def update_user():
         df = read_excel_db(OWNER_FILE)
         idx = int(data['user_idx'])
         
-        # 정보 업데이트
         df.at[idx, '직급'] = data['position']
         df.at[idx, '레벨'] = int(data['level'])
         df.at[idx, '전화번호'] = data['phone']
