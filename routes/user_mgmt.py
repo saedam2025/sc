@@ -13,7 +13,7 @@ LEVEL_MAP = {
 @user_mgmt_bp.route('/')
 def index():
     try:
-        return render_template('user_mgmt/user_list.html')
+        return render_template('user_list.html')
     except Exception as e:
         return f"템플릿 에러: {str(e)}", 500
 
