@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# 오류 발생 시 즉시 중단
+# exit on error
 set -o errexit
 
-# 1. 라이브러리 설치
 pip install -r requirements.txt
 
-# 2. PDF 엔진 wkhtmltopdf 설치
+# wkhtmltopdf 설치 (Render의 우분투 환경용)
 apt-get update && apt-get install -y wkhtmltopdf
