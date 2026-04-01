@@ -117,7 +117,7 @@
             <div class="user-section">
                 {% if session.user_name %}
                 <span class="user-name"><strong>{{ session.user_name }}</strong>님 환영합니다</span>
-                <a href="/logout" class="btn-logout" title="로그아웃">
+                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </a>
                 {% endif %}
