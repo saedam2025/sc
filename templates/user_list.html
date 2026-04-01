@@ -3,112 +3,102 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/user_mgmt.css') }}">
 <style>
-    /* 초대 모드 보안 설정: 모든 내비게이션 요소 강제 숨김 */
+    /* 초대 가입 시 레이아웃 숨기기 */
     {% if mode == 'invite' %}
-    nav, header, footer, .sidebar, .navbar, .breadcrumb, .top-nav { display: none !important; }
-    body { background-color: #f0f2f5; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Apple SD Gothic Neo', sans-serif; }
-    .user-mgmt-container { width: 100%; max-width: 460px; margin: 0; }
+    nav, .sidebar, header, footer, .navbar { display: none !important; }
+    body { background-color: #f0f2f5; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
+    .user-mgmt-container { width: 100%; max-width: 450px; }
     {% endif %}
 
     .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
     .status-pending { background: #fff4e6; color: #d9480f; }
     .status-approved { background: #ebfbee; color: #2b8a3e; }
-    .action-btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 0.85em; transition: 0.2s; }
+    .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; font-size: 0.85em; }
     .btn-edit { background: #4a90e2; color: white; }
     .btn-delete { background: #fa5252; color: white; }
     .btn-approve { background: #28a745; color: white; }
-    .btn-invite-top { background: #6741d9; color: white; border-radius: 8px; padding: 10px 20px; border: none; cursor: pointer; font-weight: bold; }
+    .btn-invite { background: #6741d9; color: white; font-weight: bold; padding: 8px 15px; border-radius: 6px; border: none; cursor: pointer; }
     
-    /* 모달 레이아웃 */
-    .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
-    .modal-content { background: white; margin: 7% auto; padding: 30px; width: 440px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); }
-    .modal-field { margin-bottom: 15px; }
-    .modal-field label { display: block; font-weight: bold; margin-bottom: 6px; color: #444; font-size: 0.9em; }
-    .modal-field input, .modal-field select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-    .modal-footer { text-align: right; margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px; }
-
-    /* 초대 전용 카드 스타일 */
-    .invite-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #eee; }
-    .mgmt-card { background: white; padding: 25px; border-radius: 12px; border: 1px solid #ddd; }
-    .approve-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .approve-table th, .approve-table td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; font-size: 0.95em; }
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    .modal-content { background: white; margin: 5% auto; padding: 25px; width: 440px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+    .modal-field { margin-bottom: 12px; }
+    .modal-field label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; font-size: 0.9em; }
+    .modal-field input, .modal-field select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+    .modal-footer { text-align: right; margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+    
+    .invite-form-card { background: white; padding: 35px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: 1px solid #eee; }
+    .readonly-field { background-color: #f8f9fa; cursor: not-allowed; color: #6c757d; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="user-mgmt-container">
     {% if mode == 'invite' %}
-    <div class="invite-card">
-        <h2 style="text-align: center; color: #333; margin-top: 0;">새담 인트라넷 가입 신청</h2>
-        <p style="text-align: center; color: #777; margin-bottom: 30px; font-size: 0.95em;">초대받은 정보를 기반으로 정보를 입력해 주세요.</p>
+    <div class="invite-form-card">
+        <h2 style="text-align: center; color: #333; margin-top: 0;">새담 인트라넷 가입</h2>
+        <p style="text-align: center; color: #777; margin-bottom: 25px;">정보를 입력하여 가입을 신청해 주세요.</p>
         <hr style="border: 0; border-top: 1px solid #eee; margin-bottom: 25px;">
-        
-        <form id="inviteRegisterForm">
-            <div class="modal-field">
-                <label>이름 (성명)</label><input type="text" id="name" placeholder="실명을 입력하세요" required>
-            </div>
-            <div class="modal-field">
-                <label>접속 비밀번호 (4자리)</label><input type="password" id="password" maxlength="4" placeholder="숫자 4자리" required>
-            </div>
-            <div class="modal-field">
-                <label>주민등록번호</label><input type="text" id="rrn" placeholder="000000-0000000" required>
-            </div>
-            <div class="modal-field">
-                <label>이메일 (자동입력)</label><input type="email" id="email" value="{{ invite_email }}" readonly style="background:#f8f9fa; color:#666;">
-            </div>
-            <div class="modal-field">
-                <label>희망 직급</label>
-                <select id="position">
-                    <option value="사원">사원</option><option value="팀장">팀장</option><option value="실장">실장</option><option value="센터장">센터장</option><option value="계약직">계약직</option>
-                </select>
-            </div>
-            <div class="modal-field">
-                <label>연락처</label><input type="text" id="phone" placeholder="010-0000-0000">
-            </div>
-            <button type="button" onclick="registerUser()" style="width:100%; background:#4a90e2; color:white; padding:16px; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:1.1em; margin-top:15px;">가입 신청하기</button>
-        </form>
+        <div class="modal-field">
+            <label>성명</label><input type="text" id="name" placeholder="실명 입력" required>
+        </div>
+        <div class="modal-field">
+            <label>비밀번호 (4자리)</label><input type="password" id="password" maxlength="4" placeholder="로그인 시 사용" required>
+        </div>
+        <div class="modal-field">
+            <label>주민등록번호</label><input type="text" id="rrn" placeholder="000000-0000000" required>
+        </div>
+        <div class="modal-field">
+            <label>이메일 (초대됨)</label><input type="email" id="email" value="{{ invite_email }}" readonly class="readonly-field">
+        </div>
+        <div class="modal-field">
+            <label>희망 직급</label>
+            <select id="position">
+                <option value="사원">사원</option><option value="팀장">팀장</option><option value="실장">실장</option><option value="센터장">센터장</option><option value="계약직">계약직</option>
+            </select>
+        </div>
+        <div class="modal-field">
+            <label>연락처</label><input type="text" id="phone" placeholder="010-0000-0000">
+        </div>
+        <button type="button" onclick="registerUser()" style="width:100%; background:#4a90e2; color:white; padding:15px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:1.1em; margin-top:15px;">가입 신청 완료</button>
     </div>
 
     {% else %}
-    <div class="mgmt-header" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px;">
+    <div class="mgmt-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-            <h2 style="margin: 0;"><i class="fa-solid fa-users-gear"></i> 회원 및 권한 관리</h2>
-            <p style="color: #666; margin: 5px 0 0 0;">신규 사용자 승인 및 전체 구성원 명단을 통합 관리합니다.</p>
+            <h2><i class="fa-solid fa-users-gear"></i> 회원 및 권한 관리</h2>
+            <p>신규 가입 승인 및 전체 구성원 명단을 관리합니다.</p>
         </div>
-        <button class="btn-invite-top" onclick="openInviteModal()">
-            <i class="fa-solid fa-paper-plane"></i> 신규가입 초대메일 발송
-        </button>
+        <button class="btn-invite" onclick="openInviteModal()"><i class="fa-solid fa-paper-plane"></i> 가입 초대 메일</button>
     </div>
 
-    <div class="mgmt-grid" style="display: grid; grid-template-columns: 1fr 1.6fr; gap: 30px;">
-        <div class="mgmt-card">
-            <h3><i class="fa-solid fa-pen-to-square"></i> 내부 수동 등록</h3><hr>
-            <div class="modal-field"><label>성명</label><input type="text" id="name" placeholder="성명"></div>
-            <div class="modal-field"><label>비밀번호</label><input type="password" id="password" placeholder="4자리"></div>
-            <div class="modal-field"><label>주민번호</label><input type="text" id="rrn" placeholder="000000-0000000"></div>
-            <div class="modal-field"><label>이메일</label><input type="email" id="email" placeholder="email@address.com"></div>
+    <div class="mgmt-grid" style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px;">
+        <div class="mgmt-card" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+            <h3><i class="fa-solid fa-pen-to-square"></i> 직접 신청 등록</h3><hr>
+            <div class="modal-field"><input type="text" id="name" placeholder="성명"></div>
+            <div class="modal-field"><input type="password" id="password" placeholder="비밀번호"></div>
+            <div class="modal-field"><input type="text" id="rrn" placeholder="주민번호"></div>
+            <div class="modal-field"><input type="email" id="email" placeholder="이메일"></div>
             <div class="modal-field">
-                <label>직급</label>
                 <select id="position">
                     <option value="사원">사원</option><option value="팀장">팀장</option><option value="실장">실장</option><option value="이사">이사</option><option value="대표이사">대표이사</option>
                 </select>
             </div>
-            <button class="btn-approve" onclick="registerUser()" style="width:100%; padding:12px; font-weight:bold; background:#4a90e2; color:white; border:none; border-radius:6px; cursor:pointer;">등록 신청</button>
+            <button class="btn-approve" onclick="registerUser()" style="width:100%; padding:10px;">신청 하기</button>
         </div>
 
-        <div class="mgmt-card">
-            <h3><i class="fa-solid fa-user-clock"></i> 가입 승인 대기 명단</h3><hr>
-            <table class="approve-table">
-                <thead><tr><th>이름</th><th>직급</th><th>상태</th><th>작업</th></tr></thead>
+        <div class="mgmt-card" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+            <h3><i class="fa-solid fa-user-clock"></i> 가입 승인 대기</h3><hr>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>이름</th><th>직급</th><th>상태</th><th>작업</th></tr></thead>
                 <tbody id="pending-list-body"></tbody>
             </table>
         </div>
     </div>
 
-    <div class="mgmt-card" style="margin-top: 30px;">
-        <h3><i class="fa-solid fa-address-book"></i> 전체 구성원 명단 관리</h3><hr>
-        <table class="approve-table">
-            <thead><tr><th>이름</th><th>직급</th><th>레벨</th><th>연락처</th><th>이메일</th><th>작업</th></tr></thead>
+    <div class="mgmt-card" style="margin-top: 30px; background: white; padding: 20px; border-radius: 10px; border: 1px solid #ddd;">
+        <h3><i class="fa-solid fa-list-ul"></i> 전체 구성원 명단</h3><hr>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead><tr style="text-align: left; border-bottom: 2px solid #eee;"><th>이름</th><th>직급</th><th>레벨</th><th>연락처</th><th>이메일</th><th>관리</th></tr></thead>
             <tbody id="member-list-body"></tbody>
         </table>
     </div>
@@ -117,24 +107,20 @@
 
 <div id="userModal" class="modal">
     <div class="modal-content">
-        <h3 id="modalTitle" style="margin-top: 0; color: #333;">정보 관리</h3><hr>
+        <h3 id="modalTitle">관리</h3><hr>
         <div id="modalBody"></div>
         <div class="modal-footer">
-            <div id="adminArea">
-                <label style="display:block; text-align:left; font-size:0.85em; font-weight:bold; margin-bottom:5px;">관리자 보안 암호</label>
-                <input type="password" id="adminPass" placeholder="암호 입력" style="width:100%; padding:12px; margin-bottom:15px; border-radius:8px; border:1px solid #ddd;">
-            </div>
-            <button class="action-btn" onclick="closeModal()" style="background:#eee; color:#333;">닫기</button>
-            <button id="modalSubmitBtn" class="action-btn btn-approve">처리 실행</button>
+            <div id="adminArea"><input type="password" id="adminPass" placeholder="관리자 암호" style="width:100%; padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid #ddd;"></div>
+            <button class="action-btn" onclick="closeModal()">취소</button>
+            <button id="modalSubmitBtn" class="action-btn btn-approve">진행</button>
         </div>
     </div>
 </div>
 
 <script>
-const LEVEL_MAP = {"대표이사":1, "이사":2, "실장":3, "팀장":4, "사원":5, "센터장":6, "전담코디":7, "안전코디":8, "계약직":9, "임시회원":10};
+const LEVEL_MAP = {"대표이사":1, "이사":2, "실장":3, "팀장":4, "사원":5, "센터장":6, "계약직":9, "임시회원":10};
 let currentUserData = [];
 
-// 명단 로드 및 렌더링 (삭제/생략 없음)
 async function loadAllUsers() {
     const pBody = document.getElementById('pending-list-body');
     const mBody = document.getElementById('member-list-body');
@@ -143,41 +129,21 @@ async function loadAllUsers() {
     try {
         const res = await fetch('/user/list');
         currentUserData = await res.json();
-        
         pBody.innerHTML = ''; mBody.innerHTML = '';
-        
         currentUserData.forEach((u, i) => {
             if(u.승인상태 === '대기') {
-                pBody.innerHTML += `<tr>
-                    <td>${u.이름}</td><td>${u.직급}</td>
-                    <td><span class="status-badge status-pending">승인대기</span></td>
-                    <td><button onclick="openApproveModal(${i})" class="action-btn btn-approve">승인하기</button></td>
-                </tr>`;
+                pBody.innerHTML += `<tr><td>${u.이름}</td><td>${u.직급}</td><td><span class="status-badge status-pending">대기</span></td><td><button onclick="openApproveModal(${i})" class="action-btn btn-approve">승인</button></td></tr>`;
             } else {
-                mBody.innerHTML += `<tr>
-                    <td><b>${u.이름}</b></td><td>${u.직급}</td><td>Lv.${u.레벨}</td><td>${u.전화번호||'-'}</td><td>${u.이메일||'-'}</td>
-                    <td>
-                        <button onclick="openEditModal(${i})" class="action-btn btn-edit">수정</button>
-                        <button onclick="deleteUser(${i})" class="action-btn btn-delete">삭제</button>
-                    </td>
-                </tr>`;
+                mBody.innerHTML += `<tr><td><b>${u.이름}</b></td><td>${u.직급}</td><td>Lv.${u.레벨}</td><td>${u.전화번호||'-'}</td><td>${u.이메일||'-'}</td><td><button onclick="openEditModal(${i})" class="action-btn btn-edit">수정</button><button onclick="deleteUser(${i})" class="action-btn btn-delete">삭제</button></td></tr>`;
             }
         });
-    } catch(e) { console.error("명단 로드 에러", e); }
+    } catch(e) { console.error("Data load failed", e); }
 }
 
-// 초대 모달 오픈
 function openInviteModal() {
-    document.getElementById('modalTitle').innerText = "가입 초대 메일 발송";
-    document.getElementById('modalBody').innerHTML = `
-        <div class="modal-field">
-            <label>상대방 이메일 주소</label>
-            <input type="email" id="target_email" placeholder="example@email.com" required>
-        </div>
-        <p style="font-size:0.85em; color:#666;">발송 시 해당 이메일로 가입 전용 링크가 전송됩니다.</p>
-    `;
+    document.getElementById('modalTitle').innerText = "초대 이메일 발송";
+    document.getElementById('modalBody').innerHTML = `<div class="modal-field"><label>받는 사람 이메일</label><input type="email" id="target_email" placeholder="example@email.com"></div>`;
     document.getElementById('adminArea').style.display = 'none';
-    document.getElementById('modalSubmitBtn').innerText = "메일 발송";
     document.getElementById('modalSubmitBtn').onclick = submitInvite;
     document.getElementById('userModal').style.display = 'block';
 }
@@ -187,48 +153,26 @@ async function submitInvite() {
     if(!email) return alert("이메일을 입력하세요.");
     const btn = document.getElementById('modalSubmitBtn');
     btn.innerText = "발송 중..."; btn.disabled = true;
-
-    try {
-        const res = await fetch('/user/send_invite', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email }) });
-        const data = await res.json();
-        alert(data.message);
-        closeModal();
-    } catch(e) { alert("연결 오류"); }
-    finally { btn.disabled = false; btn.innerText = "메일 발송"; }
+    const res = await fetch('/user/send_invite', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email }) });
+    const d = await res.json(); alert(d.message); closeModal();
 }
 
-// 가입 신청 프로세스
 async function registerUser() {
     const data = {
         name: document.getElementById('name').value, password: document.getElementById('password').value,
         rrn: document.getElementById('rrn').value, email: document.getElementById('email').value,
         position: document.getElementById('position').value, phone: document.getElementById('phone').value
     };
-    if(!data.name || !data.password || !data.rrn) return alert("성명, 비밀번호, 주민번호를 입력하세요.");
-
+    if(!data.name || !data.password || !data.rrn) return alert("이름, 비밀번호, 주민번호는 필수입니다.");
     const res = await fetch('/user/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-    const result = await res.json();
-    alert(result.message);
-
-    if(res.ok) {
-        {% if mode == 'invite' %}
-        document.body.innerHTML = "<div style='text-align:center; padding:100px;'><h2>가입 신청이 완료되었습니다.</h2><p>관리자의 최종 승인 후 이용 가능합니다. 창을 닫아주세요.</p></div>";
-        {% else %}
-        loadAllUsers();
-        {% endif %}
-    }
+    const d = await res.json(); alert(d.message);
+    if(res.ok) { {% if mode == 'invite' %} document.body.innerHTML = "<h2 style='text-align:center; margin-top:50px;'>가입 신청 완료!</h2>"; {% else %} loadAllUsers(); {% endif %} }
 }
 
-// 가입 승인 팝업
 function openApproveModal(i) {
-    const u = currentUserData[i];
-    document.getElementById('modalTitle').innerText = `${u.이름} 님 승인`;
-    document.getElementById('modalBody').innerHTML = `
-        <div class="modal-field"><label>최종 직급 선택</label>
-        <select id="modal_pos">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
-    `;
+    document.getElementById('modalTitle').innerText = "가입 승인";
+    document.getElementById('modalBody').innerHTML = `<div class="modal-field"><label>최종 직급</label><select id="modal_pos">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>`;
     document.getElementById('adminArea').style.display = 'block';
-    document.getElementById('modalSubmitBtn').innerText = "승인 완료";
     document.getElementById('modalSubmitBtn').onclick = () => submitApprove(i);
     document.getElementById('userModal').style.display = 'block';
 }
@@ -238,18 +182,21 @@ async function submitApprove(i) {
     const r = await res.json(); alert(r.message); if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
-// 상세 정보 수정 팝업
-async function openEditModal(i) {
+// 수정사항: 회원 수정 시 모든 정보 출력 및 이름/주민번호 수정 불가 설정
+function openEditModal(i) {
     const u = currentUserData[i];
-    document.getElementById('modalTitle').innerText = "정보 수정";
+    document.getElementById('modalTitle').innerText = "회원 정보 수정";
     document.getElementById('modalBody').innerHTML = `
-        <div class="modal-field"><label>직급</label><select id="modal_pos">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}</select></div>
-        <div class="modal-field"><label>레벨(권한)</label><input type="number" id="modal_level" value="${u.레벨}"></div>
+        <div class="modal-field"><label>성명 (수정불가)</label><input type="text" value="${u.이름}" readonly class="readonly-field"></div>
+        <div class="modal-field"><label>주민번호 (수정불가)</label><input type="text" value="${u.주민번호||''}" readonly class="readonly-field"></div>
+        <div class="modal-field"><label>직급</label>
+            <select id="modal_pos">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}</select>
+        </div>
+        <div class="modal-field"><label>레벨</label><input type="number" id="modal_level" value="${u.레벨}"></div>
         <div class="modal-field"><label>연락처</label><input type="text" id="modal_phone" value="${u.전화번호||''}"></div>
         <div class="modal-field"><label>이메일</label><input type="email" id="modal_email" value="${u.이메일||''}"></div>
     `;
     document.getElementById('adminArea').style.display = 'block';
-    document.getElementById('modalSubmitBtn').innerText = "저장하기";
     document.getElementById('modalSubmitBtn').onclick = () => submitUpdate(i);
     document.getElementById('userModal').style.display = 'block';
 }
@@ -259,13 +206,10 @@ async function submitUpdate(i) {
     const r = await res.json(); alert(r.message); if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
-// 회원 삭제
 async function deleteUser(i) {
-    const p = prompt("회원을 삭제하시려면 관리자 암호를 입력하세요:"); 
-    if(!p) return;
+    const p = prompt("관리자 암호:"); if(!p) return;
     const res = await fetch('/user/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: p, user_idx: i }) });
-    const r = await res.json(); alert(r.message);
-    if(res.ok) loadAllUsers();
+    const r = await res.json(); alert(r.message); if(res.ok) loadAllUsers();
 }
 
 function closeModal() { document.getElementById('userModal').style.display = 'none'; document.getElementById('adminPass').value = ''; }
