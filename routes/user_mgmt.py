@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for
+from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect
 from .db_handler import read_excel_db, write_excel_db, OWNER_FILE
 import pandas as pd
 import base64
@@ -10,12 +10,13 @@ from email.mime.multipart import MIMEMultipart
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
-# 직급별 권한 레벨 및 사번 그룹 코드 정의
+# 직급별 권한 레벨 정의
 LEVEL_MAP = {
     "대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5,
     "센터장": 6, "전담코디": 7, "안전코디": 8, "계약직": 9, "임시회원": 10
 }
 
+# 사번 그룹 코드 정의
 GROUP_CODE_MAP = {
     "대표이사": "01",
     "이사": "02", "실장": "02",
@@ -33,7 +34,6 @@ def generate_sd_emp_no(df, position):
     if df.empty or '사번' not in df.columns:
         return f"{prefix}001"
     
-    # 해당 그룹코드로 시작하는 기존 사번들 추출
     group_emps = df[df['사번'].astype(str).str.startswith(prefix)]
     
     if group_emps.empty:
@@ -43,6 +43,47 @@ def generate_sd_emp_no(df, position):
     last_no_str = group_emps['사번'].astype(str).max()[-3:]
     next_no = int(last_no_str) + 1
     return f"{prefix}{next_no:03d}"
+
+# 로그인 페이지 렌더링
+@user_mgmt_bp.route('/login_page')
+def login_page():
+    return render_template('login.html')
+
+# 로그인 처리
+@user_mgmt_bp.route('/login', methods=['POST'])
+def login():
+    try:
+        data = request.json
+        emp_no = data.get('emp_no')
+        password = data.get('password')
+        
+        df = read_excel_db(OWNER_FILE)
+        if df.empty:
+            return jsonify({"status": "error", "message": "사용자 정보가 존재하지 않습니다."}), 404
+
+        # 사번과 비밀번호 일치 여부 확인
+        user = df[(df['사번'].astype(str) == str(emp_no)) & (df['암호'].astype(str) == str(password))]
+        
+        if not user.empty:
+            u_info = user.iloc[0]
+            if u_info['승인상태'] != '승인':
+                return jsonify({"status": "error", "message": "승인 대기 중인 계정입니다."}), 403
+            
+            # 세션에 로그인 정보 기록
+            session['emp_no'] = str(u_info['사번'])
+            session['user_name'] = u_info['이름']
+            session['user_level'] = int(u_info['레벨'])
+            return jsonify({"status": "success"})
+        
+        return jsonify({"status": "error", "message": "사번 또는 비밀번호가 올바르지 않습니다."}), 401
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# 로그아웃 처리
+@user_mgmt_bp.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('user_mgmt.login_page'))
 
 def send_real_email(target_email, invite_link):
     SMTP_SERVER = "smtp.gmail.com"
