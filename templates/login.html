@@ -2,66 +2,55 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>새담 인트라넷 - 로그인</title>
+    <title>로그인 - 새담 인트라넷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background: #f0f2f5; font-family: 'Pretendard', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 380px; }
-        .login-card h2 { text-align: center; color: #4a90e2; margin-bottom: 30px; }
+        body { background: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 350px; }
         .input-group { margin-bottom: 20px; position: relative; }
-        .input-group i { position: absolute; left: 15px; top: 15px; color: #adb5bd; }
-        .input-group input { width: 100%; padding: 12px 12px 12px 45px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
-        .options { display: flex; justify-content: space-between; align-items: center; margin: 20px 0; font-size: 14px; color: #666; }
-        .btn-login { width: 100%; padding: 14px; background: #4a90e2; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        .btn-login:hover { background: #357abd; }
+        .input-group i { position: absolute; left: 15px; top: 13px; color: #adb5bd; }
+        .input-group input { width: 100%; padding: 12px 12px 12px 45px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; outline: none; }
+        .btn-login { width: 100%; padding: 14px; background: #4a90e2; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="login-card">
-        <h2><i class="fa-solid fa-seedling"></i> 새담 인트라넷</h2>
+        <h2 style="text-align:center; color:#4a90e2;">로그인</h2>
         <div class="input-group">
             <i class="fa-solid fa-id-card"></i>
-            <input type="text" id="emp_no" placeholder="사번 (sdXXXXX)">
+            <input type="text" id="emp_no" placeholder="사번 입력">
         </div>
         <div class="input-group">
             <i class="fa-solid fa-lock"></i>
             <input type="password" id="password" placeholder="비밀번호">
         </div>
-        <div class="options">
+        <div style="margin-bottom:20px; font-size:14px; color:#666;">
             <label style="cursor:pointer;"><input type="checkbox" id="remember_me"> 사번 저장</label>
         </div>
-        <button class="btn-login" onclick="handleLogin()">로그인</button>
+        <button class="btn-login" onclick="doLogin()">접속하기</button>
     </div>
 
     <script>
         window.onload = () => {
-            const savedEmpNo = localStorage.getItem('saved_sd_emp');
-            if (savedEmpNo) {
-                document.getElementById('emp_no').value = savedEmpNo;
-                document.getElementById('remember_me').checked = true;
-            }
+            const saved = localStorage.getItem('saved_sd_emp');
+            if(saved) { document.getElementById('emp_no').value = saved; document.getElementById('remember_me').checked = true; }
         };
 
-        async function handleLogin() {
+        async function doLogin() {
             const emp_no = document.getElementById('emp_no').value;
             const password = document.getElementById('password').value;
-            const remember = document.getElementById('remember_me').checked;
-
-            if (!emp_no || !password) return alert("사번과 비밀번호를 모두 입력하세요.");
-
-            const res = await fetch('/user/login', {
+            const res = await fetch('/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ emp_no, password })
             });
-
-            if (res.ok) {
-                if (remember) localStorage.setItem('saved_sd_emp', emp_no);
+            if(res.ok) {
+                if(document.getElementById('remember_me').checked) localStorage.setItem('saved_sd_emp', emp_no);
                 else localStorage.removeItem('saved_sd_emp');
                 location.href = '/';
             } else {
-                const result = await res.json();
-                alert(result.message);
+                const err = await res.json();
+                alert(err.message);
             }
         }
     </script>
