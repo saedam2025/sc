@@ -66,8 +66,11 @@
         .menu-register i { color: #4a90e2; }
 
         /* 로그아웃 아이콘 스타일 */
-        .btn-logout { color: #e03131; margin-left: 10px; transition: 0.2s; }
+        .btn-logout { color: #e03131; margin-left: 10px; transition: 0.2s; display: inline-block; }
         .btn-logout:hover { transform: scale(1.1); }
+        
+        /* 사용자 섹션 정렬 */
+        .user-section { display: flex; align-items: center; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -115,9 +118,9 @@
             </nav>
 
             <div class="user-section">
-                {% if session.user_name %}
-                <span class="user-name"><strong>{{ session.user_name }}</strong>님 환영합니다</span>
-                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
+                {% if session.get('user_name') %}
+                <span class="user-name"><strong>{{ session['user_name'] }}</strong>님 환영합니다</span>
+                <a href="/logout" class="btn-logout" title="로그아웃">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </a>
                 {% endif %}
@@ -153,6 +156,7 @@
                         <option value="계약직">계약직</option>
                         <option value="안전코디">안전코디</option>
                         <option value="전담코디">전담코디</option>
+                        <option value="센터장">센터장</option>
                     </select>
                     <input type="text" id="m_phone" placeholder="연락처 (010-0000-0000)">
                     <button type="button" class="btn-modal-submit" onclick="submitModalRegister()">등록 신청하기</button>
