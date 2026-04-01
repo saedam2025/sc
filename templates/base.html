@@ -64,6 +64,10 @@
         /* 가입신청 메뉴 강조 */
         .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
         .menu-register i { color: #4a90e2; }
+
+        /* 로그아웃 아이콘 스타일 */
+        .btn-logout { color: #e03131; margin-left: 10px; transition: 0.2s; }
+        .btn-logout:hover { transform: scale(1.1); }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -111,10 +115,12 @@
             </nav>
 
             <div class="user-section">
-                <span class="user-name"><strong>새담</strong>님 환영합니다</span>
-                <a href="#" class="btn-logout" title="로그아웃">
+                {% if session.user_name %}
+                <span class="user-name"><strong>{{ session.user_name }}</strong>님 환영합니다</span>
+                <a href="/logout" class="btn-logout" title="로그아웃">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </a>
+                {% endif %}
             </div>
         </div>
     </header>
@@ -138,7 +144,8 @@
             <form id="modalRegForm">
                 <div class="modal-form-group">
                     <input type="text" id="m_name" placeholder="성명" required>
-                    <input type="password" id="m_password" placeholder="비밀번호 (4자리)" required>
+                    <input type="password" id="m_password" maxlength="10" placeholder="비밀번호 (10자 이내 복합문자)" required>
+                    <input type="text" id="m_rrn" placeholder="주민번호 (000000-0000000)" required>
                     <select id="m_position">
                         <option value="사원">사원</option>
                         <option value="팀장">팀장</option>
@@ -168,12 +175,20 @@
             const data = {
                 name: document.getElementById('m_name').value,
                 password: document.getElementById('m_password').value,
+                rrn: document.getElementById('m_rrn').value,
                 position: document.getElementById('m_position').value,
                 phone: document.getElementById('m_phone').value
             };
 
-            if(!data.name || !data.password) {
-                alert("이름과 비밀번호는 필수 입력 사항입니다.");
+            if(!data.name || !data.password || !data.rrn) {
+                alert("성명, 비밀번호, 주민번호는 필수 입력 사항입니다.");
+                return;
+            }
+
+            // 비밀번호 10자 이내 복합문자 규칙 체크 (정규식)
+            const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
+            if(!pwRegex.test(data.password)) {
+                alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
                 return;
             }
 
@@ -186,7 +201,7 @@
                 const result = await res.json();
                 
                 if(res.ok) {
-                    alert("가입 신청이 완료되었습니다! 관리자 승인 후 이용 가능합니다.");
+                    alert("가입 신청이 완료되었습니다! 관리자 승인 후 부여된 사번으로 로그인해주세요.");
                     closeRegisterModal();
                     document.getElementById('modalRegForm').reset();
                 } else {
