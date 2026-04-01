@@ -16,11 +16,8 @@
     
     .action-btn { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: 0.2s; }
     .btn-edit { background: #e7f5ff; color: #1971c2; }
-    .btn-edit:hover { background: #1971c2; color: white; }
     .btn-delete { background: #fff5f5; color: #c92a2a; }
-    .btn-delete:hover { background: #c92a2a; color: white; }
     .btn-retire { background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; }
-    .btn-retire:hover { background: #343a40; color: white; }
     .btn-approve { background: #28a745; color: white; }
     
     .btn-top { padding: 12px 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: 0.3s; }
@@ -199,7 +196,7 @@ async function submitDirectRegister() {
     };
     if(!data.name || !data.password || !data.rrn) return alert("필수 정보를 입력하세요.");
     
-    // 비밀번호 정규식: 10자 이내 (영문, 숫자, 특수문자 허용)
+    // 비밀번호 정규식 검증
     const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
     if(!pwRegex.test(data.password)) return alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
 
@@ -207,24 +204,6 @@ async function submitDirectRegister() {
     const d = await res.json();
     alert(d.message);
     if(res.ok) { closeModal(); loadAllUsers(); }
-}
-
-function openInviteModal() {
-    document.getElementById('modalTitle').innerText = "초대장 발송";
-    document.getElementById('modalBody').innerHTML = `<div class="modal-field"><label>수신자 이메일</label><input type="email" id="target_email"></div>`;
-    document.getElementById('adminArea').style.display = 'none';
-    document.getElementById('modalSubmitBtn').innerText = "발송하기";
-    document.getElementById('modalSubmitBtn').onclick = submitInvite;
-    document.getElementById('userModal').style.display = 'block';
-}
-
-async function submitInvite() {
-    const email = document.getElementById('target_email').value;
-    if(!email) return alert("이메일을 입력하세요.");
-    const btn = document.getElementById('modalSubmitBtn');
-    btn.innerText = "발송 중..."; btn.disabled = true;
-    const res = await fetch('/user/send_invite', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ email }) });
-    const d = await res.json(); alert(d.message); closeModal();
 }
 
 async function registerUser() {

@@ -34,7 +34,6 @@
     </div>
 
     <script>
-        // 페이지 로드 시 로컬 스토리지에서 사번 확인
         window.onload = () => {
             const savedEmpNo = localStorage.getItem('saved_sd_emp');
             if (savedEmpNo) {
@@ -65,11 +64,6 @@
                 alert(result.message);
             }
         }
-
-        // 엔터키 로그인 지원
-        document.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') handleLogin();
-        });
     </script>
 </body>
 </html>
