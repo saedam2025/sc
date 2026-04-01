@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
+    <title>본인인증 | 새담청소년교육문화원</title>
+    <style>
+        :root {
+            --saedam-blue: #004ea2;
+            --saedam-navy: #002c63; /* 진한 네이비 */
+            --border-color: #d1d8e0;
+        }
+
+        body {
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: var(--saedam-navy); /* 바탕은 진한 네이비색 배경 */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* height 대신 min-height 사용 (모바일 대응) */
+        }
+
+        /* 1) 가로로 넓은 로그인창 (기본 PC 설정) */
+        .login-wrapper {
+            width: 92%;
+            max-width: 855px;
+            background: #ffffff;
+            display: flex; /* 가로 배치를 위한 flex */
+            flex-direction: row; 
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border-radius: 0; /* 사각테두리 Flat 디자인 */
+            overflow: hidden;
+            margin: 20px;
+        }
+
+        /* 4) 로그인창 왼편 그림 영역 */
+        .login-side-image {
+            flex: 1;
+            background: var(--saedam-blue);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            padding: 40px;
+            text-align: center;
+            background-image: linear-gradient(rgba(0, 78, 162, 0.8), rgba(0, 78, 162, 0.8)), 
+                              url('https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80');
+            background-size: cover;
+            background-position: center;
+        }
+
+        .login-side-image h2 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .login-side-image p {
+            font-size: 1rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        /* 로그인 폼 영역 */
+        .login-form-area {
+            flex: 1.2;
+            padding: 60px 50px;
+            box-sizing: border-box;
+        }
+
+        .login-header {
+            margin-bottom: 35px;
+        }
+
+        .login-header .logo-title {
+            font-size: 0.9rem;
+            color: var(--saedam-blue);
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .login-header h2 {
+            font-size: 1.8rem;
+            color: var(--saedam-navy);
+            margin: 0;
+            font-weight: 800;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            background: #fdfdfd;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--saedam-navy);
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 15px;
+        }
+
+        .btn-login:hover {
+            background-color: var(--saedam-blue);
+        }
+
+        .footer-info {
+            margin-top: 30px;
+            font-size: 0.75rem;
+            color: #aaa;
+            text-align: center;
+        }
+
+        /* [모바일 대응 미디어 쿼리 추가] */
+        @media (max-width: 768px) {
+            body {
+                align-items: flex-start; /* 모바일에서 상단 정렬 */
+                height: auto;
+            }
+
+            .login-wrapper {
+                flex-direction: column; /* 가로 배치를 세로 배치로 변경 */
+                width: 95%;
+                margin: 40px auto;
+            }
+
+            .login-side-image {
+                padding: 40px 20px;
+            }
+
+            .login-side-image h2 {
+                font-size: 1.5rem;
+            }
+
+            .login-form-area {
+                padding: 40px 30px;
+            }
+
+            .login-header h2 {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+
+<script>
+    // 1. 우클릭 방지
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.');
+    });
+
+    // 2. 단축키 차단 (F12, 소스보기, 개발자도구 등)
+    document.onkeydown = function(e) {
+        if (e.keyCode == 123) return false;
+        if (e.ctrlKey && e.shiftKey && e.keyCode == 73) return false;
+        if (e.ctrlKey && e.shiftKey && e.keyCode == 74) return false;
+        if (e.ctrlKey && e.keyCode == 85) return false;
+        if (e.ctrlKey && e.keyCode == 83) return false;
+    };
+
+    // 3. 드래그 및 선택 방지
+    document.onselectstart = function() {
+        return false;
+    };
+</script>
+
+<body>
+
+    <div class="login-wrapper">
+        <div class="login-side-image">
+            <h2>새담 계약시스템</h2>
+            <span style="color: #ffffff; font-size: 25px; text-shadow: 0 2px 3px rgba(0,0,0,0.35);">Contract System</span>
+            <p>미래를 설계하는 즐거움<br>(사)새담청소년교육문화원</p>
+        </div>
+
+        <div class="login-form-area">
+            <header class="login-header">
+                <span class="logo-title">CONTRACTOR LOGIN</span>
+                <h2>계약자 본인인증</h2>
+            </header>
+
+            <form action="/login" method="post">
+                <div class="form-group">
+                    <label for="name">성명 <span style="font-family: Arial, sans-serif; font-weight: normal; color:#6FA8DC; font-size: 14px;">Name</span></label>
+                    <input type="text" id="name" name="name" placeholder="이름을 입력하세요" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="ssn">주민등록번호 <span style="font-family: Arial, sans-serif; font-weight: normal; color:#6FA8DC; font-size: 14px;">Registration Number</span></label>
+                    <input type="text" id="ssn" name="ssn" placeholder="800101-1234567" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="ssn_last4">비밀번호 <span style="font-family: Arial, sans-serif; font-weight: normal; color:#6FA8DC; font-size: 14px;">Password</span></label>
+                    <input type="password" id="ssn_last4" name="ssn_last4" placeholder="••••" required>
+                </div>
+
+                <button type="submit" class="btn-login">
+                    계약 목록 확인하기<br>
+                    <span style="font-family: Arial, sans-serif; font-weight: normal; color:#6FA8DC; font-size: 14px;">Contract List</span>
+                </button>
+            </form>
+            
+            <footer class="footer-info">
+                <div style="text-align: center; margin-bottom: 10px;">
+                    <img src="http://www.saedam.org/img/logo01.gif" width="100" alt="Logo">
+                </div>
+                ©SAEDAM Youth Education & Culture Center. All Rights Reserved.
+            </footer>
+        </div>
+    </div>
+
+</body>
+</html>

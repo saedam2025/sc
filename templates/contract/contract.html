@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <title>계약서 작성 | (사)새담</title>
+    <style>
+        :root {
+            --saedam-blue: #004ea2;
+            --saedam-navy: #002c63;
+            --bg-light: #f4f7fa;
+            --border-color: #d1d8e0;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--saedam-navy);
+            margin: 0;
+            padding: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .contract-wrapper {
+            width: 95%;
+            max-width: 800px;
+            background: white;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+
+        .type-badge {
+            display: inline-block;
+            background: var(--saedam-blue);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-decoration: underline;
+        }
+
+        .info-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }
+
+        .info-item label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .canvas-container {
+            border: 1px dashed #adb5bd; 
+            margin: 20px 0;
+            background: #fcfdfe; 
+            border-radius: 8px;
+            padding: 5px; 
+            transition: all 0.3s ease;
+            /* [수정] 모바일 터치 시 브라우저 스크롤 방지 */
+            touch-action: none; 
+        }
+
+        .canvas-container:hover {
+            border-color: var(--saedam-blue);
+            background-color: #f0f7ff;
+        }
+
+        canvas { 
+            width: 100%; 
+            height: 200px; 
+            cursor: crosshair; 
+            background-color: transparent; 
+            /* [수정] 모바일 터치 시 브라우저 스크롤 방지 */
+            touch-action: none;
+        }
+
+        .btn-area { text-align: center; margin-top: 30px; }
+        
+        #submit-btn {
+            background: var(--saedam-blue);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        #submit-btn:hover { background: #003d82; }
+        .clear-btn { background: #666; color: white; border: none; padding: 5px 15px; border-radius: 3px; cursor: pointer; }
+
+        .readonly-text {
+            padding: 10px 2px;
+            font-size: 1em;
+            color: #333;
+            border-bottom: 1px solid #ccc;
+        }
+
+        #sig-canvas {
+            touch-action: none; 
+            -webkit-user-select: none;
+            user-select: none;
+        }
+    </style>
+
+<script>
+    // 1. 우클릭 방지
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.');
+    });
+
+    // 2. 단축키 차단 (F12, 소스보기, 개발자도구 등)
+    document.onkeydown = function(e) {
+        // F12 차단
+        if (e.keyCode == 123) {
+            return false;
+        }
+        // Ctrl + Shift + I (개발자 도구) 차단
+        if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
+            return false;
+        }
+        // Ctrl + Shift + J (콘솔) 차단
+        if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+            return false;
+        }
+        // Ctrl + U (페이지 소스 보기) 차단
+        if (e.ctrlKey && e.keyCode == 85) {
+            return false;
+        }
+        // Ctrl + S (페이지 저장) 차단
+        if (e.ctrlKey && e.keyCode == 83) {
+            return false;
+        }
+    };
+
+    // 3. 드래그 및 선택 방지 (계약서 내용 복사 방지)
+    document.onselectstart = function() {
+        return false;
+    };
+</script>
+
+</head>
+<body>
+
+<div class="contract-wrapper">
+    <div class="type-badge">{{ '센터장' if data.계약구분 in ['코디근로자', '코디사업자'] else data.계약구분 }}</div>
+    
+    {% set doc_title = "" %}
+    {% if data.계약구분 in ['방과후강사', '맞춤형강사'] %}
+        {% set doc_title = "새담청소년교육문화원 위탁교육계약서" %}
+    {% elif data.계약구분 in ['코디근로자', '코디사업자'] %}
+        {% set doc_title = "새담청소년교육문화원 센터장 계약서" %}
+    {% elif data.계약구분 in ['원어민근로자', '원어민사업자'] %}
+        {% set doc_title = "방과후 영어 원어민 강사 위탁 계약서" %}
+    {% elif data.계약구분 == '안전코디' %}
+        {% set doc_title = "새담청소년교육문화원 위수탁계약서" %}
+    {% elif data.계약구분 == '직원근로자' %}
+        {% set doc_title = "새담청소년교육문화원 근로계약서" %}
+    {% elif data.계약구분 == '직원사업자' %}
+        {% set doc_title = "새담청소년교육문화원 위탁업무계약서" %}
+    {% else %}
+        {% set doc_title = "새담청소년교육문화원 계약서 (" ~ data.계약구분 ~ ")" %}
+    {% endif %}
+
+    <h1>{{ doc_title }}</h1>
+
+    <div class="info-section">
+        <div class="info-item">
+            <label>
+                {% if data.계약구분 in ['원어민근로자', '원어민사업자'] %}
+                    School Name
+                {% elif data.계약구분 in ['직원근로자', '직원사업자'] %}
+                    법인명
+                {% else %}
+                    수탁학교명
+                {% endif %}
+            </label>
+            <div class="readonly-text">
+                {% if data.계약구분 in ['직원근로자', '직원사업자'] %}
+                    새담청소년교육문화원
+                {% else %}
+                    {{ data.수탁학교명 }}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="info-item">
+            <label>
+                {% if data.계약구분 in ['원어민근로자', '원어민사업자'] %}
+                    Part
+                {% elif data.계약구분 in ['코디사업자', '코디근로자', '안전코디', '직원근로자'] %}
+                    직책
+                {% elif data.계약구분 == '직원사업자' %}
+                    위탁업무
+                {% else %}
+                    부서명
+                {% endif %}
+            </label>
+            <div class="readonly-text">{{ data.부서명 }}</div>
+        </div>
+
+        <div class="info-item">
+            <label>성명</label>
+            <div class="readonly-text">{{ data.성명 }}</div>
+        </div>
+        <div class="info-item">
+            <label>주민번호</label>
+            <div class="readonly-text">{{ data.주민번호 }}</div>
+        </div>
+        
+        <div class="info-item">
+            <label>연락처</label>
+            <input type="text" id="phone" class="input-field" placeholder="010-1234-5678">
+        </div>
+
+        <div class="info-item">
+            <label>이메일 (입력하신 이메일로 계약서가 발송됩니다)</label>
+            <input type="email" id="email" class="input-field" placeholder="example@gmail.com">
+        </div>
+        <div class="info-item" style="grid-column: span 2;">
+            <label>주소</label>
+            <input type="text" id="address" class="input-field" placeholder="등본상 주소를 입력하세요">
+        </div>
+    </div>
+
+    <h3>계약 조항</h3>
+    <div class="terms-area" style="background: #fff; padding: 20px; border: 1px solid var(--border-color); border-radius: 8px;">
+        <div class="content-box" style="font-family: 'Pretendard', sans-serif; font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 10px;">
+            {{ data.terms_content1 | safe }}
+        </div>
+        <hr style="border: 0; border-top: 1px dashed #ddd; margin: 10px 0;">
+        <div class="content-box" style="font-family: 'Pretendard', sans-serif; font-size: 16px; line-height: 1.8; color: #333;">
+            {{ data.terms_content2 | safe }}
+        </div>
+    </div>
+    <br>
+
+    <div style="background: #eee; padding: 15px; font-size: 1em; line-height: 1.6; color: #444; border-radius: 4px;">
+        ※ 본 계약은 아래 전자서명 및 계약완료버튼을 클릭하셔야 계약이 완료됩니다. 상기 내용를 확인하신 후 아래 체크박스<br>&nbsp;&nbsp;내용 3가지를 확인 및 체크하시고 하단에 서명해 주시기 바랍니다. 계약서는 입력하신 본인 이메일로 전송됩니다.
+    </div>
+
+    <div style="margin-top: 30px;">
+        <div style="background: #f0f7ff; border: 1px dashed var(--saedam-blue); padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px; cursor: pointer; font-size: 0.95em;">
+                <input type="checkbox" id="agree1" style="width: 16px; height: 16px; vertical-align: middle;"> 
+                <span style="vertical-align: middle; margin-left: 5px;">동의 1: 본인은 본 계약서의 모든 내용을 충분히 숙지하고 이해하였으며, 아래 전자서명을 통해 이에 동의함을 확인합니다.</span>
+            </label>
+            <label style="display: block; margin-bottom: 10px; cursor: pointer; font-size: 0.95em;">
+                <input type="checkbox" id="agree2" style="width: 16px; height: 16px; vertical-align: middle;"> 
+                <span style="vertical-align: middle; margin-left: 5px;">동의 2: 본인은 본 계약서 정보 및 본인이 제출한 이력서와 그에 따른 첨부서류에 대한 본사의 개인정보활용에 동의합니다.</span>
+            </label>
+            <label style="display: block; cursor: pointer; font-size: 0.95em;">
+                <input type="checkbox" id="agree3" style="width: 16px; height: 16px; vertical-align: middle;"> 
+                <span style="vertical-align: middle; margin-left: 5px;">동의 3: 본인은 본 계약서가 법적 효력을 가짐을 확인하며 본인 메일로 전송받은 계약서를 보관할 책임이 있음을 확인합니다.</span>
+            </label>
+        </div>
+
+        <h3>계약자 성명입력 및 서명란</h3>
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="confirm-name" class="input-field" 
+                   placeholder="계약자 성명 입력" 
+                   autocomplete="off"
+                   style="width: 260px; border: 2px solid var(--saedam-blue); text-align: center; font-weight: bold;">
+            <span style="font-size: 0.85em; color: #666; margin-left: 8px;">* 성명을 입력하고 아래 서명란에 서명 후 [계약서 서명 및 완료] 버튼을 누르면 계약이 완료됩니다.</span>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="sig-canvas"></canvas>
+    </div>
+    <button type="button" class="clear-btn" id="clear-btn">서명 초기화</button>
+
+    <div class="btn-area">
+        <button type="button" id="submit-btn">계약완료 및 전송받기</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('sig-canvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let isSigned = false;
+
+    // 캔버스 사이즈 조절
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = 200;
+        // 리사이즈 후 컨텍스트 설정 초기화 방지
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#1a202c';
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 좌표 계산 (모바일 터치 대응 정밀화)
+    function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        let clientX, clientY;
+
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+            clientY = e.touches[0].clientY;
+        } else {
+            clientX = e.clientX;
+            clientY = e.clientY;
+        }
+
+        return {
+            x: clientX - rect.left,
+            y: clientY - rect.top
+        };
+    }
+
+    function start(e) {
+        drawing = true;
+        isSigned = true;
+        ctx.beginPath();
+        const p = getPos(e);
+        ctx.moveTo(p.x, p.y);
+    }
+
+    function draw(e) {
+        if (!drawing) return;
+        
+        // [수정] 모바일에서 스크롤 간섭 방지 (끊김 해결 핵심)
+        if (e.cancelable) e.preventDefault();
+        
+        const p = getPos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+    }
+
+    function stop() {
+        drawing = false;
+        ctx.closePath();
+    }
+
+    // 마우스 이벤트
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stop);
+
+    // [수정] 터치 이벤트 (끊김 방지를 위해 {passive: false} 적용 및 이벤트 세분화)
+    canvas.addEventListener('touchstart', function(e) {
+        start(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', function(e) {
+        draw(e);
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', stop, { passive: false });
+    
+    // 캔버스 밖으로 나갔을 때 처리
+    canvas.addEventListener('touchcancel', stop, { passive: false });
+
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        isSigned = false;
+    });
+
+    document.getElementById('submit-btn').addEventListener('click', function() {
+        const phone = document.getElementById('phone').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const address = document.getElementById('address').value.trim();
+        const confirmName = document.getElementById('confirm-name').value.trim();
+        const targetName = "{{ data.성명 }}";
+
+        const isAgree1 = document.getElementById('agree1').checked;
+        const isAgree2 = document.getElementById('agree2').checked;
+        const isAgree3 = document.getElementById('agree3').checked;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if(!phone || !email || !address) {
+            alert("연락처, 이메일, 주소를 모두 입력해 주세요.");
+            return;
+        }
+        if(!emailRegex.test(email)) {
+            alert("유효한 이메일 주소를 입력해 주세요.");
+            document.getElementById('email').focus();
+            return;
+        }
+        if(!isAgree1 || !isAgree2 || !isAgree3) {
+            alert("3가지 필수 동의 항목에 모두 체크해 주세요.");
+            return;
+        }
+        if(!confirmName) {
+            alert("수탁자 성명을 입력해 주세요.");
+            document.getElementById('confirm-name').focus();
+            return;
+        }
+        if(confirmName !== targetName) {
+            alert("입력하신 성명이 계약자 성명(" + targetName + ")과 일치하지 않습니다.");
+            document.getElementById('confirm-name').focus();
+            return;
+        }
+        if(!isSigned) {
+            alert("서명란에 서명해 주세요.");
+            return;
+        }
+
+        this.disabled = true;
+        this.innerText = "계약서 생성 및 전송 중...";
+
+        const payload = {
+            orig_idx: "{{ data.orig_idx }}",
+            contract_type: "{{ data.계약구분 }}",
+            name: targetName,
+            school: "{{ data.수탁학교명 }}",
+            dept: "{{ data.부서명 }}",
+            fee: "{{ data.수수료 }}",
+            phone: phone,
+            email: email,
+            address: address,
+            signature: canvas.toDataURL()
+        };
+
+        fetch('/save_contract', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(d => {
+            alert(d.message);
+            if(d.status === 'success') location.href = '/list';
+            else {
+                this.disabled = false;
+                this.innerText = "계약완료 및 전송받기";
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("통신 중 오류가 발생했습니다.");
+            this.disabled = false;
+            this.innerText = "계약완료 및 전송받기";
+        });
+    });
+</script>
+
+</body>
+</html>

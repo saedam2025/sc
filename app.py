@@ -16,13 +16,27 @@ app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
 # 서버 시작 시 엑셀 파일 초기화
 init_files()
 
-# 로그인 체크 제외 대상 (로그인 페이지, 가입, 정적 파일)
-EXEMPT_ROUTES = ['login_page', 'login', 'logout', 'user_mgmt.register', 'user_mgmt.invite_page', 'static']
+# 로그인 체크 제외 대상 (로그인 페이지, 가입, 정적 파일 + 강사 계약 관련 경로 추가)
+EXEMPT_ROUTES = [
+    'login_page', 
+    'login', 
+    'logout', 
+    'user_mgmt.register', 
+    'user_mgmt.invite_page', 
+    'static',
+    # 강사 계약 시스템 예외 경로 (외부 강사 접속용)
+    'contract.login', 
+    'contract.contract_list', 
+    'contract.contract', 
+    'contract.save_contract'
+]
 
 @app.before_request
 def check_login():
     if request.endpoint in EXEMPT_ROUTES or (request.path and request.path.startswith('/static')):
         return None
+    
+    # 세션에 사번(emp_no)이 없으면 인트라넷 로그인 페이지로 리다이렉트
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
 
@@ -64,6 +78,7 @@ def logout():
 # --- Blueprint 등록 ---
 app.register_blueprint(main_bp)
 app.register_blueprint(document_bp, url_prefix='/document')
+# 강사 계약 시스템을 /contract 경로로 연결
 app.register_blueprint(contract_bp, url_prefix='/contract')
 app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')
