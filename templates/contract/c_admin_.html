@@ -266,7 +266,7 @@
 </div>
 
 
-<form class="filter-bar" method="GET" action="/c_admin">
+<form class="filter-bar" method="GET" action="/contract/admin">
         <div class="filter-group">
             <label>연도</label>
             <select name="year">
@@ -320,7 +320,7 @@
 
         <div style="display: flex; gap: 5px;">
             <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
-            <button type="button" onclick="location.href='/c_admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
+            <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
         </div>
         
         <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: auto; font-size: 0.8rem;">선택 삭제</button>
@@ -422,18 +422,18 @@
 
 
 <div class="pagination">
-        <a href="{{ url_for('admin_page', page=1, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">«</a>
+        <a href="{{ url_for('contract.admin_page', page=1, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">«</a>
 
-        <a href="{{ url_for('admin_page', page=prev_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Prev 10</a>
+        <a href="{{ url_for('contract.admin_page', page=prev_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Prev 10</a>
 
         {% for p in range(start_page, end_page + 1) %}
-        <a href="{{ url_for('admin_page', page=p, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" 
+        <a href="{{ url_for('contract.admin_page', page=p, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" 
            class="{{ 'active' if p == current_page else '' }}">{{p}}</a>
         {% endfor %}
 
-        <a href="{{ url_for('admin_page', page=next_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Next 10</a>
+        <a href="{{ url_for('contract.admin_page', page=next_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Next 10</a>
 
-        <a href="{{ url_for('admin_page', page=total_pages, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">»</a>
+        <a href="{{ url_for('contract.admin_page', page=total_pages, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">»</a>
     </div>
 </div>
 
@@ -495,7 +495,7 @@
 
         if (!payload.성명) { alert("성명을 입력해주세요."); return; }
 
-        fetch('/c_admin/add', { 
+        fetch('/contract/admin/add', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(payload) 
@@ -546,7 +546,7 @@ let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
 
     // 실제 서버 통신 실행
     function executeDeleteAction() {
-        fetch('/c_admin/delete', { 
+        fetch('/contract/admin/delete', { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ indices: selectedIdsForDelete }) 
@@ -578,7 +578,7 @@ let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
         const formData = new FormData();
         formData.append('excel_file', fileInput.files[0]);
 
-        fetch('/c_admin/upload_excel', { method: 'POST', body: formData })
+        fetch('/contract/admin/upload_excel', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
@@ -610,7 +610,7 @@ let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
 
         // 서버 라우팅에 맞춰 /c_admin/ 또는 /admin/ 확인 후 사용
         if(confirm(ids.length + "건의 계약서를 ZIP파일로 다운로드하시겠습니까?")) {
-            location.href = `/admin/download_selected?ids=${idString}`;
+            location.href = `/contract/admin/download_selected?ids=${idString}`;
         }
     }
 </script>
