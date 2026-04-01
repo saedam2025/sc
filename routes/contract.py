@@ -194,8 +194,16 @@ def contract(safe_id):
 
 @contract_bp.route('/save_contract', methods=['POST'])
 def save_contract():
-    data = request.json
+    data = request.get_json(silent=True)
+
+    if not data:
+        data = request.form.to_dict()
+
+    if not data:
+        return jsonify({"status": "error", "message": "데이터 없음"}), 400
+
     idx = int(data['orig_idx'])
+
     now_dt = datetime.now(KST)
     try:
         df = pd.read_excel(EXCEL_FILE, dtype=str)
