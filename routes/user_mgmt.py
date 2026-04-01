@@ -55,11 +55,6 @@ def send_real_email(target_email, invite_link):
 def index():
     return render_template('user_list.html')
 
-@user_mgmt_bp.route('/register_page')
-def register_page():
-    # 직접 신청 등록 전용 페이지 (독립 레이아웃)
-    return render_template('user_list.html', mode='invite', direct=True)
-
 @user_mgmt_bp.route('/invite_page/<token>')
 def invite_page(token):
     try:
@@ -87,7 +82,6 @@ def register():
         data = request.json
         df = read_excel_db(OWNER_FILE)
         if not df.empty:
-            # 이름과 주민번호 전체가 일치할 때만 중복 처리
             dup = df[(df['이름'] == data['name']) & (df['주민번호'] == data.get('rrn', ''))]
             if not dup.empty:
                 return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
@@ -111,7 +105,7 @@ def approve():
         idx = int(data['user_idx'])
         pos = data['approved_position']
         df.at[idx, '직급'] = pos
-        df.at[idx, '레벨'] = LEVEL_MAP.get(pos, 10)
+        df.at[idx, '레벨'] = LEVEL_MAP.get(approved_pos, 10)
         df.at[idx, '승인상태'] = '승인'
         df.at[idx, '입사일'] = datetime.now().strftime('%Y-%m-%d')
         write_excel_db(df, OWNER_FILE)
