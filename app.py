@@ -1,40 +1,67 @@
-from flask import Flask, session, redirect, url_for, request, render_template
+from flask import Flask, session, redirect, url_for, request, render_template, jsonify
 import os
+# 상대 경로 임포트 에러 수정을 위해 절대 경로 사용
 from routes.main import main_bp
 from routes.document import document_bp
 from routes.contract import contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
 from routes.board import board_bp
-from routes.db_handler import init_files
+from routes.db_handler import init_files, read_excel_db, OWNER_FILE
 
 app = Flask(__name__)
-# 세션 암호화를 위한 키
-app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_7777")
+# 세션 보안을 위한 키 설정
+app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
 
-# 서버 시작 시 엑셀 파일들 초기화
+# 서버 시작 시 엑셀 파일 초기화
 init_files()
 
-# 로그인 체크 예외 대상 경로
-EXEMPT_ROUTES = [
-    'user_mgmt.login_page', 
-    'user_mgmt.login', 
-    'user_mgmt.register', 
-    'user_mgmt.invite_page', 
-    'static'
-]
+# 로그인 체크 제외 대상 (로그인 페이지, 가입, 정적 파일)
+EXEMPT_ROUTES = ['login_page', 'login', 'logout', 'user_mgmt.register', 'user_mgmt.invite_page', 'static']
 
 @app.before_request
 def check_login():
-    # 제외 대상 경로이거나 정적 파일인 경우 통과
     if request.endpoint in EXEMPT_ROUTES or (request.path and request.path.startswith('/static')):
         return None
-    
-    # 세션에 사번(emp_no) 정보가 없으면 로그인 페이지로 강제 이동
     if 'emp_no' not in session:
-        return redirect(url_for('user_mgmt.login_page'))
+        return redirect(url_for('login_page'))
 
-# Blueprint 등록 (모든 메뉴 연결)
+# --- 로그인/로그아웃 총괄 로직 ---
+
+@app.route('/login_page')
+def login_page():
+    return render_template('login.html')
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    emp_no = data.get('emp_no')
+    password = data.get('password')
+    
+    df = read_excel_db(OWNER_FILE)
+    if df.empty:
+        return jsonify({"status": "error", "message": "사용자 정보가 없습니다."}), 404
+
+    user = df[(df['사번'].astype(str) == str(emp_no)) & (df['암호'].astype(str) == str(password))]
+    
+    if not user.empty:
+        u_info = user.iloc[0]
+        if u_info['승인상태'] != '승인':
+            return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
+            
+        session['emp_no'] = str(u_info['사번'])
+        session['user_name'] = u_info['이름']
+        session['user_level'] = int(u_info['레벨'])
+        return jsonify({"status": "success"})
+    
+    return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
+
+@app.route('/logout')
+def logout():
+    session.clear() # 모든 세션 파기
+    return redirect(url_for('login_page'))
+
+# --- Blueprint 등록 ---
 app.register_blueprint(main_bp)
 app.register_blueprint(document_bp, url_prefix='/document')
 app.register_blueprint(contract_bp, url_prefix='/contract')
