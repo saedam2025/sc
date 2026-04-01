@@ -10,13 +10,40 @@ from email.mime.multipart import MIMEMultipart
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
-# 직급별 권한 레벨 정의
+# 직급별 권한 레벨 및 사번 그룹 코드 정의
 LEVEL_MAP = {
     "대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5,
     "센터장": 6, "전담코디": 7, "안전코디": 8, "계약직": 9, "임시회원": 10
 }
 
-# 실제 메일 발송 함수 (Render 환경변수 사용)
+GROUP_CODE_MAP = {
+    "대표이사": "01",
+    "이사": "02", "실장": "02",
+    "팀장": "03", "사원": "03",
+    "센터장": "04",
+    "전담코디": "05", "안전코디": "05", "계약직": "05",
+    "임시회원": "00"
+}
+
+# 사번 생성 함수 (sd + 그룹코드 + 3자리 순번)
+def generate_sd_emp_no(df, position):
+    group_code = GROUP_CODE_MAP.get(position, "05")
+    prefix = f"sd{group_code}"
+    
+    if df.empty or '사번' not in df.columns:
+        return f"{prefix}001"
+    
+    # 해당 그룹코드로 시작하는 기존 사번들 추출
+    group_emps = df[df['사번'].astype(str).str.startswith(prefix)]
+    
+    if group_emps.empty:
+        return f"{prefix}001"
+    
+    # 마지막 순번 추출 후 1 증가
+    last_no_str = group_emps['사번'].astype(str).max()[-3:]
+    next_no = int(last_no_str) + 1
+    return f"{prefix}{next_no:03d}"
+
 def send_real_email(target_email, invite_link):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
@@ -87,6 +114,7 @@ def register():
                 return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
 
         new_user = pd.DataFrame([{
+            '사번': '',
             '이름': data['name'], '암호': str(data['password']), '직급': data['position'],
             '레벨': 10, '주민번호': data.get('rrn', ''), '이메일': data.get('email', ''),
             '전화번호': data.get('phone', ''), '입사일': '', '퇴사일': '', '승인상태': '대기'
@@ -104,13 +132,18 @@ def approve():
         df = read_excel_db(OWNER_FILE)
         idx = int(data['user_idx'])
         pos = data['approved_position']
+        
+        # 승인 시 사번 생성 및 부여
+        df.at[idx, '사번'] = generate_sd_emp_no(df, pos)
         df.at[idx, '직급'] = pos
-        df.at[idx, '레벨'] = LEVEL_MAP.get(approved_pos, 10)
+        df.at[idx, '레벨'] = LEVEL_MAP.get(pos, 10)
         df.at[idx, '승인상태'] = '승인'
         df.at[idx, '입사일'] = datetime.now().strftime('%Y-%m-%d')
+        
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": "승인이 완료되었습니다."})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "success", "message": f"승인 완료! (사번: {df.at[idx, '사번']})"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/retire', methods=['POST'])
 def retire_user():
@@ -121,7 +154,8 @@ def retire_user():
         df.at[idx, '퇴사일'] = datetime.now().strftime('%Y-%m-%d')
         write_excel_db(df, OWNER_FILE)
         return jsonify({"status": "success", "message": "퇴사 처리가 완료되었습니다."})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/update', methods=['POST'])
 def update_user():
@@ -135,7 +169,8 @@ def update_user():
         df.at[idx, '이메일'] = data['email']
         write_excel_db(df, OWNER_FILE)
         return jsonify({"status": "success", "message": "정보 수정 완료"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/delete', methods=['POST'])
 def delete_user():
@@ -146,7 +181,8 @@ def delete_user():
         df = df.drop(df.index[idx]).reset_index(drop=True)
         write_excel_db(df, OWNER_FILE)
         return jsonify({"status": "success", "message": "삭제 완료"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/list')
 def get_user_list():
