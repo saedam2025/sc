@@ -10,11 +10,13 @@ from email.mime.multipart import MIMEMultipart
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
+# 직급별 권한 레벨 정의
 LEVEL_MAP = {
     "대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5,
     "센터장": 6, "전담코디": 7, "안전코디": 8, "계약직": 9, "임시회원": 10
 }
 
+# 실제 메일 발송 함수 (Render 환경변수 사용)
 def send_real_email(target_email, invite_link):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
@@ -32,7 +34,7 @@ def send_real_email(target_email, invite_link):
     body = f"""
     <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #ddd; padding: 25px; border-radius: 15px;">
         <h2 style="color: #4a90e2; text-align: center;">새담 인트라넷 초대</h2>
-        <p>새담 청소년 교육문화원 가입을 위한 보안 링크입니다.</p>
+        <p>안녕하세요. 새담 청소년 교육문화원입니다. 가입을 위한 보안 링크를 보내드립니다.</p>
         <div style="text-align: center; margin: 25px 0;">
             <a href="{invite_link}" target="_blank" style="background: #4a90e2; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold;">가입 신청하기</a>
         </div>
@@ -55,7 +57,7 @@ def index():
 
 @user_mgmt_bp.route('/register_page')
 def register_page():
-    # 직접 등록을 위한 독립창 (초대 가입과 동일 디자인 사용)
+    # 직접 신청 등록 전용 페이지 (독립 레이아웃)
     return render_template('user_list.html', mode='invite', direct=True)
 
 @user_mgmt_bp.route('/invite_page/<token>')
@@ -85,9 +87,10 @@ def register():
         data = request.json
         df = read_excel_db(OWNER_FILE)
         if not df.empty:
+            # 이름과 주민번호 전체가 일치할 때만 중복 처리
             dup = df[(df['이름'] == data['name']) & (df['주민번호'] == data.get('rrn', ''))]
             if not dup.empty:
-                return jsonify({"status": "error", "message": "이미 가입된 정보입니다."}), 400
+                return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
 
         new_user = pd.DataFrame([{
             '이름': data['name'], '암호': str(data['password']), '직급': data['position'],
@@ -96,7 +99,7 @@ def register():
         }])
         df = pd.concat([df, new_user], ignore_index=True)
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": "가입 신청 완료!"})
+        return jsonify({"status": "success", "message": "가입 신청이 완료되었습니다."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -110,9 +113,9 @@ def approve():
         df.at[idx, '직급'] = pos
         df.at[idx, '레벨'] = LEVEL_MAP.get(pos, 10)
         df.at[idx, '승인상태'] = '승인'
-        df.at[idx, '입사일'] = datetime.now().strftime('%Y-%m-%d') # 승인 시 입사일 자동입력
+        df.at[idx, '입사일'] = datetime.now().strftime('%Y-%m-%d')
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": "승인 및 입사 처리가 완료되었습니다."})
+        return jsonify({"status": "success", "message": "승인이 완료되었습니다."})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/retire', methods=['POST'])
@@ -121,7 +124,7 @@ def retire_user():
         data = request.json
         df = read_excel_db(OWNER_FILE)
         idx = int(data['user_idx'])
-        df.at[idx, '퇴사일'] = datetime.now().strftime('%Y-%m-%d') # 퇴사일 자동입력
+        df.at[idx, '퇴사일'] = datetime.now().strftime('%Y-%m-%d')
         write_excel_db(df, OWNER_FILE)
         return jsonify({"status": "success", "message": "퇴사 처리가 완료되었습니다."})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
@@ -137,7 +140,7 @@ def update_user():
         df.at[idx, '전화번호'] = data['phone']
         df.at[idx, '이메일'] = data['email']
         write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": "수정 완료"})
+        return jsonify({"status": "success", "message": "정보 수정 완료"})
     except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/delete', methods=['POST'])
