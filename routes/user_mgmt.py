@@ -13,6 +13,7 @@ LEVEL_MAP = {
 @user_mgmt_bp.route('/')
 def index():
     try:
+        # templates/user_list.html 경로로 렌더링
         return render_template('user_list.html')
     except Exception as e:
         return f"템플릿 에러: {str(e)}", 500
@@ -47,7 +48,8 @@ def register():
             '암호': str(data['password']), 
             '직급': data['position'],
             '레벨': 10, 
-            '주민번호': data.get('rrn', ''),
+            '주민번호': data.get('rrn', ''), # 주민번호 추가
+            '이메일': data.get('email', ''), # 이메일 추가
             '전화번호': data.get('phone', ''), 
             '주소': data.get('address', ''), 
             '기타사항': data.get('note', ''), 
@@ -79,6 +81,29 @@ def approve():
         
         write_excel_db(df, OWNER_FILE)
         return jsonify({"status": "success", "message": f"{approved_pos}(으)로 처리가 완료되었습니다. (인증: {admin_name})"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@user_mgmt_bp.route('/update', methods=['POST'])
+def update_user():
+    try:
+        data = request.json
+        is_valid, admin_name = verify_admin(data.get('admin_pass'))
+        
+        if not is_valid:
+            return jsonify({"status": "error", "message": "수정 권한이 없습니다 (관리자 암호 확인)."}), 403
+
+        df = read_excel_db(OWNER_FILE)
+        idx = int(data['user_idx'])
+        
+        # 정보 업데이트
+        df.at[idx, '직급'] = data['position']
+        df.at[idx, '레벨'] = int(data['level'])
+        df.at[idx, '전화번호'] = data['phone']
+        df.at[idx, '이메일'] = data['email']
+        
+        write_excel_db(df, OWNER_FILE)
+        return jsonify({"status": "success", "message": f"회원 정보가 수정되었습니다. (인증: {admin_name})"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
