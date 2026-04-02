@@ -115,7 +115,7 @@
                         </a>
                     </li>
                     
-                    {# 권한 제어: 레벨 5 이상만 회원관리 메뉴 노출, 레벨은 숫자가 낮을 수록 높음. 0제외. #}
+                    {# 권한 제어: 레벨 5 이하(높은 권한)만 회원관리 메뉴 노출 #}
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
@@ -135,7 +135,7 @@
                         </a>
                     </li>
 
-                    {# 권한 제어: 레벨 5 이하만 전자계약 메뉴 노출 #}
+                    {# 권한 제어: 레벨 5 이하(높은 권한)만 전자계약 메뉴 노출 #}
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/contract/admin" class="menu-item">
@@ -288,9 +288,13 @@
 
                 if (result.status === 'success') {
                     const data = result.data;
+                    
+                    // 제목 변경
                     title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
 
+                    // 지정된 순서대로 정렬 (승인상태, 퇴사일 제외)
                     const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'];
+
                     let html = '';
                     order.forEach(key => {
                         if (data.hasOwnProperty(key)) {
