@@ -30,7 +30,6 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             position: relative;
         }
-        /* 회원정보 모달은 조금 더 넓게 설정 */
         .modal-info-content {
             width: 450px;
         }
@@ -67,15 +66,12 @@
         }
         .btn-modal-submit:hover { background: #357abd; }
         
-        /* 가입신청 메뉴 강조 */
         .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
         .menu-register i { color: #4a90e2; }
 
-        /* 로그아웃 아이콘 스타일 */
         .btn-logout { color: #e03131; margin-left: 10px; transition: 0.2s; display: inline-block; }
         .btn-logout:hover { transform: scale(1.1); }
         
-        /* 사용자 섹션 스타일 */
         .user-section { display: flex; align-items: center; }
         .user-name-link { 
             cursor: pointer; 
@@ -85,16 +81,64 @@
         }
         .user-name-link:hover { color: #4a90e2; }
 
-        /* 내 정보 테이블 스타일 */
         .info-table { width:100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
         .info-table th { background: #f8f9fa; padding: 10px; border: 1px solid #eee; text-align: left; width: 35%; color: #666; }
         .info-table td { padding: 10px; border: 1px solid #eee; color: #333; font-weight: 600; }
         
-        /* 확인 버튼 중앙 정렬을 위한 컨테이너 */
         .modal-footer-center {
             display: flex;
             justify-content: center;
             margin-top: 25px;
+        }
+
+        /* --- 증명서 발급 풀다운(드롭다운) 스타일 --- */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #ffffff;
+            min-width: 170px;
+            box-shadow: 0px 8px 16px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            z-index: 1000;
+            margin-top: 5px;
+            border: 1px solid #eee;
+            overflow: hidden;
+        }
+
+        .dropdown-content a {
+            color: #333;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #f1f7ff;
+            color: #4a90e2;
+        }
+
+        .dropdown-content a i {
+            margin-right: 10px;
+            width: 15px;
+            text-align: center;
+        }
+
+        /* 호버 시 드롭다운 표시 */
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .dropdown:hover .menu-item {
+            color: #4a90e2;
         }
     </style>
     
@@ -115,7 +159,6 @@
                         </a>
                     </li>
                     
-                    {# 권한 제어: 레벨 5 이하(높은 권한)만 회원관리 메뉴 노출 #}
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
@@ -129,13 +172,21 @@
                             <i class="fa-solid fa-file-signature"></i> 사내결재
                         </a>
                     </li>
-                    <li>
-                        <a href="/document" class="menu-item">
+
+                    <li class="dropdown">
+                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
                             <i class="fa-solid fa-print"></i> 증명서발급
                         </a>
+                        <div class="dropdown-content">
+                            <a href="/document/apply">
+                                <i class="fa-solid fa-file-circle-plus"></i> - 증명서신청
+                            </a>
+                            <a href="/document/admin">
+                                <i class="fa-solid fa-file-invoice"></i> - 증명신청현황
+                            </a>
+                        </div>
                     </li>
 
-                    {# 권한 제어: 레벨 5 이하(높은 권한)만 전자계약 메뉴 노출 #}
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/contract/admin" class="menu-item">
@@ -288,20 +339,14 @@
 
                 if (result.status === 'success') {
                     const data = result.data;
-                    
-                    // 제목 변경
                     title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
-
-                    // 지정된 순서대로 정렬 (승인상태, 퇴사일 제외)
                     const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'];
-
                     let html = '';
                     order.forEach(key => {
                         if (data.hasOwnProperty(key)) {
                             html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`;
                         }
                     });
-
                     table.innerHTML = html;
                     loading.style.display = "none";
                     display.style.display = "block";

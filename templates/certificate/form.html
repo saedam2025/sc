@@ -1,318 +1,370 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>강사 경력증명서 신청</title>
-  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
-  <style>
-    body {
-      font-family: 'Nanum Gothic', sans-serif;
-      background-color: #f9f9f9;
-      margin: 0;
-      padding: 20px 10px;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 30px;
-      flex-wrap: wrap; /* 화면이 좁아지면 유의사항이 아래로 내려감 */
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
+    <title>경력증명서 신청 | 새담청소년교육문화원</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --saedam-blue: #004ea2;
+            --saedam-navy: #002c63;
+            --border-color: #d1d8e0;
+            --bg-color: #f4f7fa;
+        }
 
-    .required-star::before {
-      content: "*";
-      color: orange;
-      margin-right: 4px;
-      font-weight: bold;
-    }
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px 10px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
 
-    .container {
-      width: 500px;
-      max-width: 100%;
-      background-color: #fff;
-      padding: 30px;
-      border-radius: 12px;
-      border: 1px solid #ccc;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    }
+        .main-wrapper {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            gap: 25px;
+            flex-wrap: wrap;
+        }
 
-    h1 {
-      text-align: center;
-      margin-bottom: 25px;
-      font-size: 20px;
-      color: #1a2b4c;
-      font-weight: 700;
-    }
+        /* 입력 폼 컨테이너 */
+        .container {
+            flex: 1;
+            min-width: 320px;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border-top: 8px solid var(--saedam-blue);
+        }
 
-    form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px 20px;
-    }
+        h1 {
+            text-align: center;
+            margin-bottom: 35px;
+            font-size: 24px;
+            color: var(--saedam-navy);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
 
-    .full-width {
-      grid-column: 1 / -1;
-    }
+        form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px 25px;
+        }
 
-    label {
-      display: flex;
-      flex-direction: column;
-      font-size: 12px;
-      color: #555;
-    }
+        .full-width {
+            grid-column: 1 / -1;
+        }
 
-    label span {
-      display: flex;
-      align-items: center;
-      font-size: 13px;
-      font-weight: bold;
-      color: #444;
-      margin-bottom: 8px;
-    }
+        label {
+            display: flex;
+            flex-direction: column;
+        }
 
-    input, select {
-      padding: 10px;
-      font-size: 13px;
-      border: 1px solid #ddd;
-      background-color: #fafafa;
-      border-radius: 6px;
-      transition: border-color 0.2s;
-    }
+        label span {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: #444;
+            margin-bottom: 10px;
+        }
 
-    input:focus, select:focus {
-      border-color: #0055cc;
-      outline: none;
-      background-color: #fff;
-    }
+        label span::after {
+            content: "*";
+            color: #e03131;
+            margin-left: 4px;
+        }
 
-    .inline-group {
-      grid-column: 1 / -1;
-      display: flex;
-      gap: 14px;
-    }
+        input, select {
+            padding: 12px 15px;
+            font-size: 15px;
+            border: 1px solid var(--border-color);
+            background-color: #fcfdfe;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
 
-    .inline-group > label {
-      flex: 1;
-    }
+        input:focus, select:focus {
+            border-color: var(--saedam-blue);
+            background-color: #fff;
+            outline: none;
+            box-shadow: 0 0 8px rgba(0, 78, 162, 0.1);
+        }
 
-    button {
-      grid-column: 1 / -1;
-      padding: 14px;
-      font-size: 15px;
-      font-weight: bold;
-      background-color: #0055cc;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 10px;
-      transition: background-color 0.2s;
-    }
+        .inline-group {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 15px;
+        }
 
-    button:hover {
-      background-color: #0044aa;
-    }
+        .inline-group > label {
+            flex: 1;
+        }
 
-    button:disabled {
-      background-color: #ccc;
-      cursor: not-allowed;
-    }
+        button#submitBtn {
+            grid-column: 1 / -1;
+            padding: 18px;
+            font-size: 17px;
+            font-weight: 700;
+            background-color: var(--saedam-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background-color 0.3s;
+        }
 
-    /* 오른쪽 유의사항 스타일 */
-    .notice-box {
-      width: 260px;
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 20px;
-      border-radius: 16px;
-      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
-      position: relative;
-    }
+        button#submitBtn:hover {
+            background-color: var(--saedam-navy);
+        }
 
-    .notice-title {
-      display: block;
-      background: #f1f3f5;
-      padding: 8px;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 15px;
-      color: #1a2b4c;
-    }
+        button#submitBtn:disabled {
+            background-color: #adb5bd;
+            cursor: not-allowed;
+        }
 
-    .notice-content {
-      font-size: 12px;
-      line-height: 2;
-      color: #444;
-    }
+        /* 우측 유의사항 카드 */
+        .notice-card {
+            width: 280px;
+            background-color: var(--saedam-navy);
+            color: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 44, 99, 0.2);
+            align-self: flex-start;
+        }
 
-    .notice-item {
-      display: block;
-      margin-bottom: 5px;
-    }
+        .notice-card h3 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 15px;
+        }
 
-    .notice-sub {
-      display: block;
-      padding-left: 14px;
-      color: #666;
-    }
-  </style>
+        .notice-list {
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+        .notice-list li {
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 12px;
+            color: #d1d8e0;
+            position: relative;
+            padding-left: 18px;
+        }
+
+        .notice-list li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--saedam-blue);
+            font-weight: bold;
+        }
+
+        .contact-box {
+            margin-top: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .contact-box span {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #adb5bd;
+        }
+
+        .contact-box strong {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        @media (max-width: 800px) {
+            .notice-card {
+                width: 100%;
+            }
+            form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>📝 강사 경력증명서 신청</h1>
+    <div class="main-wrapper">
+        <div class="container">
+            <h1>📄 경력증명서 발급 신청</h1>
 
-    <form method="POST" action="/document/submit" id="certForm">
-      <label class="full-width"><span class="required-star">증명서 종류</span>
-        <select name="증명서종류" id="certType" required>
-          <option value="">-- 선택하세요 --</option>
-          <option value="강사 활동증명서">강사 활동증명서</option>
-          <option value="강사 해촉증명서">강사 해촉증명서</option>
-        </select>
-      </label>
+            <form method="POST" action="/document/submit" id="certForm">
+                <label class="full-width"><span>증명서 종류</span>
+                    <select name="증명서종류" id="certType" required>
+                        <option value="">-- 선택하세요 --</option>
+                        <option value="강사 활동증명서">강사 활동증명서</option>
+                        <option value="강사 해촉증명서">강사 해촉증명서</option>
+                    </select>
+                </label>
 
-      <label><span class="required-star">성명</span>
-        <input type="text" name="성명" required placeholder="이름 입력">
-      </label>
+                <label><span>성명</span>
+                    <input type="text" name="성명" required placeholder="성함을 입력하세요">
+                </label>
 
-      <label><span class="required-star">주민번호</span>
-        <input type="text" name="주민번호" required pattern="\d{6}-\d{7}" placeholder="예: 901010-1234567">
-      </label>
+                <label><span>주민등록번호</span>
+                    <input type="text" name="주민번호" required pattern="\d{6}-\d{7}" placeholder="000000-0000000">
+                </label>
 
-      <label class="full-width"><span class="required-star">자택주소</span>
-        <input type="text" name="자택주소" required placeholder="주소지 전체 입력">
-      </label>
+                <label class="full-width"><span>자택주소</span>
+                    <input type="text" name="자택주소" required placeholder="현재 거주 중인 주소를 입력하세요">
+                </label>
 
-      <label><span class="required-star">직책</span>
-        <select name="직책" required>
-          <option value="">-- 선택하세요 --</option>
-          <option value="늘봄학교 선택형 강사">늘봄학교 선택형 강사</option>
-          <option value="늘봄학교 맞춤형 강사">늘봄학교 맞춤형 강사</option>
-          <option value="방과후 강사">방과후 강사</option>
-        </select>
-      </label>
+                <label><span>직책</span>
+                    <select name="직책" required>
+                        <option value="">-- 선택하세요 --</option>
+                        <option value="늘봄학교 선택형 강사">늘봄학교 선택형 강사</option>
+                        <option value="늘봄학교 맞춤형 강사">늘봄학교 맞춤형 강사</option>
+                        <option value="방과후 강사">방과후 강사</option>
+                    </select>
+                </label>
 
-      <label><span class="required-star">강의과목</span>
-        <input type="text" name="강의과목" required placeholder="예: 바둑, 로봇">
-      </label>
+                <label><span>강의과목</span>
+                    <input type="text" name="강의과목" required placeholder="예: 바둑, 로봇코딩">
+                </label>
 
-      <label class="full-width"><span class="required-star">근무학교</span>
-        <input type="text" name="근무장소" required placeholder="예: 새담초등학교">
-      </label>
+                <label class="full-width"><span>근무학교</span>
+                    <input type="text" name="근무장소" required placeholder="계약된 수탁 학교명을 입력하세요">
+                </label>
 
-      <label><span class="required-star">근무시작일</span>
-        <input type="date" name="근무시작일" required>
-      </label>
+                <label><span>근무 시작일</span>
+                    <input type="date" name="근무시작일" required>
+                </label>
 
-      <div class="inline-group">
-        <label><span class="required-star">종료일 구분</span>
-          <select name="종료일선택" id="endDateSelect">
-            <option value="날짜지정">날짜 지정</option>
-            <option value="현재까지">현재까지 (재직 중)</option>
-          </select>
-        </label>
-        <label id="endDateWrapper"><span class="required-star">근무종료일</span>
-          <input type="date" name="근무종료일" id="endDate" required>
-        </label>
-      </div>
+                <div class="inline-group">
+                    <label><span>종료일 구분</span>
+                        <select name="종료일선택" id="endDateSelect">
+                            <option value="날짜지정">날짜 지정</option>
+                            <option value="현재까지">현재까지 (재직 중)</option>
+                        </select>
+                    </label>
+                    <label id="endDateWrapper"><span>근무 종료일</span>
+                        <input type="date" name="근무종료일" id="endDate" required>
+                    </label>
+                </div>
 
-      <div class="inline-group">
-        <label><span class="required-star">증명용도</span>
-          <select name="용도" required>
-            <option value="">-- 선택하세요 --</option>
-            <option value="학교제출용">학교제출용</option>
-            <option value="기관제출용">기관제출용</option>
-            <option value="보험공단제출용">보험공단제출용</option>
-          </select>
-        </label>
-        <label id="reasonWrapper" style="display:none;"><span class="required-star">계약종료사유</span>
-          <select name="종료사유" id="reasonSelect">
-            <option value="">-- 선택하세요 --</option>
-            <option value="개인사정">개인사정</option>
-            <option value="계약만료">계약만료</option>
-            <option value="계약해지">계약해지</option>
-          </select>
-        </label>
-      </div>
+                <div class="inline-group">
+                    <label><span>증명 용도</span>
+                        <select name="용도" required>
+                            <option value="">-- 선택하세요 --</option>
+                            <option value="학교제출용">학교제출용</option>
+                            <option value="기관제출용">기관제출용</option>
+                            <option value="보험공단제출용">보험공단제출용</option>
+                        </select>
+                    </label>
+                    <label id="reasonWrapper" style="display:none;"><span>계약 종료 사유</span>
+                        <select name="종료사유" id="reasonSelect">
+                            <option value="">-- 선택하세요 --</option>
+                            <option value="개인사정">개인사정</option>
+                            <option value="계약만료">계약만료</option>
+                            <option value="계약해지">계약해지</option>
+                        </select>
+                    </label>
+                </div>
 
-      <label class="full-width">
-        <span class="required-star">이메일 주소 (PDF 수신용)</span>
-        <input type="email" name="이메일주소" required 
-               placeholder="example@domain.com"
-               title="정확한 이메일 주소를 입력해 주세요.">
-      </label>
+                <label class="full-width"><span>이메일 주소 (PDF 수신용)</span>
+                    <input type="email" name="이메일주소" required placeholder="결과를 받으실 정확한 이메일을 입력하세요">
+                </label>
 
-      <button type="submit" id="submitBtn">신청하기</button>
-    </form>
-  </div>
+                <button type="submit" id="submitBtn">신청 완료하기</button>
+            </form>
+        </div>
 
-  <div class="notice-box">
-    <span class="notice-title">💡 신청 유의사항</span>
-    <div class="notice-content">
-      <span class="notice-item">1. 입력한 내용을 사실확인 후 발급됩니다.</span>
-      <span class="notice-item">2. 허위사실이 있을 시 발급되지 않습니다.</span>
-      <span class="notice-item">3. 주소 및 내용을 정확히 입력하세요.</span>
-      <span class="notice-item">4. 입력하신 이메일로 PDF 파일이 전송됩니다.</span>
-      
-      <div style="text-align: center; margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
-        <span style="font-weight: bold; color: #1a2b4c;">📞 발급문의</span><br>
-        <span style="font-size: 14px;">031-8016-1900</span>
-      </div>
-      <img src="http://www.saedam.org/img_sub/logo.gif" alt="로고" style="display: block; margin: 15px auto 0; height: 35px; width: auto;">
+        <div class="notice-card">
+            <h3>💡 신청 유의사항</h3>
+            <ul class="notice-list">
+                <li>입력하신 모든 내용은 본 기관의 실제 데이터와 대조하여 사실 확인 후 발급됩니다.</li>
+                <li>허위 사실을 기재할 경우 증명서 발급이 거부될 수 있습니다.</li>
+                <li>주민등록번호 및 이메일 주소 오기입 시 발급이 불가능하므로 정확히 확인해 주세요.</li>
+                <li>발급 완료된 PDF 파일은 입력하신 이메일로 영업일 기준 1~2일 내에 전송됩니다.</li>
+            </ul>
+            
+            <div class="contact-box">
+                <span>증명서 발급 문의</span>
+                <strong>031-8016-1900</strong>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px; opacity: 0.6;">
+                <img src="http://www.saedam.org/img_sub/logo.gif" alt="새담로고" style="height: 35px; filter: brightness(0) invert(1);">
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const form = document.getElementById('certForm');
-      const submitBtn = document.getElementById('submitBtn');
-      const certType = document.getElementById('certType');
-      const endDateSelect = document.getElementById('endDateSelect');
-      const endDateWrapper = document.getElementById('endDateWrapper');
-      const endDateInput = document.getElementById('endDate');
-      const reasonWrapper = document.getElementById('reasonWrapper');
-      const reasonSelect = document.getElementById('reasonSelect');
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('certForm');
+            const submitBtn = document.getElementById('submitBtn');
+            const certType = document.getElementById('certType');
+            const endDateSelect = document.getElementById('endDateSelect');
+            const endDateWrapper = document.getElementById('endDateWrapper');
+            const endDateInput = document.getElementById('endDate');
+            const reasonWrapper = document.getElementById('reasonWrapper');
+            const reasonSelect = document.getElementById('reasonSelect');
 
-      // 1. 미래 날짜 선택 방지
-      const today = new Date().toISOString().split('T')[0];
-      endDateInput.max = today;
+            // 미래 날짜 선택 방지
+            const today = new Date().toISOString().split('T')[0];
+            endDateInput.max = today;
 
-      // 2. 종료일 입력 토글
-      endDateSelect.addEventListener('change', () => {
-        if (endDateSelect.value === '현재까지') {
-          endDateWrapper.style.visibility = 'hidden';
-          endDateInput.disabled = true;
-          endDateInput.required = false;
-        } else {
-          endDateWrapper.style.visibility = 'visible';
-          endDateInput.disabled = false;
-          endDateInput.required = true;
-        }
-      });
+            // 종료일 입력 필드 토글
+            endDateSelect.addEventListener('change', () => {
+                if (endDateSelect.value === '현재까지') {
+                    endDateWrapper.style.visibility = 'hidden';
+                    endDateInput.disabled = true;
+                    endDateInput.required = false;
+                } else {
+                    endDateWrapper.style.visibility = 'visible';
+                    endDateInput.disabled = false;
+                    endDateInput.required = true;
+                }
+            });
 
-      // 3. 증명서 종류에 따른 종료사유 토글
-      certType.addEventListener('change', () => {
-        if (certType.value === '강사 해촉증명서') {
-          reasonWrapper.style.display = 'flex';
-          reasonSelect.required = true;
-        } else {
-          reasonWrapper.style.display = 'none';
-          reasonSelect.required = false;
-        }
-      });
+            // 해촉증명서일 경우 종료사유 필수 표시
+            certType.addEventListener('change', () => {
+                if (certType.value === '강사 해촉증명서') {
+                    reasonWrapper.style.display = 'flex';
+                    reasonSelect.required = true;
+                } else {
+                    reasonWrapper.style.display = 'none';
+                    reasonSelect.required = false;
+                }
+            });
 
-      // 4. 제출 전 최종 검증
-      form.addEventListener('submit', (e) => {
-        if (certType.value === '강사 해촉증명서' && endDateSelect.value === '현재까지') {
-          alert("해촉증명서는 '현재까지'를 선택할 수 없습니다.\n정확한 해촉(퇴사) 날짜를 입력해 주세요.");
-          e.preventDefault();
-          return;
-        }
+            // 제출 전 최종 검증
+            form.addEventListener('submit', (e) => {
+                if (certType.value === '강사 해촉증명서' && endDateSelect.value === '현재까지') {
+                    alert("해촉증명서는 '현재까지'를 선택하실 수 없습니다.\n정확한 계약 종료(해촉) 날짜를 입력해 주세요.");
+                    e.preventDefault();
+                    return;
+                }
 
-        submitBtn.disabled = true;
-        submitBtn.innerText = "신청 처리 중...";
-      });
-    });
-  </script>
+                submitBtn.disabled = true;
+                submitBtn.innerText = "데이터 전송 중...";
+            });
+        });
+    </script>
 </body>
 </html>
