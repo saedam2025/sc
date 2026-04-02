@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>강사 경력증명서 신청</title>
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Nanum Gothic', sans-serif;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 20px 10px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 30px;
+      flex-wrap: wrap; /* 화면이 좁아지면 유의사항이 아래로 내려감 */
+    }
+
+    .required-star::before {
+      content: "*";
+      color: orange;
+      margin-right: 4px;
+      font-weight: bold;
+    }
+
+    .container {
+      width: 500px;
+      max-width: 100%;
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-size: 20px;
+      color: #1a2b4c;
+      font-weight: 700;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px 20px;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 12px;
+      color: #555;
+    }
+
+    label span {
+      display: flex;
+      align-items: center;
+      font-size: 13px;
+      font-weight: bold;
+      color: #444;
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      padding: 10px;
+      font-size: 13px;
+      border: 1px solid #ddd;
+      background-color: #fafafa;
+      border-radius: 6px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: #0055cc;
+      outline: none;
+      background-color: #fff;
+    }
+
+    .inline-group {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 14px;
+    }
+
+    .inline-group > label {
+      flex: 1;
+    }
+
+    button {
+      grid-column: 1 / -1;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: bold;
+      background-color: #0055cc;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #0044aa;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    /* 오른쪽 유의사항 스타일 */
+    .notice-box {
+      width: 260px;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 16px;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    .notice-title {
+      display: block;
+      background: #f1f3f5;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 15px;
+      color: #1a2b4c;
+    }
+
+    .notice-content {
+      font-size: 12px;
+      line-height: 2;
+      color: #444;
+    }
+
+    .notice-item {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .notice-sub {
+      display: block;
+      padding-left: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>📝 강사 경력증명서 신청</h1>
+
+    <form method="POST" action="/document/submit" id="certForm">
+      <label class="full-width"><span class="required-star">증명서 종류</span>
+        <select name="증명서종류" id="certType" required>
+          <option value="">-- 선택하세요 --</option>
+          <option value="강사 활동증명서">강사 활동증명서</option>
+          <option value="강사 해촉증명서">강사 해촉증명서</option>
+        </select>
+      </label>
+
+      <label><span class="required-star">성명</span>
+        <input type="text" name="성명" required placeholder="이름 입력">
+      </label>
+
+      <label><span class="required-star">주민번호</span>
+        <input type="text" name="주민번호" required pattern="\d{6}-\d{7}" placeholder="예: 901010-1234567">
+      </label>
+
+      <label class="full-width"><span class="required-star">자택주소</span>
+        <input type="text" name="자택주소" required placeholder="주소지 전체 입력">
+      </label>
+
+      <label><span class="required-star">직책</span>
+        <select name="직책" required>
+          <option value="">-- 선택하세요 --</option>
+          <option value="늘봄학교 선택형 강사">늘봄학교 선택형 강사</option>
+          <option value="늘봄학교 맞춤형 강사">늘봄학교 맞춤형 강사</option>
+          <option value="방과후 강사">방과후 강사</option>
+        </select>
+      </label>
+
+      <label><span class="required-star">강의과목</span>
+        <input type="text" name="강의과목" required placeholder="예: 바둑, 로봇">
+      </label>
+
+      <label class="full-width"><span class="required-star">근무학교</span>
+        <input type="text" name="근무장소" required placeholder="예: 새담초등학교">
+      </label>
+
+      <label><span class="required-star">근무시작일</span>
+        <input type="date" name="근무시작일" required>
+      </label>
+
+      <div class="inline-group">
+        <label><span class="required-star">종료일 구분</span>
+          <select name="종료일선택" id="endDateSelect">
+            <option value="날짜지정">날짜 지정</option>
+            <option value="현재까지">현재까지 (재직 중)</option>
+          </select>
+        </label>
+        <label id="endDateWrapper"><span class="required-star">근무종료일</span>
+          <input type="date" name="근무종료일" id="endDate" required>
+        </label>
+      </div>
+
+      <div class="inline-group">
+        <label><span class="required-star">증명용도</span>
+          <select name="용도" required>
+            <option value="">-- 선택하세요 --</option>
+            <option value="학교제출용">학교제출용</option>
+            <option value="기관제출용">기관제출용</option>
+            <option value="보험공단제출용">보험공단제출용</option>
+          </select>
+        </label>
+        <label id="reasonWrapper" style="display:none;"><span class="required-star">계약종료사유</span>
+          <select name="종료사유" id="reasonSelect">
+            <option value="">-- 선택하세요 --</option>
+            <option value="개인사정">개인사정</option>
+            <option value="계약만료">계약만료</option>
+            <option value="계약해지">계약해지</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="full-width">
+        <span class="required-star">이메일 주소 (PDF 수신용)</span>
+        <input type="email" name="이메일주소" required 
+               placeholder="example@domain.com"
+               title="정확한 이메일 주소를 입력해 주세요.">
+      </label>
+
+      <button type="submit" id="submitBtn">신청하기</button>
+    </form>
+  </div>
+
+  <div class="notice-box">
+    <span class="notice-title">💡 신청 유의사항</span>
+    <div class="notice-content">
+      <span class="notice-item">1. 입력한 내용을 사실확인 후 발급됩니다.</span>
+      <span class="notice-item">2. 허위사실이 있을 시 발급되지 않습니다.</span>
+      <span class="notice-item">3. 주소 및 내용을 정확히 입력하세요.</span>
+      <span class="notice-item">4. 입력하신 이메일로 PDF 파일이 전송됩니다.</span>
+      
+      <div style="text-align: center; margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+        <span style="font-weight: bold; color: #1a2b4c;">📞 발급문의</span><br>
+        <span style="font-size: 14px;">031-8016-1900</span>
+      </div>
+      <img src="http://www.saedam.org/img_sub/logo.gif" alt="로고" style="display: block; margin: 15px auto 0; height: 35px; width: auto;">
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('certForm');
+      const submitBtn = document.getElementById('submitBtn');
+      const certType = document.getElementById('certType');
+      const endDateSelect = document.getElementById('endDateSelect');
+      const endDateWrapper = document.getElementById('endDateWrapper');
+      const endDateInput = document.getElementById('endDate');
+      const reasonWrapper = document.getElementById('reasonWrapper');
+      const reasonSelect = document.getElementById('reasonSelect');
+
+      // 1. 미래 날짜 선택 방지
+      const today = new Date().toISOString().split('T')[0];
+      endDateInput.max = today;
+
+      // 2. 종료일 입력 토글
+      endDateSelect.addEventListener('change', () => {
+        if (endDateSelect.value === '현재까지') {
+          endDateWrapper.style.visibility = 'hidden';
+          endDateInput.disabled = true;
+          endDateInput.required = false;
+        } else {
+          endDateWrapper.style.visibility = 'visible';
+          endDateInput.disabled = false;
+          endDateInput.required = true;
+        }
+      });
+
+      // 3. 증명서 종류에 따른 종료사유 토글
+      certType.addEventListener('change', () => {
+        if (certType.value === '강사 해촉증명서') {
+          reasonWrapper.style.display = 'flex';
+          reasonSelect.required = true;
+        } else {
+          reasonWrapper.style.display = 'none';
+          reasonSelect.required = false;
+        }
+      });
+
+      // 4. 제출 전 최종 검증
+      form.addEventListener('submit', (e) => {
+        if (certType.value === '강사 해촉증명서' && endDateSelect.value === '현재까지') {
+          alert("해촉증명서는 '현재까지'를 선택할 수 없습니다.\n정확한 해촉(퇴사) 날짜를 입력해 주세요.");
+          e.preventDefault();
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = "신청 처리 중...";
+      });
+    });
+  </script>
+</body>
+</html>

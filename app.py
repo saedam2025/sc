@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 상대 경로 임포트 에러 수정을 위해 절대 경로 사용
 from routes.main import main_bp
-from routes.document import document_bp
+from routes.document import document_bp  # 증명서 및 서류 관리
 from routes.contract import contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
@@ -21,7 +21,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
 # 서버 시작 시 엑셀 파일 초기화
 init_files()
 
-# 로그인 체크 제외 대상 (인트라넷 로그인 관련, 정적 파일 + 강사 계약 관련 모든 경로)
+# 로그인 체크 제외 대상 (인트라넷 로그인 관련, 정적 파일 + 외부용 서비스 경로)
 EXEMPT_ROUTES = [
     'login_page', 
     'login', 
@@ -30,10 +30,12 @@ EXEMPT_ROUTES = [
     'user_mgmt.invite_page', 
     'static',
     # --- 강사 계약 시스템 예외 경로 (외부 강사 본인인증용) ---
-    'contract.login',          # 계약자 로그인/본인인증 페이지
+    'contract.login',           # 계약자 로그인/본인인증 페이지
     'contract.contract_list',   # 계약 목록
     'contract.contract',        # 계약서 보기
-    'contract.save_contract'    # 계약 완료 및 서명 저장
+    'contract.save_contract',    # 계약 완료 및 서명 저장
+    # --- 증명서 신청 시스템 예외 경로 (외부 강사용) ---
+    'document.apply'            # 강사 경력증명서 직접 신청 페이지 (로그인 없이 접근 가능)
 ]
 
 @app.before_request
@@ -43,7 +45,7 @@ def check_login():
         return None
     
     # 2. 세션에 사번(emp_no)이 없으면 인트라넷 로그인 페이지로 리다이렉트
-    # 외부 계약자용 페이지는 위 EXEMPT_ROUTES에서 이미 통과되므로 영향을 받지 않습니다.
+    # 외부 계약자나 증명서 신청 페이지는 위 EXEMPT_ROUTES에서 이미 통과됨
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
 
@@ -110,8 +112,9 @@ def logout():
 
 # --- Blueprint 등록 ---
 app.register_blueprint(main_bp)
+# 증명서 관리/신청 시스템 연결 (/document/apply 등)
 app.register_blueprint(document_bp, url_prefix='/document')
-# 강사 계약 시스템을 /contract 경로로 연결
+# 강사 계약 시스템 연결
 app.register_blueprint(contract_bp, url_prefix='/contract')
 app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')

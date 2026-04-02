@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* 기존 admin.html의 스타일 유지 및 인트라넷 테마와 조화 */
+body {
+  font-family: 'Nanum Gothic', sans-serif;
+  background-image: url("https://www.saedam.org/img_sub/Kakao_friendsbg4k.png");
+  background-repeat: repeat;
+  background-size: auto;
+  background-position: center top;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-wrapper {
+  width: 1700px;
+  margin: 20px auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.4);
+  margin-top: 50px; /* base.html 헤더 고려하여 조정 */
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  word-break: break-word;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: center;
+  font-size: 13px;
+}
+
+th { background-color: #fce473; height: 40px; }
+
+tbody tr:hover { background-color: #fff8cc; }
+
+/* 버튼 스타일 */
+.btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  display: inline-block;
+  transition: 0.2s;
+}
+
+.btn-delete { color: #f67280; }
+.btn-delete:hover { background: #f67280; color: #fff; }
+.btn-save { color: #55b79a; }
+.btn-save:hover { background: #a8e6cf; }
+.btn-issue { color: #4a90e2; font-weight: bold; }
+.btn-issue:hover { background: #4a90e2; color: #fff; }
+
+.status-issued { color: #007bff; font-weight: bold; }
+.status-pending { color: #dc3545; font-weight: bold; }
+
+/* 캐릭터 및 구름 레이아웃 */
+#floatingContainer {
+  position: fixed;
+  top: 150px;
+  left: 50px;
+  z-index: 999;
+  cursor: grab;
+}
+#floatingBalloon {
+  background: #fff; border: 1px solid #ccc; padding: 5px 15px;
+  border-radius: 15px; font-family: 'Dongle', sans-serif; font-size: 20px;
+  color: #4a90e2; white-space: nowrap; margin-bottom: 5px;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+}
+</style>
+
+{% if pending > 0 %}
+<div id="floatingContainer">
+    <div id="floatingBalloon">발급신청 {{ pending }}건 남았어요!</div>
+    <img id="floatingAlert" src="" style="max-height: 120px;" title="드래그 가능">
+</div>
+{% endif %}
+
+<div class="admin-wrapper">
+    <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="font-weight: bold; color: #333;">📝 강사 경력증명서 통합 관리 시스템</h2>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 35px;"><input type="checkbox" id="checkAll"></th>
+                <th style="width: 45px;">No</th>
+                <th style="width: 85px;">신청일</th>
+                <th style="width: 110px;">종류</th>
+                <th style="width: 80px;">성명</th>
+                <th style="width: 110px;">주민번호</th>
+                <th style="width: 100px;">직책</th>
+                <th style="width: 100px;">과목</th>
+                <th style="width: 100px;">용도</th>
+                <th style="width: 120px;">근무장소</th>
+                <th style="width: 90px;">시작일</th>
+                <th style="width: 90px;">종료일</th>
+                <th style="width: 40px;">메일</th>
+                <th style="width: 100px;">발급번호</th>
+                <th style="width: 160px;">작업</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in submissions %}
+            <tr>
+                <td><input type="checkbox" class="chk" value="{{ item.index }}"></td>
+                <td>{{ total - loop.index0 }}</td>
+                <td>{{ item.신청일 }}</td>
+                <td>{{ item.증명서종류 }}</td>
+                <td title="{{ item.자택주소 }}">{{ item.성명 }}</td>
+                <td>{{ item.주민번호 }}</td>
+                <td>{{ item.직책 }}</td>
+                <td>{{ item.강의과목 }}</td>
+                <td>{{ item.용도 }}</td>
+                <td>{{ item.근무장소 }}</td>
+                <td>{{ item.근무시작일 }}</td>
+                <td>{{ item.근무종료일 }}</td>
+                <td>
+                    <img src="https://www.saedam.org/img_sub/mail.png" style="height: 16px; cursor: pointer;" 
+                         onclick="openMailModal('{{ item.성명 }}', '{{ item.이메일주소 }}')">
+                </td>
+                <td>
+                    {% if item.상태 == "발급완료" %}
+                        <a href="{{ url_for('document.serve_pdf', filename=item.파일명) }}" target="_blank" class="status-issued">
+                            {{ item.발급번호 }}
+                        </a>
+                    {% else %}
+                        <span class="status-pending">대기</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.상태 == "대기" %}
+                        <a href="{{ url_for('document.generate_certificate', idx=item.index) }}" class="btn btn-issue" onclick="showLoading(this)">발급</a>
+                        <a href="{{ url_for('document.delete_record', idx=item.index) }}" class="btn btn-delete" onclick="return confirm('삭제하시겠습니까?')">삭제</a>
+                    {% else %}
+                        <span style="font-size: 11px; color: #888;">발급일: {{ item.발급일 }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+        <div class="summary-box" style="border: 1px solid #ccc; padding: 8px 15px; border-radius: 8px; background: #fafafa; font-size: 14px;">
+            전체: <strong>{{ total }}</strong>건 | 대기: <strong style="color:red;">{{ pending }}</strong>건
+        </div>
+        </div>
+</div>
+
+<div id="mailModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; padding:25px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.3); z-index:1001; width:500px;">
+    <h3 style="margin-top:0;">📧 간단 안내 메일</h3>
+    <form action="/document/send_simple_email" method="POST">
+        <label style="font-size:12px;">수신자</label>
+        <input type="text" name="email" id="modalEmail" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd;" readonly>
+        <label style="font-size:12px;">제목</label>
+        <input type="text" name="subject" id="modalSubject" style="width:100%; padding:8px; margin-bottom:10px; border:1px solid #ddd;">
+        <label style="font-size:12px;">본문</label>
+        <textarea name="body" id="modalBody" rows="6" style="width:100%; padding:8px; border:1px solid #ddd;"></textarea>
+        <div style="text-align:right; margin-top:15px;">
+            <button type="button" class="btn" onclick="closeMailModal()">닫기</button>
+            <button type="submit" class="btn btn-issue">발송하기</button>
+        </div>
+    </form>
+</div>
+
+<script>
+// 캐릭터 랜덤 이미지 및 드래그
+document.addEventListener("DOMContentLoaded", function() {
+    const alertImg = document.getElementById("floatingAlert");
+    if(alertImg) {
+        const randomNum = Math.floor(Math.random() * 7) + 1;
+        alertImg.src = `https://www.saedam.org/img_sub/issue_alert0${randomNum}.png`;
+    }
+});
+
+// 체크박스 전체 선택
+document.getElementById('checkAll').onclick = function() {
+    let checkboxes = document.querySelectorAll('.chk');
+    for (let checkbox of checkboxes) {
+        checkbox.checked = this.checked;
+    }
+}
+
+// 로딩 표시
+function showLoading(btn) {
+    btn.innerHTML = '<img src="https://www.saedam.org/img_sub/loading.gif" width="12">';
+    btn.style.pointerEvents = "none";
+}
+
+// 메일 모달 제어
+function openMailModal(name, email) {
+    document.getElementById('modalEmail').value = email;
+    document.getElementById('modalSubject').value = `[새담] ${name} 강사님, 경력증명서 신청 관련 안내드립니다.`;
+    document.getElementById('modalBody').value = `안녕하세요 ${name} 강사님,\n새담청소년교육문화원입니다.\n\n신청하신 서류 관련하여...`;
+    document.getElementById('mailModal').style.display = 'block';
+}
+function closeMailModal() {
+    document.getElementById('mailModal').style.display = 'none';
+}
+</script>
+
+{% endblock %}

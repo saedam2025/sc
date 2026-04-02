@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>증명서발급</title>
+  <!-- 구글 웹폰트 추가 -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      max-width: 750px;                               /* 전체 페이지의 크기 조정 */
+      margin: auto;
+      padding: 50px;
+      line-height: 1.8;
+      background: #fff;
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #000;
+    }
+    .code {
+      text-align: right;
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 5px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    td {
+      border: 1px solid #444;
+      padding: 12px;
+      font-size: 16px;
+    }
+    td.label {
+      background-color: #f5f5f5;
+      width: 22%;
+      font-weight: bold;
+      text-align: center;
+    }
+    .center-text {
+      text-align: center;
+      margin: 30px 0 10px;
+      font-size: 18px;
+    }
+    .signature {
+      text-align: center;
+      margin-top: 50px;
+      font-size: 24px;
+    }
+    .signature img {
+      height: 60px;
+      vertical-align: middle;
+      margin-left: -2px;
+      border: 1px solid #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <br>
+
+  <center>
+    <span style="font-size: 40px;">{{ 증명서종류 }}</span>
+  </center>
+
+  <br>
+
+  <div class="code">{{ 발급번호 }}</div>
+
+<table>
+    <tr>
+      <td height="40" style="width: 20%; text-align: center; background-color: #f5f5f5; font-weight: bold;">성명</td>
+      <td style="width: 30%; text-align: center;">{{ 성명 }}</td>
+      <td style="width: 20%; text-align: center; background-color: #f5f5f5; font-weight: bold;">주민등록번호</td>
+      <td style="width: 30%; text-align: center;">{{ 주민번호 }}</td>
+    </tr>
+    <tr>
+      <td height="40" class="label">주소</td>
+      <td colspan="3">{{ 주소 }}</td>
+    </tr>
+    <tr>
+      <td height="40" class="label">직책</td>
+      <td colspan="3">
+        {{ 직책 if 직책 else "방과후 " ~ 과목 ~ " 강사" }}
+      </td>
+    </tr>
+    <tr>
+      <td height="40" class="label">업무내용</td>
+      <td colspan="3">
+        {{ 장소 }} 방과후 {{ 과목 }} 교육
+      </td>
+    </tr>
+    <tr>
+      <td height="40" class="label">근무기간</td>
+      <td colspan="3">
+        {{ 시작 }} ~ {{ 종료 }}
+        {% if 증명서종류 == "강사 해촉증명서" and 종료사유 %}
+          (계약종료사유: {{ 종료사유 }})
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td height="40" class="label">증명용도</td>
+      <td colspan="3">{{ 용도 }}</td>
+    </tr>
+
+    <tr>
+      <td height="100" class="label">업체정보</td>
+      <td colspan="3"> 상호: 사단법인 새담청소년교육문화원<br>소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
+    사업자번호: 144-82-00397 / 연락처: 031-8016-1900</td>
+    </tr>
+
+    <tr>
+      <td colspan="4" height="40">
+
+
+  <br>
+
+  <center>
+    <span style="font-size: 18px;">
+      {% if 증명서종류 == '강사 해촉증명서' %}
+        <p>상기인은 위와 같이 근무하였으나 현재는 해촉되었음을 증명합니다.</p>
+      {% else %}
+        <p>상기인은 위와 같이 근무하였음을 증명합니다.</p>
+      {% endif %}
+    </span>
+  </center>
+
+   <br>   <p class="center-text">{{ 발급일자 }}</p>  <br>
+
+<div class="signature" style="margin-top: 22px; font-size: 30px;">
+  (사)새담청소년교육문화원 이사장 배호영
+  <img src="seal.gif" style="width: 17%; height: auto; border: none; margin-left: -15px;" alt="도장">
+</div>
+
+  <br><br><br><br>
+  </table>
+
+</body>
+</html>

@@ -1,108 +1,253 @@
-from flask import Blueprint, render_template, request, jsonify, send_file
-from .db_handler import read_excel_db, write_excel_db, EXCEL_FILE, OWNER_FILE, ATTEND_FILE
-from datetime import datetime
 import os
 import pandas as pd
+import pdfkit
+import smtplib
+import shutil
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+from jinja2 import Template
 
+# Blueprint 설정
 document_bp = Blueprint('document', __name__)
 
-# 관리자 암호 (기존 설정 유지)
-ADMIN_PASSWORD = "1900" 
+# 한국 시간 설정 함수
+def now_kst():
+    return datetime.now(ZoneInfo("Asia/Seoul"))
 
-@document_bp.route('/')
-def index():
-    try:
-        # 실제 파일명인 document.html로 연결 (하위 폴더 경로 제거)
-        return render_template('document.html')
-    except Exception as e:
-        return f"템플릿 에러: {str(e)}", 500
+# --- [경로 및 환경 설정] ---
+# Render 배포 환경(/mnt/data) 및 로컬 환경 대응
+BASE_DIR = "/mnt/data" if os.path.exists("/mnt/data") else os.getcwd()
+DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
+PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
+SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
-# --- 사용자/관리자 관련 로직 ---
-@document_bp.route('/get_owners')
-def get_owners():
-    try:
-        df = read_excel_db(OWNER_FILE)
-        return jsonify(df.to_dict(orient='records') if not df.empty else [])
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+# 템플릿 경로 (요청하신 templates/certificate/ 폴더 내 위치)
+TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
-@document_bp.route('/add_owner', methods=['POST'])
-def add_owner():
-    try:
-        data = request.json
-        if str(data.get('admin_pass')) != ADMIN_PASSWORD:
-            return jsonify({"status": "error", "message": "관리자 암호 불일치"}), 403
-        
-        df = read_excel_db(OWNER_FILE)
-        if not df.empty and data['name'] in df['이름'].values:
-            idx = df[df['이름'] == data['name']].index[0]
-            df.at[idx, '직책'] = data.get('position', '담당자')
-            df.at[idx, '암호'] = str(data['owner_pass'])
-            msg = "사용자 정보가 수정되었습니다."
-        else:
-            new_row = pd.DataFrame([{
-                '이름': data['name'], 
-                '암호': str(data['owner_pass']), 
-                '직책': data.get('position', '담당자')
-            }])
-            df = pd.concat([df, new_row], ignore_index=True)
-            msg = "신규 인원이 등록되었습니다."
+# 폴더 생성
+os.makedirs(PDF_FOLDER, exist_ok=True)
+
+# 이메일 설정 (환경변수 참조)
+SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS_01")
+SENDER_PW = os.environ.get("APP_PASSWORD_01")
+ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
+
+# PDF 엔진 설정 (wkhtmltopdf 경로 확인)
+WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
+PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+
+# --- [내부 데이터베이스 관리 함수] ---
+def ensure_db_initialized():
+    """certificates.xlsx 파일이 없으면 표준 컬럼으로 생성"""
+    if not os.path.exists(DATA_PATH):
+        columns = [
+            "신청일", "증명서종류", "성명", "주민번호", "자택주소",
+            "근무시작일", "근무종료일", "근무장소", "강의과목", "용도", "직책",
+            "이메일주소", "상태", "발급일", "발급번호", "종료사유", "파일명"
+        ]
+        pd.DataFrame(columns=columns).to_excel(DATA_PATH, index=False)
+
+def get_next_issue_number():
+    """연도별 발급 번호 자동 생성 (예: 제26-0001호)"""
+    year_prefix = now_kst().strftime('%y')
+    num_file = os.path.join(BASE_DIR, f"last_cert_num_{year_prefix}.txt")
+    
+    last_num = 0
+    if os.path.exists(num_file):
+        with open(num_file, 'r') as f:
+            try: last_num = int(f.read().strip())
+            except: last_num = 0
+    
+    next_num = last_num + 1
+    with open(num_file, 'w') as f:
+        f.write(str(next_num))
+    
+    return f"제{year_prefix}-{next_num:04d}호"
+
+# --- [외부 라우트: 강사 신청용] ---
+@document_bp.route('/apply', methods=['GET', 'POST'])
+def apply():
+    ensure_db_initialized()
+    if request.method == 'POST':
+        try:
+            df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+            form_data = dict(request.form)
             
-        write_excel_db(df, OWNER_FILE)
-        return jsonify({"status": "success", "message": msg})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+            # 근무 종료일 '현재까지' 처리 로직
+            if form_data.get("종료일선택") == "현재까지":
+                form_data["근무종료일"] = "현재까지"
+            
+            form_data["신청일"] = now_kst().strftime("%Y-%m-%d")
+            form_data["상태"] = "대기"
+            form_data["발급일"] = ""
+            form_data["발급번호"] = ""
+            form_data["파일명"] = ""
+            
+            # 임시 필드 제거
+            form_data.pop("종료일선택", None)
 
-# --- 근태 신청/승인 로직 ---
-@document_bp.route('/submit_attendance', methods=['POST'])
-def submit_attendance():
+            # 데이터 추가 및 저장
+            new_row = pd.DataFrame([form_data])
+            df = pd.concat([df, new_row], ignore_index=True)
+            df.to_excel(DATA_PATH, index=False)
+
+            # 관리자 알림 (옵션)
+            send_admin_alert(form_data['성명'], form_data['증명서종류'])
+            
+            return render_template('certificate/success.html', name=form_data['성명'])
+        except Exception as e:
+            return f"신청 중 오류가 발생했습니다: {str(e)}", 500
+            
+    return render_template('certificate/form.html')
+
+# --- [내부 라우트: 관리자용] ---
+@document_bp.route('/admin')
+def admin_list():
+    """인트라넷 관리자용 신청 현황 목록"""
+    if 'user_name' not in session:
+        return redirect(url_for('login_page'))
+    
+    ensure_db_initialized()
+    df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+    # 최신 신청건이 위로 오도록 역순 정렬하여 템플릿에 전달
+    submissions = df.iloc[::-1].reset_index().to_dict(orient='records')
+    
+    return render_template('certificate/admin.html', 
+                           submissions=submissions,
+                           total=len(df),
+                           pending=len(df[df['상태'] == '대기']))
+
+@document_bp.route('/generate/<int:idx>')
+def generate_certificate(idx):
+    """관리자가 발급 버튼을 눌렀을 때 실행"""
+    if 'user_name' not in session: return abort(403)
+    
     try:
-        data = request.json
-        owners_df = read_excel_db(OWNER_FILE)
-        user = owners_df[(owners_df['이름'] == data['owner']) & (owners_df['암호'].astype(str) == str(data['password']))]
+        df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+        # 역순 정렬된 리스트의 index이므로 실제 원본 인덱스 계산
+        actual_idx = len(df) - 1 - idx
+        row = df.iloc[actual_idx]
         
-        if user.empty:
-            return jsonify({"status": "error", "message": "비밀번호가 틀렸습니다."}), 403
+        if row['상태'] == '발급완료':
+            flash("이미 발급이 완료된 요청입니다.")
+            return redirect(url_for('document.admin_list'))
 
-        df = read_excel_db(ATTEND_FILE)
-        new_row = pd.DataFrame([{
-            '신청일': datetime.now().strftime('%Y-%m-%d'),
-            '담당자': data['owner'],
-            '구분': data['type'],
-            '시작일': data['start_date'],
-            '종료일': data['end_date'],
-            '사유': data['reason'],
-            '승인상태': '대기'
-        }])
-        df = pd.concat([df, new_row], ignore_index=True)
-        write_excel_db(df, ATTEND_FILE)
-        return jsonify({"status": "success"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@document_bp.route('/approve_attendance', methods=['POST'])
-def approve_attendance():
-    try:
-        data = request.json
-        owners_df = read_excel_db(OWNER_FILE)
-        admin = owners_df[(owners_df['이름'] == data['admin_name']) & (owners_df['암호'].astype(str) == str(data['admin_password']))]
+        # 1. 발급 번호 따기
+        issue_no = get_next_issue_number()
         
-        if admin.empty or admin.iloc[0]['직책'] not in ['이사', '대표이사']:
-            return jsonify({"status": "error", "message": "승인 권한이 없습니다 (이사 이상 가능)."}), 403
-
-        df = read_excel_db(ATTEND_FILE)
-        idx = int(data['idx'])
-        df.at[idx, '승인상태'] = data['status']
-        write_excel_db(df, ATTEND_FILE)
-        return jsonify({"status": "success"})
+        # 2. PDF 생성
+        pdf_path = create_pdf_file(row, issue_no)
+        
+        # 3. 강사에게 이메일 전송
+        send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
+        
+        # 4. 엑셀 상태 업데이트
+        df.at[actual_idx, '상태'] = '발급완료'
+        df.at[actual_idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
+        df.at[actual_idx, '발급번호'] = issue_no
+        df.at[actual_idx, '파일명'] = os.path.basename(pdf_path)
+        df.to_excel(DATA_PATH, index=False)
+        
+        flash(f"{row['성명']} 님께 증명서 발송을 완료했습니다.")
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        flash(f"발급 중 오류 발생: {str(e)}")
+        
+    return redirect(url_for('document.admin_list'))
 
-@document_bp.route('/download')
-def download():
+# --- [보조 기능 함수들] ---
+
+def create_pdf_file(row, issue_no):
+    """HTML 템플릿을 읽어 PDF 파일 생성"""
+    with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        template = Template(f.read())
+
+    # 주민번호 마스킹 처리
+    ssn = str(row['주민번호'])
+    masked_ssn = ssn[:8] + "******" if "-" in ssn else ssn
+
+    # 템플릿 렌더링
+    html_content = template.render(
+        **row.to_dict(),
+        주민번호=masked_ssn,
+        발급번호=issue_no,
+        발급일자=now_kst().strftime("%Y년 %m월 %d일")
+    )
+
+    # 도장 이미지 삽입 (절대 경로 처리)
+    seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE)}"
+    html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
+
+    file_name = f"{issue_no}_{row['성명']}.pdf"
+    output_path = os.path.join(PDF_FOLDER, file_name)
+    
+    options = {
+        'enable-local-file-access': None, 
+        'encoding': 'UTF-8',
+        'margin-top': '0', 'margin-bottom': '0', 'margin-left': '0', 'margin-right': '0'
+    }
+    
+    pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
+    return output_path
+
+def send_email_to_instructor(to_email, name, pdf_path, cert_type):
+    """생성된 PDF를 첨부하여 강사에게 메일 발송"""
+    msg = MIMEMultipart()
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = to_email
+    msg['Subject'] = f"[(사)새담] 요청하신 {cert_type} 발송 안내 ({name} 강사님)"
+    
+    body = f"{name} 강사님, 안녕하세요.\n\n새담청소년교육문화원입니다.\n요청하신 {cert_type}를 첨부파일로 보내드립니다.\n\n감사합니다."
+    msg.attach(MIMEText(body, 'plain'))
+    
+    with open(pdf_path, "rb") as f:
+        part = MIMEApplication(f.read(), _subtype="pdf")
+        part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
+        msg.attach(part)
+        
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(SENDER_EMAIL, SENDER_PW)
+        server.send_message(msg)
+
+def send_admin_alert(name, cert_type):
+    """신청 발생 시 관리자에게 간단 알림"""
     try:
-        if os.path.exists(EXCEL_FILE):
-            return send_file(EXCEL_FILE, as_attachment=True)
-        return "파일 없음", 404
+        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요.")
+        msg['Subject'] = f"[신청접수] {name} 강사님 - {cert_type}"
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = ADMIN_NOTIFICATION_EMAIL
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SENDER_EMAIL, SENDER_PW)
+            server.send_message(msg)
+    except:
+        pass
+
+@document_bp.route('/pdf/<filename>')
+def serve_pdf(filename):
+    """관리자 페이지에서 발급된 PDF 보기"""
+    if 'user_name' not in session: return abort(403)
+    return send_from_directory(PDF_FOLDER, filename)
+
+@document_bp.route('/delete/<int:idx>')
+def delete_record(idx):
+    """신청 기록 및 파일 삭제"""
+    if 'user_name' not in session: return abort(403)
+    try:
+        df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+        actual_idx = len(df) - 1 - idx
+        
+        # 파일이 있으면 파일도 삭제
+        filename = df.at[actual_idx, '파일명']
+        if filename:
+            p = os.path.join(PDF_FOLDER, filename)
+            if os.path.exists(p): os.remove(p)
+            
+        df = df.drop(index=actual_idx)
+        df.to_excel(DATA_PATH, index=False)
+        flash("기록이 성공적으로 삭제되었습니다.")
     except Exception as e:
-        return f"다운로드 에러: {str(e)}", 500
+        flash(f"삭제 중 오류: {str(e)}")
+    return redirect(url_for('document.admin_list'))

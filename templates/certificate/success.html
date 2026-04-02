@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
+  <title>신청 완료 | 새담청소년교육문화원</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --saedam-blue: #004ea2;
+      --saedam-navy: #002c63;
+      --bg-color: #f4f7fa;
+    }
+
+    body {
+      font-family: 'Nanum Gothic', sans-serif;
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+
+    .container {
+      width: 92%;
+      max-width: 550px;
+      background: #ffffff;
+      border-radius: 15px;
+      padding: 50px 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      border-top: 8px solid var(--saedam-blue);
+    }
+
+    .check-icon {
+      width: 80px;
+      height: 80px;
+      background-color: #e7f1ff;
+      color: var(--saedam-blue);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      margin: 0 auto 25px;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: var(--saedam-navy);
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    p.description {
+      font-size: 15px;
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 35px;
+    }
+
+    /* 신청 내역 박스 */
+    .summary-box {
+      background-color: #f9f9fb;
+      border: 1px solid #e1e5eb;
+      border-radius: 12px;
+      padding: 25px 30px;
+      margin-bottom: 35px;
+      text-align: left;
+    }
+
+    .summary-item {
+      display: flex;
+      padding: 12px 0;
+      border-bottom: 1px dashed #d1d8e0;
+      font-size: 15px;
+    }
+
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+
+    .summary-item strong {
+      width: 130px;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    .summary-item span {
+      color: var(--saedam-navy);
+      font-weight: bold;
+      word-break: break-all;
+    }
+
+    /* 버튼 스타일 */
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .btn-home {
+      background-color: var(--saedam-blue);
+      color: #fff;
+    }
+
+    .btn-home:hover {
+      background-color: var(--saedam-navy);
+      transform: translateY(-2px);
+    }
+
+    .footer-notice {
+      margin-top: 30px;
+      font-size: 13px;
+      color: #888;
+      background: #fff9db;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid #ffe066;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="check-icon">✓</div>
+    <h1>신청이 완료되었습니다!</h1>
+    <p class="description">
+      제출하신 내용을 담당자가 확인한 후<br>
+      입력하신 이메일로 PDF 증명서를 발송해 드립니다.
+    </p>
+
+    <div class="summary-box">
+      <div class="summary-item">
+        <strong>증명서 종류</strong>
+        <span>{{ 증명서종류 }}</span>
+      </div>
+      <div class="summary-item">
+        <strong>신청인</strong>
+        <span>{{ 성명 }}님</span>
+      </div>
+      <div class="summary-item">
+        <strong>신청일자</strong>
+        <span>{{ 신청일 }}</span>
+      </div>
+      <div class="summary-item">
+        <strong>수신 이메일</strong>
+        <span>{{ 이메일주소 }}</span>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <a class="btn btn-home" href="{{ url_for('document.apply') }}">신청 페이지로 이동</a>
+    </div>
+
+    <div class="footer-notice">
+        <b>💡 안내사항</b><br>
+        발급은 업무일 기준 1~2일 정도 소요될 수 있습니다.<br>
+        문의사항: 📞 031-8016-1900
+    </div>
+
+    <img src="https://www.saedam.org/img_sub/logo.gif" alt="로고" style="height: 40px; margin-top: 30px; opacity: 0.8;">
+  </div>
+
+</body>
+</html>
