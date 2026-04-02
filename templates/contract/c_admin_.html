@@ -230,6 +230,8 @@
             <label>계약구분</label>
             <select name="category">
                 <option value="">전체 구분</option>
+                <option value="미작성" {% if request.args.get('category') == '미작성' %}selected{% endif %}>🔴 미작성</option>
+                <option disabled>──────────</option>
                 {% for cat in ['방과후강사', '맞춤형강사', '코디사업자', '코디근로자', '안전코디', '직원근로자', '직원사업자', '원어민근로자', '원어민사업자'] %}
                 <option value="{{cat}}" {% if request.args.get('category') == cat %}selected{% endif %}>{{cat}}</option>
                 {% endfor %}
@@ -258,19 +260,18 @@
             <input type="text" name="name" placeholder="성명 입력" value="{{ request.args.get('name', '') }}">
         </div>
 
-<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%;">
-    <div style="display: flex; gap: 5px;">
-        <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
-        <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
-    </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%;">
+            <div style="display: flex; gap: 5px;">
+                <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
+                <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
+            </div>
 
-    <div style="display: flex; gap: 8px; margin-left: auto;">
-        <button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">📧 계약메일전송</button>
-        <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">선택 삭제</button>
-        <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold; font-size: 0.8rem;">선택 항목 다운로드 (ZIP)</button>
-    </div>
-</div>
-
+            <div style="display: flex; gap: 8px; margin-left: auto;">
+                <button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">📧 계약메일전송</button>
+                <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">선택 삭제</button>
+                <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold; font-size: 0.8rem;">선택 항목 다운로드 (ZIP)</button>
+            </div>
+        </div>
     </form>
 
     <div class="table-wrapper">
@@ -372,7 +373,7 @@
 </div>
 
 <script>
-    // 1. 보안 설정: 우클릭 및 단축키 방지 (base.html의 보안과 충돌하지 않도록 유지)
+    // 1. 보안 설정: 우클릭 및 단축키 방지
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.');
@@ -444,8 +445,7 @@
     function deleteSelected() {
         const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
         if (selected.length === 0) { alert("삭제할 항목을 선택해 주세요."); return; }
-        if (!confirm(selected.length + "건의 데이터를 삭제하시겠습니까?")) return;
-
+        
         selectedIdsForDelete = selected;
         openDeleteModal(selected.length);
     }
@@ -505,44 +505,40 @@
         }
     }
 
-// 9. 선택 대상 계약 독촉 메일 전송
-function sendRemindMail() {
-    const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-    
-    if (selected.length === 0) {
-        alert("메일을 발송할 대상을 선택해 주세요.");
-        return;
-    }
-
-    if (!confirm(`선택한 ${selected.length}명에게 계약 독촉 메일을 발송하시겠습니까?\n(이미 완료된 대상자에게도 발송될 수 있으니 확인 바랍니다.)`)) return;
-
-    // 로딩 표시 (버튼 비활성화)
-    const btn = event.target;
-    const originalText = btn.innerText;
-    btn.innerText = "발송 중...";
-    btn.disabled = true;
-
-    fetch('/contract/admin/send_remind_mail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ indices: selected })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert(data.message);
-        } else {
-            alert("발송 실패: " + data.message);
+    // 9. 선택 대상 계약 독촉 메일 전송
+    function sendRemindMail() {
+        const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+        
+        if (selected.length === 0) {
+            alert("메일을 발송할 대상을 선택해 주세요.");
+            return;
         }
-    })
-    .catch(err => alert("서버 통신 오류가 발생했습니다."))
-    .finally(() => {
-        btn.innerText = originalText;
-        btn.disabled = false;
-    });
-}
 
+        if (!confirm(`선택한 ${selected.length}명에게 계약 독촉 메일을 발송하시겠습니까?`)) return;
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "발송 중...";
+        btn.disabled = true;
+
+        fetch('/contract/admin/send_remind_mail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ indices: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert(data.message);
+            } else {
+                alert("발송 실패: " + data.message);
+            }
+        })
+        .catch(err => alert("서버 통신 오류가 발생했습니다."))
+        .finally(() => {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        });
+    }
 </script>
-
-
 {% endblock %}
