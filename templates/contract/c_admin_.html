@@ -1,222 +1,125 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
-    <title>새담 관리자 - 계약관리</title>
-    <style>
-        :root {
-            --saedam-blue: #004ea2;
-            --saedam-navy: #002c63;
-            --saedam-green: #28a745;
-            --bg-light: #f4f7fa;
-            --border-color: #d1d8e0;
-            --text-dark: #333;
-        }
+{% extends "base.html" %}
 
-        body {
-            font-family: 'Pretendard', sans-serif;
-            background-color: var(--bg-light);
-            margin: 0; padding: 20px 0; color: var(--text-dark);
-        }
-
-        .admin-container {
-            width: 1200px; 
-            margin: 0 auto; 
-            background: #fff; 
-            padding: 25px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
-            border-top: 5px solid var(--saedam-navy); 
-            border-radius: 12px;
-        }
-
-        .admin-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #f1f3f5;
-        }
-        .admin-header h2 { margin: 0; color: var(--saedam-navy); font-size: 1.5rem; font-weight: 800; }
-
-        .btn-add-toggle {
-            background: var(--saedam-green); color: white; padding: 10px 20px; border-radius: 8px;
-            font-size: 0.9rem; font-weight: 600; border: none; cursor: pointer; transition: 0.2s;
-        }
-        .btn-add-toggle:hover { background: #218838; transform: translateY(-1px); }
-
-        .input-section { 
-            background: #fdfdfd; 
-            border: 1px solid var(--saedam-blue); 
-            border-radius: 12px; 
-            padding: 25px; 
-            margin-bottom: 25px; 
-            display: none; 
-        }
-        .input-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr 1fr; 
-            gap: 15px 20px; 
-            margin-bottom: 20px; 
-        }
-        .input-group { display: flex; flex-direction: column; gap: 6px; }
-        .input-group label { font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); }
-        .input-group input, .input-group select { 
-            padding: 10px; 
-            border: 1px solid var(--border-color); 
-            border-radius: 6px; 
-            font-size: 0.85rem;
-        }
-
-        .table-wrapper { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td { padding: 10px 4px; font-size: 0.75rem; border-bottom: 1px solid var(--border-color); text-align: center; }
-        th { background: #f1f5f9; color: var(--saedam-navy); font-weight: 700; }
-
-        .col-chk { width: 35px; }
-        .col-num { width: 45px; }
-        .col-year { width: 55px; }
-        .col-cat { width: 85px; }
-        .col-school { width: 110px; }
-        .col-dept { width: 100px; }
-        .col-name { width: 80px; }
-        .col-ssn { width: 110px; }
-        .col-date { width: 140px; }
-
-        .name-click {
-            color: var(--saedam-blue); font-weight: 700; cursor: pointer; text-decoration: underline;
-            padding: 4px 8px; border-radius: 4px;
-        }
-        .name-click:hover { background-color: #e7f1ff; }
-
-        .detail-row { display: none; background-color: #fcfdfe; }
-        .detail-content-box { padding: 20px; border-bottom: 2px solid #eee; }
-
-        .inner-detail-table { 
-            width: 100%; 
-            table-layout: auto; 
-            border: 2px solid #002c63; 
-            background: #fff;
-        }
-        .inner-detail-table th { 
-            width: 18%; 
-            background: #f8fafc; 
-            color: #475569; 
-            text-align: left; 
-            padding: 8px 12px; 
-            border: 1px solid #e2e8f0;
-            font-size: 0.72rem;
-        }
-        .inner-detail-table td { 
-            width: 32%; 
-            text-align: left; 
-            padding: 8px 12px; 
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-            font-weight: 600;
-            font-size: 0.75rem;
-        }
-
-        tbody tr:hover:not(.detail-row) { background-color: #f8faff; }
-        .status-off { color: #dc3545; background: #fff5f5; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
-        .pdf-link { color: var(--saedam-blue); text-decoration: underline; font-weight: 600; }
-        
-        .filter-bar { background: #fff; padding: 12px; margin-bottom: 20px; border: 1px solid var(--border-color); display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; border-radius: 8px; }
-        .filter-group { display: flex; flex-direction: column; gap: 4px; }
-        .filter-group label { font-size: 0.7rem; font-weight: bold; color: #666; }
-        .filter-bar select, .filter-bar input { padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.8rem; min-width: 100px; }
-        
-        .pagination { margin-top: 25px; display: flex; justify-content: center; gap: 5px; }
-        .pagination a { padding: 6px 12px; text-decoration: none; color: var(--saedam-navy); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; }
-        .pagination a.active { background: var(--saedam-navy); color: #fff; }
-    </style>
-
-<script>
-    // 1. 우클릭 방지
-    document.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.');
-    });
-
-    // 2. 단축키 차단 (F12, 소스보기, 개발자도구 등)
-    document.onkeydown = function(e) {
-        // F12 차단
-        if (e.keyCode == 123) {
-            return false;
-        }
-        // Ctrl + Shift + I (개발자 도구) 차단
-        if (e.ctrlKey && e.shiftKey && e.keyCode == 73) {
-            return false;
-        }
-        // Ctrl + Shift + J (콘솔) 차단
-        if (e.ctrlKey && e.shiftKey && e.keyCode == 74) {
-            return false;
-        }
-        // Ctrl + U (페이지 소스 보기) 차단
-        if (e.ctrlKey && e.keyCode == 85) {
-            return false;
-        }
-        // Ctrl + S (페이지 저장) 차단
-        if (e.ctrlKey && e.keyCode == 83) {
-            return false;
-        }
-    };
-
-    // 3. 드래그 및 선택 방지 (계약서 내용 복사 방지)
-    document.onselectstart = function() {
-        return false;
-    };
-</script>
-
-
-</head>
-<body>
-
-<div class="admin-container">
-
-<div class="admin-header">
-    <h2>📝 새담 인재 계약관리 시스템</h2>
-    <div style="display: flex; gap: 10px;">
-        <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;" onchange="uploadExcelFile()">
-        <button type="button" class="btn-add-toggle" style="background: #6c757d;" onclick="document.getElementById('excelFile').click()">📂 엑셀 업로드</button>
-        <button type="button" class="btn-add-toggle" onclick="toggleInputForm()">+ 신규 등록</button>
-    </div>
-</div>
-
-<div id="inputForm" class="input-section">
-    <h3 style="margin-top:0; margin-bottom:15px; font-size: 1.05rem; color: var(--saedam-navy);">새로운 계약 정보 입력</h3>
-    <div class="input-grid">
-        <div class="input-group">
-            <label>계약구분</label>
-            <select id="new-category">
-                <option value="방과후강사">방과후강사</option>
-                <option value="맞춤형강사">맞춤형강사</option>
-                <option value="코디사업자">코디사업자</option>
-                <option value="코디근로자">코디근로자</option>
-                <option value="안전코디">안전코디</option>
-                <option value="직원근로자">직원근로자</option>
-                <option value="직원사업자">직원사업자</option>
-                <option value="원어민근로자">원어민근로자</option>
-                <option value="원어민사업자">원어민사업자</option>
-            </select>
-        </div>
-        <div class="input-group"><label>수탁학교명</label><input type="text" id="new-school" placeholder="학교명"></div>
-        <div class="input-group"><label>부서명</label><input type="text" id="new-dept" placeholder="과목/직책"></div>
-        
-        <div class="input-group"><label>강사명</label><input type="text" id="new-name" placeholder="성함"></div>
-        <div class="input-group"><label>주민번호</label><input type="text" id="new-ssn" placeholder="주민번호"></div>
-        <div class="input-group"><label>수수료</label><input type="text" id="new-fee" placeholder="0"></div>
-        
-        <div class="input-group"><label>보조금</label><input type="text" id="new-subsidy" placeholder="0"></div>
-        <div class="input-group"><label>경력수당</label><input type="text" id="new-career" placeholder="0"></div>
-        <div class="input-group"><label>직책수당</label><input type="text" id="new-position" placeholder="0"></div>
-
-        <div class="input-group"><label>기타수당</label><input type="text" id="new-etc" placeholder="0"></div>
-        <div class="input-group"><label>근무시간</label><input type="text" id="new-work-time" placeholder="예: 주 5일"></div>
-        <div class="input-group"><label>계약기간</label><input type="text" id="new-period" placeholder="예: 2026.03.01~"></div>
-    </div>
-    <button type="button" style="background:var(--saedam-navy); color:white; border:none; width:100%; height:42px; border-radius:6px; cursor:pointer; font-weight:600; font-size: 0.9rem;" onclick="addNewLecturer()">계약 정보 저장하기</button>
-</div>
-
+{% block content %}
 <style>
+    :root {
+        --saedam-blue: #004ea2;
+        --saedam-navy: #002c63;
+        --saedam-green: #28a745;
+        --bg-light: #f4f7fa;
+        --border-color: #d1d8e0;
+        --text-dark: #333;
+    }
+
+    /* base.html 상속에 따른 레이아웃 미세 조정 */
+    .admin-container {
+        width: 100%;
+        max-width: 1200px;
+        margin: 20px auto;
+        background: #fff;
+        padding: 25px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border-top: 5px solid var(--saedam-navy);
+        border-radius: 12px;
+    }
+
+    .admin-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #f1f3f5;
+    }
+    .admin-header h2 { margin: 0; color: var(--saedam-navy); font-size: 1.5rem; font-weight: 800; }
+
+    .btn-add-toggle {
+        background: var(--saedam-green); color: white; padding: 10px 20px; border-radius: 8px;
+        font-size: 0.9rem; font-weight: 600; border: none; cursor: pointer; transition: 0.2s;
+    }
+    .btn-add-toggle:hover { background: #218838; transform: translateY(-1px); }
+
+    .input-section { 
+        background: #fdfdfd; 
+        border: 1px solid var(--saedam-blue); 
+        border-radius: 12px; 
+        padding: 25px; 
+        margin-bottom: 25px; 
+        display: none; 
+    }
+    .input-grid { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr 1fr; 
+        gap: 15px 20px; 
+        margin-bottom: 20px; 
+    }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); }
+    .input-group input, .input-group select { 
+        padding: 10px; 
+        border: 1px solid var(--border-color); 
+        border-radius: 6px; 
+        font-size: 0.85rem;
+    }
+
+    .table-wrapper { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: #fff; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 10px 4px; font-size: 0.75rem; border-bottom: 1px solid var(--border-color); text-align: center; }
+    th { background: #f1f5f9; color: var(--saedam-navy); font-weight: 700; }
+
+    .col-chk { width: 35px; }
+    .col-num { width: 45px; }
+    .col-year { width: 55px; }
+    .col-cat { width: 85px; }
+    .col-school { width: 110px; }
+    .col-dept { width: 100px; }
+    .col-name { width: 80px; }
+    .col-ssn { width: 110px; }
+    .col-date { width: 140px; }
+
+    .name-click {
+        color: var(--saedam-blue); font-weight: 700; cursor: pointer; text-decoration: underline;
+        padding: 4px 8px; border-radius: 4px;
+    }
+    .name-click:hover { background-color: #e7f1ff; }
+
+    .detail-row { display: none; background-color: #fcfdfe; }
+    .detail-content-box { padding: 20px; border-bottom: 2px solid #eee; }
+
+    .inner-detail-table { 
+        width: 100%; 
+        table-layout: auto; 
+        border: 2px solid #002c63; 
+        background: #fff;
+    }
+    .inner-detail-table th { 
+        width: 18%; 
+        background: #f8fafc; 
+        color: #475569; 
+        text-align: left; 
+        padding: 8px 12px; 
+        border: 1px solid #e2e8f0;
+        font-size: 0.72rem;
+    }
+    .inner-detail-table td { 
+        width: 32%; 
+        text-align: left; 
+        padding: 8px 12px; 
+        border: 1px solid #e2e8f0;
+        color: #1e293b;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    tbody tr:hover:not(.detail-row) { background-color: #f8faff; }
+    .status-off { color: #dc3545; background: #fff5f5; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
+    .pdf-link { color: var(--saedam-blue); text-decoration: underline; font-weight: 600; }
+    
+    .filter-bar { background: #fff; padding: 12px; margin-bottom: 20px; border: 1px solid var(--border-color); display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; border-radius: 8px; }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 0.7rem; font-weight: bold; color: #666; }
+    .filter-bar select, .filter-bar input { padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.8rem; min-width: 100px; }
+    
+    .pagination { margin-top: 25px; display: flex; justify-content: center; gap: 5px; }
+    .pagination a { padding: 6px 12px; text-decoration: none; color: var(--saedam-navy); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; }
+    .pagination a.active { background: var(--saedam-navy); color: #fff; }
+
     .dashboard-container {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -243,30 +146,77 @@
     .color-red { color: #dc3545 !important; }
 </style>
 
-<div class="dashboard-container">
-    <div class="stat-card">
-        <h4>총 계약 대상</h4>
-        <div class="value">{{ total_count }}건</div>
-    </div>
-    <div class="stat-card">
-        <h4>계약 완료</h4>
-        <div class="value color-green">{{ completed_count }}건</div>
-    </div>
-    <div class="stat-card">
-        <h4>미작성 대기</h4>
-        <div class="value color-red">{{ pending_count }}건</div>
-    </div>
-    <div class="stat-card">
-        <h4>전체 완료율</h4>
-        <div class="value">{{ completion_rate }}%</div>
-        <div class="percent-bar">
-            <div class="percent-fill" style="width: {{ completion_rate }}%;"></div>
+<div class="admin-container">
+    <div class="admin-header">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <h2>📝 새담 인재 계약관리 시스템</h2>
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">
+                <i class="fa-solid fa-user-shield"></i> 
+                현재 관리자: <span style="color: var(--saedam-navy);">{{ session.get('user_name') }} ({{ session.get('role') }})</span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;" onchange="uploadExcelFile()">
+            <button type="button" class="btn-add-toggle" style="background: #6c757d;" onclick="document.getElementById('excelFile').click()">📂 엑셀 업로드</button>
+            <button type="button" class="btn-add-toggle" onclick="toggleInputForm()">+ 신규 등록</button>
         </div>
     </div>
-</div>
 
+    <div id="inputForm" class="input-section">
+        <h3 style="margin-top:0; margin-bottom:15px; font-size: 1.05rem; color: var(--saedam-navy);">새로운 계약 정보 입력</h3>
+        <div class="input-grid">
+            <div class="input-group">
+                <label>계약구분</label>
+                <select id="new-category">
+                    <option value="방과후강사">방과후강사</option>
+                    <option value="맞춤형강사">맞춤형강사</option>
+                    <option value="코디사업자">코디사업자</option>
+                    <option value="코디근로자">코디근로자</option>
+                    <option value="안전코디">안전코디</option>
+                    <option value="직원근로자">직원근로자</option>
+                    <option value="직원사업자">직원사업자</option>
+                    <option value="원어민근로자">원어민근로자</option>
+                    <option value="원어민사업자">원어민사업자</option>
+                </select>
+            </div>
+            <div class="input-group"><label>수탁학교명</label><input type="text" id="new-school" placeholder="학교명"></div>
+            <div class="input-group"><label>부서명</label><input type="text" id="new-dept" placeholder="과목/직책"></div>
+            <div class="input-group"><label>강사명</label><input type="text" id="new-name" placeholder="성함"></div>
+            <div class="input-group"><label>주민번호</label><input type="text" id="new-ssn" placeholder="주민번호"></div>
+            <div class="input-group"><label>수수료</label><input type="text" id="new-fee" placeholder="0"></div>
+            <div class="input-group"><label>보조금</label><input type="text" id="new-subsidy" placeholder="0"></div>
+            <div class="input-group"><label>경력수당</label><input type="text" id="new-career" placeholder="0"></div>
+            <div class="input-group"><label>직책수당</label><input type="text" id="new-position" placeholder="0"></div>
+            <div class="input-group"><label>기타수당</label><input type="text" id="new-etc" placeholder="0"></div>
+            <div class="input-group"><label>근무시간</label><input type="text" id="new-work-time" placeholder="예: 주 5일"></div>
+            <div class="input-group"><label>계약기간</label><input type="text" id="new-period" placeholder="예: 2026.03.01~"></div>
+        </div>
+        <button type="button" style="background:var(--saedam-navy); color:white; border:none; width:100%; height:42px; border-radius:6px; cursor:pointer; font-weight:600; font-size: 0.9rem;" onclick="addNewLecturer()">계약 정보 저장하기</button>
+    </div>
 
-<form class="filter-bar" method="GET" action="/contract/admin">
+    <div class="dashboard-container">
+        <div class="stat-card">
+            <h4>총 계약 대상</h4>
+            <div class="value">{{ total_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>계약 완료</h4>
+            <div class="value color-green">{{ completed_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>미작성 대기</h4>
+            <div class="value color-red">{{ pending_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>전체 완료율</h4>
+            <div class="value">{{ completion_rate }}%</div>
+            <div class="percent-bar">
+                <div class="percent-fill" style="width: {{ completion_rate }}%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <form class="filter-bar" method="GET" action="/contract/admin">
         <div class="filter-group">
             <label>연도</label>
             <select name="year">
@@ -276,23 +226,15 @@
                 {% endfor %}
             </select>
         </div>
-
-<div class="filter-group">
-    <label>계약구분</label>
-    <select name="category">
-        <option value="">전체 구분</option>
-        <option value="방과후강사" {% if request.args.get('category') == '방과후강사' %}selected{% endif %}>방과후강사</option>
-        <option value="맞춤형강사" {% if request.args.get('category') == '맞춤형강사' %}selected{% endif %}>맞춤형강사</option>
-        <option value="코디사업자" {% if request.args.get('category') == '코디사업자' %}selected{% endif %}>코디사업자</option>
-        <option value="코디근로자" {% if request.args.get('category') == '코디근로자' %}selected{% endif %}>코디근로자</option>
-        <option value="안전코디" {% if request.args.get('category') == '안전코디' %}selected{% endif %}>안전코디</option>
-        <option value="직원근로자" {% if request.args.get('category') == '직원근로자' %}selected{% endif %}>직원근로자</option>
-        <option value="직원사업자" {% if request.args.get('category') == '직원사업자' %}selected{% endif %}>직원사업자</option>
-        <option value="원어민근로자" {% if request.args.get('category') == '원어민근로자' %}selected{% endif %}>원어민근로자</option>
-        <option value="원어민사업자" {% if request.args.get('category') == '원어민사업자' %}selected{% endif %}>원어민사업자</option>
-    </select>
-</div>
-
+        <div class="filter-group">
+            <label>계약구분</label>
+            <select name="category">
+                <option value="">전체 구분</option>
+                {% for cat in ['방과후강사', '맞춤형강사', '코디사업자', '코디근로자', '안전코디', '직원근로자', '직원사업자', '원어민근로자', '원어민사업자'] %}
+                <option value="{{cat}}" {% if request.args.get('category') == cat %}selected{% endif %}>{{cat}}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="filter-group">
             <label>수탁학교명</label>
             <select name="school">
@@ -302,31 +244,25 @@
                 {% endfor %}
             </select>
         </div>
-
-<div class="filter-group">
-    <label>부서명/직책</label>
-    <select name="dept">
-        <option value="">부서명/직책</option>
-        {% for d in depts %}
-        <option value="{{d}}" {% if request.args.get('dept') == d %}selected{% endif %}>{{d}}</option>
-        {% endfor %}
-    </select>
-</div>
-
+        <div class="filter-group">
+            <label>부서명/직책</label>
+            <select name="dept">
+                <option value="">부서명/직책</option>
+                {% for d in depts %}
+                <option value="{{d}}" {% if request.args.get('dept') == d %}selected{% endif %}>{{d}}</option>
+                {% endfor %}
+            </select>
+        </div>
         <div class="filter-group">
             <label>성명</label>
             <input type="text" name="name" placeholder="성명 입력" value="{{ request.args.get('name', '') }}">
         </div>
-
         <div style="display: flex; gap: 5px;">
             <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
             <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
         </div>
-        
         <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: auto; font-size: 0.8rem;">선택 삭제</button>
-        <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold;">선택 항목 다운로드 (ZIP)
-    </button>
-
+        <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold;">선택 항목 다운로드 (ZIP)</button>
     </form>
 
     <div class="table-wrapper">
@@ -365,80 +301,70 @@
                     </td>
                 </tr>
                 <tr id="detail-{{ loop.index }}" class="detail-row">
-    <td colspan="9">
-        <div class="detail-content-box">
-            #{{ item.성명 }}님의 상세정보
-            
-            <table class="inner-detail-table">
-                <tr>
-                    <th>수수료</th><td>{{ item.수수료 or '0' }}</td>
-                    <th>보조금</th><td>{{ item.보조금 or '0' }}</td>
+                    <td colspan="9">
+                        <div class="detail-content-box">
+                            #{{ item.성명 }}님의 상세정보
+                            <table class="inner-detail-table">
+                                <tr>
+                                    <th>수수료</th><td>{{ item.수수료 or '0' }}</td>
+                                    <th>보조금</th><td>{{ item.보조금 or '0' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>경력수당</th><td>{{ item.경력수당 or '0' }}</td>
+                                    <th>직책수당</th><td>{{ item.직책수당 or '0' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>기타수당</th><td>{{ item.기타 or '0' }}</td>
+                                    <th>근무시간</th><td>{{ item.근무시간 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>계약기간</th><td>{{ item.계약기간 or '-' }}</td>
+                                    <th>이메일</th><td>{{ item.email or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>연락처</th><td>{{ item.연락처 or '-' }}</td>
+                                    <th>거주지</th><td>{{ item.거주지 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>접속 IP</th>
+                                    <td colspan="3">{{ item.IP or '-' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
                 </tr>
-                <tr>
-                    <th>경력수당</th><td>{{ item.경력수당 or '0' }}</td>
-                    <th>직책수당</th><td>{{ item.직책수당 or '0' }}</td>
-                </tr>
-                <tr>
-                    <th>기타수당</th><td>{{ item.기타 or '0' }}</td>
-                    <th>근무시간</th><td>{{ item.근무시간 or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>계약기간</th><td>{{ item.계약기간 or '-' }}</td>
-                    <th>이메일</th><td>{{ item.email or '-' }}</td>
-                </tr>
-                <tr>
-                    <th>연락처</th><td>{{ item.연락처 or '-' }}</td>
-                    <th>거주지</th><td>{{ item.거주지 or '-' }}</td>
-                </tr>
-<tr>
-    <th>접속 IP</th>
-    <td colspan="3">{{ item.IP or '-' }}</td>
-</tr>
-            </table>
-        </div>
-    </td>
-</tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-<div id="customModalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
-    <div style="background:#fff; width:380px; padding:30px; border-radius:20px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.2); position:relative;">
-        <div style="font-size: 50px; margin-bottom: 20px;">🚨</div>
-        
-        <h3 style="margin:0 0 15px 0; font-size: 1.2rem; color: #1e293b;">데이터 삭제 최종 확인</h3>
-        
-        <p id="modalMessage" style="color: #64748b; line-height: 1.6; margin-bottom: 25px; font-size: 0.95rem;">
-            정말로 삭제하시겠습니까?<br>삭제된 데이터는 복구할 수 없습니다.
-        </p>
-
-        <div style="display: flex; gap: 10px;">
-            <button onclick="closeDeleteModal()" style="flex:1; padding:12px; border:none; border-radius:12px; background:#f1f3f5; color:#495057; font-weight:600; cursor:pointer;">취소</button>
-            <button id="finalDeleteBtn" style="flex:1; padding:12px; border:none; border-radius:12px; background:#3b82f6; color:#fff; font-weight:600; cursor:pointer;">확인했어요</button>
+    <div id="customModalOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:#fff; width:380px; padding:30px; border-radius:20px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,0.2); position:relative;">
+            <div style="font-size: 50px; margin-bottom: 20px;">🚨</div>
+            <h3 style="margin:0 0 15px 0; font-size: 1.2rem; color: #1e293b;">데이터 삭제 최종 확인</h3>
+            <p id="modalMessage" style="color: #64748b; line-height: 1.6; margin-bottom: 25px; font-size: 0.95rem;">
+                정말로 삭제하시겠습니까?<br>삭제된 데이터는 복구할 수 없습니다.
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeDeleteModal()" style="flex:1; padding:12px; border:none; border-radius:12px; background:#f1f3f5; color:#495057; font-weight:600; cursor:pointer;">취소</button>
+                <button id="finalDeleteBtn" style="flex:1; padding:12px; border:none; border-radius:12px; background:#3b82f6; color:#fff; font-weight:600; cursor:pointer;">확인했어요</button>
+            </div>
         </div>
     </div>
-</div>
 
-
-<div class="pagination">
+    <div class="pagination">
         <a href="{{ url_for('contract.admin_page', page=1, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">«</a>
-
         <a href="{{ url_for('contract.admin_page', page=prev_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Prev 10</a>
-
         {% for p in range(start_page, end_page + 1) %}
-        <a href="{{ url_for('contract.admin_page', page=p, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" 
-           class="{{ 'active' if p == current_page else '' }}">{{p}}</a>
+        <a href="{{ url_for('contract.admin_page', page=p, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" class="{{ 'active' if p == current_page else '' }}">{{p}}</a>
         {% endfor %}
-
         <a href="{{ url_for('contract.admin_page', page=next_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:#f8f9fa; font-weight:bold;">Next 10</a>
-
         <a href="{{ url_for('contract.admin_page', page=total_pages, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">»</a>
     </div>
 </div>
 
 <script>
-    // 1. 보안 설정: 우클릭 및 단축키 방지
+    // 1. 보안 설정: 우클릭 및 단축키 방지 (base.html의 보안과 충돌하지 않도록 유지)
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.');
@@ -504,47 +430,31 @@
         .then(data => { if (data.status === 'success') location.reload(); });
     }
 
-    // 6. 선택 삭제 (체크박스 클래스 .chk 기반)
-let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
+    let selectedIdsForDelete = [];
 
-    // 6. 선택 삭제 (2단계 확인 프로세스)
+    // 6. 선택 삭제
     function deleteSelected() {
         const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-        
-        if (selected.length === 0) { 
-            alert("삭제할 항목을 선택해 주세요."); 
-            return; 
-        }
-        
-        // [1차 확인] 브라우저 기본 컨펌
+        if (selected.length === 0) { alert("삭제할 항목을 선택해 주세요."); return; }
         if (!confirm(selected.length + "건의 데이터를 삭제하시겠습니까?")) return;
 
-        // 삭제할 ID 저장 및 커스텀 모달 노출
         selectedIdsForDelete = selected;
         openDeleteModal(selected.length);
     }
 
-    // 모달 열기
     function openDeleteModal(count) {
         const overlay = document.getElementById('customModalOverlay');
         const msg = document.getElementById('modalMessage');
         msg.innerHTML = `선택하신 <b>${count}건</b>의 정보를 삭제합니다.<br>이 작업은 되돌릴 수 없으니 신중히 결정해 주세요.`;
-        
         overlay.style.display = 'flex';
-
-        // 확인 버튼에 실제 삭제 이벤트 바인딩
-        document.getElementById('finalDeleteBtn').onclick = function() {
-            executeDeleteAction();
-        };
+        document.getElementById('finalDeleteBtn').onclick = executeDeleteAction;
     }
 
-    // 모달 닫기
     function closeDeleteModal() {
         document.getElementById('customModalOverlay').style.display = 'none';
         selectedIdsForDelete = [];
     }
 
-    // 실제 서버 통신 실행
     function executeDeleteAction() {
         fetch('/contract/admin/delete', { 
             method: 'POST', 
@@ -553,27 +463,16 @@ let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
         })
         .then(res => res.json())
         .then(data => { 
-            if (data.status === 'success') {
-                location.reload(); 
-            } else {
-                alert("삭제 실패: " + data.message);
-                closeDeleteModal();
-            }
-        })
-        .catch(err => {
-            alert("통신 중 오류가 발생했습니다.");
-            closeDeleteModal();
+            if (data.status === 'success') location.reload(); 
+            else { alert("삭제 실패: " + data.message); closeDeleteModal(); }
         });
     }
+
     // 7. 엑셀 업로드
     function uploadExcelFile() {
         const fileInput = document.getElementById('excelFile');
         if (!fileInput.files[0]) return;
-
-        if (!confirm("선택한 엑셀 파일의 데이터를 추가하시겠습니까?")) {
-            fileInput.value = '';
-            return;
-        }
+        if (!confirm("선택한 엑셀 파일의 데이터를 추가하시겠습니까?")) { fileInput.value = ''; return; }
 
         const formData = new FormData();
         formData.append('excel_file', fileInput.files[0]);
@@ -581,39 +480,21 @@ let selectedIdsForDelete = []; // 삭제 대상을 임시 저장할 변수
         fetch('/contract/admin/upload_excel', { method: 'POST', body: formData })
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'success') {
-                alert(data.message);
-                location.reload();
-            } else {
-                alert("오류 발생: " + data.message);
-                fileInput.value = '';
-            }
-        })
-        .catch(err => {
-            alert("업로드 중 오류가 발생했습니다.");
-            fileInput.value = '';
+            if (data.status === 'success') { alert(data.message); location.reload(); }
+            else { alert("오류 발생: " + data.message); fileInput.value = ''; }
         });
     }
 
-    // 8. 선택 항목 다운로드 (수정됨: 선택자 .chk 사용 및 경로 통일)
+    // 8. 선택 항목 다운로드
     function downloadSelected() {
-        // [중요] 기존 name="contract_ids"에서 .chk:checked로 변경하여 HTML과 일치시킴
         const selectedCheckboxes = document.querySelectorAll('.chk:checked');
-        
-        if (selectedCheckboxes.length === 0) {
-            alert("다운로드할 항목을 선택해 주세요.");
-            return;
-        }
+        if (selectedCheckboxes.length === 0) { alert("다운로드할 항목을 선택해 주세요."); return; }
 
         const ids = Array.from(selectedCheckboxes).map(cb => cb.value);
         const idString = ids.join(',');
-
-        // 서버 라우팅에 맞춰 /c_admin/ 또는 /admin/ 확인 후 사용
         if(confirm(ids.length + "건의 계약서를 ZIP파일로 다운로드하시겠습니까?")) {
             location.href = `/contract/admin/download_selected?ids=${idString}`;
         }
     }
 </script>
-
-</body>
-</html>
+{% endblock %}
