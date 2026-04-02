@@ -407,9 +407,33 @@ def save_contract():
 @contract_bp.route('/download_pdf/<int:idx>')
 def download_pdf(idx):
     try:
-        df = pd.read_excel(EXCEL_FILE, dtype=str)
-        return send_file(os.path.join(CONTRACTS_DIR, str(df.at[idx, '파일명'])), mimetype='application/pdf')
-    except: return "파일 없음", 404
+        # 엑셀 다시 읽기 (최신 데이터 반영)
+        df = pd.read_excel(EXCEL_FILE, dtype=str).fillna("")
+        
+        # 해당 인덱스에 파일명이 존재하는지 확인
+        if idx not in df.index:
+            return "해당 기록을 찾을 수 없습니다.", 404
+            
+        filename = df.at[idx, '파일명']
+        
+        if not filename or filename == "":
+            return "생성된 PDF 파일 정보가 없습니다.", 404
+            
+        pdf_path = os.path.join(CONTRACTS_DIR, str(filename))
+        
+        # 파일이 실제 서버 경로에 존재하는지 확인
+        if not os.path.exists(pdf_path):
+            return f"서버에서 파일을 찾을 수 없습니다. (파일명: {filename})", 404
+            
+        # 브라우저에서 바로 열리도록(inline) 설정하여 전송
+        return send_file(
+            pdf_path, 
+            mimetype='application/pdf',
+            as_attachment=False,  # True로 바꾸면 바로 다운로드됨
+            download_name=filename
+        )
+    except Exception as e:
+        return f"파일 불러오기 중 오류 발생: {str(e)}", 500
 
 @contract_bp.route('/admin/logout')
 def admin_logout():
