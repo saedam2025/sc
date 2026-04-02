@@ -14,13 +14,16 @@ contract_bp = Blueprint('contract', __name__)
 hashids = Hashids(salt="saedam_secret_salt", min_length=8)
 
 # --- [저장 경로 설정: 인트라넷 구조에 맞춤] ---
+# Render 배포 환경(/mnt/data) 및 로컬 환경 자동 대응
 if os.path.exists('/mnt/data'):
     MOUNT_PATH = '/mnt/data'
 else:
     MOUNT_PATH = os.getcwd()
 
+# 엑셀 및 PDF 저장 폴더 설정
 EXCEL_FILE = os.path.join(MOUNT_PATH, 'admin_list.xlsx')
 CONTRACTS_DIR = os.path.join(MOUNT_PATH, 'contracts')
+# 약관 폴더는 프로젝트 최상위의 terms 폴더를 참조
 TERMS_DIR = os.path.join(os.getcwd(), 'terms') 
 
 if not os.path.exists(CONTRACTS_DIR):
@@ -51,7 +54,7 @@ def format_value(val):
     return val
 
 def init_excel():
-    """엑셀 초기화"""
+    """엑셀 초기화 (모든 읽기 작업에 dtype=str 적용)"""
     columns = [
         '계약구분', '수탁학교명', '부서명', '성명', '주민번호', '수수료', '보조금', '경력수당', '직책수당', '기타', '근무시간', '계약기간', 'email', '연락처', '거주지', '계약완료일시', '연도', '파일명', 'IP'
     ]
@@ -66,6 +69,7 @@ def init_excel():
         df = df.reindex(columns=columns)
         df.to_excel(EXCEL_FILE, index=False)
 
+# 서버 시작 시 엑셀 체크
 init_excel()
 
 # --- [관리자 기능 로직] ---
