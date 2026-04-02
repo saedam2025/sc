@@ -19,24 +19,21 @@ def now_kst():
     return datetime.now(ZoneInfo("Asia/Seoul"))
 
 # --- [경로 및 환경 설정] ---
-# Render 배포 환경(/mnt/data) 및 로컬 환경 대응
 BASE_DIR = "/mnt/data" if os.path.exists("/mnt/data") else os.getcwd()
 DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
 PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
 SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
-# 템플릿 경로 (요청하신 templates/certificate/ 폴더 내 위치)
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
-# 폴더 생성
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
-# 이메일 설정 (환경변수 참조)
+# 이메일 설정
 SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS_01")
 SENDER_PW = os.environ.get("APP_PASSWORD_01")
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 
-# PDF 엔진 설정 (wkhtmltopdf 경로 확인)
+# PDF 엔진 설정
 WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
 PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
 
@@ -52,7 +49,7 @@ def ensure_db_initialized():
         pd.DataFrame(columns=columns).to_excel(DATA_PATH, index=False)
 
 def get_next_issue_number():
-    """연도별 발급 번호 자동 생성 (예: 제26-0001호)"""
+    """연도별 발급 번호 자동 생성"""
     year_prefix = now_kst().strftime('%y')
     num_file = os.path.join(BASE_DIR, f"last_cert_num_{year_prefix}.txt")
     
@@ -95,9 +92,10 @@ def apply():
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_excel(DATA_PATH, index=False)
 
-            # 관리자 알림 (옵션)
+            # 관리자 알림
             send_admin_alert(form_data['성명'], form_data['증명서종류'])
             
+            # 수정사항: success.html에 form_data 전체를 넘겨 정보 요약이 가능하게 함
             return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
@@ -113,7 +111,6 @@ def admin_list():
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
-    # 최신 신청건이 위로 오도록 역순 정렬하여 템플릿에 전달
     submissions = df.iloc[::-1].reset_index().to_dict(orient='records')
     
     return render_template('certificate/admin.html', 
@@ -128,7 +125,6 @@ def generate_certificate(idx):
     
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
-        # 역순 정렬된 리스트의 index이므로 실제 원본 인덱스 계산
         actual_idx = len(df) - 1 - idx
         row = df.iloc[actual_idx]
         
@@ -136,16 +132,11 @@ def generate_certificate(idx):
             flash("이미 발급이 완료된 요청입니다.")
             return redirect(url_for('document.admin_list'))
 
-        # 1. 발급 번호 따기
         issue_no = get_next_issue_number()
-        
-        # 2. PDF 생성
         pdf_path = create_pdf_file(row, issue_no)
         
-        # 3. 강사에게 이메일 전송
         send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
         
-        # 4. 엑셀 상태 업데이트
         df.at[actual_idx, '상태'] = '발급완료'
         df.at[actual_idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
         df.at[actual_idx, '발급번호'] = issue_no
@@ -165,19 +156,22 @@ def create_pdf_file(row, issue_no):
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         template = Template(f.read())
 
+    # 수정사항: 주민번호 중복 인자 오류 해결을 위해 딕셔너리로 통합 관리
+    data = row.to_dict()
+    
     # 주민번호 마스킹 처리
-    ssn = str(row['주민번호'])
+    ssn = str(data.get('주민번호', ''))
     masked_ssn = ssn[:8] + "******" if "-" in ssn else ssn
+    data['주민번호'] = masked_ssn  # 딕셔너리 내부의 주민번호를 마스킹된 것으로 교체
 
-    # 템플릿 렌더링
+    # 템플릿 렌더링 (data 딕셔너리 하나만 풀어서 전달)
     html_content = template.render(
-        **row.to_dict(),
-        주민번호=masked_ssn,
+        **data,
         발급번호=issue_no,
         발급일자=now_kst().strftime("%Y년 %m월 %d일")
     )
 
-    # 도장 이미지 삽입 (절대 경로 처리)
+    # 도장 이미지 삽입
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE)}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
 
@@ -239,7 +233,6 @@ def delete_record(idx):
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         actual_idx = len(df) - 1 - idx
         
-        # 파일이 있으면 파일도 삭제
         filename = df.at[actual_idx, '파일명']
         if filename:
             p = os.path.join(PDF_FOLDER, filename)
