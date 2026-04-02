@@ -414,3 +414,56 @@ def download_pdf(idx):
 @contract_bp.route('/admin/logout')
 def admin_logout():
     return redirect(url_for('logout'))
+
+@contract_bp.route('/admin/send_remind_mail', methods=['POST'])
+def send_remind_mail():
+    # 권한 체크 (레벨 5 이하만 가능)
+    if int(session.get('user_level', 99)) > 5:
+        return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
+
+    indices = request.json.get('indices', [])
+    if not indices:
+        return jsonify({'status': 'error', 'message': '대상자가 선택되지 않았습니다.'}), 400
+
+    try:
+        df = pd.read_excel(EXCEL_FILE, dtype=str).fillna("")
+        yag = yagmail.SMTP(SENDER_EMAIL, SENDER_PASSWORD)
+        
+        # 실제 서버 주소 (배포된 도메인 주소로 수정 필요)
+        base_url = request.host_url.rstrip('/') 
+        auth_url = f"{base_url}/contract/login"
+        
+        success_count = 0
+        for idx in [int(i) for i in indices]:
+            if idx in df.index:
+                target = df.loc[idx]
+                target_email = str(target.get('email', '')).strip()
+                target_name = target.get('성명', '')
+                school_name = target.get('수탁학교명', '')
+
+                if "@" in target_email:
+                    subject = f"[재안내] {target_name}님, 새담청소년교육문화원 전자계약 체결 요청"
+                    
+                    # 메일 본문 (HTML 버튼 포함)
+                    contents = f"""
+                    <div style="font-family: 'Malgun Gothic', sans-serif; line-height: 1.6; color: #333;">
+                        <h2 style="color: #002c63;">안녕하세요, {target_name}님.</h2>
+                        <p>새담청소년교육문화원입니다.</p>
+                        <p>현재 <b>[{school_name}]</b> 관련 전자계약 서명이 완료되지 않아 재안내 드립니다.</p>
+                        <p>아래 버튼을 클릭하여 본인인증 후 계약서 작성을 완료해 주시기 바랍니다.</p>
+                        
+                        <div style="margin: 30px 0;">
+                            <a href="{auth_url}" style="background-color: #004ea2; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">계약서 작성하러 가기 (본인인증)</a>
+                        </div>
+                        
+                        <p style="font-size: 0.9rem; color: #666;">* 본 메일은 시스템에 의해 자동 발송되었습니다.</p>
+                        <hr style="border: 0; border-top: 1px solid #eee;">
+                        <p style="font-size: 0.8rem; color: #888;">(사)새담청소년교육문화원 | 경기도 수원시 팔달구</p>
+                    </div>
+                    """
+                    yag.send(to=target_email, subject=subject, contents=contents)
+                    success_count += 1
+
+        return jsonify({"status": "success", "message": f"{success_count}명에게 독촉 메일을 발송했습니다."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
