@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, session, send_file, abort
 import pandas as pd
 import os
+import sys
 import zipfile
 import io
 import pdfkit
@@ -8,30 +9,37 @@ import yagmail
 from datetime import datetime, timedelta, timezone
 from hashids import Hashids
 
+# 배포 환경에서 routes 패키지를 찾지 못하는 에러 방지
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 # Blueprint 생성 (인트라넷 통합용)
 contract_bp = Blueprint('contract', __name__)
 
 hashids = Hashids(salt="saedam_secret_salt", min_length=8)
 
 # --- [저장 경로 설정: 인트라넷 구조에 맞춤] ---
-# Render 배포 환경(/mnt/data) 및 로컬 환경 자동 대응
 if os.path.exists('/mnt/data'):
     MOUNT_PATH = '/mnt/data'
 else:
     MOUNT_PATH = os.getcwd()
 
-# 엑셀 및 PDF 저장 폴더 설정
 EXCEL_FILE = os.path.join(MOUNT_PATH, 'admin_list.xlsx')
 CONTRACTS_DIR = os.path.join(MOUNT_PATH, 'contracts')
-# 약관 폴더는 프로젝트 최상위의 terms 폴더를 참조
 TERMS_DIR = os.path.join(os.getcwd(), 'terms') 
 
 if not os.path.exists(CONTRACTS_DIR):
     os.makedirs(CONTRACTS_DIR)
 
-# [설정] 리눅스 표준 wkhtmltopdf 경로
+# [설정] wkhtmltopdf 경로 설정 (배포 환경 대응)
 WKHTMLTOPDF_PATH = '/usr/bin/wkhtmltopdf'
-PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+if not os.path.exists(WKHTMLTOPDF_PATH):
+    # 로컬 테스트 환경 등 경로가 다를 경우 자동 대응 로직 (필요 시 수정)
+    WKHTMLTOPDF_PATH = 'wkhtmltopdf' 
+
+try:
+    PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+except:
+    PDF_CONFIG = None
 
 SENDER_EMAIL = os.environ.get('MAIL_USERNAME')
 SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD')
@@ -69,23 +77,19 @@ def init_excel():
         df = df.reindex(columns=columns)
         df.to_excel(EXCEL_FILE, index=False)
 
-# 서버 시작 시 엑셀 체크
 init_excel()
 
 # --- [관리자 기능 로직] ---
 
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
-    # 1. 인트라넷 통합 로그인 체크
     if not session.get('user_name'):
         return "<script>alert('인트라넷 로그인이 필요한 페이지입니다.'); location.href='/login_page';</script>"
 
-    # 2. 레벨 기반 권한 체크 (레벨 5 이하만 모든 메뉴 접근 가능)
     user_level = session.get('user_level')
     if user_level is None or int(user_level) > 5:
         return f"<script>alert('접근 권한이 없습니다. (현재 레벨: {user_level})'); location.href='/';</script>"
 
-    # --- 권한 통과 시 기존 관리자 페이지 로직 수행 ---
     page = request.args.get('page', 1, type=int)
     per_page = 20
     s_year, s_cat, s_school, s_dept, s_name = (
@@ -143,7 +147,6 @@ def admin_page():
 
 @contract_bp.route('/admin/upload_excel', methods=['POST'])
 def upload_excel():
-    # 권한 체크
     if int(session.get('user_level', 99)) > 5:
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
@@ -166,7 +169,6 @@ def upload_excel():
 
 @contract_bp.route('/admin/add', methods=['POST'])
 def admin_add():
-    # 권한 체크
     if int(session.get('user_level', 99)) > 5:
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
@@ -188,7 +190,6 @@ def admin_add():
 
 @contract_bp.route('/admin/delete', methods=['POST'])
 def delete_contracts():
-    # 권한 체크
     if int(session.get('user_level', 99)) > 5:
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
@@ -208,7 +209,6 @@ def delete_contracts():
 
 @contract_bp.route('/admin/download_selected')
 def download_selected_contracts():
-    # 권한 체크
     if int(session.get('user_level', 99)) > 5:
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
@@ -255,22 +255,15 @@ def home():
 @contract_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        if request.is_json:
-            data = request.json
-            name = data.get('name')
-            ssn_raw = data.get('ssn', '')
-            ssn_last4 = data.get('ssn_last4')
-        else:
-            name = request.form.get('name')
-            ssn_raw = request.form.get('ssn', '')
-            ssn_last4 = request.form.get('ssn_last4')
-
+        data = request.json if request.is_json else request.form.to_dict()
+        name = data.get('name')
+        ssn_raw = data.get('ssn', '')
+        ssn_last4 = data.get('ssn_last4')
         ssn = ssn_raw.replace("-", "")
         
         try:
             df = pd.read_excel(EXCEL_FILE, dtype=str)
             user_rows = df[(df['성명'] == name) & (df['주민번호'].astype(str).str.replace("-", "") == ssn)]
-            
             if not user_rows.empty and ssn[-4:] == ssn_last4:
                 session['contract_user_name'] = name
                 session['contract_user_ssn'] = ssn_raw 
@@ -294,7 +287,7 @@ def contract_list():
 
 @contract_bp.route('/contract/<string:safe_id>')
 def contract(safe_id):
-    if 'contract_user_name' not in session or 'contract_user_ssn' not in session: return redirect(url_for('contract.login'))
+    if 'contract_user_name' not in session: return redirect(url_for('contract.login'))
     decoded = hashids.decode(safe_id)
     if not decoded: return abort(404)
     orig_idx = decoded[0]
@@ -303,7 +296,8 @@ def contract(safe_id):
         if orig_idx >= len(df): return abort(404)
         target_row = df.iloc[orig_idx]
         if target_row['성명'] != session.get('contract_user_name'):
-            return "<script>alert('해당 계약서에 대한 접근 권한이 없습니다.'); location.href='/contract/list';</script>"
+            return "<script>alert('접근 권한이 없습니다.'); location.href='/contract/list';</script>"
+        
         user_data = target_row.to_dict()
         user_data['orig_idx'] = orig_idx
         contract_type = user_data.get('계약구분', '방과후강사')
@@ -315,10 +309,7 @@ def contract(safe_id):
                     c = f.read()
                     for col in df.columns:
                         raw_val = user_data.get(col, '')
-                        if col in ['수수료', '보조금', '경력수당', '직책수당', '기타']:
-                            val = format_value(raw_val)
-                        else:
-                            val = str(raw_val) if pd.notna(raw_val) else ""
+                        val = format_value(raw_val) if col in ['수수료', '보조금', '경력수당', '직책수당', '기타'] else str(raw_val)
                         c = c.replace(f"{{{{ data.{col} }}}}", val)
                         display_style = "display:none" if not val or val == '0' or str(val).strip() == '' else "display:table-row"
                         c = c.replace(f"{{{{ style.{col} }}}}", display_style)
@@ -328,7 +319,7 @@ def contract(safe_id):
         user_data['terms_content1'] = load_and_replace(f"{contract_type}.txt")
         user_data['terms_content2'] = load_and_replace(f"{contract_type}2.txt")
         return render_template('contract/contract.html', data=user_data)
-    except Exception as e: return f"에러 발생: {str(e)}", 500
+    except Exception as e: return f"에러: {str(e)}", 500
 
 @contract_bp.route('/save_contract', methods=['POST'])
 def save_contract():
@@ -343,39 +334,33 @@ def save_contract():
         
         contract_type = df.at[idx, '계약구분']
         config = {
-            '방과후강사': ("새담청소년교육문화원 위탁교육계약서", "수탁학교 :", "담당부서 :"),
-            '맞춤형강사': ("새담청소년교육문화원 위탁교육계약서", "수탁학교 :", "담당부서 :"),
-            '코디근로자': ("새담청소년교육문화원 센터장 계약서", "수탁학교 :", "직책 :"),
-            '코디사업자': ("새담청소년교육문화원 센터장 계약서", "수탁학교 :", "직책 :"),
-            '원어민근로자': ("방과후 영어 원어민 강사 위탁 계약서", "School Name :", "Part :"),
-            '원어민사업자': ("방과후 영어 원어민 강사 위탁 계약서", "School Name :", "Part :"),
-            '안전코디': ("새담청소년교육문화원 위수탁계약서", "수탁학교 :", "직책 :"),
-            '직원근로자': ("새담청소년교육문화원 근로계약서", "기관명 :", "직책 :"),
-            '직원사업자': ("새담청소년교육문화원 위탁업무계약서", "기관명 :", "위탁업무 :")
+            '방과후강사': ("위탁교육계약서", "수탁학교 :", "담당부서 :"),
+            '맞춤형강사': ("위탁교육계약서", "수탁학교 :", "담당부서 :"),
+            '코디근로자': ("센터장 계약서", "수탁학교 :", "직책 :"),
+            '코디사업자': ("센터장 계약서", "수탁학교 :", "직책 :"),
+            '원어민근로자': ("원어민 강사 계약서", "School Name :", "Part :"),
+            '원어민사업자': ("원어민 강사 계약서", "School Name :", "Part :"),
+            '안전코디': ("위수탁계약서", "수탁학교 :", "직책 :"),
+            '직원근로자': ("근로계약서", "기관명 :", "직책 :"),
+            '직원사업자': ("위탁업무계약서", "기관명 :", "위탁업무 :")
         }
-        doc_title, school_label, dept_label = config.get(contract_type, (f"새담청소년교육문화원 계약서 ({contract_type})", "수탁학교 :", "담당부서 :"))
+        doc_title, school_label, dept_label = config.get(contract_type, (f"계약서 ({contract_type})", "수탁학교 :", "담당부서 :"))
         final_school_name = "새담청소년교육문화원" if contract_type in ['직원근로자', '직원사업자'] else data.get('school', '')
         
         stamp_path = os.path.abspath(os.path.join(os.getcwd(), 'static', 'stamp7.png'))
         stamp_uri = f"file://{stamp_path}"
+        
         signature_section = f"""
         <div class="signature-area" style="margin-top: 40px; position: relative; min-height: 150px;">
             <p style="text-align: center; margin-bottom: 50px;">{now_dt.strftime('%Y년 %m월 %d일')}</p>
-            <br>
             <div style="float: left; width: 50%; position: relative;">
                 <p><b>[위탁자]</b></p>
-                <p style="font-size: 20px; line-height: 1.6; position: relative; width: 280px;">
-               (사)새담청소년교육문화원
-             <span style="display: block; text-align: right; padding-right: 64px;">이사장</span>
-            <img src="{stamp_uri}" style="position: absolute; right: -60; bottom: -10px; width: 90px;">
-                </p>
+                <p style="font-size: 20px; line-height: 1.6;">(사)새담청소년교육문화원 이사장
+                <img src="{stamp_uri}" style="position: absolute; right: 0; bottom: -10px; width: 90px;"></p>
             </div>
-            <div style="float: right; width: 45%; text-align: left;">
+            <div style="float: right; width: 45%;">
                 <p><b>[수탁자]</b></p>
-                <p style="line-height: 40px;">
-                    성명: {data['name']} <br>
-                    서명: <img src="{data['signature']}" style="width: 200px; border-bottom: 1px solid #000; vertical-align: middle; margin-left: 10px;">
-                </p>
+                <p>성명: {data['name']} <br>서명: <img src="{data['signature']}" style="width: 150px; border-bottom: 1px solid #000;"></p>
             </div>
             <div style="clear: both;"></div>
         </div>
@@ -388,9 +373,7 @@ def save_contract():
                     c = f.read()
                     for col in df.columns:
                         raw_val = str(final_school_name) if col == '수탁학교명' else (str(df.at[idx, col]) if pd.notna(df.at[idx, col]) else "")
-                        if col in ['수수료', '보조금', '경력수당', '직책수당', '기타']:
-                            val = format_value(raw_val)
-                        else: val = raw_val
+                        val = format_value(raw_val) if col in ['수수료', '보조금', '경력수당', '직책수당', '기타'] else raw_val
                         c = c.replace(f"{{{{ data.{col} }}}}", val)
                         display_style = "display:none" if not val or val == '0' or str(val).strip() == '' else "display:table-row"
                         c = c.replace(f"{{{{ style.{col} }}}}", display_style)
@@ -398,56 +381,34 @@ def save_contract():
             return ""
 
         content1, content2 = get_cleaned_content(f"{contract_type}.txt"), get_cleaned_content(f"{contract_type}2.txt")
-        html_content = f"""
-        <html><head><meta charset=\"UTF-8\">
-        <link href=\"https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap\" rel=\"stylesheet\">
-        <style>
-            @page {{ size: A4; margin: 25mm 20mm; }} 
-            body {{ margin: 0; padding: 0; font-family: 'Noto Sans KR', sans-serif; background-color: #fff; color: #000; }} 
-            .document-wrapper {{ position: relative; z-index: 1; }} 
-            .title {{ text-align: center; font-size: 28px; font-weight: bold; margin-bottom: 35px; text-decoration: underline; }} 
-            .info-table {{ width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 15px; border: none; }} 
-            .info-table th, .info-table td {{ border: none; padding: 8px 5px; text-align: left; }} 
-            .info-table th {{ font-weight: bold; width: 15%; color: #333; }} 
-            .info-table td {{ width: 35%; border-bottom: 1px solid #eee; }} 
-            .terms-area {{ text-align: justify; line-height: 1.6; font-size: 14.5px; margin-top: 10px; word-break: keep-all; }} 
-            .signature-area {{ margin-top: 50px; position: relative; font-size: 16px; }} 
-        </style></head>
-        <body><div class=\"document-wrapper\"><div class=\"title\"><h1 style=\"text-align:center; line-height:1.4; margin-bottom:30px;\"><span style=\"display:block; font-family:'Noto Sans KR', sans-serif; font-weight:900; font-size:26px; letter-spacing:-0.03em; color:#222;\">{doc_title}</span></h1></div><br><table class=\"info-table\"><tr><th>{school_label}</th><td>{final_school_name}</td><th>{dept_label}</th><td>{data.get('dept', '')}</td></tr><tr><th>성명 :</th><td>{data.get('name', '')}</td><th>주민번호 :</th><td>{data.get('ssn', session.get('contract_user_ssn', ''))}</td></tr><tr><th>연락처 :</th><td>{data.get('phone', '')}</td><th>이메일 :</th><td>{data.get('email', '')}</td></tr><tr><th>거주지 :</th><td colspan=\"3\">{data.get('address', '')}</td></tr></table><br><div class=\"terms-area\">{content1}</div>{signature_section}{"<div style='page-break-before: always;'></div>" if content2.strip() else ""}{f"<div class='terms-area' style='margin-top:10mm;'>{content2}</div>{signature_section}" if content2.strip() else ""}</div></body></html>
-        """
+        html_content = f"<html><body style='font-family:Noto Sans KR;'><h2>{doc_title}</h2><br>{content1}{signature_section}{f'<div style=\"page-break-before:always\"></div>{content2}{signature_section}' if content2 else ''}</body></html>"
         
-        safe_school, safe_name = str(final_school_name).replace(' ', ''), str(data['name']).replace(' ', '')
-        display_contract_type = "센터장" if contract_type in ['코디사업자', '코디근로자'] else contract_type
-        filename = f"{display_contract_type}_{safe_school}_{safe_name}_{now_dt.strftime('%Y%m%d_%H%M%S')}.pdf"
+        filename = f"{contract_type}_{now_dt.strftime('%Y%m%d_%H%M%S')}.pdf"
         pdf_path = os.path.join(CONTRACTS_DIR, filename)
-        pdfkit.from_string(html_content, pdf_path, configuration=PDF_CONFIG, options={'page-size': 'A4', 'encoding': \"UTF-8\", 'javascript-delay': '1000', 'enable-local-file-access': None, 'margin-top': '25', 'margin-bottom': '25', 'margin-left': '20', 'margin-right': '20'})
         
-        user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if user_ip and ',' in user_ip: user_ip = user_ip.split(',')[0].strip()
-        df.at[idx, '연도'] = str(now_dt.year)
-        df.at[idx, '연락처'] = str(data.get('phone', ''))
-        df.at[idx, 'email'] = str(data.get('email', ''))
-        df.at[idx, '거주지'] = str(data.get('address', ''))
-        df.at[idx, '계약완료일시'] = now_dt.strftime('%Y-%m-%d %H:%M:%S')
-        df.at[idx, '파일명'] = filename
-        df.at[idx, 'IP'] = user_ip
-        df.to_excel(EXCEL_FILE, index=False)
-        
-        try:
-            target_user_email = str(data.get('email', '')).strip()
-            if target_user_email and "@" in target_user_email:
+        if PDF_CONFIG:
+            pdfkit.from_string(html_content, pdf_path, configuration=PDF_CONFIG, options={'encoding': "UTF-8", 'enable-local-file-access': None})
+            
+            user_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+            df.at[idx, '연도'] = str(now_dt.year)
+            df.at[idx, '계약완료일시'] = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+            df.at[idx, '파일명'] = filename
+            df.at[idx, 'IP'] = user_ip
+            df.to_excel(EXCEL_FILE, index=False)
+            
+            try:
                 yag = yagmail.SMTP(SENDER_EMAIL, SENDER_PASSWORD)
-                yag.send(to=[target_user_email, SENDER_EMAIL], subject=f"[계약완료] {data['name']}님 {doc_title} ({final_school_name})", contents=[f" '{doc_title}' 계약이 완료되었습니다. \n\n첨부된 파일을 확인하세요."], attachments=pdf_path)
-        except: pass
-        return jsonify({"status": "success", "message": "계약이 정상적으로 완료되었으며 이메일로 발송되었습니다."})
-    except Exception as e: return jsonify({"status": "error", "message": f"오류 발생: {str(e)}"}), 500
+                yag.send(to=[str(data.get('email', '')), SENDER_EMAIL], subject=f"[완료] {data['name']}님 계약서", contents="계약이 완료되었습니다.", attachments=pdf_path)
+            except: pass
+            return jsonify({"status": "success", "message": "완료"})
+        return jsonify({"status": "error", "message": "PDF 엔진 오류"}), 500
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
 @contract_bp.route('/download_pdf/<int:idx>')
 def download_pdf(idx):
     try:
         df = pd.read_excel(EXCEL_FILE, dtype=str)
-        pdf_path = os.path.join(CONTRACTS_DIR, str(df.at[idx, '파일명']))
-        return send_file(pdf_path, mimetype='application/pdf')
+        return send_file(os.path.join(CONTRACTS_DIR, str(df.at[idx, '파일명'])), mimetype='application/pdf')
     except: return "파일 없음", 404
 
 @contract_bp.route('/admin/logout')
