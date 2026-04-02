@@ -24,7 +24,7 @@ DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
 PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
 SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
-# 템플릿 경로 설정 (실제 경로에 맞춤)
+# 템플릿 경로 설정 (실제 경로 templates/certificate/ 하위로 고정)
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
 os.makedirs(PDF_FOLDER, exist_ok=True)
@@ -100,19 +100,18 @@ def apply():
 @document_bp.route('/admin')
 def admin_list():
     """인트라넷 관리자용 신청 현황 목록"""
-    # [에러수정 1] app.py와 세션 키 일치 (user_name -> emp_no)
+    # 에러 수정: app.py 세션 키인 'emp_no'로 체크해야 튕기지 않음
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
     
-    # [에러수정 2] admin.html에서 item.index를 사용하므로 실제 인덱스를 유지하여 전달
+    # 에러 수정: admin.html의 item.index와 맞추기 위해 실제 인덱스 값을 보존함
     df_with_idx = df.copy()
     df_with_idx['index'] = df.index
     submissions = df_with_idx.iloc[::-1].to_dict(orient='records')
     
-    # [에러수정 3] 템플릿 파일 경로 정확히 지정
     return render_template('certificate/admin.html', 
                            submissions=submissions,
                            total=len(df),
@@ -126,7 +125,7 @@ def generate_certificate(idx):
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         
-        # [에러수정 4] 전달받은 idx를 그대로 사용하여 행 참조
+        # 에러 수정: 전달받은 idx(행 번호)를 계산 없이 그대로 사용
         if idx not in df.index:
             flash("데이터를 찾을 수 없습니다.")
             return redirect(url_for('document.admin_list'))
@@ -163,7 +162,7 @@ def create_pdf_file(row, issue_no):
 
     data = row.to_dict()
     
-    # 주민번호 마스킹 (예외 발생 방지)
+    # 주민번호 마스킹 강화 (예외 처리 포함)
     ssn = str(data.get('주민번호', '')).replace("-", "")
     if len(ssn) >= 7:
         masked_ssn = f"{ssn[:6]}-{ssn[6]}******"
@@ -177,7 +176,7 @@ def create_pdf_file(row, issue_no):
         발급일자=now_kst().strftime("%Y년 %m월 %d일")
     )
 
-    # 도장 이미지 경로 절대주소로 변환
+    # 도장 이미지 절대 경로 처리
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
 
@@ -250,7 +249,7 @@ def delete_record(idx):
         flash(f"삭제 중 오류: {str(e)}")
     return redirect(url_for('document.admin_list'))
 
-# 추가 기능: admin.html의 '안내 메일 전송' 기능 유지
+# 안내 메일 전송 기능 (admin.html 모달 전송용)
 @document_bp.route('/send_simple_email', methods=['POST'])
 def send_simple_email():
     if 'emp_no' not in session: return abort(403)
