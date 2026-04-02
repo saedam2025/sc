@@ -26,6 +26,7 @@ SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
+# 필수 폴더 생성
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
 # 이메일 설정
@@ -33,20 +34,30 @@ SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS_01")
 SENDER_PW = os.environ.get("APP_PASSWORD_01")
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 
-# PDF 엔진 설정
+# PDF 엔진 설정 (wkhtmltopdf 경로 확인 및 설정)
 WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
-PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+try:
+    PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+except Exception:
+    PDF_CONFIG = None
 
 # --- [내부 데이터베이스 관리 함수] ---
 def ensure_db_initialized():
     """certificates.xlsx 파일이 없으면 표준 컬럼으로 생성"""
+    columns = [
+        "신청일", "증명서종류", "성명", "주민번호", "자택주소",
+        "근무시작일", "근무종료일", "근무장소", "강의과목", "용도", "직책",
+        "이메일주소", "상태", "발급일", "발급번호", "종료사유", "파일명"
+    ]
     if not os.path.exists(DATA_PATH):
-        columns = [
-            "신청일", "증명서종류", "성명", "주민번호", "자택주소",
-            "근무시작일", "근무종료일", "근무장소", "강의과목", "용도", "직책",
-            "이메일주소", "상태", "발급일", "발급번호", "종료사유", "파일명"
-        ]
         pd.DataFrame(columns=columns).to_excel(DATA_PATH, index=False)
+    else:
+        # 파일은 있으나 컬럼이 누락된 경우를 대비해 병합 처리
+        df = pd.read_excel(DATA_PATH)
+        for col in columns:
+            if col not in df.columns:
+                df[col] = ""
+        df.to_excel(DATA_PATH, index=False)
 
 def get_next_issue_number():
     """연도별 발급 번호 자동 생성"""
@@ -56,8 +67,11 @@ def get_next_issue_number():
     last_num = 0
     if os.path.exists(num_file):
         with open(num_file, 'r') as f:
-            try: last_num = int(f.read().strip())
-            except: last_num = 0
+            try: 
+                content = f.read().strip()
+                last_num = int(content) if content else 0
+            except: 
+                last_num = 0
     
     next_num = last_num + 1
     with open(num_file, 'w') as f:
@@ -87,7 +101,7 @@ def apply():
             # 임시 필드 제거
             form_data.pop("종료일선택", None)
 
-            # 데이터 추가 및 저장
+            # 데이터 추가 및 저장 (FutureWarning 방지를 위해 list로 감싸서 concat)
             new_row = pd.DataFrame([form_data])
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_excel(DATA_PATH, index=False)
@@ -95,7 +109,6 @@ def apply():
             # 관리자 알림
             send_admin_alert(form_data['성명'], form_data['증명서종류'])
             
-            # 수정사항: success.html에 form_data 전체를 넘겨 정보 요약이 가능하게 함
             return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
@@ -111,6 +124,8 @@ def admin_list():
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+    
+    # 최신순 정렬을 위해 인덱스 역순 처리
     submissions = df.iloc[::-1].reset_index().to_dict(orient='records')
     
     return render_template('certificate/admin.html', 
@@ -120,12 +135,20 @@ def admin_list():
 
 @document_bp.route('/generate/<int:idx>')
 def generate_certificate(idx):
-    """관리자가 발급 버튼을 눌렀을 때 실행"""
+    """관리자가 발급 버튼을 눌렀을 때 실행 (idx는 리스트의 순서임)"""
     if 'user_name' not in session: return abort(403)
     
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+        
+        # admin.html에서 넘겨준 idx는 역순 정렬된 리스트의 index이므로 실제 DataFrame index를 찾아야 함
+        # submissions가 df.iloc[::-1]이므로 실제 위치는 다음과 같음
         actual_idx = len(df) - 1 - idx
+        
+        if actual_idx < 0 or actual_idx >= len(df):
+            flash("해당 데이터를 찾을 수 없습니다.")
+            return redirect(url_for('document.admin_list'))
+
         row = df.iloc[actual_idx]
         
         if row['상태'] == '발급완료':
@@ -135,8 +158,10 @@ def generate_certificate(idx):
         issue_no = get_next_issue_number()
         pdf_path = create_pdf_file(row, issue_no)
         
+        # 이메일 발송
         send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
         
+        # 상태 업데이트
         df.at[actual_idx, '상태'] = '발급완료'
         df.at[actual_idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
         df.at[actual_idx, '발급번호'] = issue_no
@@ -153,35 +178,44 @@ def generate_certificate(idx):
 
 def create_pdf_file(row, issue_no):
     """HTML 템플릿을 읽어 PDF 파일 생성"""
-    with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
-        template = Template(f.read())
+    if not os.path.exists(TEMPLATE_PATH):
+        raise FileNotFoundError(f"템플릿 파일을 찾을 수 없습니다: {TEMPLATE_PATH}")
 
-    # 수정사항: 주민번호 중복 인자 오류 해결을 위해 딕셔너리로 통합 관리
+    with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+        template_str = f.read()
+        template = Template(template_str)
+
     data = row.to_dict()
     
-    # 주민번호 마스킹 처리
+    # 주민번호 마스킹 처리 (보안상 필요)
     ssn = str(data.get('주민번호', ''))
-    masked_ssn = ssn[:8] + "******" if "-" in ssn else ssn
-    data['주민번호'] = masked_ssn  # 딕셔너리 내부의 주민번호를 마스킹된 것으로 교체
+    if "-" in ssn:
+        parts = ssn.split("-")
+        if len(parts) > 1:
+            data['주민번호'] = f"{parts[0]}-{parts[1][0]}******"
+    elif len(ssn) >= 7:
+        data['주민번호'] = f"{ssn[:6]}-{ssn[6]}******"
 
-    # 템플릿 렌더링 (data 딕셔너리 하나만 풀어서 전달)
+    # 템플릿 렌더링
     html_content = template.render(
         **data,
         발급번호=issue_no,
         발급일자=now_kst().strftime("%Y년 %m월 %d일")
     )
 
-    # 도장 이미지 삽입
-    seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE)}"
+    # 도장 이미지 절대 경로 처리 (wkhtmltopdf 로컬 파일 접근용)
+    seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
+    html_content = html_content.replace('src="/static/seal.gif"', f'src="{seal_uri}"')
 
-    file_name = f"{issue_no}_{row['성명']}.pdf"
+    file_name = f"{issue_no}_{row['성명']}.pdf".replace("/", "_")
     output_path = os.path.join(PDF_FOLDER, file_name)
     
     options = {
         'enable-local-file-access': None, 
         'encoding': 'UTF-8',
-        'margin-top': '0', 'margin-bottom': '0', 'margin-left': '0', 'margin-right': '0'
+        'margin-top': '10mm', 'margin-bottom': '10mm', 'margin-left': '10mm', 'margin-right': '10mm',
+        'page-size': 'A4'
     }
     
     pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
@@ -189,6 +223,10 @@ def create_pdf_file(row, issue_no):
 
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
     """생성된 PDF를 첨부하여 강사에게 메일 발송"""
+    if not SENDER_EMAIL or not SENDER_PW:
+        print("이메일 설정이 누락되었습니다.")
+        return
+
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = to_email
@@ -208,8 +246,9 @@ def send_email_to_instructor(to_email, name, pdf_path, cert_type):
 
 def send_admin_alert(name, cert_type):
     """신청 발생 시 관리자에게 간단 알림"""
+    if not SENDER_EMAIL or not SENDER_PW: return
     try:
-        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요.")
+        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷 관리자 페이지에서 확인 후 발급해 주세요.")
         msg['Subject'] = f"[신청접수] {name} 강사님 - {cert_type}"
         msg['From'] = SENDER_EMAIL
         msg['To'] = ADMIN_NOTIFICATION_EMAIL
@@ -233,14 +272,17 @@ def delete_record(idx):
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         actual_idx = len(df) - 1 - idx
         
-        filename = df.at[actual_idx, '파일명']
-        if filename:
-            p = os.path.join(PDF_FOLDER, filename)
-            if os.path.exists(p): os.remove(p)
-            
-        df = df.drop(index=actual_idx)
-        df.to_excel(DATA_PATH, index=False)
-        flash("기록이 성공적으로 삭제되었습니다.")
+        if 0 <= actual_idx < len(df):
+            filename = df.at[actual_idx, '파일명']
+            if filename:
+                p = os.path.join(PDF_FOLDER, filename)
+                if os.path.exists(p): os.remove(p)
+                
+            df = df.drop(index=actual_idx)
+            df.to_excel(DATA_PATH, index=False)
+            flash("기록이 성공적으로 삭제되었습니다.")
+        else:
+            flash("삭제할 데이터를 찾을 수 없습니다.")
     except Exception as e:
         flash(f"삭제 중 오류: {str(e)}")
     return redirect(url_for('document.admin_list'))
