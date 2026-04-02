@@ -323,65 +323,42 @@ def save_contract():
         return jsonify({"status": "success", "message": "계약이 정상적으로 완료되었으며 이메일로 발송되었습니다."})
     except Exception as e: return jsonify({"status": "error", "message": f"오류 발생: {str(e)}"}), 500
 
+
 # --- [관리자 기능 로직] ---
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
-    if request.method == 'POST':
-        # JSON 요청인지 일반 폼 요청인지 구분
-        if request.is_json:
-            admin_pw = request.json.get('admin_pw')
-        else:
-            admin_pw = request.form.get('admin_pw')
-
-        if admin_pw == ADMIN_PASSWORD:
-            session['contract_admin_logged_in'] = True
-            return redirect(url_for('contract.admin_page'))
-        return "<script>alert('비밀번호가 틀렸습니다.'); history.back();</script>"
-    
-    if not session.get('contract_admin_logged_in'):
-        # 기존 관리자 로그인 디자인 폼 유지 (경로만 contract.admin_page로 수정)
-        return f'''
-        <div style="text-align:center; margin-top:100px; font-family:'Pretendard', sans-serif;">
-            <div style="display:inline-block; padding:40px; border:1px solid #ddd; border-radius:15px; box-shadow:0 4px 15px rgba(0,0,0,0.1); background:#fff;">
-                <h2 style="color:#002c63; margin-bottom:25px; font-weight:800;">🔐 계약관리자 인증</h2>
-                <form method="POST" id="adminLoginForm">
-                    <div style="margin-bottom:15px;">
-                        <input type="password" name="admin_pw" id="admin_pw" placeholder="관리자 비밀번호" 
-                               style="padding:12px; width:280px; border:1px solid #ccc; border-radius:8px; font-size:1rem;">
-                    </div>
-                    <div style="margin-bottom:20px; text-align:left; padding-left:5px;">
-                        <label style="font-size:0.9rem; color:#666; cursor:pointer; display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="remember_pw" style="width:16px; height:16px; cursor:pointer;"> 비밀번호 저장
-                        </label>
-                    </div>
-                    <button type="submit" style="padding:12px; width:100%; background:#002c63; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer; font-size:1rem;">접속하기</button>
-                </form>
-            </div>
-        </div>
+    # 1. 인트라넷 통합 로그인 체크 (세션에 사용자 이름이 있는지 확인)
+    if not session.get('user_name'):
+        return """
         <script>
-            const pwInput = document.getElementById('admin_pw');
-            const rememberChk = document.getElementById('remember_pw');
-            const loginForm = document.getElementById('adminLoginForm');
-            window.onload = function() {{
-                const savedPw = localStorage.getItem('saedam_admin_pw');
-                if (savedPw) {{
-                    pwInput.value = savedPw;
-                    rememberChk.checked = true;
-                }}
-            }};
-            loginForm.onsubmit = function() {{
-                if (rememberChk.checked) {{
-                    localStorage.setItem('saedam_admin_pw', pwInput.value);
-                }} else {{
-                    localStorage.removeItem('saedam_admin_pw');
-                }}
-            }};
+            alert('인트라넷 로그인이 필요한 페이지입니다.');
+            location.href = '/login'; 
         </script>
-        '''
+        """
 
+    # 2. 관리자 권한(직급) 체크
+    # 세션에 저장된 role(직급)이 관리자급인지 확인합니다.
+    admin_roles = ['센터장', '실장', '팀장', 'admin']
+    user_role = session.get('role')
+
+    if user_role not in admin_roles:
+        return """
+        <script>
+            alert('접근 권한이 없습니다. 관리자만 이용 가능합니다.');
+            location.href = '/';
+        </script>
+        """
+
+    # --- 권한 통과 시 기존 관리자 페이지 로직 수행 ---
     page = request.args.get('page', 1, type=int)
     per_page = 20
-    s_year, s_cat, s_school, s_dept, s_name = request.args.get('year', ''), request.args.get('category', ''), request.args.get('school', ''), request.args.get('dept', ''), request.args.get('name', '')
+    s_year, s_cat, s_school, s_dept, s_name = (
+        request.args.get('year', ''), 
+        request.args.get('category', ''), 
+        request.args.get('school', ''), 
+        request.args.get('dept', ''), 
+        request.args.get('name', '')
+    )
 
     try:
         full_df = pd.read_excel(EXCEL_FILE, dtype=str).fillna("")
@@ -395,13 +372,11 @@ def admin_page():
         
         if s_year: 
             df = df[df['연도'].astype(str).str.contains(s_year)]
-        
         if s_cat:
             if s_cat == '미작성':
                 df = df[df['계약완료일시'].astype(str).str.strip() == ""]
             else:
                 df = df[df['계약구분'] == s_cat]
-        
         if s_school: 
             df = df[df['수탁학교명'] == s_school]
         if s_dept: 
@@ -422,28 +397,16 @@ def admin_page():
             item['orig_idx'] = page_indices[i]
 
         display_size = 20 
-        move_size = 10     
         start_page = max(1, ((page - 1) // display_size) * display_size + 1)
         end_page = min(total_pages, start_page + display_size - 1)
-        prev_block = max(1, page - move_size)
-        next_block = min(total_pages, page + move_size)
 
         return render_template('contract/c_admin_.html', 
-                               items=items, 
-                               total_pages=total_pages, 
-                               current_page=page,
-                               start_page=start_page,
-                               end_page=end_page,
-                               prev_block=prev_block,
-                               next_block=next_block,
-                               total_count=total_count,
-                               completed_count=completed_count,
-                               pending_count=pending_count,
-                               completion_rate=completion_rate,
-                               filtered_count=filtered_count,
-                               years=years, 
-                               schools=schools, 
-                               depts=depts)
+                               items=items, total_pages=total_pages, current_page=page,
+                               start_page=start_page, end_page=end_page,
+                               total_count=total_count, completed_count=completed_count,
+                               pending_count=pending_count, completion_rate=completion_rate,
+                               filtered_count=filtered_count, years=years, 
+                               schools=schools, depts=depts)
     except Exception as e: 
         return f"에러: {str(e)}"
 
@@ -457,11 +420,8 @@ def upload_excel():
         for col in target_cols:
             if col in new_df.columns:
                 new_df[col] = new_df[col].apply(format_value)
-        
-        if '연도' not in new_df.columns:
-            new_df['연도'] = ""
-        else:
-            new_df['연도'] = new_df['연도'].fillna("")
+        if '연도' not in new_df.columns: new_df['연도'] = ""
+        else: new_df['연도'] = new_df['연도'].fillna("")
 
         existing_df = pd.read_excel(EXCEL_FILE, dtype=str) if os.path.exists(EXCEL_FILE) else pd.DataFrame()
         combined_df = pd.concat([existing_df, new_df], ignore_index=True)
@@ -475,20 +435,12 @@ def admin_add():
         new_data = request.json
         df = pd.read_excel(EXCEL_FILE, dtype=str)
         new_row = {
-            '계약구분': new_data.get('계약구분', '방과후강사'), 
-            '수탁학교명': new_data.get('수탁학교명'),
-            '부서명': new_data.get('부서명'), 
-            '성명': new_data.get('성명'), 
-            '주민번호': new_data.get('주민번호'),
-            '수수료': format_value(new_data.get('수수료', '0')),
-            '보조금': format_value(new_data.get('보조금', '0')),
-            '경력수당': format_value(new_data.get('경력수당', '0')),
-            '직책수당': format_value(new_data.get('직책수당', '0')),
-            '기타': format_value(new_data.get('기타', '0')),
-            '근무시간': new_data.get('근무시간', ''),
-            '계약기간': new_data.get('계약기간', ''),
-            '연도': "", 
-            '계약완료일시': "", '파일명': "", 'IP': ""
+            '계약구분': new_data.get('계약구분', '방과후강사'), '수탁학교명': new_data.get('수탁학교명'),
+            '부서명': new_data.get('부서명'), '성명': new_data.get('성명'), '주민번호': new_data.get('주민번호'),
+            '수수료': format_value(new_data.get('수수료', '0')), '보조금': format_value(new_data.get('보조금', '0')),
+            '경력수당': format_value(new_data.get('경력수당', '0')), '직책수당': format_value(new_data.get('직책수당', '0')),
+            '기타': format_value(new_data.get('기타', '0')), '근무시간': new_data.get('근무시간', ''),
+            '계약기간': new_data.get('계약기간', ''), '연도': "", '계약완료일시': "", '파일명': "", 'IP': ""
         }
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         df.to_excel(EXCEL_FILE, index=False)
@@ -521,5 +473,5 @@ def download_pdf(idx):
 
 @contract_bp.route('/admin/logout')
 def admin_logout():
-    session.pop('contract_admin_logged_in', None)
-    return redirect(url_for('contract.admin_page'))
+    # 전자계약 관리자 전용 세션은 이제 없으므로, 인트라넷 로그아웃 페이지로 이동시킵니다.
+    return redirect(url_for('main.logout'))
