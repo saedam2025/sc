@@ -304,7 +304,7 @@
                     <td>{{ item.주민번호 }}</td>
                     <td>
                         {% if item.계약완료일시 %}
-                        <a href="/download_pdf/{{ item.orig_idx }}" target="_blank" class="pdf-link">{{ item.계약완료일시 }}</a>
+                        <a href="{{ url_for('contract.download_pdf', idx=item.orig_idx) }}" target="_blank" class="pdf-link">{{ item.계약완료일시 }}</a>
                         {% else %}<span class="status-off">미작성</span>{% endif %}
                     </td>
                 </tr>
