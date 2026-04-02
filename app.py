@@ -1,5 +1,10 @@
 from flask import Flask, session, redirect, url_for, request, render_template, jsonify
 import os
+import sys
+
+# 배포 환경에서 모듈 임포트 에러 방지를 위해 현재 디렉토리를 시스템 경로에 추가
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 # 상대 경로 임포트 에러 수정을 위해 절대 경로 사용
 from routes.main import main_bp
 from routes.document import document_bp
