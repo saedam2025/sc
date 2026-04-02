@@ -338,7 +338,7 @@ def admin_page():
 
     # 2. 관리자 권한(직급) 체크
     # 세션에 저장된 role(직급)이 관리자급인지 확인합니다.
-    admin_roles = ['센터장', '실장', '팀장', 'admin']
+    admin_roles = ['대표이사', '이사', '실장', 'admin']
     user_role = session.get('role')
 
     if user_role not in admin_roles:
