@@ -34,12 +34,9 @@ SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS_01")
 SENDER_PW = os.environ.get("APP_PASSWORD_01")
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 
-# PDF 엔진 설정 (wkhtmltopdf 경로 확인 및 설정)
+# PDF 엔진 설정
 WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
-try:
-    PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
-except Exception:
-    PDF_CONFIG = None
+PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
 
 # --- [내부 데이터베이스 관리 함수] ---
 def ensure_db_initialized():
@@ -52,7 +49,7 @@ def ensure_db_initialized():
     if not os.path.exists(DATA_PATH):
         pd.DataFrame(columns=columns).to_excel(DATA_PATH, index=False)
     else:
-        # 파일은 있으나 컬럼이 누락된 경우를 대비해 병합 처리
+        # 기존 파일이 있을 경우 컬럼 누락 체크
         df = pd.read_excel(DATA_PATH)
         for col in columns:
             if col not in df.columns:
@@ -67,7 +64,7 @@ def get_next_issue_number():
     last_num = 0
     if os.path.exists(num_file):
         with open(num_file, 'r') as f:
-            try: 
+            try:
                 content = f.read().strip()
                 last_num = int(content) if content else 0
             except: 
@@ -101,7 +98,7 @@ def apply():
             # 임시 필드 제거
             form_data.pop("종료일선택", None)
 
-            # 데이터 추가 및 저장 (FutureWarning 방지를 위해 list로 감싸서 concat)
+            # 데이터 추가 및 저장
             new_row = pd.DataFrame([form_data])
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_excel(DATA_PATH, index=False)
@@ -119,14 +116,17 @@ def apply():
 @document_bp.route('/admin')
 def admin_list():
     """인트라넷 관리자용 신청 현황 목록"""
-    if 'user_name' not in session:
+    # 수정: app.py 세션 키인 'emp_no'로 변경
+    if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
     
-    # 최신순 정렬을 위해 인덱스 역순 처리
-    submissions = df.iloc[::-1].reset_index().to_dict(orient='records')
+    # 수정: admin.html에서 item.index를 사용하므로 실제 인덱스를 포함하여 전달
+    df_with_idx = df.copy()
+    df_with_idx['index'] = df.index
+    submissions = df_with_idx.iloc[::-1].to_dict(orient='records')
     
     return render_template('certificate/admin.html', 
                            submissions=submissions,
@@ -135,21 +135,18 @@ def admin_list():
 
 @document_bp.route('/generate/<int:idx>')
 def generate_certificate(idx):
-    """관리자가 발급 버튼을 눌렀을 때 실행 (idx는 리스트의 순서임)"""
-    if 'user_name' not in session: return abort(403)
+    """관리자가 발급 버튼을 눌렀을 때 실행"""
+    if 'emp_no' not in session: return abort(403)
     
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         
-        # admin.html에서 넘겨준 idx는 역순 정렬된 리스트의 index이므로 실제 DataFrame index를 찾아야 함
-        # submissions가 df.iloc[::-1]이므로 실제 위치는 다음과 같음
-        actual_idx = len(df) - 1 - idx
-        
-        if actual_idx < 0 or actual_idx >= len(df):
-            flash("해당 데이터를 찾을 수 없습니다.")
+        # 수정: idx가 엑셀의 실제 행 번호이므로 별도 계산 없이 사용
+        if idx not in df.index:
+            flash("데이터를 찾을 수 없습니다.")
             return redirect(url_for('document.admin_list'))
 
-        row = df.iloc[actual_idx]
+        row = df.iloc[idx]
         
         if row['상태'] == '발급완료':
             flash("이미 발급이 완료된 요청입니다.")
@@ -162,10 +159,10 @@ def generate_certificate(idx):
         send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
         
         # 상태 업데이트
-        df.at[actual_idx, '상태'] = '발급완료'
-        df.at[actual_idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
-        df.at[actual_idx, '발급번호'] = issue_no
-        df.at[actual_idx, '파일명'] = os.path.basename(pdf_path)
+        df.at[idx, '상태'] = '발급완료'
+        df.at[idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
+        df.at[idx, '발급번호'] = issue_no
+        df.at[idx, '파일명'] = os.path.basename(pdf_path)
         df.to_excel(DATA_PATH, index=False)
         
         flash(f"{row['성명']} 님께 증명서 발송을 완료했습니다.")
@@ -178,23 +175,18 @@ def generate_certificate(idx):
 
 def create_pdf_file(row, issue_no):
     """HTML 템플릿을 읽어 PDF 파일 생성"""
-    if not os.path.exists(TEMPLATE_PATH):
-        raise FileNotFoundError(f"템플릿 파일을 찾을 수 없습니다: {TEMPLATE_PATH}")
-
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
-        template_str = f.read()
-        template = Template(template_str)
+        template = Template(f.read())
 
     data = row.to_dict()
     
-    # 주민번호 마스킹 처리 (보안상 필요)
-    ssn = str(data.get('주민번호', ''))
-    if "-" in ssn:
-        parts = ssn.split("-")
-        if len(parts) > 1:
-            data['주민번호'] = f"{parts[0]}-{parts[1][0]}******"
-    elif len(ssn) >= 7:
-        data['주민번호'] = f"{ssn[:6]}-{ssn[6]}******"
+    # 주민번호 마스킹 강화 (예외 처리 포함)
+    ssn = str(data.get('주민번호', '')).replace("-", "")
+    if len(ssn) >= 7:
+        masked_ssn = f"{ssn[:6]}-{ssn[6]}******"
+    else:
+        masked_ssn = ssn
+    data['주민번호'] = masked_ssn
 
     # 템플릿 렌더링
     html_content = template.render(
@@ -203,10 +195,9 @@ def create_pdf_file(row, issue_no):
         발급일자=now_kst().strftime("%Y년 %m월 %d일")
     )
 
-    # 도장 이미지 절대 경로 처리 (wkhtmltopdf 로컬 파일 접근용)
+    # 도장 이미지 삽입 (wkhtmltopdf 로컬 파일 접근용)
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
-    html_content = html_content.replace('src="/static/seal.gif"', f'src="{seal_uri}"')
 
     file_name = f"{issue_no}_{row['성명']}.pdf".replace("/", "_")
     output_path = os.path.join(PDF_FOLDER, file_name)
@@ -214,8 +205,7 @@ def create_pdf_file(row, issue_no):
     options = {
         'enable-local-file-access': None, 
         'encoding': 'UTF-8',
-        'margin-top': '10mm', 'margin-bottom': '10mm', 'margin-left': '10mm', 'margin-right': '10mm',
-        'page-size': 'A4'
+        'margin-top': '0', 'margin-bottom': '0', 'margin-left': '0', 'margin-right': '0'
     }
     
     pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
@@ -223,9 +213,7 @@ def create_pdf_file(row, issue_no):
 
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
     """생성된 PDF를 첨부하여 강사에게 메일 발송"""
-    if not SENDER_EMAIL or not SENDER_PW:
-        print("이메일 설정이 누락되었습니다.")
-        return
+    if not SENDER_EMAIL or not SENDER_PW: return
 
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
@@ -248,7 +236,7 @@ def send_admin_alert(name, cert_type):
     """신청 발생 시 관리자에게 간단 알림"""
     if not SENDER_EMAIL or not SENDER_PW: return
     try:
-        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷 관리자 페이지에서 확인 후 발급해 주세요.")
+        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요.")
         msg['Subject'] = f"[신청접수] {name} 강사님 - {cert_type}"
         msg['From'] = SENDER_EMAIL
         msg['To'] = ADMIN_NOTIFICATION_EMAIL
@@ -261,28 +249,24 @@ def send_admin_alert(name, cert_type):
 @document_bp.route('/pdf/<filename>')
 def serve_pdf(filename):
     """관리자 페이지에서 발급된 PDF 보기"""
-    if 'user_name' not in session: return abort(403)
+    if 'emp_no' not in session: return abort(403)
     return send_from_directory(PDF_FOLDER, filename)
 
 @document_bp.route('/delete/<int:idx>')
 def delete_record(idx):
     """신청 기록 및 파일 삭제"""
-    if 'user_name' not in session: return abort(403)
+    if 'emp_no' not in session: return abort(403)
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
-        actual_idx = len(df) - 1 - idx
-        
-        if 0 <= actual_idx < len(df):
-            filename = df.at[actual_idx, '파일명']
+        if idx in df.index:
+            filename = df.at[idx, '파일명']
             if filename:
                 p = os.path.join(PDF_FOLDER, filename)
                 if os.path.exists(p): os.remove(p)
                 
-            df = df.drop(index=actual_idx)
+            df = df.drop(index=idx)
             df.to_excel(DATA_PATH, index=False)
             flash("기록이 성공적으로 삭제되었습니다.")
-        else:
-            flash("삭제할 데이터를 찾을 수 없습니다.")
     except Exception as e:
         flash(f"삭제 중 오류: {str(e)}")
     return redirect(url_for('document.admin_list'))
