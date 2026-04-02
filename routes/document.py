@@ -98,7 +98,7 @@ def apply():
             # 관리자 알림 (옵션)
             send_admin_alert(form_data['성명'], form_data['증명서종류'])
             
-            return render_template('certificate/success.html', name=form_data['성명'])
+            return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
             
