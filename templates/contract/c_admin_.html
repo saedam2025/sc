@@ -257,14 +257,20 @@
             <label>성명</label>
             <input type="text" name="name" placeholder="성명 입력" value="{{ request.args.get('name', '') }}">
         </div>
-<div style="display: flex; gap: 5px;">
-    <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
-    <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
+
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%;">
+    <div style="display: flex; gap: 5px;">
+        <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
+        <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-left: auto;">
+        <button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold;">📧 계약메일전송</button>
+        <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">선택 삭제</button>
+        <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold; font-size: 0.8rem;">선택 항목 다운로드 (ZIP)</button>
+    </div>
 </div>
 
-<button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: auto; font-size: 0.8rem; font-weight: bold;">📧 계약메일전송</button>
-<button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: 10px; font-size: 0.8rem;">선택 삭제</button>
-        <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold;">선택 항목 다운로드 (ZIP)</button>
     </form>
 
     <div class="table-wrapper">
