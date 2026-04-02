@@ -63,12 +63,38 @@ def login():
         if u_info['승인상태'] != '승인':
             return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
             
+        # 세션 저장 (직급 정보 추가하여 None 오류 해결)
         session['emp_no'] = str(u_info['사번'])
         session['user_name'] = u_info['이름']
         session['user_level'] = int(u_info['레벨'])
+        session['role'] = str(u_info['직급']) # '직급' 컬럼 데이터를 세션에 굽습니다.
+        
         return jsonify({"status": "success"})
     
     return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
+
+# --- [추가] 내 회원정보 조회 API ---
+@app.route('/user/my_info')
+def get_my_info():
+    if 'emp_no' not in session:
+        return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+    
+    try:
+        df = read_excel_db(OWNER_FILE)
+        # 사번으로 해당 행 찾기
+        user_row = df[df['사번'].astype(str) == session['emp_no']]
+        
+        if user_row.empty:
+            return jsonify({"status": "error", "message": "정보를 찾을 수 없습니다."}), 404
+            
+        # 모든 정보를 딕셔너리로 변환 (보안을 위해 암호는 제외)
+        info_dict = user_row.iloc[0].to_dict()
+        if '암호' in info_dict:
+            del info_dict['암호']
+            
+        return jsonify({"status": "success", "data": info_dict})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/logout')
 def logout():
