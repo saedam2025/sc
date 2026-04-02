@@ -114,11 +114,16 @@
                             <i class="fa-solid fa-calendar-check"></i> 메인달력
                         </a>
                     </li>
+                    
+                    {# 권한 제어: 레벨 5 이상만 회원관리 메뉴 노출, 레벨은 숫자가 낮을 수록 높음. 0제외. #}
+                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
                             <i class="fa-solid fa-users-gear"></i> 회원관리
                         </a>
                     </li>
+                    {% endif %}
+
                     <li>
                         <a href="/approval" class="menu-item">
                             <i class="fa-solid fa-file-signature"></i> 사내결재
@@ -129,11 +134,16 @@
                             <i class="fa-solid fa-print"></i> 증명서발급
                         </a>
                     </li>
+
+                    {# 권한 제어: 레벨 5 이하만 전자계약 메뉴 노출 #}
+                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
                     <li>
                         <a href="/contract/admin" class="menu-item">
                             <i class="fa-solid fa-file-contract"></i> 전자계약
                         </a>
                     </li>
+                    {% endif %}
+
                     <li>
                         <a href="javascript:void(0);" class="menu-item menu-register" onclick="openRegisterModal()">
                             <i class="fa-solid fa-user-plus"></i> 가입신청
@@ -211,7 +221,7 @@
     </div>
 
     <script>
-        // --- 가입 신청 관련 스크립트 (기존 유지) ---
+        // --- 가입 신청 관련 스크립트 ---
         function openRegisterModal() {
             document.getElementById('registerModal').style.display = "block";
         }
@@ -278,18 +288,11 @@
 
                 if (result.status === 'success') {
                     const data = result.data;
-                    
-                    // 제목 변경
                     title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
 
-                    // 지정된 순서대로 정렬 (승인상태, 퇴사일 제외)
-                    const order = [
-                        '사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'
-                    ];
-
+                    const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'];
                     let html = '';
                     order.forEach(key => {
-                        // DB에 해당 키가 존재하는 경우에만 출력
                         if (data.hasOwnProperty(key)) {
                             html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`;
                         }
