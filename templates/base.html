@@ -89,6 +89,13 @@
         .info-table { width:100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
         .info-table th { background: #f8f9fa; padding: 10px; border: 1px solid #eee; text-align: left; width: 35%; color: #666; }
         .info-table td { padding: 10px; border: 1px solid #eee; color: #333; font-weight: 600; }
+        
+        /* 확인 버튼 중앙 정렬을 위한 컨테이너 */
+        .modal-footer-center {
+            display: flex;
+            justify-content: center;
+            margin-top: 25px;
+        }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -189,15 +196,17 @@
     <div id="myInfoModal" class="modal">
         <div class="modal-content modal-info-content">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-id-card"></i> 내 회원 정보</h3>
+                <h3 id="myInfoModalTitle"><i class="fa-solid fa-id-card"></i> 내 회원 정보</h3>
                 <span class="close-modal" onclick="closeMyInfoModal()">&times;</span>
             </div>
             <div id="myInfoLoading" style="text-align: center; padding: 20px;">정보를 불러오는 중...</div>
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable">
-                    </table>
+                </table>
             </div>
-            <button type="button" class="btn-modal-submit" onclick="closeMyInfoModal()">확인</button>
+            <div class="modal-footer-center">
+                <button type="button" class="btn-modal-submit" style="width: 120px;" onclick="closeMyInfoModal()">확인</button>
+            </div>
         </div>
     </div>
 
@@ -251,12 +260,13 @@
             }
         }
 
-        // --- 내 정보 확인 관련 스크립트 (추가됨) ---
+        // --- 내 정보 확인 관련 스크립트 ---
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
             const display = document.getElementById('myInfoDisplay');
             const table = document.getElementById('myInfoTable');
+            const title = document.getElementById('myInfoModalTitle');
 
             modal.style.display = "block";
             loading.style.display = "block";
@@ -267,10 +277,24 @@
                 const result = await res.json();
 
                 if (result.status === 'success') {
+                    const data = result.data;
+                    
+                    // 제목 변경
+                    title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
+
+                    // 지정된 순서대로 정렬 (승인상태, 퇴사일 제외)
+                    const order = [
+                        '사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'
+                    ];
+
                     let html = '';
-                    for (const [key, value] of Object.entries(result.data)) {
-                        html += `<tr><th>${key}</th><td>${value || '-'}</td></tr>`;
-                    }
+                    order.forEach(key => {
+                        // DB에 해당 키가 존재하는 경우에만 출력
+                        if (data.hasOwnProperty(key)) {
+                            html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`;
+                        }
+                    });
+
                     table.innerHTML = html;
                     loading.style.display = "none";
                     display.style.display = "block";
@@ -288,7 +312,6 @@
             document.getElementById('myInfoModal').style.display = "none";
         }
 
-        // 모달 외부 클릭 시 닫기 (가입신청 & 내정보 공통)
         window.onclick = function(event) {
             const regModal = document.getElementById('registerModal');
             const infoModal = document.getElementById('myInfoModal');
