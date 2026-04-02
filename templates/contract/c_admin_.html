@@ -257,11 +257,13 @@
             <label>성명</label>
             <input type="text" name="name" placeholder="성명 입력" value="{{ request.args.get('name', '') }}">
         </div>
-        <div style="display: flex; gap: 5px;">
-            <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
-            <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
-        </div>
-        <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: auto; font-size: 0.8rem;">선택 삭제</button>
+<div style="display: flex; gap: 5px;">
+    <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">조회</button>
+    <button type="button" onclick="location.href='/contract/admin'" style="background: #64748b; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">초기화</button>
+</div>
+
+<button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: auto; font-size: 0.8rem; font-weight: bold;">📧 계약메일전송</button>
+<button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 6px 15px; border-radius: 4px; cursor: pointer; margin-left: 10px; font-size: 0.8rem;">선택 삭제</button>
         <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:6px 15px; border-radius:4px; cursor:pointer; font-weight: bold;">선택 항목 다운로드 (ZIP)</button>
     </form>
 
@@ -496,5 +498,45 @@
             location.href = `/contract/admin/download_selected?ids=${idString}`;
         }
     }
+
+// 9. 선택 대상 계약 독촉 메일 전송
+function sendRemindMail() {
+    const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+    
+    if (selected.length === 0) {
+        alert("메일을 발송할 대상을 선택해 주세요.");
+        return;
+    }
+
+    if (!confirm(`선택한 ${selected.length}명에게 계약 독촉 메일을 발송하시겠습니까?\n(이미 완료된 대상자에게도 발송될 수 있으니 확인 바랍니다.)`)) return;
+
+    // 로딩 표시 (버튼 비활성화)
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = "발송 중...";
+    btn.disabled = true;
+
+    fetch('/contract/admin/send_remind_mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ indices: selected })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+        } else {
+            alert("발송 실패: " + data.message);
+        }
+    })
+    .catch(err => alert("서버 통신 오류가 발생했습니다."))
+    .finally(() => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    });
+}
+
 </script>
+
+
 {% endblock %}
