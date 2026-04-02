@@ -24,9 +24,9 @@ DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
 PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
 SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
+# 템플릿 경로 설정 (실제 경로에 맞춤)
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
-# 필수 폴더 생성
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
 # 이메일 설정
@@ -48,13 +48,6 @@ def ensure_db_initialized():
     ]
     if not os.path.exists(DATA_PATH):
         pd.DataFrame(columns=columns).to_excel(DATA_PATH, index=False)
-    else:
-        # 기존 파일이 있을 경우 컬럼 누락 체크
-        df = pd.read_excel(DATA_PATH)
-        for col in columns:
-            if col not in df.columns:
-                df[col] = ""
-        df.to_excel(DATA_PATH, index=False)
 
 def get_next_issue_number():
     """연도별 발급 번호 자동 생성"""
@@ -64,11 +57,8 @@ def get_next_issue_number():
     last_num = 0
     if os.path.exists(num_file):
         with open(num_file, 'r') as f:
-            try:
-                content = f.read().strip()
-                last_num = int(content) if content else 0
-            except: 
-                last_num = 0
+            try: last_num = int(f.read().strip())
+            except: last_num = 0
     
     next_num = last_num + 1
     with open(num_file, 'w') as f:
@@ -85,7 +75,6 @@ def apply():
             df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
             form_data = dict(request.form)
             
-            # 근무 종료일 '현재까지' 처리 로직
             if form_data.get("종료일선택") == "현재까지":
                 form_data["근무종료일"] = "현재까지"
             
@@ -94,18 +83,13 @@ def apply():
             form_data["발급일"] = ""
             form_data["발급번호"] = ""
             form_data["파일명"] = ""
-            
-            # 임시 필드 제거
             form_data.pop("종료일선택", None)
 
-            # 데이터 추가 및 저장
             new_row = pd.DataFrame([form_data])
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_excel(DATA_PATH, index=False)
 
-            # 관리자 알림
             send_admin_alert(form_data['성명'], form_data['증명서종류'])
-            
             return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
@@ -116,18 +100,19 @@ def apply():
 @document_bp.route('/admin')
 def admin_list():
     """인트라넷 관리자용 신청 현황 목록"""
-    # 수정: app.py 세션 키인 'emp_no'로 변경
+    # [에러수정 1] app.py와 세션 키 일치 (user_name -> emp_no)
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
     
-    # 수정: admin.html에서 item.index를 사용하므로 실제 인덱스를 포함하여 전달
+    # [에러수정 2] admin.html에서 item.index를 사용하므로 실제 인덱스를 유지하여 전달
     df_with_idx = df.copy()
     df_with_idx['index'] = df.index
     submissions = df_with_idx.iloc[::-1].to_dict(orient='records')
     
+    # [에러수정 3] 템플릿 파일 경로 정확히 지정
     return render_template('certificate/admin.html', 
                            submissions=submissions,
                            total=len(df),
@@ -141,11 +126,11 @@ def generate_certificate(idx):
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         
-        # 수정: idx가 엑셀의 실제 행 번호이므로 별도 계산 없이 사용
+        # [에러수정 4] 전달받은 idx를 그대로 사용하여 행 참조
         if idx not in df.index:
             flash("데이터를 찾을 수 없습니다.")
             return redirect(url_for('document.admin_list'))
-
+            
         row = df.iloc[idx]
         
         if row['상태'] == '발급완료':
@@ -155,10 +140,8 @@ def generate_certificate(idx):
         issue_no = get_next_issue_number()
         pdf_path = create_pdf_file(row, issue_no)
         
-        # 이메일 발송
         send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
         
-        # 상태 업데이트
         df.at[idx, '상태'] = '발급완료'
         df.at[idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
         df.at[idx, '발급번호'] = issue_no
@@ -180,7 +163,7 @@ def create_pdf_file(row, issue_no):
 
     data = row.to_dict()
     
-    # 주민번호 마스킹 강화 (예외 처리 포함)
+    # 주민번호 마스킹 (예외 발생 방지)
     ssn = str(data.get('주민번호', '')).replace("-", "")
     if len(ssn) >= 7:
         masked_ssn = f"{ssn[:6]}-{ssn[6]}******"
@@ -188,14 +171,13 @@ def create_pdf_file(row, issue_no):
         masked_ssn = ssn
     data['주민번호'] = masked_ssn
 
-    # 템플릿 렌더링
     html_content = template.render(
         **data,
         발급번호=issue_no,
         발급일자=now_kst().strftime("%Y년 %m월 %d일")
     )
 
-    # 도장 이미지 삽입 (wkhtmltopdf 로컬 파일 접근용)
+    # 도장 이미지 경로 절대주소로 변환
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
 
@@ -213,8 +195,6 @@ def create_pdf_file(row, issue_no):
 
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
     """생성된 PDF를 첨부하여 강사에게 메일 발송"""
-    if not SENDER_EMAIL or not SENDER_PW: return
-
     msg = MIMEMultipart()
     msg['From'] = SENDER_EMAIL
     msg['To'] = to_email
@@ -234,7 +214,6 @@ def send_email_to_instructor(to_email, name, pdf_path, cert_type):
 
 def send_admin_alert(name, cert_type):
     """신청 발생 시 관리자에게 간단 알림"""
-    if not SENDER_EMAIL or not SENDER_PW: return
     try:
         msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요.")
         msg['Subject'] = f"[신청접수] {name} 강사님 - {cert_type}"
@@ -269,4 +248,25 @@ def delete_record(idx):
             flash("기록이 성공적으로 삭제되었습니다.")
     except Exception as e:
         flash(f"삭제 중 오류: {str(e)}")
+    return redirect(url_for('document.admin_list'))
+
+# 추가 기능: admin.html의 '안내 메일 전송' 기능 유지
+@document_bp.route('/send_simple_email', methods=['POST'])
+def send_simple_email():
+    if 'emp_no' not in session: return abort(403)
+    email = request.form.get('email')
+    subject = request.form.get('subject')
+    body = request.form.get('body')
+    
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = email
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SENDER_EMAIL, SENDER_PW)
+            server.send_message(msg)
+        flash("이메일이 성공적으로 발송되었습니다.")
+    except Exception as e:
+        flash(f"이메일 발송 실패: {str(e)}")
     return redirect(url_for('document.admin_list'))
