@@ -336,15 +336,14 @@ def admin_page():
         </script>
         """
 
-    # 2. 관리자 권한(직급) 체크
-    # 세션에 저장된 role(직급)이 관리자급인지 확인합니다.
+# 2. 관리자 권한(직급) 체크
     admin_roles = ['대표이사', '이사', '실장', 'admin']
     user_role = session.get('role')
 
     if user_role not in admin_roles:
-        return """
+        return f"""
         <script>
-            alert('접근 권한이 없습니다. 관리자만 이용 가능합니다.');
+            alert('접근 권한이 없습니다. (현재 시스템에 등록된 본인 직급: {user_role})');
             location.href = '/';
         </script>
         """
