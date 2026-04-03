@@ -36,7 +36,7 @@ ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
 PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
 
-# --- [★ 핵심 수정 부분: 환경변수 이름을 contract.py와 동일하게 통일] ---
+# --- [환경변수 이름 contract.py와 동일하게 통일] ---
 def get_email_credentials():
     email = os.environ.get("MAIL_USERNAME", "")
     pw = os.environ.get("MAIL_PASSWORD", "")
@@ -103,7 +103,7 @@ def apply():
 # --- [내부 라우트: 관리자용] ---
 @document_bp.route('/admin')
 def admin_list():
-    """인트라넷 관리자용 신청 현황 목록"""
+    """인트라넷 관리자용 신청 현황 목록 (페이징 추가)"""
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
@@ -112,12 +112,35 @@ def admin_list():
     
     df_with_idx = df.copy()
     df_with_idx['index'] = df.index
-    submissions = df_with_idx.iloc[::-1].to_dict(orient='records')
+    submissions_all = df_with_idx.iloc[::-1].to_dict(orient='records')
+    
+    # --- 페이징 처리 로직 ---
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # 한 페이지당 10개씩 노출
+    total_count = len(submissions_all)
+    total_pages = (total_count + per_page - 1) // per_page
+    
+    if page < 1: page = 1
+    if page > total_pages and total_pages > 0: page = total_pages
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_submissions = submissions_all[start_idx:end_idx]
+    
+    # 페이지네이션 10개 단위 블록
+    block_size = 10
+    current_block = (page - 1) // block_size + 1
+    start_page = (current_block - 1) * block_size + 1
+    end_page = min(start_page + block_size - 1, total_pages)
     
     return render_template('certificate/admin.html', 
-                           submissions=submissions,
-                           total=len(df),
-                           pending=len(df[df['상태'] == '대기']))
+                           submissions=paginated_submissions,
+                           total=total_count,
+                           pending=len(df[df['상태'] == '대기']),
+                           page=page,
+                           total_pages=total_pages,
+                           start_page=start_page,
+                           end_page=end_page)
 
 @document_bp.route('/generate/<int:idx>')
 def generate_certificate(idx):
@@ -257,7 +280,7 @@ def serve_pdf(filename):
 
 @document_bp.route('/delete/<int:idx>')
 def delete_record(idx):
-    """신청 기록 및 파일 삭제"""
+    """신청 기록 및 파일 단건 삭제"""
     if 'emp_no' not in session: return abort(403)
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
@@ -272,6 +295,36 @@ def delete_record(idx):
             flash("기록이 성공적으로 삭제되었습니다.")
     except Exception as e:
         flash(f"삭제 중 오류: {str(e)}")
+    return redirect(url_for('document.admin_list'))
+
+@document_bp.route('/delete_multiple', methods=['POST'])
+def delete_multiple():
+    """여러 건 동시 선택 삭제"""
+    if 'emp_no' not in session: return abort(403)
+    try:
+        selected_idxs = request.form.getlist('chk_ids')
+        if not selected_idxs:
+            flash("삭제할 항목이 선택되지 않았습니다.")
+            return redirect(url_for('document.admin_list'))
+            
+        df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+        deleted_count = 0
+        
+        for idx_str in selected_idxs:
+            idx = int(idx_str)
+            if idx in df.index:
+                filename = df.at[idx, '파일명']
+                if filename:
+                    p = os.path.join(PDF_FOLDER, filename)
+                    if os.path.exists(p): os.remove(p)
+                df = df.drop(index=idx)
+                deleted_count += 1
+                
+        df.to_excel(DATA_PATH, index=False)
+        flash(f"총 {deleted_count}건의 기록이 성공적으로 삭제되었습니다.")
+    except Exception as e:
+        flash(f"선택 삭제 중 오류: {str(e)}")
+        
     return redirect(url_for('document.admin_list'))
 
 # 안내 메일 전송 기능 (admin.html 모달 전송용)
