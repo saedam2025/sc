@@ -1,11 +1,15 @@
 import os
 import pandas as pd
 import pdfkit
-import yagmail  # smtplib 대신 contract.py와 동일하게 yagmail 사용
+import yagmail
+import smtplib
 import shutil
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 from jinja2 import Template
 
 # Blueprint 설정
@@ -21,7 +25,7 @@ DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
 PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
 SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
 
-# 템플릿 경로 설정 (실제 경로 templates/certificate/ 하위로 고정)
+# 템플릿 경로 설정
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
 
 os.makedirs(PDF_FOLDER, exist_ok=True)
@@ -31,6 +35,12 @@ ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 # PDF 엔진 설정
 WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
 PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+
+# --- [★ 핵심 수정 부분: 환경변수 이름을 contract.py와 동일하게 통일] ---
+def get_email_credentials():
+    email = os.environ.get("MAIL_USERNAME", "")
+    pw = os.environ.get("MAIL_PASSWORD", "")
+    return email.strip(), pw.strip()
 
 # --- [내부 데이터베이스 관리 함수] ---
 def ensure_db_initialized():
@@ -130,20 +140,20 @@ def generate_certificate(idx):
         issue_no = get_next_issue_number()
         pdf_path = create_pdf_file(row, issue_no)
         
-        # 메일 발송 시도 전 발급 완료 상태로 먼저 업데이트 (안전장치)
+        # 메일 발송 전 엑셀 데이터 먼저 업데이트 (발급 자체는 성공하도록)
         df.at[idx, '상태'] = '발급완료'
         df.at[idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
         df.at[idx, '발급번호'] = issue_no
         df.at[idx, '파일명'] = os.path.basename(pdf_path)
         df.to_excel(DATA_PATH, index=False)
 
-        # 메일 발송
-        mail_success = send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
+        # 메일 발송 (성공 여부와 상세 에러 메시지 반환)
+        mail_success, err_msg = send_email_to_instructor(row.get('이메일주소', ''), row['성명'], pdf_path, row['증명서종류'])
         
         if mail_success:
             flash(f"{row['성명']} 님께 증명서 발송을 완료했습니다.")
         else:
-            flash(f"{row['성명']} 님 증명서가 발급되었으나, 메일 발송에는 실패했습니다. 서버 설정을 확인해주세요.")
+            flash(f"발급은 완료되었으나, 메일 전송이 실패했습니다.\n사유: {err_msg}")
             
     except Exception as e:
         flash(f"발급 중 오류 발생: {str(e)}")
@@ -151,7 +161,6 @@ def generate_certificate(idx):
     return redirect(url_for('document.admin_list'))
 
 # --- [보조 기능 함수들] ---
-
 def create_pdf_file(row, issue_no):
     """HTML 템플릿을 읽어 PDF 파일 생성"""
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
@@ -186,48 +195,56 @@ def create_pdf_file(row, issue_no):
     pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
     return output_path
 
-# --- [이메일 발송 함수들 (yagmail 적용)] ---
-
+# --- [이중 방어벽이 적용된 이메일 발송 함수들] ---
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
-    """생성된 PDF를 첨부하여 강사에게 메일 발송"""
-    # 동적으로 실행 시점에 환경변수를 가져옵니다 (오류 원인 해결)
-    email_addr = os.environ.get("EMAIL_ADDRESS_01")
-    email_pw = os.environ.get("APP_PASSWORD_01")
-    
-    if not email_addr or not email_pw:
-        print("메일 환경변수가 누락되었습니다.")
-        return False
+    """생성된 PDF를 첨부하여 강사에게 메일 발송 (yagmail -> smtplib 587 이중 시도)"""
+    if not to_email or str(to_email).strip() == "":
+        return False, "수신자(강사님)의 이메일 주소가 비어있습니다."
         
+    email_addr, email_pw = get_email_credentials()
+    if not email_addr or not email_pw:
+        return False, "구글 계정/앱비밀번호 환경변수가 누락되었습니다."
+        
+    subject = f"[(사)새담] 요청하신 {cert_type} 발송 안내 ({name} 강사님)"
+    contents = f"{name} 강사님, 안녕하세요.\n\n새담청소년교육문화원입니다.\n요청하신 {cert_type}를 첨부파일로 보내드립니다.\n\n감사합니다."
+    
+    # [1차 시도] yagmail 사용
     try:
         yag = yagmail.SMTP(email_addr, email_pw)
-        subject = f"[(사)새담] 요청하신 {cert_type} 발송 안내 ({name} 강사님)"
-        contents = f"{name} 강사님, 안녕하세요.\n\n새담청소년교육문화원입니다.\n요청하신 {cert_type}를 첨부파일로 보내드립니다.\n\n감사합니다."
-        
-        # yagmail은 파일 경로 리스트만 넘기면 자동으로 첨부됨
-        yag.send(
-            to=to_email,
-            subject=subject,
-            contents=contents,
-            attachments=[pdf_path]
-        )
-        return True
-    except Exception as e:
-        print(f"메일 전송 에러 발생: {e}")
-        return False
+        yag.send(to=to_email, subject=subject, contents=contents, attachments=[pdf_path])
+        return True, ""
+    except Exception as yag_err:
+        # [2차 시도] yagmail 실패 시 smtplib 포트 587 (TLS) 직접 연결 방식으로 우회 발송
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = email_addr
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(contents, 'plain'))
+            
+            with open(pdf_path, "rb") as f:
+                part = MIMEApplication(f.read(), _subtype="pdf")
+                part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
+                msg.attach(part)
+                
+            server = smtplib.SMTP("smtp.gmail.com", 587)
+            server.starttls()  # 보안 연결
+            server.login(email_addr, email_pw)
+            server.send_message(msg)
+            server.quit()
+            return True, ""
+        except Exception as smtp_err:
+            return False, f"서버 거부 (yagmail: {str(yag_err)} / smtplib: {str(smtp_err)})"
 
 def send_admin_alert(name, cert_type):
     """신청 발생 시 관리자에게 간단 알림"""
-    email_addr = os.environ.get("EMAIL_ADDRESS_01")
-    email_pw = os.environ.get("APP_PASSWORD_01")
+    email_addr, email_pw = get_email_credentials()
+    if not email_addr or not email_pw: return
     
-    if not email_addr or not email_pw: 
-        return
-        
     try:
         yag = yagmail.SMTP(email_addr, email_pw)
         subject = f"[신청접수] {name} 강사님 - {cert_type}"
         contents = f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요."
-        
         yag.send(to=ADMIN_NOTIFICATION_EMAIL, subject=subject, contents=contents)
     except:
         pass
@@ -261,24 +278,42 @@ def delete_record(idx):
 @document_bp.route('/send_simple_email', methods=['POST'])
 def send_simple_email():
     if 'emp_no' not in session: return abort(403)
-    email = request.form.get('email')
-    subject = request.form.get('subject')
-    body = request.form.get('body')
     
-    email_addr = os.environ.get("EMAIL_ADDRESS_01")
-    email_pw = os.environ.get("APP_PASSWORD_01")
+    to_email = request.form.get('email', '').strip()
+    subject = request.form.get('subject', '')
+    body = request.form.get('body', '')
     
-    if not email_addr or not email_pw:
-        flash("메일 발송 실패: 메일 서버 환경변수가 설정되지 않았습니다.")
+    if not to_email:
+        flash("발송 실패: 수신자 이메일 주소를 확인해주세요.")
         return redirect(url_for('document.admin_list'))
         
+    email_addr, email_pw = get_email_credentials()
+    if not email_addr or not email_pw:
+        flash("발송 실패: 서버 환경변수(구글 계정)가 설정되지 않았습니다.")
+        return redirect(url_for('document.admin_list'))
+        
+    # [1차 시도] yagmail
     try:
         yag = yagmail.SMTP(email_addr, email_pw)
-        yag.send(to=email, subject=subject, contents=body)
+        yag.send(to=to_email, subject=subject, contents=body)
         flash("이메일이 성공적으로 발송되었습니다.")
-    except Exception as e:
-        flash(f"이메일 발송 실패: {str(e)}")
-        
+    except Exception as yag_e:
+        # [2차 시도] smtplib 587
+        try:
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = email_addr
+            msg['To'] = to_email
+            
+            server = smtplib.SMTP("smtp.gmail.com", 587)
+            server.starttls()
+            server.login(email_addr, email_pw)
+            server.send_message(msg)
+            server.quit()
+            flash("이메일이 성공적으로 발송되었습니다. (보조 발송 라인 이용)")
+        except Exception as smtp_e:
+            flash(f"메일 발송 완전 실패. 상세 원인:\n{str(smtp_e)}")
+            
     return redirect(url_for('document.admin_list'))
 
 @document_bp.route('/edit', methods=['POST'])
