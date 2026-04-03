@@ -1,14 +1,11 @@
 import os
 import pandas as pd
 import pdfkit
-import smtplib
+import yagmail  # smtplib 대신 contract.py와 동일하게 yagmail 사용
 import shutil
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
 from jinja2 import Template
 
 # Blueprint 설정
@@ -29,9 +26,6 @@ TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certifica
 
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
-# 이메일 설정
-SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS_01")
-SENDER_PW = os.environ.get("APP_PASSWORD_01")
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 
 # PDF 엔진 설정
@@ -100,14 +94,12 @@ def apply():
 @document_bp.route('/admin')
 def admin_list():
     """인트라넷 관리자용 신청 현황 목록"""
-    # 에러 수정: app.py 세션 키인 'emp_no'로 체크해야 튕기지 않음
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
     ensure_db_initialized()
     df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
     
-    # 에러 수정: admin.html의 item.index와 맞추기 위해 실제 인덱스 값을 보존함
     df_with_idx = df.copy()
     df_with_idx['index'] = df.index
     submissions = df_with_idx.iloc[::-1].to_dict(orient='records')
@@ -125,7 +117,6 @@ def generate_certificate(idx):
     try:
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         
-        # 에러 수정: 전달받은 idx(행 번호)를 계산 없이 그대로 사용
         if idx not in df.index:
             flash("데이터를 찾을 수 없습니다.")
             return redirect(url_for('document.admin_list'))
@@ -139,15 +130,21 @@ def generate_certificate(idx):
         issue_no = get_next_issue_number()
         pdf_path = create_pdf_file(row, issue_no)
         
-        send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
-        
+        # 메일 발송 시도 전 발급 완료 상태로 먼저 업데이트 (안전장치)
         df.at[idx, '상태'] = '발급완료'
         df.at[idx, '발급일'] = now_kst().strftime("%Y-%m-%d")
         df.at[idx, '발급번호'] = issue_no
         df.at[idx, '파일명'] = os.path.basename(pdf_path)
         df.to_excel(DATA_PATH, index=False)
+
+        # 메일 발송
+        mail_success = send_email_to_instructor(row['이메일주소'], row['성명'], pdf_path, row['증명서종류'])
         
-        flash(f"{row['성명']} 님께 증명서 발송을 완료했습니다.")
+        if mail_success:
+            flash(f"{row['성명']} 님께 증명서 발송을 완료했습니다.")
+        else:
+            flash(f"{row['성명']} 님 증명서가 발급되었으나, 메일 발송에는 실패했습니다. 서버 설정을 확인해주세요.")
+            
     except Exception as e:
         flash(f"발급 중 오류 발생: {str(e)}")
         
@@ -162,7 +159,6 @@ def create_pdf_file(row, issue_no):
 
     data = row.to_dict()
     
-    # 주민번호 마스킹 강화 (예외 처리 포함)
     ssn = str(data.get('주민번호', '')).replace("-", "")
     if len(ssn) >= 7:
         masked_ssn = f"{ssn[:6]}-{ssn[6]}******"
@@ -170,14 +166,11 @@ def create_pdf_file(row, issue_no):
         masked_ssn = ssn
     data['주민번호'] = masked_ssn
 
-    # [수정된 부분] 중복 키 에러 방지를 위해 data 딕셔너리 값을 직접 업데이트
     data['발급번호'] = issue_no
     data['발급일자'] = now_kst().strftime("%Y년 %m월 %d일")
 
-    # 렌더링 시 **data만 전달 (충돌 해결)
     html_content = template.render(**data)
 
-    # 도장 이미지 절대 경로 처리
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
 
@@ -193,36 +186,49 @@ def create_pdf_file(row, issue_no):
     pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
     return output_path
 
+# --- [이메일 발송 함수들 (yagmail 적용)] ---
 
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
     """생성된 PDF를 첨부하여 강사에게 메일 발송"""
-    msg = MIMEMultipart()
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = to_email
-    msg['Subject'] = f"[(사)새담] 요청하신 {cert_type} 발송 안내 ({name} 강사님)"
+    # 동적으로 실행 시점에 환경변수를 가져옵니다 (오류 원인 해결)
+    email_addr = os.environ.get("EMAIL_ADDRESS_01")
+    email_pw = os.environ.get("APP_PASSWORD_01")
     
-    body = f"{name} 강사님, 안녕하세요.\n\n새담청소년교육문화원입니다.\n요청하신 {cert_type}를 첨부파일로 보내드립니다.\n\n감사합니다."
-    msg.attach(MIMEText(body, 'plain'))
-    
-    with open(pdf_path, "rb") as f:
-        part = MIMEApplication(f.read(), _subtype="pdf")
-        part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
-        msg.attach(part)
+    if not email_addr or not email_pw:
+        print("메일 환경변수가 누락되었습니다.")
+        return False
         
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(SENDER_EMAIL, SENDER_PW)
-        server.send_message(msg)
+    try:
+        yag = yagmail.SMTP(email_addr, email_pw)
+        subject = f"[(사)새담] 요청하신 {cert_type} 발송 안내 ({name} 강사님)"
+        contents = f"{name} 강사님, 안녕하세요.\n\n새담청소년교육문화원입니다.\n요청하신 {cert_type}를 첨부파일로 보내드립니다.\n\n감사합니다."
+        
+        # yagmail은 파일 경로 리스트만 넘기면 자동으로 첨부됨
+        yag.send(
+            to=to_email,
+            subject=subject,
+            contents=contents,
+            attachments=[pdf_path]
+        )
+        return True
+    except Exception as e:
+        print(f"메일 전송 에러 발생: {e}")
+        return False
 
 def send_admin_alert(name, cert_type):
     """신청 발생 시 관리자에게 간단 알림"""
+    email_addr = os.environ.get("EMAIL_ADDRESS_01")
+    email_pw = os.environ.get("APP_PASSWORD_01")
+    
+    if not email_addr or not email_pw: 
+        return
+        
     try:
-        msg = MIMEText(f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요.")
-        msg['Subject'] = f"[신청접수] {name} 강사님 - {cert_type}"
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = ADMIN_NOTIFICATION_EMAIL
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SENDER_EMAIL, SENDER_PW)
-            server.send_message(msg)
+        yag = yagmail.SMTP(email_addr, email_pw)
+        subject = f"[신청접수] {name} 강사님 - {cert_type}"
+        contents = f"새로운 증명서 신청이 들어왔습니다.\n\n신청자: {name}\n종류: {cert_type}\n인트라넷에서 확인 후 발급해 주세요."
+        
+        yag.send(to=ADMIN_NOTIFICATION_EMAIL, subject=subject, contents=contents)
     except:
         pass
 
@@ -259,17 +265,20 @@ def send_simple_email():
     subject = request.form.get('subject')
     body = request.form.get('body')
     
+    email_addr = os.environ.get("EMAIL_ADDRESS_01")
+    email_pw = os.environ.get("APP_PASSWORD_01")
+    
+    if not email_addr or not email_pw:
+        flash("메일 발송 실패: 메일 서버 환경변수가 설정되지 않았습니다.")
+        return redirect(url_for('document.admin_list'))
+        
     try:
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = email
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(SENDER_EMAIL, SENDER_PW)
-            server.send_message(msg)
+        yag = yagmail.SMTP(email_addr, email_pw)
+        yag.send(to=email, subject=subject, contents=body)
         flash("이메일이 성공적으로 발송되었습니다.")
     except Exception as e:
         flash(f"이메일 발송 실패: {str(e)}")
+        
     return redirect(url_for('document.admin_list'))
 
 @document_bp.route('/edit', methods=['POST'])
@@ -282,7 +291,6 @@ def edit_record_post():
         df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
         
         if idx in df.index:
-            # 폼에서 전달받은 값들로 해당 행의 데이터 업데이트
             fields = ['증명서종류', '성명', '주민번호', '자택주소', '근무시작일', 
                       '근무종료일', '근무장소', '강의과목', '직책', '용도', '종료사유', '이메일주소']
             for field in fields:
@@ -297,5 +305,3 @@ def edit_record_post():
         flash(f"수정 중 오류 발생: {str(e)}")
         
     return redirect(url_for('document.admin_list'))
-
-
