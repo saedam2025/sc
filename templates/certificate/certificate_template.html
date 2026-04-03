@@ -97,7 +97,7 @@
       font-size: 26px; /* 선언문 크기 확대 */
       font-family: 'Noto Serif KR', serif;
       font-weight: 700;
-      margin-top: 80px;
+      margin-top: 60px;
       margin-bottom: 65px;
       letter-spacing: 4px;
     }
@@ -138,14 +138,14 @@
       line-height: 1.7;
       border-top: 1px dashed #ccc;
       padding-top: 20px;
+      margin-top: 40px;
     }
   </style>
 </head>
-<body><br><br>
+<body><br>    <!------- 마진으로 조절안되는 상단여백은 여기서 br태그로 조절--------->
   <div class="page-wrapper">
     <div class="cert-border">
-    <br>
-      
+     
       <div class="content-area">
         <div class="doc-no">발급번호: {{ 발급번호 }}</div>
         
@@ -206,7 +206,7 @@
 
       <div class="footer-info">
         상호: (사)새담청소년교육문화원 | 소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
-        사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900<br><br><br>
+        사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900<br> <!----- 마진으로 조절안되는 하단여백은 여기서 br태그로 조절------->
       </div>
 
     </div>
