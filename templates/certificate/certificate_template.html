@@ -21,8 +21,8 @@
       width: 900px;
       height: 1300px;
       box-sizing: border-box;
-      /*값: 위 60px, 오른쪽 15px, 아래 5px, 왼쪽 15px */
-      padding: 60px 15px 15px 15px;
+      /*값: 위 75px, 오른쪽 15px, 아래 5px, 왼쪽 15px */
+      padding: 75px 15px 5px 15px;
       margin: 0 auto;
     }
     /* 고급스러운 이중 테두리 */
@@ -126,8 +126,8 @@
       position: absolute;
       right: -100px;
       top: -22px;
-      width: 95px;
-      height: 95px;
+      width: 105px;
+      height: 105px;
     }
     
     /* 하단 업체 정보 */
@@ -162,7 +162,7 @@
             <td colspan="3">{{ 자택주소 }}</td>
           </tr>
           <tr>
-            <th>근무장소</th>
+            <th>강의장소</th>
             <td colspan="3">{{ 근무장소 }}</td>
           </tr>
           <tr>
@@ -173,7 +173,7 @@
             </td>
           </tr>
           <tr>
-            <th>근무기간</th>
+            <th>출강기간</th>
             <td colspan="3">
               {{ 근무시작일 }} ~ {{ 근무종료일 }}
               {% if 종료사유 %}
@@ -205,10 +205,11 @@
 
       <div class="footer-info">
         상호: (사)새담청소년교육문화원 | 소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
-        사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900
+        사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900<br><br>
       </div>
 
     </div>
   </div>
+
 </body>
 </html>
