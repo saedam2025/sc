@@ -269,3 +269,31 @@ def send_simple_email():
     except Exception as e:
         flash(f"이메일 발송 실패: {str(e)}")
     return redirect(url_for('document.admin_list'))
+
+@document_bp.route('/edit', methods=['POST'])
+def edit_record_post():
+    """모달창에서 전송된 수정 데이터를 엑셀에 반영"""
+    if 'emp_no' not in session: return abort(403)
+    
+    try:
+        idx = int(request.form.get('idx'))
+        df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
+        
+        if idx in df.index:
+            # 폼에서 전달받은 값들로 해당 행의 데이터 업데이트
+            fields = ['증명서종류', '성명', '주민번호', '자택주소', '근무시작일', 
+                      '근무종료일', '근무장소', '강의과목', '직책', '용도', '종료사유', '이메일주소']
+            for field in fields:
+                if field in request.form:
+                    df.at[idx, field] = request.form.get(field)
+                    
+            df.to_excel(DATA_PATH, index=False)
+            flash("신청 정보가 성공적으로 수정되었습니다.")
+        else:
+            flash("해당 데이터를 찾을 수 없습니다.")
+    except Exception as e:
+        flash(f"수정 중 오류 발생: {str(e)}")
+        
+    return redirect(url_for('document.admin_list'))
+
+
