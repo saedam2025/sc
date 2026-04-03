@@ -28,69 +28,42 @@
         margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f3f5;
     }
 
-    /* 2. 대시보드 통계 (슬림한 바 형태로 변경) */
+    /* 2. 대시보드 통계 (슬림한 바 형태) */
     .dashboard-bar {
-        display: flex;
-        justify-content: space-evenly;
-        align-items: center;
-        background: #f8fafc;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 12px 0;
-        margin-bottom: 25px;
+        display: flex; justify-content: space-evenly; align-items: center;
+        background: #f8fafc; border: 1px solid var(--border-color);
+        border-radius: 8px; padding: 12px 0; margin-bottom: 20px;
     }
-    .stat-item {
-        display: flex;
-        align-items: baseline;
-        gap: 10px;
-    }
-    .stat-label {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #475569;
-    }
-    .stat-value {
-        font-size: 1.15rem;
-        font-weight: 800;
-    }
-    .stat-divider {
-        width: 1px;
-        height: 20px;
-        background: #cbd5e1;
+    .stat-item { display: flex; align-items: baseline; gap: 10px; }
+    .stat-label { font-size: 0.85rem; font-weight: 700; color: #475569; }
+    .stat-value { font-size: 1.15rem; font-weight: 800; }
+    .stat-divider { width: 1px; height: 20px; background: #cbd5e1; }
+
+    /* 3. 테이블 상단 툴바 (선택삭제 버튼 위치) */
+    .table-toolbar {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 10px;
     }
 
-    /* 3. 테이블 구조 및 깔끔한 디자인 적용 */
+    /* 4. 테이블 구조 */
     .table-wrapper { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th { background: #f8fafc; color: var(--saedam-navy); font-weight: 700; padding: 12px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color); }
-    td { padding: 12px 10px; font-size: 0.85rem; vertical-align: middle; text-align: center; }
+    td { padding: 12px 10px; font-size: 0.85rem; vertical-align: middle; text-align: center; border-bottom: 1px solid var(--border-color); }
 
-    /* 레코드 구분선 최적화: 메인 정보(윗줄) 하단 선 제거 */
-    .record-row td { 
-        border-bottom: none; 
-        padding-bottom: 4px; 
+    /* 이름 클릭 아코디언 기능 */
+    .expandable-name { 
+        color: var(--saedam-blue); font-weight: 800; 
+        cursor: pointer; text-decoration: underline; text-underline-offset: 3px; 
     }
-    /* 레코드 구분선 최적화: 상세 정보(아랫줄) 하단에만 명확한 선 부여 */
-    .detail-row td { 
-        border-bottom: 1px solid #cbd5e1; 
-        padding-top: 4px;
-        padding-bottom: 12px;
-    }
+    .expandable-name:hover { color: var(--saedam-navy); background: #f0f7ff; }
     
-    /* 체크박스 셀은 위아래 2칸을 합치므로 별도 테두리 설정 */
-    .checkbox-cell {
-        border-bottom: 1px solid #cbd5e1 !important;
-        border-right: 1px dashed #f1f3f5;
-    }
-
-    /* 상세 정보(2단) 스타일: 선 대신 부드러운 박스 형태로 변경 */
-    .detail-row { font-size: 0.8rem; color: #555; }
+    .detail-row { display: none; } /* 기본적으로 숨김 처리 */
+    .detail-row.open { display: table-row; }
     .detail-content { 
         display: flex; flex-wrap: wrap; gap: 15px 25px; 
-        padding: 10px 15px; 
-        background: #f4f7fa; 
-        border-radius: 6px;
-        margin-top: 2px;
+        padding: 15px 20px; background: #f4f7fa; 
+        border-bottom: 3px solid #cbd5e1; 
     }
     .detail-item { display: flex; gap: 5px; align-items: center; }
     .detail-label { font-weight: 700; color: #475569; }
@@ -110,6 +83,18 @@
     .status-badge { padding: 3px 7px; border-radius: 4px; font-size: 11px; font-weight: bold; }
     .status-wait { background: #fff5f5; color: #dc3545; }
     .status-done { background: #f0fff4; color: #2f855a; }
+
+    /* 5. 페이지네이션 스타일 */
+    .pagination {
+        display: flex; justify-content: center; gap: 5px; 
+        margin-top: 25px; list-style: none; padding: 0;
+    }
+    .pagination a, .pagination span {
+        padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 6px;
+        text-decoration: none; color: var(--saedam-navy); font-size: 0.9rem; font-weight: 600;
+    }
+    .pagination a:hover { background: #f4f7fa; }
+    .pagination .active { background: var(--saedam-blue); color: white; border-color: var(--saedam-blue); }
 
     /* 모달 스타일 */
     #mailModal, #editModal {
@@ -149,29 +134,38 @@
         </div>
     </div>
 
+    <div class="table-toolbar">
+        <div style="font-size: 0.85rem; color: #555;">
+            💡 <strong>강사 성명</strong>을 클릭하시면 아래로 주소 등 상세정보가 펼쳐집니다.
+        </div>
+        <button type="button" class="btn btn-delete" onclick="deleteSelected()">🗑️ 선택 삭제</button>
+    </div>
+
     <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
                     <th style="width: 40px;"><input type="checkbox" id="checkAll"></th>
-                    <th style="width: 85px;">신청일</th>
-                    <th style="width: 140px;">증명서종류</th>
+                    <th style="width: 95px;">신청일</th>
+                    <th style="width: 130px;">증명서종류</th>
                     <th style="width: 75px;">성명</th>
                     <th style="width: 115px;">주민번호</th>
                     <th>근무학교/과목</th>
-                    <th style="width: 110px;">상태</th>
+                    <th style="width: 100px;">상태</th>
                     <th style="width: 180px;">작업</th>
                 </tr>
             </thead>
             <tbody>
                 {% for item in submissions %}
                 <tr class="record-row">
-                    <td rowspan="2" class="checkbox-cell">
-                        <input type="checkbox" class="chk" value="{{ item.index }}">
-                    </td>
+                    <td><input type="checkbox" class="chk" value="{{ item.index }}"></td>
                     <td>{{ item.신청일 }}</td>
                     <td style="font-weight: 700; color: var(--saedam-navy); text-align: left;">{{ item.증명서종류 }}</td>
-                    <td style="font-weight: 700;">{{ item.성명 }}</td>
+                    
+                    <td class="expandable-name" onclick="toggleDetail('detail-{{ item.index }}')">
+                        {{ item.성명 }} ⬇️
+                    </td>
+                    
                     <td style="font-size: 0.8rem; font-family: monospace;">{{ item.주민번호 }}</td>
                     <td style="text-align: left;">
                         <div style="font-weight: 600; color: #222;">{{ item.근무장소 }}</div>
@@ -212,9 +206,11 @@
                         {% endif %}
                     </td>
                 </tr>
-                <tr class="detail-row">
-                    <td colspan="7">
+                
+                <tr class="detail-row" id="detail-{{ item.index }}">
+                    <td colspan="8" style="padding: 0; border-bottom: none;">
                         <div class="detail-content">
+                            <div class="detail-item" style="width: 100%;"><span class="detail-label">[자택주소]</span> {{ item.자택주소 }}</div>
                             <div class="detail-item"><span class="detail-label">[증명용도]</span> {{ item.용도 }}</div>
                             <div class="detail-item"><span class="detail-label">[근무기간]</span> {{ item.근무시작일 }} ~ {{ item.근무종료일 }}</div>
                             {% if item.종료사유 %}
@@ -231,6 +227,28 @@
             </tbody>
         </table>
     </div>
+
+    {% if total_pages > 1 %}
+    <ul class="pagination">
+        {% if start_page > 1 %}
+        <li><a href="{{ url_for('document.admin_list', page=start_page-1) }}">◀ 이전</a></li>
+        {% endif %}
+        
+        {% for p in range(start_page, end_page + 1) %}
+        <li>
+            {% if p == page %}
+            <span class="active">{{ p }}</span>
+            {% else %}
+            <a href="{{ url_for('document.admin_list', page=p) }}">{{ p }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+        
+        {% if end_page < total_pages %}
+        <li><a href="{{ url_for('document.admin_list', page=end_page+1) }}">다음 ▶</a></li>
+        {% endif %}
+    </ul>
+    {% endif %}
 </div>
 
 <div id="modalOverlay" class="modal-overlay" onclick="closeMailModal(); closeEditModal();"></div>
@@ -321,20 +339,56 @@
 </div>
 
 <script>
-    // 전체 선택/해제
+    // 1. 전체 선택/해제 기능
     document.getElementById('checkAll').onclick = function() {
         let checkboxes = document.querySelectorAll('.chk');
         for (let checkbox of checkboxes) { checkbox.checked = this.checked; }
     }
 
-    // 발급 버튼 로딩 효과
+    // 2. 아코디언 토글 기능 (이름 클릭 시 실행)
+    function toggleDetail(rowId) {
+        const row = document.getElementById(rowId);
+        if (row.classList.contains('open')) {
+            row.classList.remove('open');
+        } else {
+            row.classList.add('open');
+        }
+    }
+
+    // 3. 선택 삭제 기능
+    function deleteSelected() {
+        const checkedBoxes = document.querySelectorAll('.chk:checked');
+        if (checkedBoxes.length === 0) {
+            alert("삭제할 신청 건을 체크박스에서 먼저 선택해주세요.");
+            return;
+        }
+        
+        if (confirm(`선택하신 ${checkedBoxes.length}건의 기록을 정말 삭제하시겠습니까?`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{{ url_for('document.delete_multiple') }}";
+            
+            checkedBoxes.forEach(box => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'chk_ids';
+                input.value = box.value;
+                form.appendChild(input);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    // 4. 발급 버튼 로딩 효과
     function showLoading(btn) {
         btn.innerHTML = "발급 중...";
         btn.style.opacity = "0.6";
         btn.style.pointerEvents = "none";
     }
 
-    // 메일 모달 제어
+    // 5. 모달 제어 함수들
     function openMailModal(name, email) {
         document.getElementById('modalEmail').value = email;
         document.getElementById('modalSubject').value = `[새담청소년교육문화원] ${name} 강사님, 신청하신 증명서 관련 안내입니다.`;
@@ -348,7 +402,6 @@
         document.getElementById('mailModal').style.display = 'none';
     }
 
-    // 수정 모달 열기 & 데이터 세팅
     function openEditModal(btn) {
         document.getElementById('editIdx').value = btn.getAttribute('data-idx');
         document.getElementById('editType').value = btn.getAttribute('data-type');
@@ -368,7 +421,6 @@
         document.getElementById('editModal').style.display = 'block';
     }
 
-    // 수정 모달 닫기
     function closeEditModal() {
         document.getElementById('modalOverlay').style.display = 'none';
         document.getElementById('editModal').style.display = 'none';
