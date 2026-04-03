@@ -16,13 +16,13 @@
       background-color: #fff;
       color: #111;
     }
-    /* A4 용지 규격에 맞춘 래퍼 */
+    /* A4 용지 규격에 맞춘 래퍼 ---- 사각형 테두리 넓이 길이 조절*/
     .page-wrapper {
-      width: 794px;
-      height: 1123px;
+      width: 900px;
+      height: 1300px;
       box-sizing: border-box;
-      /* 외곽 여백을 상하 40px, 좌우 30px로 대폭 줄여 테두리를 바깥으로 확장 */
-      padding: 40px 30px;
+      /*값: 위 60px, 오른쪽 15px, 아래 5px, 왼쪽 15px */
+      padding: 60px 15px 15px 15px;
       margin: 0 auto;
     }
     /* 고급스러운 이중 테두리 */
@@ -31,8 +31,8 @@
       height: 100%;
       border: 5px double #2c3e50;
       box-sizing: border-box;
-      /* 테두리 안쪽 여백도 상하 40px, 좌우 35px로 줄여 내용 공간 확보 */
-      padding: 40px 35px;
+      /* [수정됨] 테두리가 커진 만큼 내부 컨텐츠가 꽉 차 보이도록 안쪽 여백 조정 */
+      padding: 45px 45px 35px 45px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -45,38 +45,40 @@
 
     /* 발급번호 */
     .doc-no {
-      font-size: 14px;
+      font-size: 15px;
       color: #333;
-      margin-bottom: 30px;
+      margin-bottom: 35px;
       font-weight: 700;
+      margin-left: 35px;
     }
-    /* 증명서 제목 (공간이 넓어진 만큼 폰트 살짝 확대) */
+    /* 증명서 제목 */
     .cert-title {
       text-align: center;
-      font-size: 32px;
+      font-size: 38px; /* 비율에 맞춰 폰트 크기 미세 조정 */
       font-family: 'Noto Serif KR', serif;
       font-weight: 900;
-      letter-spacing: 22px;
-      margin-bottom: 60px;
-      margin-left: 22px; /* 자간 때문에 틀어지는 중앙 정렬 보정 */
+      letter-spacing: 24px;
+      margin-bottom: 70px; /* 제목 아래 여백 확대 */
+      margin-left: 24px; 
       color: #000;
     }
     /* 정보 테이블 */
     .info-table {
-      width: 100%;
+      width: 90%; /* 넓이 90%로 축소 */
+      margin: 0 auto 60px auto;
       border-collapse: collapse;
-      margin-bottom: 50px;
+      margin-bottom: 60px; /* 테이블 아래 여백 확대 */
       border-top: 2px solid #000;
       border-bottom: 2px solid #000;
     }
     .info-table th, .info-table td {
-      /* 공간이 넓어져 허전해 보이지 않도록 표 내부 패딩 늘림 */
-      padding: 19px 15px; 
+      /* [수정됨] 테이블의 위아래 칸 넓이를 더 넓게(22px) 확장하여 쾌적하게 배치 */
+      padding: 22px 15px; 
       border-bottom: 1px solid #d1d8e0;
-      font-size: 16px;
+      font-size: 17px; /* 글씨 크기 1px 확대 */
     }
     .info-table th {
-      width: 120px;
+      width: 130px; /* 좌우 테두리가 넓어진 만큼 제목칸 넓이도 확장 */
       text-align: left;
       background-color: #f8fafc;
       font-weight: 700;
@@ -87,23 +89,23 @@
       text-align: left;
       color: #222;
       font-weight: 500;
-      line-height: 1.5;
+      line-height: 1.6;
     }
     /* 선언문 (위와 같이 증명합니다) */
     .declaration {
       text-align: center;
-      font-size: 24px;
+      font-size: 26px; /* 선언문 크기 확대 */
       font-family: 'Noto Serif KR', serif;
       font-weight: 700;
-      margin-top: 70px;
-      margin-bottom: 55px;
-      letter-spacing: 3px;
+      margin-top: 80px;
+      margin-bottom: 65px;
+      letter-spacing: 4px;
     }
     /* 발급 날짜 */
     .date {
       text-align: center;
-      font-size: 20px;
-      margin-bottom: 70px;
+      font-size: 21px;
+      margin-bottom: 80px;
       letter-spacing: 2px;
     }
     /* 발급 기관 및 직인 */
@@ -111,7 +113,7 @@
       text-align: center;
     }
     .issuer-name {
-      font-size: 25px;
+      font-size: 27px;
       font-family: 'Noto Serif KR', serif;
       font-weight: 900;
       letter-spacing: 5px;
@@ -123,19 +125,19 @@
     .seal {
       position: absolute;
       right: -100px;
-      top: -25px;
+      top: -22px;
       width: 95px;
       height: 95px;
     }
     
-    /* 하단 업체 정보 (Flex 레이아웃에 의해 맨 아래에 고정됨) */
+    /* 하단 업체 정보 */
     .footer-info {
       text-align: center;
       font-size: 14px;
       color: #555;
-      line-height: 1.6;
+      line-height: 1.7;
       border-top: 1px dashed #ccc;
-      padding-top: 15px;
+      padding-top: 20px;
     }
   </style>
 </head>
@@ -202,7 +204,7 @@
       </div>
 
       <div class="footer-info">
-        상호: 사단법인 새담청소년교육문화원 | 소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
+        상호: (사)새담청소년교육문화원 | 소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
         사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900
       </div>
 
