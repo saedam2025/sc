@@ -131,7 +131,21 @@
                     <td>
                         {% if item.상태 == "대기" %}
                             <a href="{{ url_for('document.generate_certificate', idx=item.index) }}" class="btn btn-issue" onclick="showLoading(this)">즉시발급</a>
-                            <a href="#" class="btn btn-edit" onclick="alert('수정 기능은 준비 중입니다.'); return false;">수정</a>
+                            <button type="button" class="btn btn-edit" 
+                                data-idx="{{ item.index }}"
+                                data-type="{{ item.증명서종류 }}"
+                                data-name="{{ item.성명 }}"
+                                data-ssn="{{ item.주민번호 }}"
+                                data-addr="{{ item.자택주소 }}"
+                                data-start="{{ item.근무시작일 }}"
+                                data-end="{{ item.근무종료일 }}"
+                                data-place="{{ item.근무장소 }}"
+                                data-subject="{{ item.강의과목 }}"
+                                data-role="{{ item.직책 }}"
+                                data-purpose="{{ item.용도 }}"
+                                data-reason="{{ item.종료사유 }}"
+                                data-email="{{ item.이메일주소 }}"
+                                onclick="openEditModal(this)">수정</button>
                             <a href="{{ url_for('document.delete_record', idx=item.index) }}" class="btn btn-delete" onclick="return confirm('이 신청 내역을 삭제하시겠습니까?')">삭제</a>
                         {% else %}
                             <span class="status-badge status-done">발급완료</span>
@@ -160,7 +174,7 @@
     </div>
 </div>
 
-<div id="modalOverlay" class="modal-overlay" onclick="closeMailModal()"></div>
+<div id="modalOverlay" class="modal-overlay" onclick="closeMailModal(); closeEditModal();"></div>
 <div id="mailModal">
     <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--saedam-navy); border-bottom:2px solid #eee; padding-bottom:10px;">📧 안내 메일 발송</h3>
     <form action="/document/send_simple_email" method="POST">
@@ -176,6 +190,73 @@
         <div style="text-align:right; gap:8px; display:flex; justify-content: flex-end;">
             <button type="button" class="btn" style="background:#eee; color:#666;" onclick="closeMailModal()">취소</button>
             <button type="submit" class="btn btn-issue">안내 메일 전송</button>
+        </div>
+    </form>
+</div>
+
+<div id="editModal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; padding:30px; border-radius:15px; box-shadow:0 10px 40px rgba(0,0,0,0.2); z-index:10001; width:650px; max-height:85vh; overflow-y:auto;">
+    <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:var(--saedam-navy); border-bottom:2px solid #eee; padding-bottom:10px;">📝 신청 정보 수정</h3>
+    <form action="/document/edit" method="POST">
+        <input type="hidden" name="idx" id="editIdx">
+        
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">증명서종류</label>
+                <select name="증명서종류" id="editType" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                    <option value="경력증명서">경력증명서</option>
+                    <option value="재직증명서">재직증명서</option>
+                    <option value="해촉증명서">해촉증명서</option>
+                </select>
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">성명</label>
+                <input type="text" name="성명" id="editName" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">주민번호</label>
+                <input type="text" name="주민번호" id="editSsn" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">이메일</label>
+                <input type="text" name="이메일주소" id="editEmail" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div style="grid-column: span 2;">
+                <label style="font-size:0.75rem; font-weight:700;">자택주소</label>
+                <input type="text" name="자택주소" id="editAddr" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">근무장소 (학교명 등)</label>
+                <input type="text" name="근무장소" id="editPlace" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">강의과목</label>
+                <input type="text" name="강의과목" id="editSubject" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">직책</label>
+                <input type="text" name="직책" id="editRole" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">용도</label>
+                <input type="text" name="용도" id="editPurpose" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">근무시작일</label>
+                <input type="date" name="근무시작일" id="editStart" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div>
+                <label style="font-size:0.75rem; font-weight:700;">근무종료일</label>
+                <input type="text" name="근무종료일" id="editEnd" placeholder="날짜 또는 '현재까지'" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+            <div style="grid-column: span 2;">
+                <label style="font-size:0.75rem; font-weight:700;">종료사유</label>
+                <input type="text" name="종료사유" id="editReason" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;">
+            </div>
+        </div>
+        
+        <div style="text-align:right; gap:8px; display:flex; justify-content: flex-end; margin-top:20px;">
+            <button type="button" class="btn" style="background:#eee; color:#666;" onclick="closeEditModal()">취소</button>
+            <button type="submit" class="btn btn-issue">수정 저장</button>
         </div>
     </form>
 </div>
@@ -206,6 +287,32 @@
     function closeMailModal() {
         document.getElementById('modalOverlay').style.display = 'none';
         document.getElementById('mailModal').style.display = 'none';
+    }
+
+    // 수정 모달 열기 & 데이터 세팅
+    function openEditModal(btn) {
+        document.getElementById('editIdx').value = btn.getAttribute('data-idx');
+        document.getElementById('editType').value = btn.getAttribute('data-type');
+        document.getElementById('editName').value = btn.getAttribute('data-name');
+        document.getElementById('editSsn').value = btn.getAttribute('data-ssn');
+        document.getElementById('editEmail').value = btn.getAttribute('data-email');
+        document.getElementById('editAddr').value = btn.getAttribute('data-addr');
+        document.getElementById('editPlace').value = btn.getAttribute('data-place');
+        document.getElementById('editSubject').value = btn.getAttribute('data-subject');
+        document.getElementById('editRole').value = btn.getAttribute('data-role');
+        document.getElementById('editPurpose').value = btn.getAttribute('data-purpose');
+        document.getElementById('editStart').value = btn.getAttribute('data-start');
+        document.getElementById('editEnd').value = btn.getAttribute('data-end');
+        document.getElementById('editReason').value = btn.getAttribute('data-reason');
+
+        document.getElementById('modalOverlay').style.display = 'block';
+        document.getElementById('editModal').style.display = 'block';
+    }
+
+    // 수정 모달 닫기
+    function closeEditModal() {
+        document.getElementById('modalOverlay').style.display = 'none';
+        document.getElementById('editModal').style.display = 'none';
     }
 
     // Flask Flash 메시지 처리
