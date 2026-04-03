@@ -21,7 +21,8 @@
       width: 794px;
       height: 1123px;
       box-sizing: border-box;
-      padding: 40px;
+      /* 외곽 여백을 상하 40px, 좌우 30px로 대폭 줄여 테두리를 바깥으로 확장 */
+      padding: 40px 30px;
       margin: 0 auto;
     }
     /* 고급스러운 이중 테두리 */
@@ -30,28 +31,37 @@
       height: 100%;
       border: 5px double #2c3e50;
       box-sizing: border-box;
-      padding: 60px 50px;
-      position: relative;
+      /* 테두리 안쪽 여백도 상하 40px, 좌우 35px로 줄여 내용 공간 확보 */
+      padding: 40px 35px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
+    
+    /* 상단~직인까지의 컨텐츠 영역 */
+    .content-area {
+      width: 100%;
+    }
+
     /* 발급번호 */
     .doc-no {
       font-size: 14px;
       color: #333;
-      margin-bottom: 40px;
+      margin-bottom: 30px;
       font-weight: 700;
     }
-    /* 증명서 제목 */
+    /* 증명서 제목 (공간이 넓어진 만큼 폰트 살짝 확대) */
     .cert-title {
       text-align: center;
-      font-size: 46px;
+      font-size: 32px;
       font-family: 'Noto Serif KR', serif;
       font-weight: 900;
-      letter-spacing: 20px;
-      margin-bottom: 70px;
-      margin-left: 20px; /* 자간 때문에 틀어지는 중앙 정렬 보정 */
+      letter-spacing: 22px;
+      margin-bottom: 60px;
+      margin-left: 22px; /* 자간 때문에 틀어지는 중앙 정렬 보정 */
       color: #000;
     }
-    /* 정보 테이블 (표 테두리를 깔끔하게 변경) */
+    /* 정보 테이블 */
     .info-table {
       width: 100%;
       border-collapse: collapse;
@@ -60,7 +70,8 @@
       border-bottom: 2px solid #000;
     }
     .info-table th, .info-table td {
-      padding: 18px 15px;
+      /* 공간이 넓어져 허전해 보이지 않도록 표 내부 패딩 늘림 */
+      padding: 19px 15px; 
       border-bottom: 1px solid #d1d8e0;
       font-size: 16px;
     }
@@ -76,6 +87,7 @@
       text-align: left;
       color: #222;
       font-weight: 500;
+      line-height: 1.5;
     }
     /* 선언문 (위와 같이 증명합니다) */
     .declaration {
@@ -83,8 +95,8 @@
       font-size: 24px;
       font-family: 'Noto Serif KR', serif;
       font-weight: 700;
-      margin-top: 80px;
-      margin-bottom: 60px;
+      margin-top: 70px;
+      margin-bottom: 55px;
       letter-spacing: 3px;
     }
     /* 발급 날짜 */
@@ -99,7 +111,7 @@
       text-align: center;
     }
     .issuer-name {
-      font-size: 28px;
+      font-size: 25px;
       font-family: 'Noto Serif KR', serif;
       font-weight: 900;
       letter-spacing: 5px;
@@ -107,23 +119,23 @@
       display: inline-block;
       color: #000;
     }
+    /* 직인 */
     .seal {
       position: absolute;
-      right: -80px; /* 글자 바로 옆에 도장이 찍히도록 조정 */
-      top: -15px;
-      width: 70px;
-      height: 70px;
+      right: -100px;
+      top: -25px;
+      width: 95px;
+      height: 95px;
     }
-    /* 하단 업체 정보 (바닥에 고정) */
+    
+    /* 하단 업체 정보 (Flex 레이아웃에 의해 맨 아래에 고정됨) */
     .footer-info {
-      position: absolute;
-      bottom: 40px;
-      left: 0;
-      width: 100%;
       text-align: center;
-      font-size: 13px;
+      font-size: 14px;
       color: #555;
       line-height: 1.6;
+      border-top: 1px dashed #ccc;
+      padding-top: 15px;
     }
   </style>
 </head>
@@ -131,59 +143,61 @@
   <div class="page-wrapper">
     <div class="cert-border">
       
-      <div class="doc-no">발급번호: {{ 발급번호 }}</div>
-      
-      <div class="cert-title">{{ 증명서종류 }}</div>
-      
-      <table class="info-table">
-        <tr>
-          <th>성명</th>
-          <td>{{ 성명 }}</td>
-          <th>주민등록번호</th>
-          <td>{{ 주민번호 }}</td>
-        </tr>
-        <tr>
-          <th>자택주소</th>
-          <td colspan="3">{{ 자택주소 }}</td>
-        </tr>
-        <tr>
-          <th>근무장소</th>
-          <td colspan="3">{{ 근무장소 }}</td>
-        </tr>
-        <tr>
-          <th>직책/과목</th>
-          <td colspan="3">
-            {% if 직책 %}{{ 직책 }}{% endif %}
-            {% if 강의과목 %} (강의과목: {{ 강의과목 }}){% endif %}
-          </td>
-        </tr>
-        <tr>
-          <th>근무기간</th>
-          <td colspan="3">
-            {{ 근무시작일 }} ~ {{ 근무종료일 }}
-            {% if 종료사유 %}
-              <span style="font-size: 0.9em; color: #555; margin-left: 10px;">[종료사유: {{ 종료사유 }}]</span>
-            {% endif %}
-          </td>
-        </tr>
-        <tr>
-          <th>증명용도</th>
-          <td colspan="3">{{ 용도 }}</td>
-        </tr>
-      </table>
+      <div class="content-area">
+        <div class="doc-no">발급번호: {{ 발급번호 }}</div>
+        
+        <div class="cert-title">{{ 증명서종류 }}</div>
+        
+        <table class="info-table">
+          <tr>
+            <th>성명</th>
+            <td>{{ 성명 }}</td>
+            <th>주민등록번호</th>
+            <td>{{ 주민번호 }}</td>
+          </tr>
+          <tr>
+            <th>자택주소</th>
+            <td colspan="3">{{ 자택주소 }}</td>
+          </tr>
+          <tr>
+            <th>근무장소</th>
+            <td colspan="3">{{ 근무장소 }}</td>
+          </tr>
+          <tr>
+            <th>직책/과목</th>
+            <td colspan="3">
+              {% if 직책 %}{{ 직책 }}{% endif %}
+              {% if 강의과목 %} (강의과목: {{ 강의과목 }}){% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th>근무기간</th>
+            <td colspan="3">
+              {{ 근무시작일 }} ~ {{ 근무종료일 }}
+              {% if 종료사유 %}
+                <span style="font-size: 0.9em; color: #555; margin-left: 10px;">[종료사유: {{ 종료사유 }}]</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th>증명용도</th>
+            <td colspan="3">{{ 용도 }}</td>
+          </tr>
+        </table>
 
-      <div class="declaration">
-        위와 같이 증명합니다.
-      </div>
+        <div class="declaration">
+          위와 같이 증명합니다.
+        </div>
 
-      <div class="date">
-        {{ 발급일자 }}
-      </div>
+        <div class="date">
+          {{ 발급일자 }}
+        </div>
 
-      <div class="issuer-box">
-        <div class="issuer-name">
-          사단법인 새담청소년교육문화원장
-          <img class="seal" src="seal.gif" alt="직인">
+        <div class="issuer-box">
+          <div class="issuer-name">
+            사단법인 새담청소년교육문화원
+            <img class="seal" src="seal.gif" alt="직인">
+          </div>
         </div>
       </div>
 
