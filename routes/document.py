@@ -170,11 +170,12 @@ def create_pdf_file(row, issue_no):
         masked_ssn = ssn
     data['주민번호'] = masked_ssn
 
-    html_content = template.render(
-        **data,
-        발급번호=issue_no,
-        발급일자=now_kst().strftime("%Y년 %m월 %d일")
-    )
+    # [수정된 부분] 중복 키 에러 방지를 위해 data 딕셔너리 값을 직접 업데이트
+    data['발급번호'] = issue_no
+    data['발급일자'] = now_kst().strftime("%Y년 %m월 %d일")
+
+    # 렌더링 시 **data만 전달 (충돌 해결)
+    html_content = template.render(**data)
 
     # 도장 이미지 절대 경로 처리
     seal_uri = f"file:///{os.path.abspath(SEAL_IMAGE).replace(os.sep, '/')}"
@@ -191,6 +192,7 @@ def create_pdf_file(row, issue_no):
     
     pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
     return output_path
+
 
 def send_email_to_instructor(to_email, name, pdf_path, cert_type):
     """생성된 PDF를 첨부하여 강사에게 메일 발송"""
