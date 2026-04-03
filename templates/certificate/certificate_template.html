@@ -2,149 +2,197 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>증명서발급</title>
-  <!-- 구글 웹폰트 추가 -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap" rel="stylesheet">
+  <title>{{ 증명서종류 }}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@700;900&display=swap" rel="stylesheet">
   <style>
     @page {
       size: A4;
       margin: 0;
     }
     body {
+      margin: 0;
+      padding: 0;
       font-family: 'Noto Sans KR', sans-serif;
-      max-width: 750px;                               /* 전체 페이지의 크기 조정 */
-      margin: auto;
-      padding: 50px;
-      line-height: 1.8;
-      background: #fff;
+      background-color: #fff;
+      color: #111;
     }
-    h1 {
+    /* A4 용지 규격에 맞춘 래퍼 */
+    .page-wrapper {
+      width: 794px;
+      height: 1123px;
+      box-sizing: border-box;
+      padding: 40px;
+      margin: 0 auto;
+    }
+    /* 고급스러운 이중 테두리 */
+    .cert-border {
+      width: 100%;
+      height: 100%;
+      border: 5px double #2c3e50;
+      box-sizing: border-box;
+      padding: 60px 50px;
+      position: relative;
+    }
+    /* 발급번호 */
+    .doc-no {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 40px;
+      font-weight: 700;
+    }
+    /* 증명서 제목 */
+    .cert-title {
       text-align: center;
-      font-size: 28px;
-      margin-bottom: 10px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #000;
+      font-size: 46px;
+      font-family: 'Noto Serif KR', serif;
+      font-weight: 900;
+      letter-spacing: 20px;
+      margin-bottom: 70px;
+      margin-left: 20px; /* 자간 때문에 틀어지는 중앙 정렬 보정 */
+      color: #000;
     }
-    .code {
-      text-align: right;
-      font-size: 16px;
-      color: #555;
-      margin-bottom: 5px;
-    }
-    table {
+    /* 정보 테이블 (표 테두리를 깔끔하게 변경) */
+    .info-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 30px;
+      margin-bottom: 50px;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
     }
-    td {
-      border: 1px solid #444;
-      padding: 12px;
+    .info-table th, .info-table td {
+      padding: 18px 15px;
+      border-bottom: 1px solid #d1d8e0;
       font-size: 16px;
     }
-    td.label {
-      background-color: #f5f5f5;
-      width: 22%;
-      font-weight: bold;
-      text-align: center;
+    .info-table th {
+      width: 120px;
+      text-align: left;
+      background-color: #f8fafc;
+      font-weight: 700;
+      color: #2c3e50;
+      border-right: 1px solid #d1d8e0;
     }
-    .center-text {
-      text-align: center;
-      margin: 30px 0 10px;
-      font-size: 18px;
+    .info-table td {
+      text-align: left;
+      color: #222;
+      font-weight: 500;
     }
-    .signature {
+    /* 선언문 (위와 같이 증명합니다) */
+    .declaration {
       text-align: center;
-      margin-top: 50px;
       font-size: 24px;
+      font-family: 'Noto Serif KR', serif;
+      font-weight: 700;
+      margin-top: 80px;
+      margin-bottom: 60px;
+      letter-spacing: 3px;
     }
-    .signature img {
-      height: 60px;
-      vertical-align: middle;
-      margin-left: -2px;
-      border: 1px solid #aaa;
+    /* 발급 날짜 */
+    .date {
+      text-align: center;
+      font-size: 20px;
+      margin-bottom: 70px;
+      letter-spacing: 2px;
+    }
+    /* 발급 기관 및 직인 */
+    .issuer-box {
+      text-align: center;
+    }
+    .issuer-name {
+      font-size: 28px;
+      font-family: 'Noto Serif KR', serif;
+      font-weight: 900;
+      letter-spacing: 5px;
+      position: relative;
+      display: inline-block;
+      color: #000;
+    }
+    .seal {
+      position: absolute;
+      right: -80px; /* 글자 바로 옆에 도장이 찍히도록 조정 */
+      top: -15px;
+      width: 70px;
+      height: 70px;
+    }
+    /* 하단 업체 정보 (바닥에 고정) */
+    .footer-info {
+      position: absolute;
+      bottom: 40px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.6;
     }
   </style>
 </head>
 <body>
+  <div class="page-wrapper">
+    <div class="cert-border">
+      
+      <div class="doc-no">발급번호: {{ 발급번호 }}</div>
+      
+      <div class="cert-title">{{ 증명서종류 }}</div>
+      
+      <table class="info-table">
+        <tr>
+          <th>성명</th>
+          <td>{{ 성명 }}</td>
+          <th>주민등록번호</th>
+          <td>{{ 주민번호 }}</td>
+        </tr>
+        <tr>
+          <th>자택주소</th>
+          <td colspan="3">{{ 자택주소 }}</td>
+        </tr>
+        <tr>
+          <th>근무장소</th>
+          <td colspan="3">{{ 근무장소 }}</td>
+        </tr>
+        <tr>
+          <th>직책/과목</th>
+          <td colspan="3">
+            {% if 직책 %}{{ 직책 }}{% endif %}
+            {% if 강의과목 %} (강의과목: {{ 강의과목 }}){% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th>근무기간</th>
+          <td colspan="3">
+            {{ 근무시작일 }} ~ {{ 근무종료일 }}
+            {% if 종료사유 %}
+              <span style="font-size: 0.9em; color: #555; margin-left: 10px;">[종료사유: {{ 종료사유 }}]</span>
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th>증명용도</th>
+          <td colspan="3">{{ 용도 }}</td>
+        </tr>
+      </table>
 
-  <br>
+      <div class="declaration">
+        위와 같이 증명합니다.
+      </div>
 
-  <center>
-    <span style="font-size: 40px;">{{ 증명서종류 }}</span>
-  </center>
+      <div class="date">
+        {{ 발급일자 }}
+      </div>
 
-  <br>
+      <div class="issuer-box">
+        <div class="issuer-name">
+          사단법인 새담청소년교육문화원장
+          <img class="seal" src="seal.gif" alt="직인">
+        </div>
+      </div>
 
-  <div class="code">{{ 발급번호 }}</div>
+      <div class="footer-info">
+        상호: 사단법인 새담청소년교육문화원 | 소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
+        사업자등록번호: 144-82-00397 | 연락처: 031-8016-1900
+      </div>
 
-<table>
-    <tr>
-      <td height="40" style="width: 20%; text-align: center; background-color: #f5f5f5; font-weight: bold;">성명</td>
-      <td style="width: 30%; text-align: center;">{{ 성명 }}</td>
-      <td style="width: 20%; text-align: center; background-color: #f5f5f5; font-weight: bold;">주민등록번호</td>
-      <td style="width: 30%; text-align: center;">{{ 주민번호 }}</td>
-    </tr>
-    <tr>
-      <td height="40" class="label">주소</td>
-      <td colspan="3">{{ 주소 }}</td>
-    </tr>
-    <tr>
-      <td height="40" class="label">직책</td>
-      <td colspan="3">
-        {{ 직책 if 직책 else "방과후 " ~ 과목 ~ " 강사" }}
-      </td>
-    </tr>
-    <tr>
-      <td height="40" class="label">업무내용</td>
-      <td colspan="3">
-        {{ 장소 }} 방과후 {{ 과목 }} 교육
-      </td>
-    </tr>
-    <tr>
-      <td height="40" class="label">근무기간</td>
-      <td colspan="3">
-        {{ 시작 }} ~ {{ 종료 }}
-        {% if 증명서종류 == "강사 해촉증명서" and 종료사유 %}
-          (계약종료사유: {{ 종료사유 }})
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td height="40" class="label">증명용도</td>
-      <td colspan="3">{{ 용도 }}</td>
-    </tr>
-
-    <tr>
-      <td height="100" class="label">업체정보</td>
-      <td colspan="3"> 상호: 사단법인 새담청소년교육문화원<br>소재지: 경기도 수원시 팔달구 매산로116번길 18<br>
-    사업자번호: 144-82-00397 / 연락처: 031-8016-1900</td>
-    </tr>
-
-    <tr>
-      <td colspan="4" height="40">
-
-
-  <br>
-
-  <center>
-    <span style="font-size: 18px;">
-      {% if 증명서종류 == '강사 해촉증명서' %}
-        <p>상기인은 위와 같이 근무하였으나 현재는 해촉되었음을 증명합니다.</p>
-      {% else %}
-        <p>상기인은 위와 같이 근무하였음을 증명합니다.</p>
-      {% endif %}
-    </span>
-  </center>
-
-   <br>   <p class="center-text">{{ 발급일자 }}</p>  <br>
-
-<div class="signature" style="margin-top: 22px; font-size: 30px;">
-  (사)새담청소년교육문화원 이사장 배호영
-  <img src="seal.gif" style="width: 17%; height: auto; border: none; margin-left: -15px;" alt="도장">
-</div>
-
-  <br><br><br><br>
-  </table>
-
+    </div>
+  </div>
 </body>
 </html>
