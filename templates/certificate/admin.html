@@ -131,7 +131,7 @@
                     <td>
                         {% if item.상태 == "대기" %}
                             <a href="{{ url_for('document.generate_certificate', idx=item.index) }}" class="btn btn-issue" onclick="showLoading(this)">즉시발급</a>
-                            <a href="{{ url_for('document.edit_record', idx=item.index) }}" class="btn btn-edit">수정</a>
+                            <a href="#" class="btn btn-edit" onclick="alert('수정 기능은 준비 중입니다.'); return false;">수정</a>
                             <a href="{{ url_for('document.delete_record', idx=item.index) }}" class="btn btn-delete" onclick="return confirm('이 신청 내역을 삭제하시겠습니까?')">삭제</a>
                         {% else %}
                             <span class="status-badge status-done">발급완료</span>
