@@ -65,9 +65,15 @@ def index():
     # 날짜순으로 주간 일정 정렬
     weekly_events.sort(key=lambda x: x['start'])
 
-    # 4. 한국 공휴일 데이터 생성 (올해와 내년)
+    # 4. 한국 공휴일 데이터 생성 (대체공휴일 이름 축약 적용)
     kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
-    holidays_dict = {str(date): name for date, name in kr_holidays.items()}
+    holidays_dict = {}
+    for date, name in kr_holidays.items():
+        # 이름에 '대체공휴일'이 포함되어 있으면 '대체공휴일'로 통일
+        if "대체공휴일" in name:
+            holidays_dict[str(date)] = "대체공휴일"
+        else:
+            holidays_dict[str(date)] = name
 
     # 5. 로그인 세션 정보 가져오기 (현재 로그인한 유저 기본값 세팅)
     current_user = session.get('user_name', '배서현') 
