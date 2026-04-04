@@ -9,10 +9,10 @@
     /* 2) 달력 숫자 왼쪽 정렬 강제 적용 */
     .fc .fc-daygrid-day-top { 
         display: flex; 
-        flex-direction: row !important; /* 기본값인 row-reverse를 덮어씌워 왼쪽으로 이동 */
+        flex-direction: row !important; 
         justify-content: flex-start !important; 
         align-items: center;
-        padding-left: 5px; /* 왼쪽 여백 조금 확보 */
+        padding-left: 5px; 
     }
 
     /* 3) 일요일 및 토요일 폰트 색상 강제 지정 */
@@ -95,8 +95,6 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     var calendarEl = document.getElementById('calendar');
-    
-    // 파이썬에서 넘겨받은 공휴일 데이터
     const holidays = {{ holidays_dict | tojson | safe }};
 
     var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -106,29 +104,25 @@
       events: {{ events | tojson | safe }},
       height: 'auto',
 
-      // 달력 날짜 렌더링 시 공휴일 체크 및 표시
       dayCellDidMount: function(arg) {
         const d = arg.date;
         const dateStr = d.getFullYear() + "-" + 
                         String(d.getMonth() + 1).padStart(2, '0') + "-" + 
                         String(d.getDate()).padStart(2, '0');
         
-        // 공휴일 딕셔너리에 존재하는 날짜라면 처리
         if (holidays[dateStr]) {
-            arg.el.classList.add('holiday-day'); // 공휴일 빨간색 클래스 추가
+            arg.el.classList.add('holiday-day');
             
-            // 날짜 상단 컨테이너를 찾아 독립적인 span 엘리먼트로 휴일 명칭 추가 (글자 중복 방지)
             let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
-            if (dayTopEl) {
-                // 휴일 이름용 span 생성
+            
+            // [핵심 수정] 중복 추가 방지: 이미 holiday-name이 존재하면 건너뜀
+            if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
                 let holidaySpan = document.createElement('span');
                 holidaySpan.className = 'holiday-name';
                 holidaySpan.innerText = holidays[dateStr];
                 
-                // 기존 컨테이너에 추가 (innerHTML 조작 없이 깔끔하게 삽입)
                 dayTopEl.appendChild(holidaySpan);
 
-                // 날짜 숫자 강제 빨간색 적용
                 let dayNumberEl = dayTopEl.querySelector('.fc-daygrid-day-number');
                 if (dayNumberEl) {
                     dayNumberEl.style.color = '#e74c3c';
@@ -137,13 +131,11 @@
         }
       },
 
-      // 빈 날짜 클릭 시 일정 입력 모달 호출
       dateClick: function(info) {
         document.getElementById('taskDate').value = info.dateStr;
         document.getElementById('taskModal').style.display = 'block';
       },
 
-      // 기존 이벤트 클릭 로직
       eventClick: function(info) {
         const p = info.event.extendedProps;
         if(p.owner) {
@@ -154,26 +146,36 @@
     calendar.render();
   });
 
-  // 모달 닫기
   function closeTaskModal() {
       document.getElementById('taskModal').style.display = 'none';
   }
 
-  // 모달 폼 저장 액션
+  // 모달 폼 저장 액션 (서버 에러 로깅 보강)
   async function saveTask() {
+      const taskDate = document.getElementById('taskDate').value;
+      const taskOwner = document.getElementById('taskOwner').value;
+      
+      // 혹시 모를 누락 방지용 1차 검증
+      if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
+      if (!taskOwner) { alert('담당자 정보가 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
+
+      // 입력값이 비어있을 경우 파이썬 서버에서 파싱 오류가 나지 않도록 기본 빈 문자열 설정
       const data = {
-          date: document.getElementById('taskDate').value,
-          owner: document.getElementById('taskOwner').value,
-          inside: document.getElementById('insideTask').value,
-          outside: document.getElementById('outsideTask').value,
-          meeting: '', // 서버 에러 방지용 필수 빈값
-          note: document.getElementById('taskNote').value
+          date: taskDate,
+          owner: taskOwner,
+          inside: document.getElementById('insideTask').value || '',
+          outside: document.getElementById('outsideTask').value || '',
+          meeting: '', 
+          note: document.getElementById('taskNote').value || ''
       };
 
       try {
           const res = await fetch('/save_task', {
               method: 'POST',
-              headers: {'Content-Type': 'application/json'},
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest' // Flask 등에서 ajax 요청을 명확히 인식하도록 헤더 추가
+              },
               body: JSON.stringify(data)
           });
           
@@ -181,11 +183,14 @@
               alert("업무가 성공적으로 등록되었습니다.");
               location.reload(); 
           } else {
-              alert("등록에 실패했습니다. (서버 응답 오류)");
+              // 서버 에러 상세 확인을 위한 로그 추출
+              const errText = await res.text();
+              console.error("백엔드 서버 에러 상세:", errText);
+              alert(`등록에 실패했습니다. (HTTP 에러코드: ${res.status})\nF12를 눌러 콘솔 로그를 확인해주세요.`);
           }
       } catch (error) {
           alert("등록 중 네트워크 오류가 발생했습니다.");
-          console.error(error);
+          console.error("Fetch 전송 에러:", error);
       }
   }
 </script>
