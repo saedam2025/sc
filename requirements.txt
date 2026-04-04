@@ -1,7 +1,11 @@
-Flask
+flask
+gunicorn
 pandas
 openpyxl
+fpdf2
+beautifulsoup4
+python-dateutil
 pdfkit
 yagmail
 hashids
-gunicorn
+holidays>=0.45,<1.0
