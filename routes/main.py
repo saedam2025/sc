@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, session
 from .db_handler import read_excel_db, EXCEL_FILE, ATTEND_FILE
-from datetime import datetime
+from datetime import datetime, timedelta
+import holidays
 
 main_bp = Blueprint('main', __name__)
 
@@ -12,7 +13,6 @@ def index():
     
     if not df_tasks.empty:
         for idx, row in df_tasks.iterrows():
-            # [담당자] 업무내용 형식으로 타이틀 구성
             title = f"[{row['담당자']}] {row['내근업무'] or row['외근업무']}"
             events.append({
                 "id": f"task_{idx}",
@@ -40,11 +40,42 @@ def index():
                 "allDay": True
             })
 
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    # 오늘 날짜 일정만 필터링 (우측 TODAY 리스트용)
-    today_events = [e for e in events if e['start'] == today_str]
+    # 3. 날짜 계산 (오늘 및 주간 일정 필터링용)
+    today = datetime.now()
+    today_date = today.date()
+    tomorrow_date = today_date + timedelta(days=1)
+    next_week_date = today_date + timedelta(days=7) # 내일부터 1주일
+
+    today_events = []
+    weekly_events = []
+
+    for e in events:
+        try:
+            # 문자열 날짜를 datetime 객체로 변환하여 비교
+            e_date_str = e['start'][:10]
+            e_date = datetime.strptime(e_date_str, '%Y-%m-%d').date()
+            
+            if e_date == today_date:
+                today_events.append(e)
+            elif tomorrow_date <= e_date <= next_week_date:
+                weekly_events.append(e)
+        except ValueError:
+            continue
+
+    # 날짜순으로 주간 일정 정렬
+    weekly_events.sort(key=lambda x: x['start'])
+
+    # 4. 한국 공휴일 데이터 생성 (올해와 내년)
+    kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
+    holidays_dict = {str(date): name for date, name in kr_holidays.items()}
+
+    # 5. 로그인 세션 정보 가져오기 (현재 로그인한 유저 기본값 세팅)
+    current_user = session.get('user_name', '배서현') 
 
     return render_template('main.html', 
                            events=events, 
                            today_events=today_events,
-                           today_str=datetime.now().strftime('%Y년 %m월 %d일'))
+                           weekly_events=weekly_events,
+                           today_str=today.strftime('%Y년 %m월 %d일'),
+                           holidays_dict=holidays_dict,
+                           current_user=current_user)
