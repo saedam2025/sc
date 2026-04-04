@@ -6,14 +6,23 @@
     .fc { font-size: 0.85em; }
     .fc .fc-toolbar-title { font-size: 1.2em !important; }
     
-    /* 2) 일요일 및 토요일 폰트 색상 강제 지정 */
+    /* 2) 달력 숫자 왼쪽 정렬 강제 적용 */
+    .fc .fc-daygrid-day-top { 
+        display: flex; 
+        flex-direction: row !important; /* 기본값인 row-reverse를 덮어씌워 왼쪽으로 이동 */
+        justify-content: flex-start !important; 
+        align-items: center;
+        padding-left: 5px; /* 왼쪽 여백 조금 확보 */
+    }
+
+    /* 3) 일요일 및 토요일 폰트 색상 강제 지정 */
     .fc-day-sun .fc-col-header-cell-cushion, 
     .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
     
     .fc-day-sat .fc-col-header-cell-cushion, 
     .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
     
-    /* 3) 공휴일 동적 클래스 적용 (숫자와 글자 모두 빨간색 강제 적용) */
+    /* 4) 공휴일 동적 클래스 적용 */
     .holiday-day .fc-daygrid-day-number,
     .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.75em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
@@ -104,15 +113,26 @@
                         String(d.getMonth() + 1).padStart(2, '0') + "-" + 
                         String(d.getDate()).padStart(2, '0');
         
-        // 공휴일 딕셔너리에 존재하는 날짜라면 CSS 적용
+        // 공휴일 딕셔너리에 존재하는 날짜라면 처리
         if (holidays[dateStr]) {
             arg.el.classList.add('holiday-day'); // 공휴일 빨간색 클래스 추가
             
-            // 날짜 엘리먼트를 찾아서 휴일 이름 추가 및 숫자 색상 강제 변경
-            let dayNumberEl = arg.el.querySelector('.fc-daygrid-day-number');
-            if (dayNumberEl) {
-                dayNumberEl.style.color = '#e74c3c'; // 인라인 스타일로도 한 번 더 강제 적용
-                dayNumberEl.innerHTML += `<span class="holiday-name">${holidays[dateStr]}</span>`;
+            // 날짜 상단 컨테이너를 찾아 독립적인 span 엘리먼트로 휴일 명칭 추가 (글자 중복 방지)
+            let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
+            if (dayTopEl) {
+                // 휴일 이름용 span 생성
+                let holidaySpan = document.createElement('span');
+                holidaySpan.className = 'holiday-name';
+                holidaySpan.innerText = holidays[dateStr];
+                
+                // 기존 컨테이너에 추가 (innerHTML 조작 없이 깔끔하게 삽입)
+                dayTopEl.appendChild(holidaySpan);
+
+                // 날짜 숫자 강제 빨간색 적용
+                let dayNumberEl = dayTopEl.querySelector('.fc-daygrid-day-number');
+                if (dayNumberEl) {
+                    dayNumberEl.style.color = '#e74c3c';
+                }
             }
         }
       },
@@ -141,13 +161,12 @@
 
   // 모달 폼 저장 액션
   async function saveTask() {
-      // 서버에서 필수값으로 요구하던 meeting: '' 필드를 다시 복구했습니다.
       const data = {
           date: document.getElementById('taskDate').value,
           owner: document.getElementById('taskOwner').value,
           inside: document.getElementById('insideTask').value,
           outside: document.getElementById('outsideTask').value,
-          meeting: '', 
+          meeting: '', // 서버 에러 방지용 필수 빈값
           note: document.getElementById('taskNote').value
       };
 
