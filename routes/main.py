@@ -69,8 +69,8 @@ def index():
     kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
     holidays_dict = {}
     for date, name in kr_holidays.items():
-        # 이름에 '대체공휴일'이 포함되어 있으면 '대체공휴일'로 통일
-        if "대체공휴일" in name:
+        # 이름에 '대체'라는 단어가 포함되어 있으면 무조건 '대체공휴일'로 통일
+        if "대체" in name:
             holidays_dict[str(date)] = "대체공휴일"
         else:
             holidays_dict[str(date)] = name
