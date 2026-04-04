@@ -13,8 +13,9 @@
     .fc-day-sat .fc-col-header-cell-cushion, 
     .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
     
-    /* 2) 공휴일 동적 클래스 적용 */
-    .holiday-day .fc-daygrid-day-number { color: #e74c3c !important; }
+    /* 3) 공휴일 동적 클래스 적용 (숫자와 글자 모두 빨간색 강제 적용) */
+    .holiday-day .fc-daygrid-day-number,
+    .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.75em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
 
     /* 모달 입력창 스타일 */
@@ -96,9 +97,8 @@
       events: {{ events | tojson | safe }},
       height: 'auto',
 
-      // 2) 달력 날짜 렌더링 시 공휴일 체크 및 표시
+      // 달력 날짜 렌더링 시 공휴일 체크 및 표시
       dayCellDidMount: function(arg) {
-        // 날짜를 YYYY-MM-DD 포맷으로 변환
         const d = arg.date;
         const dateStr = d.getFullYear() + "-" + 
                         String(d.getMonth() + 1).padStart(2, '0') + "-" + 
@@ -106,23 +106,24 @@
         
         // 공휴일 딕셔너리에 존재하는 날짜라면 CSS 적용
         if (holidays[dateStr]) {
-            arg.el.classList.add('holiday-day'); // 공휴일 빨간색 적용
+            arg.el.classList.add('holiday-day'); // 공휴일 빨간색 클래스 추가
             
-            // 날짜 숫자 옆에 휴일 이름 추가
+            // 날짜 엘리먼트를 찾아서 휴일 이름 추가 및 숫자 색상 강제 변경
             let dayNumberEl = arg.el.querySelector('.fc-daygrid-day-number');
             if (dayNumberEl) {
+                dayNumberEl.style.color = '#e74c3c'; // 인라인 스타일로도 한 번 더 강제 적용
                 dayNumberEl.innerHTML += `<span class="holiday-name">${holidays[dateStr]}</span>`;
             }
         }
       },
 
-      // 3) 빈 날짜 클릭 시 일정 입력 모달 호출
+      // 빈 날짜 클릭 시 일정 입력 모달 호출
       dateClick: function(info) {
         document.getElementById('taskDate').value = info.dateStr;
         document.getElementById('taskModal').style.display = 'block';
       },
 
-      // 기존 이벤트 클릭 로직 (상세정보 알림창 유지)
+      // 기존 이벤트 클릭 로직
       eventClick: function(info) {
         const p = info.event.extendedProps;
         if(p.owner) {
@@ -140,25 +141,32 @@
 
   // 모달 폼 저장 액션
   async function saveTask() {
+      // 서버에서 필수값으로 요구하던 meeting: '' 필드를 다시 복구했습니다.
       const data = {
           date: document.getElementById('taskDate').value,
           owner: document.getElementById('taskOwner').value,
           inside: document.getElementById('insideTask').value,
           outside: document.getElementById('outsideTask').value,
+          meeting: '', 
           note: document.getElementById('taskNote').value
       };
 
-      const res = await fetch('/save_task', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(data)
-      });
-      
-      if(res.ok) {
-          alert("업무가 등록되었습니다.");
-          location.reload(); // 등록 후 페이지 새로고침하여 즉시 반영
-      } else {
-          alert("등록에 실패했습니다.");
+      try {
+          const res = await fetch('/save_task', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(data)
+          });
+          
+          if(res.ok) {
+              alert("업무가 성공적으로 등록되었습니다.");
+              location.reload(); 
+          } else {
+              alert("등록에 실패했습니다. (서버 응답 오류)");
+          }
+      } catch (error) {
+          alert("등록 중 네트워크 오류가 발생했습니다.");
+          console.error(error);
       }
   }
 </script>
