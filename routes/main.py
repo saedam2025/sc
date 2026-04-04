@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, jsonify, session
-from .db_handler import read_excel_db, EXCEL_FILE, ATTEND_FILE
+from flask import Blueprint, render_template, jsonify, session, request
+from .db_handler import read_excel_db, write_excel_db, EXCEL_FILE, ATTEND_FILE
 from datetime import datetime, timedelta
+import pandas as pd
 import holidays
 
 main_bp = Blueprint('main', __name__)
@@ -86,3 +87,52 @@ def index():
                            today_str=today.strftime('%Y년 %m월 %d일'),
                            holidays_dict=holidays_dict,
                            current_user=current_user)
+
+# --- 새로 추가된 일정 저장 라우트 (404 에러 해결) ---
+@main_bp.route('/save_task', methods=['POST'])
+def save_task():
+    try:
+        # 프론트엔드에서 보낸 JSON 데이터 받기
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "데이터가 없습니다."}), 400
+
+        date_str = data.get('date', '')
+        owner = data.get('owner', '')
+        inside = data.get('inside', '')
+        outside = data.get('outside', '')
+        meeting = data.get('meeting', '')
+        note = data.get('note', '')
+
+        # 연도 추출 (YYYY)
+        year = date_str[:4] if date_str else ''
+
+        # 기존 엑셀 데이터 읽기
+        df_tasks = read_excel_db(EXCEL_FILE)
+
+        # 새 데이터 구성 (db_handler.py의 컬럼 기준에 맞춤)
+        new_row = pd.DataFrame([{
+            '연도': year,
+            '날짜': date_str,
+            '담당자': owner,
+            '내근업무': inside,
+            '외근업무': outside,
+            '회의': meeting,
+            '비고': note,
+            '기타': ''
+        }])
+
+        # 데이터 병합
+        if df_tasks.empty:
+            df_tasks = new_row
+        else:
+            df_tasks = pd.concat([df_tasks, new_row], ignore_index=True)
+            
+        # 엑셀 파일 덮어쓰기 저장
+        write_excel_db(df_tasks, EXCEL_FILE)
+
+        return jsonify({"status": "success", "message": "일정 등록 완료"})
+
+    except Exception as e:
+        print(f"서버 에러 상세: {str(e)}") # 터미널 디버깅용
+        return jsonify({"status": "error", "message": str(e)}), 500
