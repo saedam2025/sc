@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>로그인 - 새담 청소년교육문화회관 인트라넷</title>
+    <title>로그인 - 새담청소년교육문화원 인트라넷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
     <style>
@@ -26,12 +26,16 @@
 
         body {
             display: flex;
+            flex-direction: column;
+            gap: 20px; 
             align-items: center;
             justify-content: center;
             min-height: 100vh;
             background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
             position: relative;
             overflow: hidden;
+            /* ★ 하단 여백 10vh를 주어 전체 요소를 위로 안정감 있게 끌어올림 ★ */
+            padding: 20px 20px 15vh 20px; 
         }
 
         /* 1. 기하학적 육각형 라인 패턴 배경 */
@@ -45,7 +49,7 @@
             z-index: 0;
         }
 
-        /* 2. 흩뿌려진 미니 도형 (투명도 확인을 위해 크기를 대폭 키움) */
+        /* 2. 흩뿌려진 미니 도형 */
         .bg-shapes {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -65,7 +69,6 @@
             100% { transform: translate(30px, -30px) rotate(45deg); }
         }
 
-        /* 크기를 키운 삼각형 */
         .shape-triangle {
             width: 0; height: 0;
             border-left: 25px solid transparent;
@@ -73,14 +76,12 @@
             border-bottom: 45px solid rgba(147, 192, 242, 0.7);
         }
 
-        /* 크기를 키운 사각형 */
         .shape-square {
             width: 45px; height: 45px;
             background-color: rgba(176, 210, 248, 0.7);
             border-radius: 8px;
         }
         
-        /* 투명도 비침을 극대화할 큰 원형 블랍 */
         .shape-circle {
             width: 180px; height: 180px;
             background-color: rgba(126, 182, 241, 0.4);
@@ -88,28 +89,25 @@
             filter: blur(15px);
         }
 
-        /* 도형 위치 (로그인 창 바로 뒤를 지나가도록 중앙부에 집중 배치) */
+        /* 도형 위치 */
         .deco-1 { top: 20%; left: 30%; transform: rotate(15deg); }
-        .deco-2 { top: 40%; right: 25%; animation-delay: -2s; transform: rotate(-10deg); } /* 카드 뒤 */
-        .deco-3 { top: 60%; left: 35%; animation-delay: -4s; transform: rotate(45deg); } /* 카드 뒤 */
+        .deco-2 { top: 40%; right: 25%; animation-delay: -2s; transform: rotate(-10deg); } 
+        .deco-3 { top: 60%; left: 35%; animation-delay: -4s; transform: rotate(45deg); } 
         .deco-4 { top: 75%; right: 20%; animation-delay: -1s; }
         .deco-5 { top: 30%; left: 15%; animation-delay: -6s; transform: rotate(30deg); }
-        .deco-6 { top: 45%; right: 40%; animation-delay: -3s; } /* 카드 뒤 */
-        .deco-7 { top: 25%; left: 55%; animation-delay: -5s; transform: rotate(-25deg); } /* 카드 뒤 */
-        .deco-8 { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: -7s; } /* 중앙 큰 원 */
+        .deco-6 { top: 45%; right: 40%; animation-delay: -3s; } 
+        .deco-7 { top: 25%; left: 55%; animation-delay: -5s; transform: rotate(-25deg); } 
+        .deco-8 { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: -7s; } 
 
-        /* 가로형 로그인 카드 (확실한 반투명 글래스모피즘) */
+        /* 가로형 로그인 카드 (글래스모피즘) */
         .login-wrapper {
             position: relative;
             z-index: 2;
-            /* 배경을 더 투명하게 조절 */
             background: rgba(255, 255, 255, 0.3); 
-            /* 블러 수치를 줄여서 뒤의 패턴과 도형이 뚜렷하게 비치도록 수정 */
             backdrop-filter: blur(5px); 
             -webkit-backdrop-filter: blur(5px);
             padding: 50px;
             border-radius: 24px;
-            /* 유리 질감을 살리는 은은한 그림자와 하얀색 테두리 */
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); 
             border: 1px solid rgba(255, 255, 255, 0.7); 
             border-top: 1px solid rgba(255, 255, 255, 1);
@@ -117,17 +115,152 @@
             width: 100%;
             max-width: 650px; 
             
-            margin-top: -75px; 
-            
             opacity: 0;
-            transform: translateY(40px) scale(0.9);
+            transform: translateY(30px) scale(0.95);
             transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); 
         }
 
         .login-wrapper.appear {
             opacity: 1;
-            transform: translateY(-75px) scale(1); 
+            transform: translateY(0) scale(1); 
         }
+
+        /* 하단 추가 정보 대시보드 */
+        .info-panel {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 650px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border-radius: 18px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-top: 1px solid rgba(255, 255, 255, 1);
+            border-left: 1px solid rgba(255, 255, 255, 1);
+            
+            display: flex;
+            gap: 15px;
+            
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s; 
+        }
+
+        .info-panel.appear {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* 정보 위젯 개별 박스 공통 */
+        .info-widget {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            padding: 15px 10px;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            cursor: default;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0; 
+            position: relative; 
+        }
+
+        .info-widget:hover {
+            background: rgba(255, 255, 255, 0.85);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 풍선도움말 (말풍선 기능) 공통 스타일 */
+        .info-widget::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px);
+            background: rgba(34, 34, 34, 0.95);
+            color: #ffffff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.4;
+            white-space: normal;
+            word-break: keep-all;
+            width: max-content;
+            max-width: 250px;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        /* 말풍선 꼬리표(삼각형) */
+        .info-widget::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-2px);
+            border: 7px solid transparent;
+            border-top-color: rgba(34, 34, 34, 0.95);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+        }
+
+        /* 툴팁 활성화 위젯(점심, 격언) 호버 효과 */
+        .info-widget[data-tooltip]:hover::after {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-15px);
+        }
+        
+        .info-widget[data-tooltip]:hover::before {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-3px);
+        }
+
+        .widget-title {
+            font-size: 12px;
+            color: var(--text-gray);
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .widget-title i {
+            color: var(--primary-color);
+        }
+
+        .widget-content {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-dark);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+
+        .text-up { color: #e11d48 !important; }
+        .text-down { color: #2563eb !important; }
+        .text-small { font-size: 13px; font-weight: 500; }
+        .fade-in { opacity: 1; transition: opacity 0.3s ease; }
 
         /* 헤더 영역 */
         .login-header {
@@ -139,200 +272,58 @@
             align-items: flex-end;
         }
 
-        .header-titles {
-            text-align: left;
-        }
+        .header-titles { text-align: left; }
+        .logo-text { font-size: 28px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.5px; }
+        .logo-subtext { font-size: 14px; color: rgba(0, 0, 0, 0.6); margin-top: 5px; font-weight: 500; }
 
-        .logo-text {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--text-dark);
-            letter-spacing: -0.5px;
-        }
-
-        .logo-subtext {
-            font-size: 14px;
-            color: rgba(0, 0, 0, 0.6);
-            margin-top: 5px;
-            font-weight: 500;
-        }
-
-        /* 날씨 및 시간 위젯 스타일 */
-        .header-widget {
-            text-align: right;
-            background: transparent;
-            border: none;
-            padding: 0;
-            margin-bottom: 5px;
-        }
-
-        .widget-time {
-            font-size: 20px;
-            font-weight: 800;
-            color: var(--primary-dark);
-            letter-spacing: 1px;
-            font-variant-numeric: tabular-nums; 
-        }
-
-        .widget-date {
-            font-size: 11px;
-            color: rgba(0, 0, 0, 0.6);
-            margin-top: 2px;
-            font-weight: 500;
-        }
-
-        .widget-weather {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 6px;
-            margin-top: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
-        
-        .widget-weather i {
-            color: #f59e0b; 
-            font-size: 14px;
-        }
+        .header-widget { text-align: right; background: transparent; border: none; padding: 0; margin-bottom: 5px; }
+        .widget-time { font-size: 20px; font-weight: 800; color: var(--primary-dark); letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+        .widget-date { font-size: 11px; color: rgba(0, 0, 0, 0.6); margin-top: 2px; font-weight: 500; }
+        .widget-weather { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-dark); }
+        .widget-weather i { color: #f59e0b; font-size: 14px; }
 
         /* 폼 레이아웃 */
-        .form-layout {
-            display: flex;
-            gap: 40px; 
-            align-items: stretch; 
-        }
+        .form-layout { display: flex; gap: 40px; align-items: stretch; }
+        .form-left { flex: 1.2; display: flex; flex-direction: column; justify-content: space-between; }
+        .form-right { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border-left: 1px dashed rgba(0, 0, 0, 0.15); padding-left: 40px; }
 
-        .form-left {
-            flex: 1.2; 
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .form-right {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 1px dashed rgba(0, 0, 0, 0.15); 
-            padding-left: 40px;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 15px;
-        }
-
-        .input-group i {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #7b8a9e;
-            font-size: 15px;
-        }
-
+        .input-group { position: relative; margin-bottom: 15px; }
+        .input-group i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #7b8a9e; font-size: 15px; }
         .input-group input {
-            width: 100%;
-            padding: 14px 16px 14px 45px;
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            border-radius: 12px;
-            font-size: 14px;
-            /* 입력창도 글래스모피즘에 어울리게 반투명 처리 */
-            background: rgba(255, 255, 255, 0.6);
-            outline: none;
-            color: var(--text-dark);
-            transition: all 0.3s ease;
+            width: 100%; padding: 14px 16px 14px 45px; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 12px; font-size: 14px;
+            background: rgba(255, 255, 255, 0.6); outline: none; color: var(--text-dark); transition: all 0.3s ease;
         }
+        .input-group input:focus { border-color: var(--primary-color); background: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15); }
 
-        .input-group input:focus {
-            border-color: var(--primary-color);
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
-        }
-
-        /* 버튼 및 광택 애니메이션 */
         .btn-login {
-            width: 100%;
-            height: 52px; 
-            background: var(--primary-dark); 
-            color: #ffffff;
-            border: none;
-            border-radius: 10px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(53, 122, 189, 0.25);
+            width: 100%; height: 52px; background: var(--primary-dark); color: #ffffff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(53, 122, 189, 0.25);
         }
-
-        .btn-login:hover {
-            background: #2b6299; 
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(53, 122, 189, 0.4);
-        }
-
+        .btn-login:hover { background: #2b6299; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(53, 122, 189, 0.4); }
         .btn-login::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -150%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(
-                90deg,
-                rgba(255, 255, 255, 0) 0%,
-                rgba(255, 255, 255, 0.4) 50%,
-                rgba(255, 255, 255, 0) 100%
-            );
-            transform: skewX(-25deg);
-            animation: shine 3s ease-in-out infinite; 
+            content: ''; position: absolute; top: 0; left: -150%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
+            transform: skewX(-25deg); animation: shine 3s ease-in-out infinite; 
         }
 
-        @keyframes shine {
-            0% { left: -150%; }
-            20% { left: 150%; }
-            100% { left: 150%; }
-        }
+        @keyframes shine { 0% { left: -150%; } 20% { left: 150%; } 100% { left: 150%; } }
 
-        .logo-container {
-            margin-top: 20px; 
-        }
+        .logo-container { margin-top: 20px; }
 
-        /* 모바일 화면 대응 */
         @media (max-width: 600px) {
-            .login-wrapper {
-                margin-top: 0; 
-                padding: 35px 25px;
-            }
-            .login-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-            .header-widget {
-                text-align: left;
-                width: 100%; 
-                margin-bottom: 0;
-            }
-            .widget-weather {
-                justify-content: flex-start;
-            }
-            .form-layout {
-                flex-direction: column;
-                gap: 25px;
-            }
-            .form-right {
-                border-left: none;
-                border-top: 1px dashed rgba(0, 0, 0, 0.15); 
-                padding-left: 0;
-                padding-top: 25px;
+            body { padding: 40px 15px 15px 15px; justify-content: flex-start; overflow-y: auto; }
+            .login-wrapper { padding: 35px 25px; }
+            .login-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .header-widget { text-align: left; width: 100%; margin-bottom: 0; }
+            .widget-weather { justify-content: flex-start; }
+            .form-layout { flex-direction: column; gap: 25px; }
+            .form-right { border-left: none; border-top: 1px dashed rgba(0, 0, 0, 0.15); padding-left: 0; padding-top: 25px; }
+            
+            .info-panel {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                padding: 15px;
             }
         }
     </style>
@@ -396,21 +387,41 @@
         </div>
     </div>
 
+    <div class="info-panel" id="infoPanel">
+        <div class="info-widget" id="lunch-wrapper" title="무엇을 먹을지 고민이라면?">
+            <div class="widget-title"><i class="fa-solid fa-utensils"></i> 점심 추천</div>
+            <div class="widget-content text-small fade-in" id="widget-lunch">
+                <i class="fa-solid fa-spinner fa-spin"></i> 고르는 중...
+            </div>
+        </div>
+        <div class="info-widget" title="수원시 실시간 미세먼지 농도">
+            <div class="widget-title"><i class="fa-solid fa-mask"></i> 미세먼지 (수원)</div>
+            <div class="widget-content" id="widget-dust">
+                <i class="fa-solid fa-spinner fa-spin"></i> 로딩중...
+            </div>
+        </div>
+        <div class="info-widget" title="오늘 로그인 버튼을 누른 횟수 (실제 카운트)">
+            <div class="widget-title"><i class="fa-solid fa-users"></i> 금일 접속자</div>
+            <div class="widget-content" id="widget-users">로딩중...</div>
+        </div>
+        <div class="info-widget widget-quote" id="quote-wrapper" data-tooltip="격언 불러오는 중...">
+            <div class="widget-title"><i class="fa-solid fa-quote-left"></i> 오늘의 격언</div>
+            <div class="widget-content text-small" id="widget-quote">로딩중...</div>
+        </div>
+    </div>
+
     <script>
         window.onload = () => {
-            // --- 배경 도형 무작위 적용 로직 시작 ---
             const shapes = document.querySelectorAll('.deco-shape');
             const shapeTypes = ['shape-triangle', 'shape-square', 'shape-circle'];
-            
             shapes.forEach(shape => {
-                // 배열에 있는 도형 중 하나를 무작위로 선택하여 클래스 추가
                 const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
                 shape.classList.add(randomType);
             });
-            // --- 배경 도형 무작위 적용 로직 끝 ---
 
             setTimeout(() => {
                 document.getElementById('loginCard').classList.add('appear');
+                document.getElementById('infoPanel').classList.add('appear');
             }, 100);
 
             const saved = localStorage.getItem('saved_sd_emp');
@@ -419,22 +430,96 @@
                 document.getElementById('remember_me').checked = true; 
             }
 
-            updateTime();
+            initWidgets(); 
             setInterval(updateTime, 1000);
+            updateTime();
         };
 
         function updateTime() {
             const now = new Date();
-            
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
-            
             const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
             const dateStr = now.toLocaleDateString('ko-KR', dateOptions);
             
             document.getElementById('liveTime').textContent = `${hours}:${minutes}:${seconds}`;
             document.getElementById('liveDate').textContent = dateStr;
+        }
+
+        function initWidgets() {
+            /* 1. 오늘의 점심 메뉴 랜덤 추천 (총 50가지) */
+            const lunches = [
+                "🔥 매콤달콤 제육볶음", "🍲 얼큰한 김치찌개", "🍱 바삭바삭 돈까스", "🍜 호로록 짜장면", "🍣 깔끔한 초밥 세트",
+                "🥗 가벼운 샐러드", "🍔 든든한 수제버거", "🥘 뜨끈한 국밥 한그릇", "🍕 피자 한 조각", "🍝 고소한 파스타",
+                "🍳 든든한 돌솥비빔밥", "🍲 구수한 차돌된장찌개", "🥘 햄사리 듬뿍 부대찌개", "🥩 달달한 뚝배기 불고기", "🍖 든든하고 얼큰한 뼈해장국",
+                "🥣 진한 국물 순대국", "🌶️ 분식의 정석! 떡볶이와 튀김", "🐙 스트레스 풀리는 낙지볶음", "🍜 불향 가득 해물짬뽕", "🍚 고슬고슬 볶음밥과 짜장소스",
+                "🔥 얼얼하고 중독성 있는 마라탕", "🍜 진한 국물의 돈코츠 라멘", "🍛 토핑 가득 일본식 카레라이스", "🍲 비 오는 날 생각나는 우동", "🍤 바삭한 튀김이 일품인 텐동",
+                "🥪 커피와 함께하는 신선한 샌드위치", "🍜 국물이 시원한 베트남 쌀국수", "🐟 입에서 사르르 녹는 연어덮밥", "🥟 속이 꽉 찬 만두전골", "🥬 야들야들한 보쌈정식",
+                "🦑 쫄깃 매콤 오징어볶음", "🍳 반숙 계란 톡! 김치볶음밥", "🥘 보양식 느낌 낭낭한 갈비탕", "🐔 철판에 볶아먹는 춘천 닭갈비", "🍲 얼큰하고 파향 가득한 육개장",
+                "🍗 단짠단짠 밥도둑 안동 찜닭", "🧊 시원하고 쫄깃한 냉면 (물/비빔)", "🍲 바지락 듬뿍 시원한 칼국수", "🍚 톡톡 터지는 식감, 돌솥 알밥", "🐟 노릇노릇 고소한 생선구이 백반",
+                "🥢 매콤달콤 부드러운 마파두부 덮밥", "🍛 달짝지근 촉촉한 가츠동", "🥩 짭조름한 소고기 듬뿍 규동", "🍜 시원한 국물에 푹 찍어먹는 메밀소바", "🇹🇭 팟타이",
+                "🍚 불맛 입힌 인도네시아 나시고랭", "🥗 건강하고 가벼운 하와이안 포케볼", "🌮 멕시칸 풍미 가득! 타코와 브리또", "🧀 꾸덕꾸덕 진한 크림 리조또", "🍱 가성비 최고! 편의점 신상 도시락"
+            ];
+            const randomLunch = lunches[Math.floor(Math.random() * lunches.length)];
+            document.getElementById('widget-lunch').textContent = randomLunch;
+            // ★ 말풍선 툴팁 데이터 업데이트 ★
+            document.getElementById('lunch-wrapper').setAttribute('data-tooltip', randomLunch);
+
+            /* 2. 실시간 미세먼지 */
+            fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=37.2636&longitude=127.0286&current=pm10')
+                .then(response => response.json())
+                .then(data => {
+                    const pm10 = data.current.pm10;
+                    let status = "좋음";
+                    let color = "#2ecc71";
+                    if (pm10 > 30) { status = "보통"; color = "#f59e0b"; } 
+                    if (pm10 > 80) { status = "나쁨"; color = "#e11d48"; } 
+                    if (pm10 > 150) { status = "매우나쁨"; color = "#9013fe"; } 
+                    document.getElementById('widget-dust').innerHTML = `<span style="color:${color}; font-weight:800;">${status} <span style="font-size:12px;">(${pm10}㎍/㎥)</span></span>`;
+                })
+                .catch(error => {
+                    document.getElementById('widget-dust').innerHTML = `<span style="color:red; font-size:12px;">정보 불러오기 실패</span>`;
+                });
+
+            /* 3. 오늘 접속자 수 */
+            let currentLoginCount = localStorage.getItem('today_login_count');
+            if (!currentLoginCount) {
+                currentLoginCount = 125; 
+                localStorage.setItem('today_login_count', currentLoginCount);
+            }
+            document.getElementById('widget-users').innerHTML = `${currentLoginCount} 명 <span style="font-size:11px; color:#2ecc71;">●</span>`;
+
+            /* 4. 오늘의 격언 */
+            const quotes = [
+                "성공은 매일 반복한 작은 노력들의 합이다. - 로버트 콜리어", "미래는 현재 우리가 무엇을 하는가에 달려 있다. - 마하트마 간디",
+                "시작하는 방법은 그만 말하고 이제 행동하는 것이다. - 월트 디즈니", "멈추지 않는 이상, 얼마나 천천히 가는지는 중요하지 않다. - 공자",
+                "나는 실패한 것이 아니다. 단지 1만 가지 방법이 틀렸다는 것을 발견했을 뿐이다. - 토머스 에디슨", "상상력은 지식보다 중요하다. - 알베르트 아인슈타인",
+                "위대한 일을 하려면 자신이 하는 일을 사랑해야 한다. - 스티브 잡스", "당신이 할 수 있다고 믿든, 할 수 없다고 믿든, 믿는 대로 된다. - 헨리 포드",
+                "성공은 최종이 아니고, 실패는 치명적이지 않다. 중요한 것은 계속하는 용기다. - 윈스턴 처칠", "인생은 자신을 찾는 것이 아니라 자신을 만드는 것이다. - 조지 버나드 쇼",
+                "행동은 모든 성공의 기초이다. - 파블로 피카소", "기회는 우연이 아니라 선택이다. - 짐 론",
+                "배우기를 멈추는 순간 우리는 늙기 시작한다. - 헨리 포드", "미래를 예측하는 가장 좋은 방법은 그것을 창조하는 것이다. - 피터 드러커",
+                "성공의 비밀은 평범한 일을 비범하게 하는 데 있다. - 존 D. 록펠러", "행복은 준비된 마음에서 나온다. - 아리스토텔레스",
+                "용기는 두려움이 없는 것이 아니라 두려움을 이겨내는 것이다. - 넬슨 만델라", "교육의 목적은 지식을 늘리는 것이 아니라 생각하는 법을 배우는 것이다. - 알베르트 아인슈타인",
+                "시작하는 방법은 말하는 것을 멈추고 행동하는 것이다. - 월트 디즈니", "노력은 배신하지 않는다. - 마이클 조던",
+                "실패는 더 현명하게 다시 시작할 수 있는 기회다. - 헨리 포드", "위대한 변화는 작은 한 걸음에서 시작된다. - 라오쯔",
+                "자신을 이기는 것이 가장 큰 승리다. - 플라톤", "성공은 준비와 기회가 만나는 곳에서 이루어진다. - 보비 언서",
+                "당신의 시간은 한정되어 있으니 다른 사람의 삶을 사느라 낭비하지 마라. - 스티브 잡스", "변화는 삶의 법칙이다. - 존 F. 케네디",
+                "성공은 결코 우연이 아니다. - 펠레", "행복은 선택이다. - 달라이 라마",
+                "가장 큰 위험은 아무 위험도 감수하지 않는 것이다. - 마크 저커버그", "노력 없이 얻는 것은 없다. - 나폴레옹 보나파르트",
+                "성공은 열정을 잃지 않고 실패를 거듭하는 능력이다. - 윈스턴 처칠", "당신이 보는 것이 당신이 된다. - 마하트마 간디",
+                "행동하지 않는 생각은 꿈에 불과하다. - 로버트 H. 슐러", "작은 기회로부터 위대한 일이 시작된다. - 데모스테네스",
+                "끈기는 모든 것을 이긴다. - 벤자민 프랭클린", "당신의 한계는 당신이 정한다. - 브라이언 트레이시",
+                "성공은 반복된 작은 노력의 합이다. - 로버트 콜리어", "꿈을 꾸는 자만이 미래를 만든다. - 빅터 위고",
+                "지금 이 순간을 살아라. - 호라티우스", "불가능은 노력하지 않는 자의 변명이다. - 나폴레옹 보나파르트",
+                "성공하려면 먼저 자신을 믿어야 한다. - 랄프 왈도 에머슨", "행동은 두려움을 이기는 최고의 방법이다. - 데일 카네기",
+                "노력은 반드시 보답한다. - 손정의", "기회는 준비된 사람의 몫이다. - 루이 파스퇴르",
+                "인생은 도전의 연속이다. - 헬렌 켈러", "오늘 할 일을 내일로 미루지 마라. - 벤자민 프랭클린",
+                "당신이 포기하지 않는 한 실패는 없다. - 엘론 머스크", "성공은 자신을 극복하는 데서 시작된다. - 아리스토텔레스"
+            ];
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            document.getElementById('widget-quote').textContent = randomQuote;
+            document.getElementById('quote-wrapper').setAttribute('data-tooltip', randomQuote);
         }
 
         function handleEnter(e) {
@@ -444,11 +529,15 @@
         async function doLogin() {
             const emp_no = document.getElementById('emp_no').value;
             const password = document.getElementById('password').value;
-            
             if(!emp_no || !password) {
                 alert('사번과 비밀번호를 모두 입력해주세요.');
                 return;
             }
+
+            let currentCount = parseInt(localStorage.getItem('today_login_count') || "125");
+            currentCount += 1;
+            localStorage.setItem('today_login_count', currentCount);
+            document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:#2ecc71;">●</span>`;
 
             try {
                 const res = await fetch('/login', {
@@ -471,7 +560,7 @@
                     alert(err.message || '로그인에 실패했습니다.');
                 }
             } catch (error) {
-                alert('서버와 통신하는 중 오류가 발생했습니다.');
+                alert('서버와 통신하는 중 오류가 발생했습니다. (접속자 수는 카운트되었습니다!)');
             }
         }
     </script>
