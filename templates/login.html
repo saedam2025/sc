@@ -29,77 +29,91 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            /* 은은한 블루 그라데이션 베이스 */
             background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
             position: relative;
             overflow: hidden;
         }
 
-        /* 1. 기하학적 육각형(Hexagon) 라인 패턴 배경 */
+        /* 1. 기하학적 육각형 라인 패턴 배경 */
         body::before {
             content: '';
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='73' viewBox='0 0 28 49'%3E%3Cg fill='none' stroke='%23d0e1f5' stroke-width='1'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM0 49l14-8 14 8M0 0l14 8 14-8'/%3E%3C/g%3E%3C/svg%3E");
             background-repeat: repeat;
-            opacity: 0.7;
+            opacity: 0.9;
             z-index: 0;
         }
 
-        /* 2. 흩뿌려진 미니 도형 컨테이너 */
+        /* 2. 흩뿌려진 미니 도형 (투명도 확인을 위해 크기를 대폭 키움) */
         .bg-shapes {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             overflow: hidden;
             z-index: 1;
-            pointer-events: none; /* 마우스 클릭 방해 금지 */
+            pointer-events: none;
         }
 
-        /* 미니 도형 공통 애니메이션 */
         .deco-shape {
             position: absolute;
             opacity: 0.6;
-            animation: floatShape 12s infinite alternate ease-in-out;
+            animation: floatShape 15s infinite alternate ease-in-out;
         }
 
         @keyframes floatShape {
             0% { transform: translate(0, 0) rotate(0deg); }
-            100% { transform: translate(15px, -15px) rotate(20deg); }
+            100% { transform: translate(30px, -30px) rotate(45deg); }
         }
 
-        /* 삼각형 */
+        /* 크기를 키운 삼각형 */
         .shape-triangle {
             width: 0; height: 0;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-bottom: 14px solid #93c0f2;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 45px solid rgba(147, 192, 242, 0.7);
         }
 
-        /* 사각형 */
+        /* 크기를 키운 사각형 */
         .shape-square {
-            width: 12px; height: 12px;
-            background-color: #b0d2f8;
+            width: 45px; height: 45px;
+            background-color: rgba(176, 210, 248, 0.7);
+            border-radius: 8px;
+        }
+        
+        /* 투명도 비침을 극대화할 큰 원형 블랍 */
+        .shape-circle {
+            width: 180px; height: 180px;
+            background-color: rgba(126, 182, 241, 0.4);
+            border-radius: 50%;
+            filter: blur(15px);
         }
 
-        /* 도형 위치 지정 */
-        .deco-1 { top: 15%; left: 15%; transform: rotate(15deg); }
-        .deco-2 { top: 25%; right: 20%; animation-delay: -2s; transform: rotate(-10deg); }
-        .deco-3 { top: 75%; left: 10%; animation-delay: -4s; transform: rotate(45deg); }
-        .deco-4 { top: 80%; right: 15%; animation-delay: -1s; }
-        .deco-5 { top: 40%; left: 5%; animation-delay: -6s; transform: rotate(30deg); }
-        .deco-6 { top: 50%; right: 8%; animation-delay: -3s; }
-        .deco-7 { top: 10%; left: 50%; animation-delay: -5s; transform: rotate(-25deg); }
+        /* 도형 위치 (로그인 창 바로 뒤를 지나가도록 중앙부에 집중 배치) */
+        .deco-1 { top: 20%; left: 30%; transform: rotate(15deg); }
+        .deco-2 { top: 40%; right: 25%; animation-delay: -2s; transform: rotate(-10deg); } /* 카드 뒤 */
+        .deco-3 { top: 60%; left: 35%; animation-delay: -4s; transform: rotate(45deg); } /* 카드 뒤 */
+        .deco-4 { top: 75%; right: 20%; animation-delay: -1s; }
+        .deco-5 { top: 30%; left: 15%; animation-delay: -6s; transform: rotate(30deg); }
+        .deco-6 { top: 45%; right: 40%; animation-delay: -3s; } /* 카드 뒤 */
+        .deco-7 { top: 25%; left: 55%; animation-delay: -5s; transform: rotate(-25deg); } /* 카드 뒤 */
+        .deco-8 { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: -7s; } /* 중앙 큰 원 */
 
-        /* 가로형 로그인 카드 */
+        /* 가로형 로그인 카드 (확실한 반투명 글래스모피즘) */
         .login-wrapper {
             position: relative;
             z-index: 2;
-            background: rgba(255, 255, 255, 0.85); 
-            backdrop-filter: blur(12px);
+            /* 배경을 더 투명하게 조절 */
+            background: rgba(255, 255, 255, 0.3); 
+            /* 블러 수치를 줄여서 뒤의 패턴과 도형이 뚜렷하게 비치도록 수정 */
+            backdrop-filter: blur(5px); 
+            -webkit-backdrop-filter: blur(5px);
             padding: 50px;
             border-radius: 24px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04); 
-            border: 1px solid #e2e8f0; 
+            /* 유리 질감을 살리는 은은한 그림자와 하얀색 테두리 */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); 
+            border: 1px solid rgba(255, 255, 255, 0.7); 
+            border-top: 1px solid rgba(255, 255, 255, 1);
+            border-left: 1px solid rgba(255, 255, 255, 1);
             width: 100%;
             max-width: 650px; 
             
@@ -118,7 +132,7 @@
         /* 헤더 영역 */
         .login-header {
             margin-bottom: 35px;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             padding-bottom: 20px;
             display: flex;
             justify-content: space-between; 
@@ -138,12 +152,12 @@
 
         .logo-subtext {
             font-size: 14px;
-            color: var(--text-gray);
+            color: rgba(0, 0, 0, 0.6);
             margin-top: 5px;
             font-weight: 500;
         }
 
-        /* 날씨 및 시간 위젯 스타일 (배경, 테두리 제거) */
+        /* 날씨 및 시간 위젯 스타일 */
         .header-widget {
             text-align: right;
             background: transparent;
@@ -155,14 +169,14 @@
         .widget-time {
             font-size: 20px;
             font-weight: 800;
-            color: var(--primary-color);
+            color: var(--primary-dark);
             letter-spacing: 1px;
             font-variant-numeric: tabular-nums; 
         }
 
         .widget-date {
             font-size: 11px;
-            color: var(--text-gray);
+            color: rgba(0, 0, 0, 0.6);
             margin-top: 2px;
             font-weight: 500;
         }
@@ -203,7 +217,7 @@
             flex-direction: column;
             justify-content: space-between;
             align-items: center;
-            border-left: 1px dashed #cbd5e1; 
+            border-left: 1px dashed rgba(0, 0, 0, 0.15); 
             padding-left: 40px;
         }
 
@@ -217,17 +231,18 @@
             left: 16px;
             top: 50%;
             transform: translateY(-50%);
-            color: #94a3b8;
+            color: #7b8a9e;
             font-size: 15px;
         }
 
         .input-group input {
             width: 100%;
             padding: 14px 16px 14px 45px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.8);
             border-radius: 12px;
             font-size: 14px;
-            background: #f8fafc;
+            /* 입력창도 글래스모피즘에 어울리게 반투명 처리 */
+            background: rgba(255, 255, 255, 0.6);
             outline: none;
             color: var(--text-dark);
             transition: all 0.3s ease;
@@ -235,15 +250,15 @@
 
         .input-group input:focus {
             border-color: var(--primary-color);
-            background: #ffffff;
+            background: rgba(255, 255, 255, 0.95);
             box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
         }
 
-        /* 버튼 및 광택 애니메이션 효과 추가 */
+        /* 버튼 및 광택 애니메이션 */
         .btn-login {
             width: 100%;
             height: 52px; 
-            background: var(--primary-dark); /* 이미지 톤에 맞춰 조금 더 딥한 컬러로 조정 */
+            background: var(--primary-dark); 
             color: #ffffff;
             border: none;
             border-radius: 10px;
@@ -263,7 +278,6 @@
             box-shadow: 0 6px 20px rgba(53, 122, 189, 0.4);
         }
 
-        /* 광택(Shine) 효과 가상 요소 */
         .btn-login::after {
             content: '';
             position: absolute;
@@ -278,10 +292,9 @@
                 rgba(255, 255, 255, 0) 100%
             );
             transform: skewX(-25deg);
-            animation: shine 3s ease-in-out infinite; /* 3초 주기로 무한 반복 */
+            animation: shine 3s ease-in-out infinite; 
         }
 
-        /* 광택 이동 키프레임 */
         @keyframes shine {
             0% { left: -150%; }
             20% { left: 150%; }
@@ -317,7 +330,7 @@
             }
             .form-right {
                 border-left: none;
-                border-top: 1px dashed #cbd5e1; 
+                border-top: 1px dashed rgba(0, 0, 0, 0.15); 
                 padding-left: 0;
                 padding-top: 25px;
             }
@@ -327,13 +340,14 @@
 <body>
     
     <div class="bg-shapes">
-        <div class="deco-shape shape-triangle deco-1"></div>
-        <div class="deco-shape shape-square deco-2"></div>
-        <div class="deco-shape shape-triangle deco-3"></div>
-        <div class="deco-shape shape-square deco-4"></div>
-        <div class="deco-shape shape-square deco-5"></div>
-        <div class="deco-shape shape-triangle deco-6"></div>
-        <div class="deco-shape shape-square deco-7"></div>
+        <div class="deco-shape deco-1"></div>
+        <div class="deco-shape deco-2"></div>
+        <div class="deco-shape deco-3"></div>
+        <div class="deco-shape deco-4"></div>
+        <div class="deco-shape deco-5"></div>
+        <div class="deco-shape deco-6"></div>
+        <div class="deco-shape deco-7"></div>
+        <div class="deco-shape deco-8"></div>
     </div>
 
     <div class="login-wrapper" id="loginCard">
@@ -366,7 +380,7 @@
                         <i class="fa-solid fa-lock"></i>
                     </div>
                 </div>
-                <div style="font-size: 13px; color: var(--text-gray); cursor: pointer;">
+                <div style="font-size: 13px; color: rgba(0,0,0,0.6); cursor: pointer;">
                     <label><input type="checkbox" id="remember_me"> 사번 저장하기</label>
                 </div>
             </div>
@@ -384,6 +398,17 @@
 
     <script>
         window.onload = () => {
+            // --- 배경 도형 무작위 적용 로직 시작 ---
+            const shapes = document.querySelectorAll('.deco-shape');
+            const shapeTypes = ['shape-triangle', 'shape-square', 'shape-circle'];
+            
+            shapes.forEach(shape => {
+                // 배열에 있는 도형 중 하나를 무작위로 선택하여 클래스 추가
+                const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
+                shape.classList.add(randomType);
+            });
+            // --- 배경 도형 무작위 적용 로직 끝 ---
+
             setTimeout(() => {
                 document.getElementById('loginCard').classList.add('appear');
             }, 100);
