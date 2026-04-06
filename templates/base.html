@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
-        /* --- 로그인 화면 디자인 테마 공통 적용 --- */
         body {
             font-family: 'Pretendard', sans-serif;
             background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
@@ -30,7 +29,6 @@
             z-index: -2;
         }
 
-        /* 떠다니는 배경 도형 애니메이션 */
         .bg-shapes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; pointer-events: none; }
         .deco-shape { position: absolute; opacity: 0.4; animation: floatShape 15s infinite alternate ease-in-out; }
         @keyframes floatShape {
@@ -45,32 +43,35 @@
         .deco-2 { top: 70%; right: 15%; animation-delay: -2s; transform: rotate(-10deg); } 
         .deco-3 { top: 40%; left: 80%; animation-delay: -4s; transform: rotate(45deg); } 
 
-        /* --- 레이아웃 너비 1.5배 확장 --- */
-        .nav-container, .content-container {
-            max-width: 1600px !important; /* 기존 대비 1.5배 확장 */
+        .content-container {
+            max-width: 1600px !important;
             width: 95% !important;
             margin: 0 auto;
         }
 
-        /* --- 상단 메뉴바: 가운데 기준 양옆이 좁아지는 둥근 라운드 디자인 --- */
+        /* --- 상단 메뉴 디자인 수정 --- */
         .navbar {
-            padding: 20px 0;
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
+            padding: 0; /* 상단 여백 제거 */
+            margin-bottom: 20px;
         }
 
         .nav-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: rgba(255, 255, 255, 0.4); 
+            background: rgba(255, 255, 255, 0.5); 
             backdrop-filter: blur(10px); 
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.8);
-            border-radius: 60px; /* 양 끝이 유선형으로 좁아지는 둥근 필(Pill) 디자인 */
-            padding: 10px 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+            border-top: none; /* 위쪽 보더 제거 */
+            
+            /* 아랫쪽만 가운데 라운딩, 양옆이 위로 좁아지는 곡선 효과 */
+            border-radius: 0 0 60px 60px; 
+            
+            padding: 15px 50px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            max-width: 1600px !important;
+            margin: 0 auto;
         }
 
         .logo { font-size: 1.4rem; font-weight: 800; color: #222; text-decoration: none; display: flex; align-items: center; gap: 8px; }
@@ -78,22 +79,22 @@
 
         .menu-list { display: flex; gap: 15px; list-style: none; margin: 0; padding: 0; align-items: center; }
         .menu-item {
-            color: #555; text-decoration: none; font-weight: 600; padding: 12px 24px;
+            color: #555; text-decoration: none; font-weight: 600; padding: 10px 20px;
             border-radius: 30px; transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+            font-size: 0.95rem;
         }
         .menu-item:hover, .menu-item.active {
-            background: rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.9);
             color: #4a90e2;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
 
         .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
 
-        /* 증명서 발급 풀다운 */
         .dropdown { position: relative; }
         .dropdown-content {
             display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-            background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+            background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
             min-width: 170px; box-shadow: 0px 8px 24px rgba(0,0,0,0.1); border-radius: 15px;
             z-index: 1000; margin-top: 10px; border: 1px solid rgba(255,255,255,1); overflow: hidden;
         }
@@ -101,7 +102,6 @@
         .dropdown-content a:hover { background-color: rgba(74, 144, 226, 0.1); color: #4a90e2; }
         .dropdown:hover .dropdown-content { display: block; }
 
-        /* 우측 유저 섹션 */
         .user-section { display: flex; align-items: center; font-size: 0.95rem; font-weight: 500; color: #444; }
         .user-name-link { cursor: pointer; text-decoration: none; color: #4a90e2; transition: 0.2s; font-weight: 700; border-bottom: 1px dashed #4a90e2; }
         .btn-logout { 
@@ -110,7 +110,7 @@
         }
         .btn-logout:hover { background: #e03131; color: white; }
 
-        /* 모달 스타일 유지 및 글래스모피즘 약간 반영 */
+        /* 모달 스타일 */
         .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); backdrop-filter: blur(3px); }
         .modal-content { background-color: rgba(255,255,255,0.95); backdrop-filter: blur(10px); margin: 8% auto; padding: 30px; border-radius: 20px; width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid rgba(255,255,255,0.8); }
         .modal-info-content { width: 500px; }
@@ -150,53 +150,22 @@
 
             <nav class="nav-wrapper">
                 <ul class="menu-list">
-                    <li>
-                        <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
-                            <i class="fa-solid fa-calendar-check"></i> 메인달력
-                        </a>
-                    </li>
-                    
+                    <li><a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}"><i class="fa-solid fa-calendar-check"></i> 메인달력</a></li>
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li>
-                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-users-gear"></i> 회원관리
-                        </a>
-                    </li>
+                    <li><a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}"><i class="fa-solid fa-users-gear"></i> 회원관리</a></li>
                     {% endif %}
-
-                    <li>
-                        <a href="/approval" class="menu-item">
-                            <i class="fa-solid fa-file-signature"></i> 사내결재
-                        </a>
-                    </li>
-
+                    <li><a href="/approval" class="menu-item"><i class="fa-solid fa-file-signature"></i> 사내결재</a></li>
                     <li class="dropdown">
-                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-print"></i> 증명서발급
-                        </a>
+                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}"><i class="fa-solid fa-print"></i> 증명서발급</a>
                         <div class="dropdown-content">
-                            <a href="/document/apply">
-                                <i class="fa-solid fa-file-circle-plus"></i> 증명서신청
-                            </a>
-                            <a href="/document/admin">
-                                <i class="fa-solid fa-file-invoice"></i> 증명신청현황
-                            </a>
+                            <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서신청</a>
+                            <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 증명신청현황</a>
                         </div>
                     </li>
-
                     {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li>
-                        <a href="/contract/admin" class="menu-item">
-                            <i class="fa-solid fa-file-contract"></i> 전자계약
-                        </a>
-                    </li>
+                    <li><a href="/contract/admin" class="menu-item"><i class="fa-solid fa-file-contract"></i> 전자계약</a></li>
                     {% endif %}
-
-                    <li>
-                        <a href="javascript:void(0);" class="menu-item menu-register" onclick="openRegisterModal()">
-                            <i class="fa-solid fa-user-plus"></i> 가입신청
-                        </a>
-                    </li>
+                    <li><a href="javascript:void(0);" class="menu-item menu-register" onclick="openRegisterModal()"><i class="fa-solid fa-user-plus"></i> 가입신청</a></li>
                 </ul>
             </nav>
 
@@ -205,9 +174,7 @@
                 <span class="user-name">
                     <strong class="user-name-link" onclick="openMyInfoModal()">{{ session['user_name'] }}</strong>님 환영합니다
                 </span>
-                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                </a>
+                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃"><i class="fa-solid fa-right-from-bracket"></i></a>
                 {% endif %}
             </div>
         </div>
@@ -282,34 +249,23 @@
             };
 
             if(!data.name || !data.password || !data.rrn) {
-                alert("성명, 비밀번호, 주민번호는 필수 입력 사항입니다.");
-                return;
+                alert("성명, 비밀번호, 주민번호는 필수 입력 사항입니다."); return;
             }
-
             const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
             if(!pwRegex.test(data.password)) {
-                alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
-                return;
+                alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다."); return;
             }
 
             try {
                 const res = await fetch('/user/register', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
                 });
                 const result = await res.json();
-                
                 if(res.ok) {
                     alert("가입 신청이 완료되었습니다! 관리자 승인 후 부여된 사번으로 로그인해주세요.");
-                    closeRegisterModal();
-                    document.getElementById('modalRegForm').reset();
-                } else {
-                    alert("오류: " + result.message);
-                }
-            } catch (e) {
-                alert("서버와 통신 중 오류가 발생했습니다.");
-            }
+                    closeRegisterModal(); document.getElementById('modalRegForm').reset();
+                } else { alert("오류: " + result.message); }
+            } catch (e) { alert("서버와 통신 중 오류가 발생했습니다."); }
         }
 
         async function openMyInfoModal() {
@@ -319,42 +275,28 @@
             const table = document.getElementById('myInfoTable');
             const title = document.getElementById('myInfoModalTitle');
 
-            modal.style.display = "block";
-            loading.style.display = "block";
-            display.style.display = "none";
+            modal.style.display = "block"; loading.style.display = "block"; display.style.display = "none";
 
             try {
-                const res = await fetch('/user/my_info');
-                const result = await res.json();
-
+                const res = await fetch('/user/my_info'); const result = await res.json();
                 if (result.status === 'success') {
                     const data = result.data;
                     title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
                     const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'];
                     let html = '';
                     order.forEach(key => {
-                        if (data.hasOwnProperty(key)) {
-                            html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`;
-                        }
+                        if (data.hasOwnProperty(key)) { html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`; }
                     });
                     table.innerHTML = html;
-                    loading.style.display = "none";
-                    display.style.display = "block";
-                } else {
-                    alert(result.message);
-                    closeMyInfoModal();
-                }
-            } catch (e) {
-                alert("데이터를 가져오는 중 오류가 발생했습니다.");
-                closeMyInfoModal();
-            }
+                    loading.style.display = "none"; display.style.display = "block";
+                } else { alert(result.message); closeMyInfoModal(); }
+            } catch (e) { alert("데이터를 가져오는 중 오류가 발생했습니다."); closeMyInfoModal(); }
         }
 
         function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
 
         window.onclick = function(event) {
-            const regModal = document.getElementById('registerModal');
-            const infoModal = document.getElementById('myInfoModal');
+            const regModal = document.getElementById('registerModal'); const infoModal = document.getElementById('myInfoModal');
             if (event.target == regModal) closeRegisterModal();
             if (event.target == infoModal) closeMyInfoModal();
         }

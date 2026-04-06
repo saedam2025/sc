@@ -2,106 +2,131 @@
 
 {% block content %}
 <style>
-    /* 1) 전체 달력 폰트 크기 조절 (축소) */
     .fc { font-size: 0.85em; }
     .fc .fc-toolbar-title { font-size: 1.3em !important; font-weight: 800; color: #222; }
+    .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
+    .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
+    .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
     
-    /* 2) 달력 숫자 왼쪽 정렬 강제 적용 */
-    .fc .fc-daygrid-day-top { 
-        display: flex; 
-        flex-direction: row !important; 
-        justify-content: flex-start !important; 
-        align-items: center;
-        padding-left: 5px; 
-    }
-
-    /* 3) 일요일 및 토요일 폰트 색상 강제 지정 */
-    .fc-day-sun .fc-col-header-cell-cushion, 
-    .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
-    
-    .fc-day-sat .fc-col-header-cell-cushion, 
-    .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
-    
-    /* 4) 공휴일 동적 클래스 적용 */
-    .holiday-day .fc-daygrid-day-number,
-    .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
+    .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.75em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
 
-    /* 글래스모피즘 박스 스타일 (로그인 화면과 동일) */
     .glass-box {
-        background: rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        border-radius: 24px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
         padding: 30px;
     }
 
-    /* 이벤트 카드 투명화 */
+    /* --- 우측 리스트 폰트/여백 축소 & 아코디언 UI 스타일 --- */
     .glass-event-card {
-        background: rgba(255, 255, 255, 0.6);
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        transition: transform 0.2s;
+        background: rgba(255, 255, 255, 0.7); border-radius: 10px;
+        padding: 10px 12px; /* 여백 축소 */
+        margin-bottom: 8px; /* 카드간 간격 축소 */
+        box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        cursor: pointer; transition: background 0.2s;
     }
-    .glass-event-card:hover { transform: translateY(-2px); }
+    .glass-event-card:hover { background: rgba(255, 255, 255, 0.95); }
+    
+    .card-header { display: flex; justify-content: space-between; align-items: center; }
+    .card-title { font-size: 0.85rem; font-weight: 700; color: #222; } /* 폰트 축소 */
+    
+    /* 뱃지 아이콘 스타일 */
+    .badge-wrap { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .status-badge { 
+        font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: white; display: inline-flex; align-items: center; gap: 3px; 
+    }
+    .badge-in { background: #4a90e2; }
+    .badge-out { background: #e67e22; }
+    .badge-meet { background: #9b59b6; }
+    .badge-etc { background: #7b8a9e; }
+
+    /* 아코디언 상세 정보창 (기본 숨김) */
+    .card-details {
+        display: none; margin-top: 10px; padding-top: 10px;
+        border-top: 1px dashed rgba(0,0,0,0.15); font-size: 0.75rem; color: #444; line-height: 1.5;
+    }
+    .card-details p { margin: 2px 0; }
+    .card-details strong { color: #222; }
 
     .modal-input { width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
     .modal-input:focus { border-color: #4a90e2; outline: none; background: #fff; }
 </style>
 
-<div class="dashboard-container" style="padding: 20px 0; background-color: transparent;">
+<div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
     <div class="row" style="display: flex; gap: 30px;">
         <div class="col-calendar glass-box" style="flex: 7;">
             <div id='calendar'></div>
         </div>
 
-        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: calc(100vh - 150px);">
-            
-            <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 20px; font-weight: 800;">
+        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: 850px;"> <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;">
                 <i class="fa-solid fa-calendar-day"></i> TODAY 
-                <span style="font-size: 0.65em; color: #777; font-weight: 500; margin-left: 5px;">{{ today_str }}</span>
+                <span style="font-size: 0.7em; color: #777; font-weight: 500; margin-left: 5px;">{{ today_str }}</span>
             </h3>
+            
             <div class="today-list">
                 {% for event in today_events %}
-                <div class="glass-event-card" style="border-left: 5px solid {{ event.color }};">
-                    <strong style="display: block; margin-bottom: 5px; color: #222;">{{ event.title }}</strong>
+                <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
+                    <div class="card-header">
+                        <span class="card-title">{{ event.title }}</span>
+                        <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
+                    </div>
+                    
                     {% if event.extendedProps %}
-                    <small style="color: #555;"><i class="fa-solid fa-building-user"></i> 내근: {{ event.extendedProps.inside }}</small>
+                    <div class="badge-wrap">
+                        {% if event.extendedProps.inside %}<span class="status-badge badge-in"><i class="fa-solid fa-building-user"></i> 내근</span>{% endif %}
+                        {% if event.extendedProps.outside %}<span class="status-badge badge-out"><i class="fa-solid fa-person-walking-luggage"></i> 외근</span>{% endif %}
+                        {% if event.extendedProps.meeting %}<span class="status-badge badge-meet"><i class="fa-solid fa-handshake"></i> 회의</span>{% endif %}
+                        {% if event.extendedProps.note %}<span class="status-badge badge-etc"><i class="fa-solid fa-comment-dots"></i> 기타</span>{% endif %}
+                    </div>
+                    
+                    <div class="card-details">
+                        {% if event.extendedProps.inside %}<p><strong>내근:</strong> {{ event.extendedProps.inside }}</p>{% endif %}
+                        {% if event.extendedProps.outside %}<p><strong>외근:</strong> {{ event.extendedProps.outside }}</p>{% endif %}
+                        {% if event.extendedProps.meeting %}<p><strong>회의:</strong> {{ event.extendedProps.meeting }}</p>{% endif %}
+                        {% if event.extendedProps.note %}<p><strong>기타:</strong> {{ event.extendedProps.note }}</p>{% endif %}
+                    </div>
                     {% endif %}
                 </div>
                 {% else %}
-                <p style="color: #999; text-align: center; margin-top: 40px; font-weight: 500;">
-                    <i class="fa-regular fa-face-smile" style="font-size: 2rem; display: block; margin-bottom: 10px; color: #ccc;"></i>
-                    오늘 등록된 일정이 없습니다.
-                </p>
+                <p style="color: #aaa; text-align: center; margin-top: 30px; font-weight: 500; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>
                 {% endfor %}
             </div>
 
-            <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.15); margin: 30px 0;">
+            <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.15); margin: 20px 0;">
             
-            <h3 style="color: #2c3e50; margin-bottom: 20px; font-weight: 800;">
+            <h3 style="color: #2c3e50; margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;">
                 <i class="fa-solid fa-calendar-week"></i> UPCOMING 
-                <span style="font-size: 0.65em; color: #777; font-weight: 500; margin-left: 5px;">내일부터 7일간</span>
+                <span style="font-size: 0.7em; color: #777; font-weight: 500; margin-left: 5px;">내일부터 7일간</span>
             </h3>
+            
             <div class="weekly-list">
                 {% for event in weekly_events %}
-                <div class="glass-event-card" style="border-left: 5px solid {{ event.color | default('#4a90e2') }};">
-                    <div style="font-size: 0.8em; color: #7b8a9e; margin-bottom: 6px; font-weight: 600;">
-                        <i class="fa-regular fa-clock"></i> {{ event.start[:10] }}
+                <div class="glass-event-card" style="border-left: 4px solid {{ event.color | default('#4a90e2') }};" onclick="toggleDetails(this)">
+                    <div style="font-size: 0.7rem; color: #7b8a9e; margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
+                    
+                    <div class="card-header">
+                        <span class="card-title">{{ event.title }}</span>
+                        <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
                     </div>
-                    <strong style="display: block; margin-bottom: 5px; color: #222;">{{ event.title }}</strong>
+                    
                     {% if event.extendedProps %}
-                    <small style="color: #555;">내근: {{ event.extendedProps.inside }}</small>
+                    <div class="badge-wrap">
+                        {% if event.extendedProps.inside %}<span class="status-badge badge-in"><i class="fa-solid fa-building-user"></i> 내근</span>{% endif %}
+                        {% if event.extendedProps.outside %}<span class="status-badge badge-out"><i class="fa-solid fa-person-walking-luggage"></i> 외근</span>{% endif %}
+                        {% if event.extendedProps.meeting %}<span class="status-badge badge-meet"><i class="fa-solid fa-handshake"></i> 회의</span>{% endif %}
+                        {% if event.extendedProps.note %}<span class="status-badge badge-etc"><i class="fa-solid fa-comment-dots"></i> 기타</span>{% endif %}
+                    </div>
+                    
+                    <div class="card-details">
+                        {% if event.extendedProps.inside %}<p><strong>내근:</strong> {{ event.extendedProps.inside }}</p>{% endif %}
+                        {% if event.extendedProps.outside %}<p><strong>외근:</strong> {{ event.extendedProps.outside }}</p>{% endif %}
+                        {% if event.extendedProps.meeting %}<p><strong>회의:</strong> {{ event.extendedProps.meeting }}</p>{% endif %}
+                        {% if event.extendedProps.note %}<p><strong>기타:</strong> {{ event.extendedProps.note }}</p>{% endif %}
+                    </div>
                     {% endif %}
                 </div>
                 {% else %}
-                <p style="color: #999; text-align: center; margin-top: 40px; font-weight: 500;">
-                    예정된 주간 일정이 없습니다.
-                </p>
+                <p style="color: #aaa; text-align: center; margin-top: 30px; font-weight: 500; font-size: 0.85rem;">예정된 주간 일정이 없습니다.</p>
                 {% endfor %}
             </div>
 
@@ -115,12 +140,12 @@
         <h3 id="modalTitle" style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
         <form id="taskForm">
             <input type="date" id="taskDate" class="modal-input" required readonly style="background-color: #f0f4f8;">
-            
             <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background-color: #f0f4f8; color: #555;">
             
             <input type="text" id="insideTask" class="modal-input" placeholder="내근업무">
-            <input type="text" id="outsideTask" class="modal-input" placeholder="외근업무 / 회의">
-            <textarea id="taskNote" class="modal-input" placeholder="비고 및 기타사항" style="height:90px; resize: none;"></textarea>
+            <input type="text" id="outsideTask" class="modal-input" placeholder="외근업무">
+            <input type="text" id="meetingTask" class="modal-input" placeholder="회의사항">
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 기타사항" style="height:70px; resize: none;"></textarea>
             
             <button type="button" onclick="saveTask()" style="width:100%; background:#4a90e2; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem; transition: background 0.3s;">일정 저장하기</button>
         </form>
@@ -129,6 +154,22 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
+  // 아코디언 토글 스크립트
+  function toggleDetails(card) {
+      const details = card.querySelector('.card-details');
+      const icon = card.querySelector('.toggle-icon');
+      
+      if(details) {
+          if (details.style.display === 'block') {
+              details.style.display = 'none';
+              icon.style.transform = 'rotate(0deg)';
+          } else {
+              details.style.display = 'block';
+              icon.style.transform = 'rotate(180deg)';
+          }
+      }
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     var calendarEl = document.getElementById('calendar');
     const holidays = {{ holidays_dict | tojson | safe }};
@@ -138,30 +179,24 @@
       locale: 'ko',
       headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
       events: {{ events | tojson | safe }},
-      height: 'auto',
+      height: 850, /* 달력 세로 사이즈 약 20% 확대 고정 (기존 auto) */
 
       dayCellDidMount: function(arg) {
         const d = arg.date;
-        const dateStr = d.getFullYear() + "-" + 
-                        String(d.getMonth() + 1).padStart(2, '0') + "-" + 
-                        String(d.getDate()).padStart(2, '0');
+        const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
         
         if (holidays[dateStr]) {
             arg.el.classList.add('holiday-day');
-            
             let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
             
             if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
                 let holidaySpan = document.createElement('span');
                 holidaySpan.className = 'holiday-name';
                 holidaySpan.innerText = holidays[dateStr];
-                
                 dayTopEl.appendChild(holidaySpan);
 
                 let dayNumberEl = dayTopEl.querySelector('.fc-daygrid-day-number');
-                if (dayNumberEl) {
-                    dayNumberEl.style.color = '#e74c3c';
-                }
+                if (dayNumberEl) { dayNumberEl.style.color = '#e74c3c'; }
             }
         }
       },
@@ -172,18 +207,23 @@
       },
 
       eventClick: function(info) {
+        // 기존의 alert 팝업 대신 내역을 확인할 수 있도록 유지하거나 제외할 수 있음
+        // 우측 리스트에 아코디언이 있으므로 달력 클릭시에도 간략히 보여줍니다.
         const p = info.event.extendedProps;
         if(p.owner) {
-            alert(`[${p.owner} 업무상세]\n내근: ${p.inside || '없음'}\n외근: ${p.outside || '없음'}\n비고: ${p.note || '없음'}`);
+            let msg = `[${p.owner} 일정상세]\n`;
+            if(p.inside) msg += `내근: ${p.inside}\n`;
+            if(p.outside) msg += `외근: ${p.outside}\n`;
+            if(p.meeting) msg += `회의: ${p.meeting}\n`;
+            if(p.note) msg += `기타: ${p.note}\n`;
+            alert(msg);
         }
       }
     });
     calendar.render();
   });
 
-  function closeTaskModal() {
-      document.getElementById('taskModal').style.display = 'none';
-  }
+  function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
 
   async function saveTask() {
       const taskDate = document.getElementById('taskDate').value;
@@ -192,22 +232,20 @@
       if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
       if (!taskOwner) { alert('담당자 정보가 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
 
+      // 회의(meeting) 항목을 분리하여 서버로 전송하도록 폼 파라미터 매칭
       const data = {
           date: taskDate,
           owner: taskOwner,
           inside: document.getElementById('insideTask').value || '',
           outside: document.getElementById('outsideTask').value || '',
-          meeting: '', 
+          meeting: document.getElementById('meetingTask').value || '', 
           note: document.getElementById('taskNote').value || ''
       };
 
       try {
           const res = await fetch('/save_task', {
               method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'X-Requested-With': 'XMLHttpRequest'
-              },
+              headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify(data)
           });
           
@@ -216,12 +254,11 @@
               location.reload(); 
           } else {
               const errText = await res.text();
-              console.error("백엔드 서버 에러 상세:", errText);
-              alert(`등록에 실패했습니다. (HTTP 에러코드: ${res.status})\nF12를 눌러 콘솔 로그를 확인해주세요.`);
+              console.error("백엔드 에러:", errText);
+              alert(`등록 실패 (코드: ${res.status}). 콘솔을 확인해주세요.`);
           }
       } catch (error) {
-          alert("등록 중 네트워크 오류가 발생했습니다.");
-          console.error("Fetch 전송 에러:", error);
+          alert("등록 중 오류가 발생했습니다.");
       }
   }
 </script>
