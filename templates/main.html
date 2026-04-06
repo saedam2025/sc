@@ -42,9 +42,11 @@
     .btn-edit { color: #4a90e2; }
     .btn-delete { color: #e74c3c; }
 
-    /* 채팅 스크롤바 디자인 커스텀 */
+    /* 채팅방 커스텀 스타일 */
     #chatBox::-webkit-scrollbar { width: 6px; }
     #chatBox::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+    .emoji-item { font-size: 1.5rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
+    .emoji-item:hover { background: #eee; }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
@@ -139,7 +141,9 @@
                         <span style="color: #444;">From: <strong>{{ msg.sender }}</strong></span>
                         <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
                     </div>
-                    <div style="color: #666; font-size:0.8rem;">{{ msg.content }}</div>
+                    <div style="color: #666; font-size:0.8rem;">
+                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
+                    </div>
                 </div>
                 {% else %}
                 <p style="text-align: center; color: #aaa; font-size: 0.85rem;">받은 쪽지가 없습니다.</p>
@@ -153,7 +157,9 @@
                         <span style="color: #444;">To: <strong>{{ msg.receiver }}</strong></span>
                         <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
                     </div>
-                    <div style="color: #666; font-size:0.8rem;">{{ msg.content }}</div>
+                    <div style="color: #666; font-size:0.8rem;">
+                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
+                    </div>
                 </div>
                 {% else %}
                 <p style="text-align: center; color: #aaa; font-size: 0.85rem;">보낸 쪽지가 없습니다.</p>
@@ -170,12 +176,27 @@
             <i class="fa-solid fa-comments"></i> <span id="chatPartnerName"></span>님과의 대화
         </h3>
         
-        <div id="chatBox" style="flex:1; overflow-y:auto; background:#f4f6f9; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
-        </div>
+        <div id="chatBox" style="flex:1; overflow-y:auto; background:#f4f6f9; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;"></div>
         
-        <div style="display:flex; gap:8px;">
-            <input type="text" id="chatInput" class="modal-input" style="margin-bottom:0; flex:1; border-radius:10px;" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()">
-            <button onclick="sendChatReply()" style="background:#9b59b6; color:white; border:none; padding:0 20px; border-radius:10px; font-weight:bold; cursor:pointer; transition: background 0.3s;">전송</button>
+        <div style="display:flex; gap:8px; align-items:center; position:relative;">
+            
+            <label for="chatFile" style="cursor:pointer; color:#9b59b6; font-size:1.2rem; padding:5px;"><i class="fa-solid fa-paperclip"></i></label>
+            <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
+            
+            <i class="fa-regular fa-face-smile" style="cursor:pointer; color:#f1c40f; font-size:1.3rem; padding:5px;" onclick="toggleEmojiPicker('chatEmojiPicker')"></i>
+            
+            <div id="chatEmojiPicker" style="display:none; position:absolute; bottom:50px; left:40px; background:white; border:1px solid #ddd; border-radius:10px; padding:10px; box-shadow:0 5px 15px rgba(0,0,0,0.1); width:210px; grid-template-columns:repeat(5, 1fr); gap:5px; z-index:2100;">
+                <span class="emoji-item" onclick="addEmoji('chatInput', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('chatInput', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('chatInput', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('chatInput', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('chatInput', '😭')">😭</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('chatInput', '👍')">👍</span><span class="emoji-item" onclick="addEmoji('chatInput', '🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('chatInput', '🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('chatInput', '💖')">💖</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('chatInput', '✨')">✨</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('chatInput', '👏')">👏</span><span class="emoji-item" onclick="addEmoji('chatInput', '🙌')">🙌</span>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; position:relative;">
+                <div id="chatFileName" style="font-size:0.7rem; color:#4a90e2; position:absolute; top:-18px; left:5px; display:none; background:rgba(255,255,255,0.9); padding:2px 5px; border-radius:4px;"></div>
+                <input type="text" id="chatInput" class="modal-input" style="margin-bottom:0; width:100%; border-radius:10px;" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()">
+            </div>
+            
+            <button onclick="sendChatReply()" style="background:#9b59b6; color:white; border:none; padding:10px 15px; border-radius:10px; font-weight:bold; cursor:pointer;">전송</button>
         </div>
     </div>
 </div>
@@ -193,7 +214,17 @@
                     {% endif %}
                 {% endfor %}
             </select>
-            <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
+            
+            <div style="position:relative;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:10px; top:-25px; cursor:pointer; color:#f1c40f; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-80px; right:35px; background:white; border:1px solid #ddd; border-radius:10px; padding:10px; box-shadow:0 5px 15px rgba(0,0,0,0.1); width:210px; grid-template-columns:repeat(5, 1fr); gap:5px; z-index:2100;">
+                    <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('msgContent', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('msgContent', '😭')">😭</span>
+                    <span class="emoji-item" onclick="addEmoji('msgContent', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('msgContent', '👍')">👍</span><span class="emoji-item" onclick="addEmoji('msgContent', '🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('msgContent', '🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('msgContent', '💖')">💖</span>
+                </div>
+                <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
+            </div>
+            
+            <input type="file" id="msgFile" class="modal-input" style="background:#f8f9fa;">
             <button type="button" onclick="sendNewMessage()" style="width:100%; background:#9b59b6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">전송하기</button>
         </form>
     </div>
@@ -268,40 +299,59 @@
   window.taskDataMap = window.taskDataMap || {};
   const currentUser = '{{ current_user }}';
 
-  // 쪽지 탭 전환 함수
+  // 쪽지함 탭 스위칭
   function switchMsgTab(tab) {
       if(tab === 'recv') {
-          document.getElementById('list-recv').style.display = 'block';
-          document.getElementById('list-sent').style.display = 'none';
-          document.getElementById('tab-recv').style.fontWeight = 'bold';
-          document.getElementById('tab-recv').style.color = '#9b59b6';
-          document.getElementById('tab-sent').style.fontWeight = 'normal';
-          document.getElementById('tab-sent').style.color = '#aaa';
+          document.getElementById('list-recv').style.display = 'block'; document.getElementById('list-sent').style.display = 'none';
+          document.getElementById('tab-recv').style.fontWeight = 'bold'; document.getElementById('tab-recv').style.color = '#9b59b6';
+          document.getElementById('tab-sent').style.fontWeight = 'normal'; document.getElementById('tab-sent').style.color = '#aaa';
       } else {
-          document.getElementById('list-recv').style.display = 'none';
-          document.getElementById('list-sent').style.display = 'block';
-          document.getElementById('tab-sent').style.fontWeight = 'bold';
-          document.getElementById('tab-sent').style.color = '#9b59b6';
-          document.getElementById('tab-recv').style.fontWeight = 'normal';
-          document.getElementById('tab-recv').style.color = '#aaa';
+          document.getElementById('list-recv').style.display = 'none'; document.getElementById('list-sent').style.display = 'block';
+          document.getElementById('tab-sent').style.fontWeight = 'bold'; document.getElementById('tab-sent').style.color = '#9b59b6';
+          document.getElementById('tab-recv').style.fontWeight = 'normal'; document.getElementById('tab-recv').style.color = '#aaa';
       }
   }
 
-  // --- 채팅 관련 로직 ---
+  // --- 채팅, 파일첨부, 이모티콘 로직 ---
   let currentChatPartner = null;
+
+  function toggleEmojiPicker(pickerId) {
+      const picker = document.getElementById(pickerId);
+      picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
+  }
+
+  function addEmoji(inputId, emoji) {
+      const input = document.getElementById(inputId);
+      input.value += emoji;
+      input.focus();
+      document.getElementById('chatEmojiPicker').style.display = 'none';
+      document.getElementById('newMsgEmojiPicker').style.display = 'none';
+  }
+
+  function showChatFileName(input) {
+      const nameDiv = document.getElementById('chatFileName');
+      if(input.files && input.files.length > 0) {
+          nameDiv.innerText = "첨부: " + input.files[0].name;
+          nameDiv.style.display = 'block';
+      } else {
+          nameDiv.style.display = 'none';
+      }
+  }
 
   async function openChat(partnerName) {
       currentChatPartner = partnerName;
       document.getElementById('chatPartnerName').innerText = partnerName;
       document.getElementById('chatModal').style.display = 'block';
       await refreshChatBox();
-      checkUnreadMessages(); // 모달 오픈 시 읽음 처리되므로 뱃지 업데이트
+      checkUnreadMessages();
   }
 
   function closeChat() {
       document.getElementById('chatModal').style.display = 'none';
       currentChatPartner = null;
-      location.reload(); // 메시지 리스트 갱신을 위해 새로고침
+      document.getElementById('chatFile').value = '';
+      document.getElementById('chatFileName').style.display = 'none';
+      location.reload(); 
   }
 
   async function refreshChatBox() {
@@ -309,18 +359,29 @@
       try {
           const res = await fetch(`/get_chat_history/${currentChatPartner}`);
           const chats = await res.json();
-          
           const box = document.getElementById('chatBox');
           box.innerHTML = '';
           
           chats.forEach(c => {
               const timeStr = c.sent_at.substring(5, 16);
+              let fileHtml = '';
+              
+              if(c.filename) {
+                  const ext = c.filename.split('.').pop().toLowerCase();
+                  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                  if(isImage) {
+                      fileHtml = `<div style="margin-top:8px;"><img src="/uploads/${c.filename}" style="max-width:100%; border-radius:8px; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="window.open(this.src)"></div>`;
+                  } else {
+                      fileHtml = `<div style="margin-top:8px; font-size:0.8rem; background:rgba(0,0,0,0.05); padding:6px; border-radius:5px;"><i class="fa-solid fa-paperclip"></i> <a href="/uploads/${c.filename}" target="_blank" style="color:inherit; text-decoration:none; font-weight:bold;">${c.filename} 다운로드</a></div>`;
+                  }
+              }
+
               if(c.sender === currentUser) {
-                  // 내가 보낸 메시지 (우측 정렬, 보라색 말풍선)
                   box.innerHTML += `
                   <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
                       <div style="background:#9b59b6; color:white; padding:10px 14px; border-radius:15px 15px 0 15px; font-size:0.9rem; word-break:break-all; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
                           ${c.content}
+                          ${fileHtml}
                       </div>
                       <div style="font-size:0.7rem; color:#999; margin-top:4px;">
                           <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span> · ${timeStr} 
@@ -328,11 +389,11 @@
                       </div>
                   </div>`;
               } else {
-                  // 상대가 보낸 메시지 (좌측 정렬, 흰색 말풍선)
                   box.innerHTML += `
                   <div style="align-self: flex-start; max-width: 80%; display:flex; flex-direction:column; align-items:flex-start;">
                       <div style="background:#fff; color:#333; padding:10px 14px; border-radius:15px 15px 15px 0; font-size:0.9rem; word-break:break-all; border:1px solid #e0e0e0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
                           ${c.content}
+                          ${fileHtml}
                       </div>
                       <div style="font-size:0.7rem; color:#999; margin-top:4px;">
                           ${timeStr} · <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span>
@@ -340,50 +401,64 @@
                   </div>`;
               }
           });
-          // 새 메시지가 오면 스크롤을 맨 아래로
           box.scrollTop = box.scrollHeight;
       } catch(e) {}
   }
 
   async function sendChatReply() {
       const input = document.getElementById('chatInput');
+      const fileInput = document.getElementById('chatFile');
       const content = input.value.trim();
-      if(!content || !currentChatPartner) return;
       
-      const data = { receiver: currentChatPartner, content: content };
+      if(!content && fileInput.files.length === 0) return;
+      if(!currentChatPartner) return;
+      
+      let formData = new FormData();
+      formData.append('receiver', currentChatPartner);
+      formData.append('content', content);
+      if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
       try {
-          const res = await fetch('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+          const res = await fetch('/send_message', { method: 'POST', body: formData });
           if(res.ok) { 
               input.value = '';
+              fileInput.value = '';
+              document.getElementById('chatFileName').style.display = 'none';
+              document.getElementById('chatEmojiPicker').style.display = 'none';
               await refreshChatBox();
           }
       } catch (e) { alert("오류 발생"); }
   }
 
+  async function sendNewMessage() {
+      const receiver = document.getElementById('msgReceiver').value;
+      const content = document.getElementById('msgContent').value;
+      const fileInput = document.getElementById('msgFile');
+
+      if(!receiver) { alert("수신자를 선택해주세요."); return; }
+      if(!content && fileInput.files.length === 0) { alert("내용이나 파일을 입력해주세요."); return; }
+
+      let formData = new FormData();
+      formData.append('receiver', receiver);
+      formData.append('content', content);
+      if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+      try {
+          const res = await fetch('/send_message', { method: 'POST', body: formData });
+          if(res.ok) { 
+              document.getElementById('msgModal').style.display='none'; 
+              document.getElementById('msgForm').reset();
+              openChat(receiver); 
+          }
+      } catch (e) { alert("오류 발생"); }
+  }
+
   async function deleteChatMsg(msgId) {
-      if(!confirm("이 메시지를 완전히 삭제하시겠습니까?")) return;
+      if(!confirm("이 메시지를 삭제하시겠습니까?")) return;
       try {
           const res = await fetch(`/delete_message/${msgId}`, { method: 'DELETE' });
           if(res.ok) { await refreshChatBox(); }
       } catch(e) {}
-  }
-
-  // 완전히 새로운 대상에게 처음 메시지 보내기 모달용
-  async function sendNewMessage() {
-      const receiver = document.getElementById('msgReceiver').value;
-      const content = document.getElementById('msgContent').value;
-      if(!receiver) { alert("수신자를 선택해주세요."); return; }
-      if(!content) { alert("내용을 입력해주세요."); return; }
-
-      const data = { receiver: receiver, content: content };
-      try {
-          const res = await fetch('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if(res.ok) { 
-              document.getElementById('msgModal').style.display='none'; 
-              document.getElementById('msgForm').reset();
-              openChat(receiver); // 전송 성공 시 채팅방 바로 열기
-          }
-      } catch (e) { alert("오류 발생"); }
   }
 
   async function checkUnreadMessages() {
@@ -396,7 +471,7 @@
       } catch (e) {}
   }
 
-  // --- 기존 캘린더/게시판 자바스크립트 생략 없이 유지 ---
+  // --- 기존 캘린더 로직 (생략 없이 유지) ---
   function toggleDetails(card) {
       const details = card.querySelector('.card-details');
       const icon = card.querySelector('.toggle-icon');
@@ -552,7 +627,7 @@
       } catch (e) {}
   }
 
-  // --- 사내 게시판 스크립트 ---
+  // --- 기존 사내 게시판 스크립트 ---
   let currentBoardId = null;
 
   function openBoardForm() {
