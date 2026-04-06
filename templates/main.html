@@ -4,7 +4,7 @@
 <style>
     /* 1) 전체 달력 폰트 크기 조절 (축소) */
     .fc { font-size: 0.85em; }
-    .fc .fc-toolbar-title { font-size: 1.2em !important; }
+    .fc .fc-toolbar-title { font-size: 1.3em !important; font-weight: 800; color: #222; }
     
     /* 2) 달력 숫자 왼쪽 정렬 강제 적용 */
     .fc .fc-daygrid-day-top { 
@@ -27,45 +27,81 @@
     .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.75em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
 
-    /* 모달 입력창 스타일 */
-    .modal-input { width:100%; padding:10px; margin-bottom:15px; border:1px solid #ddd; border-radius:5px; box-sizing: border-box;}
+    /* 글래스모피즘 박스 스타일 (로그인 화면과 동일) */
+    .glass-box {
+        background: rgba(255, 255, 255, 0.4);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        padding: 30px;
+    }
+
+    /* 이벤트 카드 투명화 */
+    .glass-event-card {
+        background: rgba(255, 255, 255, 0.6);
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.02);
+        transition: transform 0.2s;
+    }
+    .glass-event-card:hover { transform: translateY(-2px); }
+
+    .modal-input { width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
+    .modal-input:focus { border-color: #4a90e2; outline: none; background: #fff; }
 </style>
 
-<div class="dashboard-container" style="padding: 20px; background-color: #f4f7fc;">
-    <div class="row" style="display: flex; gap: 20px;">
-        <div class="col-calendar" style="flex: 7; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+<div class="dashboard-container" style="padding: 20px 0; background-color: transparent;">
+    <div class="row" style="display: flex; gap: 30px;">
+        <div class="col-calendar glass-box" style="flex: 7;">
             <div id='calendar'></div>
         </div>
 
-        <div class="col-today" style="flex: 3; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow-y: auto; max-height: calc(100vh - 100px);">
+        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: calc(100vh - 150px);">
             
-            <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;">TODAY <span style="font-size: 0.7em; color: #999;">{{ today_str }}</span></h3>
+            <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 20px; font-weight: 800;">
+                <i class="fa-solid fa-calendar-day"></i> TODAY 
+                <span style="font-size: 0.65em; color: #777; font-weight: 500; margin-left: 5px;">{{ today_str }}</span>
+            </h3>
             <div class="today-list">
                 {% for event in today_events %}
-                <div class="event-card" style="border-left: 5px solid {{ event.color }}; background: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 8px;">
-                    <strong style="display: block; margin-bottom: 5px;">{{ event.title }}</strong>
+                <div class="glass-event-card" style="border-left: 5px solid {{ event.color }};">
+                    <strong style="display: block; margin-bottom: 5px; color: #222;">{{ event.title }}</strong>
                     {% if event.extendedProps %}
-                    <small style="color: #666;">내근: {{ event.extendedProps.inside }}</small>
+                    <small style="color: #555;"><i class="fa-solid fa-building-user"></i> 내근: {{ event.extendedProps.inside }}</small>
                     {% endif %}
                 </div>
                 {% else %}
-                <p style="color: #ccc; text-align: center; margin-top: 30px;">오늘 등록된 일정이 없습니다.</p>
+                <p style="color: #999; text-align: center; margin-top: 40px; font-weight: 500;">
+                    <i class="fa-regular fa-face-smile" style="font-size: 2rem; display: block; margin-bottom: 10px; color: #ccc;"></i>
+                    오늘 등록된 일정이 없습니다.
+                </p>
                 {% endfor %}
             </div>
 
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0;">
-            <h3 style="color: #2c3e50; margin-bottom: 20px;">UPCOMING <span style="font-size: 0.7em; color: #999;">내일부터 7일간</span></h3>
+            <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.15); margin: 30px 0;">
+            
+            <h3 style="color: #2c3e50; margin-bottom: 20px; font-weight: 800;">
+                <i class="fa-solid fa-calendar-week"></i> UPCOMING 
+                <span style="font-size: 0.65em; color: #777; font-weight: 500; margin-left: 5px;">내일부터 7일간</span>
+            </h3>
             <div class="weekly-list">
                 {% for event in weekly_events %}
-                <div class="event-card" style="border-left: 5px solid {{ event.color | default('#2c3e50') }}; background: #f8f9fa; padding: 15px; margin-bottom: 12px; border-radius: 8px;">
-                    <div style="font-size: 0.85em; color: #888; margin-bottom: 5px;">📅 {{ event.start[:10] }}</div>
-                    <strong style="display: block; margin-bottom: 5px;">{{ event.title }}</strong>
+                <div class="glass-event-card" style="border-left: 5px solid {{ event.color | default('#4a90e2') }};">
+                    <div style="font-size: 0.8em; color: #7b8a9e; margin-bottom: 6px; font-weight: 600;">
+                        <i class="fa-regular fa-clock"></i> {{ event.start[:10] }}
+                    </div>
+                    <strong style="display: block; margin-bottom: 5px; color: #222;">{{ event.title }}</strong>
                     {% if event.extendedProps %}
-                    <small style="color: #666;">내근: {{ event.extendedProps.inside }}</small>
+                    <small style="color: #555;">내근: {{ event.extendedProps.inside }}</small>
                     {% endif %}
                 </div>
                 {% else %}
-                <p style="color: #ccc; text-align: center; margin-top: 30px;">예정된 주간 일정이 없습니다.</p>
+                <p style="color: #999; text-align: center; margin-top: 40px; font-weight: 500;">
+                    예정된 주간 일정이 없습니다.
+                </p>
                 {% endfor %}
             </div>
 
@@ -73,20 +109,20 @@
     </div>
 </div>
 
-<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5);">
-    <div class="modal-content" style="background:white; margin:10% auto; padding:30px; width:450px; border-radius:15px; position:relative;">
-        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:20px;">&times;</span>
-        <h2 id="modalTitle">새 일정 등록</h2>
+<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); margin:10% auto; padding:30px; width:450px; border-radius:20px; position:relative; border:1px solid rgba(255,255,255,0.8); box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+        <span onclick="closeTaskModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color: #aaa;">&times;</span>
+        <h3 id="modalTitle" style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
         <form id="taskForm">
-            <input type="date" id="taskDate" class="modal-input" required readonly>
+            <input type="date" id="taskDate" class="modal-input" required readonly style="background-color: #f0f4f8;">
             
-            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background-color: #f8f9fa; color: #555;">
+            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background-color: #f0f4f8; color: #555;">
             
             <input type="text" id="insideTask" class="modal-input" placeholder="내근업무">
             <input type="text" id="outsideTask" class="modal-input" placeholder="외근업무 / 회의">
-            <textarea id="taskNote" class="modal-input" placeholder="비고 및 기타사항" style="height:80px;"></textarea>
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 기타사항" style="height:90px; resize: none;"></textarea>
             
-            <button type="button" onclick="saveTask()" style="width:100%; background:#4a90e2; color:white; border:none; padding:15px; border-radius:8px; font-weight:bold; cursor:pointer;">일정 저장하기</button>
+            <button type="button" onclick="saveTask()" style="width:100%; background:#4a90e2; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem; transition: background 0.3s;">일정 저장하기</button>
         </form>
     </div>
 </div>
@@ -115,7 +151,6 @@
             
             let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
             
-            // [핵심 수정] 중복 추가 방지: 이미 holiday-name이 존재하면 건너뜀
             if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
                 let holidaySpan = document.createElement('span');
                 holidaySpan.className = 'holiday-name';
@@ -150,16 +185,13 @@
       document.getElementById('taskModal').style.display = 'none';
   }
 
-  // 모달 폼 저장 액션 (서버 에러 로깅 보강)
   async function saveTask() {
       const taskDate = document.getElementById('taskDate').value;
       const taskOwner = document.getElementById('taskOwner').value;
       
-      // 혹시 모를 누락 방지용 1차 검증
       if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
       if (!taskOwner) { alert('담당자 정보가 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
 
-      // 입력값이 비어있을 경우 파이썬 서버에서 파싱 오류가 나지 않도록 기본 빈 문자열 설정
       const data = {
           date: taskDate,
           owner: taskOwner,
@@ -174,7 +206,7 @@
               method: 'POST',
               headers: {
                   'Content-Type': 'application/json',
-                  'X-Requested-With': 'XMLHttpRequest' // Flask 등에서 ajax 요청을 명확히 인식하도록 헤더 추가
+                  'X-Requested-With': 'XMLHttpRequest'
               },
               body: JSON.stringify(data)
           });
@@ -183,7 +215,6 @@
               alert("업무가 성공적으로 등록되었습니다.");
               location.reload(); 
           } else {
-              // 서버 에러 상세 확인을 위한 로그 추출
               const errText = await res.text();
               console.error("백엔드 서버 에러 상세:", errText);
               alert(`등록에 실패했습니다. (HTTP 에러코드: ${res.status})\nF12를 눌러 콘솔 로그를 확인해주세요.`);

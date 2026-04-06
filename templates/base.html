@@ -5,146 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAEDAM INTRANET</title>
     
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
-        /* 가입 신청 및 회원 정보 모달 공통 스타일 */
-        .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 9999; 
-            left: 0; top: 0; 
-            width: 100%; height: 100%; 
-            background-color: rgba(0,0,0,0.5);
-            backdrop-filter: blur(2px);
-        }
-        .modal-content {
-            background-color: #fff;
-            margin: 10% auto;
-            padding: 30px;
-            border-radius: 15px;
-            width: 380px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        /* --- 로그인 화면 디자인 테마 공통 적용 --- */
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
+            min-height: 100vh;
+            margin: 0;
             position: relative;
         }
-        .modal-info-content {
-            width: 450px;
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='73' viewBox='0 0 28 49'%3E%3Cg fill='none' stroke='%23d0e1f5' stroke-width='1'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM0 49l14-8 14 8M0 0l14 8 14-8'/%3E%3C/g%3E%3C/svg%3E");
+            background-repeat: repeat;
+            opacity: 0.9;
+            z-index: -2;
         }
-        .modal-header {
+
+        /* 떠다니는 배경 도형 애니메이션 */
+        .bg-shapes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; pointer-events: none; }
+        .deco-shape { position: absolute; opacity: 0.4; animation: floatShape 15s infinite alternate ease-in-out; }
+        @keyframes floatShape {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(30px, -30px) rotate(45deg); }
+        }
+        .shape-triangle { width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-bottom: 45px solid rgba(147, 192, 242, 0.7); }
+        .shape-square { width: 45px; height: 45px; background-color: rgba(176, 210, 248, 0.7); border-radius: 8px; }
+        .shape-circle { width: 180px; height: 180px; background-color: rgba(126, 182, 241, 0.4); border-radius: 50%; filter: blur(15px); }
+        
+        .deco-1 { top: 20%; left: 10%; transform: rotate(15deg); }
+        .deco-2 { top: 70%; right: 15%; animation-delay: -2s; transform: rotate(-10deg); } 
+        .deco-3 { top: 40%; left: 80%; animation-delay: -4s; transform: rotate(45deg); } 
+
+        /* --- 레이아웃 너비 1.5배 확장 --- */
+        .nav-container, .content-container {
+            max-width: 1600px !important; /* 기존 대비 1.5배 확장 */
+            width: 95% !important;
+            margin: 0 auto;
+        }
+
+        /* --- 상단 메뉴바: 가운데 기준 양옆이 좁아지는 둥근 라운드 디자인 --- */
+        .navbar {
+            padding: 20px 0;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .nav-container {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #4a90e2;
-            padding-bottom: 10px;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.4); 
+            backdrop-filter: blur(10px); 
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 60px; /* 양 끝이 유선형으로 좁아지는 둥근 필(Pill) 디자인 */
+            padding: 10px 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
         }
+
+        .logo { font-size: 1.4rem; font-weight: 800; color: #222; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+        .logo i { color: #4a90e2; }
+
+        .menu-list { display: flex; gap: 15px; list-style: none; margin: 0; padding: 0; align-items: center; }
+        .menu-item {
+            color: #555; text-decoration: none; font-weight: 600; padding: 12px 24px;
+            border-radius: 30px; transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+        }
+        .menu-item:hover, .menu-item.active {
+            background: rgba(255, 255, 255, 0.85);
+            color: #4a90e2;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
+
+        /* 증명서 발급 풀다운 */
+        .dropdown { position: relative; }
+        .dropdown-content {
+            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+            min-width: 170px; box-shadow: 0px 8px 24px rgba(0,0,0,0.1); border-radius: 15px;
+            z-index: 1000; margin-top: 10px; border: 1px solid rgba(255,255,255,1); overflow: hidden;
+        }
+        .dropdown-content a { color: #555; padding: 12px 16px; text-decoration: none; display: block; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .dropdown-content a:hover { background-color: rgba(74, 144, 226, 0.1); color: #4a90e2; }
+        .dropdown:hover .dropdown-content { display: block; }
+
+        /* 우측 유저 섹션 */
+        .user-section { display: flex; align-items: center; font-size: 0.95rem; font-weight: 500; color: #444; }
+        .user-name-link { cursor: pointer; text-decoration: none; color: #4a90e2; transition: 0.2s; font-weight: 700; border-bottom: 1px dashed #4a90e2; }
+        .btn-logout { 
+            color: #e03131; margin-left: 15px; transition: 0.2s;
+            background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 20px; text-decoration: none;
+        }
+        .btn-logout:hover { background: #e03131; color: white; }
+
+        /* 모달 스타일 유지 및 글래스모피즘 약간 반영 */
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); backdrop-filter: blur(3px); }
+        .modal-content { background-color: rgba(255,255,255,0.95); backdrop-filter: blur(10px); margin: 8% auto; padding: 30px; border-radius: 20px; width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid rgba(255,255,255,0.8); }
+        .modal-info-content { width: 500px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #4a90e2; padding-bottom: 10px; }
         .modal-header h3 { margin: 0; color: #4a90e2; font-size: 1.3rem; }
         .close-modal { cursor: pointer; font-size: 24px; color: #aaa; }
         .close-modal:hover { color: #333; }
         
         .modal-form-group { display: flex; flex-direction: column; gap: 15px; }
-        .modal-form-group input, .modal-form-group select {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 0.95rem;
-        }
-        .btn-modal-submit {
-            background: #4a90e2;
-            color: white;
-            padding: 14px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1rem;
-            margin-top: 10px;
-            transition: background 0.2s;
-        }
+        .modal-form-group input, .modal-form-group select { padding: 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 0.95rem; background: rgba(255,255,255,0.7); outline:none; }
+        .modal-form-group input:focus { border-color: #4a90e2; background: #fff; }
+        .btn-modal-submit { background: #4a90e2; color: white; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: background 0.2s; }
         .btn-modal-submit:hover { background: #357abd; }
         
-        .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
-        .menu-register i { color: #4a90e2; }
-
-        .btn-logout { color: #e03131; margin-left: 10px; transition: 0.2s; display: inline-block; }
-        .btn-logout:hover { transform: scale(1.1); }
-        
-        .user-section { display: flex; align-items: center; }
-        .user-name-link { 
-            cursor: pointer; 
-            text-decoration: underline; 
-            color: #002c63; 
-            transition: color 0.2s;
-        }
-        .user-name-link:hover { color: #4a90e2; }
-
         .info-table { width:100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
-        .info-table th { background: #f8f9fa; padding: 10px; border: 1px solid #eee; text-align: left; width: 35%; color: #666; }
-        .info-table td { padding: 10px; border: 1px solid #eee; color: #333; font-weight: 600; }
-        
-        .modal-footer-center {
-            display: flex;
-            justify-content: center;
-            margin-top: 25px;
-        }
+        .info-table th { background: rgba(248, 249, 250, 0.8); padding: 12px; border-bottom: 1px solid #eee; text-align: left; width: 35%; color: #666; border-radius: 8px 0 0 8px; }
+        .info-table td { padding: 12px; border-bottom: 1px solid #eee; color: #333; font-weight: 600; }
+        .modal-footer-center { display: flex; justify-content: center; margin-top: 25px; }
 
-        /* --- 증명서 발급 풀다운(드롭다운) 스타일 --- */
-        .dropdown {
-            position: relative;
-            display: inline-block;
-        }
-
-        .dropdown-content {
-            display: none;
-            position: absolute;
-            background-color: #ffffff;
-            min-width: 170px;
-            box-shadow: 0px 8px 16px rgba(0,0,0,0.1);
-            border-radius: 10px;
-            z-index: 1000;
-            margin-top: 5px;
-            border: 1px solid #eee;
-            overflow: hidden;
-        }
-
-        .dropdown-content a {
-            color: #333;
-            padding: 12px 16px;
-            text-decoration: none;
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s;
-            text-align: left;
-        }
-
-        .dropdown-content a:hover {
-            background-color: #f1f7ff;
-            color: #4a90e2;
-        }
-
-        .dropdown-content a i {
-            margin-right: 10px;
-            width: 15px;
-            text-align: center;
-        }
-
-        /* 호버 시 드롭다운 표시 */
-        .dropdown:hover .dropdown-content {
-            display: block;
-        }
-
-        .dropdown:hover .menu-item {
-            color: #4a90e2;
-        }
+        .main-footer { text-align: center; padding: 20px; color: #777; font-size: 0.9rem; margin-top: 40px; }
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    <div class="bg-shapes">
+        <div class="deco-shape shape-triangle deco-1"></div>
+        <div class="deco-shape shape-square deco-2"></div>
+        <div class="deco-shape shape-circle deco-3"></div>
+    </div>
+
     <header class="navbar">
         <div class="nav-container">
             <a href="/" class="logo">
@@ -179,10 +176,10 @@
                         </a>
                         <div class="dropdown-content">
                             <a href="/document/apply">
-                                <i class="fa-solid fa-file-circle-plus"></i> - 증명서신청
+                                <i class="fa-solid fa-file-circle-plus"></i> 증명서신청
                             </a>
                             <a href="/document/admin">
-                                <i class="fa-solid fa-file-invoice"></i> - 증명신청현황
+                                <i class="fa-solid fa-file-invoice"></i> 증명신청현황
                             </a>
                         </div>
                     </li>
@@ -272,14 +269,8 @@
     </div>
 
     <script>
-        // --- 가입 신청 관련 스크립트 ---
-        function openRegisterModal() {
-            document.getElementById('registerModal').style.display = "block";
-        }
-
-        function closeRegisterModal() {
-            document.getElementById('registerModal').style.display = "none";
-        }
+        function openRegisterModal() { document.getElementById('registerModal').style.display = "block"; }
+        function closeRegisterModal() { document.getElementById('registerModal').style.display = "none"; }
 
         async function submitModalRegister() {
             const data = {
@@ -321,7 +312,6 @@
             }
         }
 
-        // --- 내 정보 확인 관련 스크립트 ---
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
@@ -360,9 +350,7 @@
             }
         }
 
-        function closeMyInfoModal() {
-            document.getElementById('myInfoModal').style.display = "none";
-        }
+        function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
 
         window.onclick = function(event) {
             const regModal = document.getElementById('registerModal');
