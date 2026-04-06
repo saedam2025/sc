@@ -11,171 +11,267 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
+        /* 기본 배경 및 애니메이션 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
+            background: #f0f4f8; 
             min-height: 100vh;
             margin: 0;
-            position: relative;
+            overflow-x: hidden;
         }
 
+        /* 배경 기하학적 문양 강화 */
         body::before {
             content: '';
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='73' viewBox='0 0 28 49'%3E%3Cg fill='none' stroke='%23d0e1f5' stroke-width='1'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM0 49l14-8 14 8M0 0l14 8 14-8'/%3E%3C/g%3E%3C/svg%3E");
-            background-repeat: repeat;
-            opacity: 0.9;
+            background: 
+                radial-gradient(at 0% 0%, rgba(74, 144, 226, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(155, 89, 182, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(26, 188, 156, 0.1) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(241, 196, 15, 0.1) 0px, transparent 50%);
             z-index: -2;
         }
 
-        .bg-shapes { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; pointer-events: none; }
-        .deco-shape { position: absolute; opacity: 0.4; animation: floatShape 15s infinite alternate ease-in-out; }
-        @keyframes floatShape {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            100% { transform: translate(30px, -30px) rotate(45deg); }
-        }
-        .shape-triangle { width: 0; height: 0; border-left: 25px solid transparent; border-right: 25px solid transparent; border-bottom: 45px solid rgba(147, 192, 242, 0.7); }
-        .shape-square { width: 45px; height: 45px; background-color: rgba(176, 210, 248, 0.7); border-radius: 8px; }
-        .shape-circle { width: 180px; height: 180px; background-color: rgba(126, 182, 241, 0.4); border-radius: 50%; filter: blur(15px); }
-        
-        .deco-1 { top: 20%; left: 10%; transform: rotate(15deg); }
-        .deco-2 { top: 70%; right: 15%; animation-delay: -2s; transform: rotate(-10deg); } 
-        .deco-3 { top: 40%; left: 80%; animation-delay: -4s; transform: rotate(45deg); } 
-
         .content-container {
-            max-width: 1600px !important;
+            max-width: 1550px !important;
             width: 95% !important;
             margin: 0 auto;
         }
 
-        /* --- 상단 메뉴 디자인 수정 --- */
+        /* --- [세련된 플로팅 네비게이션바] --- */
         .navbar {
-            padding: 0; /* 상단 여백 제거 */
-            margin-bottom: 20px;
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
 
         .nav-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: rgba(255, 255, 255, 0.5); 
-            backdrop-filter: blur(10px); 
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            border-top: none; /* 위쪽 보더 제거 */
-            
-            /* 아랫쪽만 가운데 라운딩, 양옆이 위로 좁아지는 곡선 효과 */
-            border-radius: 0 0 60px 60px; 
-            
-            padding: 15px 50px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-            max-width: 1600px !important;
+            background: rgba(255, 255, 255, 0.7); 
+            backdrop-filter: blur(15px); 
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 24px; 
+            padding: 10px 30px;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
             margin: 0 auto;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         }
 
-        .logo { font-size: 1.4rem; font-weight: 800; color: #222; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-        .logo i { color: #4a90e2; }
+        /* 로고 스타일 */
+        .logo {
+            display: flex;
+            align-items: center;
+            transition: transform 0.3s;
+        }
+        .logo:hover { transform: scale(1.05); }
+        .logo-img { height: 42px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
 
-        .menu-list { display: flex; gap: 15px; list-style: none; margin: 0; padding: 0; align-items: center; }
+        /* 메뉴 리스트 */
+        .menu-list { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; align-items: center; }
+        
         .menu-item {
-            color: #555; text-decoration: none; font-weight: 600; padding: 10px 20px;
-            border-radius: 30px; transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+            color: #445; 
+            text-decoration: none; 
+            font-weight: 600; 
+            padding: 10px 20px;
+            border-radius: 16px; 
+            transition: all 0.3s ease; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
             font-size: 0.95rem;
+            position: relative;
         }
-        .menu-item:hover, .menu-item.active {
-            background: rgba(255, 255, 255, 0.9);
+
+        .menu-item i { font-size: 1rem; color: #789; transition: color 0.3s; }
+
+        /* 호버 효과: 배경색 대신 세련된 강조 방식 */
+        .menu-item:hover {
+            background: rgba(255, 255, 255, 0.8);
             color: #4a90e2;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
+        .menu-item:hover i { color: #4a90e2; }
 
-        .menu-register { color: #4a90e2 !important; font-weight: 700 !important; }
+        /* 활성화된 메뉴 상태 */
+        .menu-item.active {
+            background: #4a90e2;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        }
+        .menu-item.active i { color: #fff; }
 
+        /* --- [드롭다운 메뉴의 고급화] --- */
         .dropdown { position: relative; }
         .dropdown-content {
-            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-            background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-            min-width: 170px; box-shadow: 0px 8px 24px rgba(0,0,0,0.1); border-radius: 15px;
-            z-index: 1000; margin-top: 10px; border: 1px solid rgba(255,255,255,1); overflow: hidden;
+            display: block;
+            position: absolute;
+            top: 130%;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            min-width: 200px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
+            border-radius: 18px;
+            z-index: 1100;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
-        .dropdown-content a { color: #555; padding: 12px 16px; text-decoration: none; display: block; font-size: 14px; font-weight: 500; transition: all 0.2s; }
-        .dropdown-content a:hover { background-color: rgba(74, 144, 226, 0.1); color: #4a90e2; }
-        .dropdown:hover .dropdown-content { display: block; }
 
-        .user-section { display: flex; align-items: center; font-size: 0.95rem; font-weight: 500; color: #444; }
-        .user-name-link { cursor: pointer; text-decoration: none; color: #4a90e2; transition: 0.2s; font-weight: 700; border-bottom: 1px dashed #4a90e2; }
+        .dropdown:hover .dropdown-content {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .dropdown-content a {
+            color: #556;
+            padding: 12px 20px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #f0f7ff;
+            color: #4a90e2;
+        }
+
+        /* --- [사용자 정보 및 로그아웃 구역] --- */
+        .user-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding-left: 20px;
+            border-left: 1px solid rgba(0,0,0,0.08);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 5px 12px;
+            border-radius: 14px;
+            transition: background 0.2s;
+        }
+        .user-profile:hover { background: rgba(0,0,0,0.03); }
+
+        .user-icon-circle {
+            width: 38px;
+            height: 38px;
+            background: #eef2f6;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .user-info-text { display: flex; flex-direction: column; }
+        .user-name { font-size: 0.9rem; font-weight: 700; color: #223; }
+        .user-role { font-size: 0.7rem; color: #889; font-weight: 600; }
+
         .btn-logout { 
-            color: #e03131; margin-left: 15px; transition: 0.2s;
-            background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 20px; text-decoration: none;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e03131;
+            background: #fff0f0;
+            border-radius: 12px;
+            transition: all 0.3s;
+            text-decoration: none;
         }
-        .btn-logout:hover { background: #e03131; color: white; }
+        .btn-logout:hover { background: #e03131; color: white; transform: rotate(15deg); }
 
-        /* 모달 스타일 */
-        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.3); backdrop-filter: blur(3px); }
-        .modal-content { background-color: rgba(255,255,255,0.95); backdrop-filter: blur(10px); margin: 8% auto; padding: 30px; border-radius: 20px; width: 400px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); position: relative; border: 1px solid rgba(255,255,255,0.8); }
-        .modal-info-content { width: 500px; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #4a90e2; padding-bottom: 10px; }
-        .modal-header h3 { margin: 0; color: #4a90e2; font-size: 1.3rem; }
-        .close-modal { cursor: pointer; font-size: 24px; color: #aaa; }
-        .close-modal:hover { color: #333; }
-        
-        .modal-form-group { display: flex; flex-direction: column; gap: 15px; }
-        .modal-form-group input, .modal-form-group select { padding: 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 0.95rem; background: rgba(255,255,255,0.7); outline:none; }
-        .modal-form-group input:focus { border-color: #4a90e2; background: #fff; }
-        .btn-modal-submit { background: #4a90e2; color: white; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: background 0.2s; }
-        .btn-modal-submit:hover { background: #357abd; }
-        
-        .info-table { width:100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
-        .info-table th { background: rgba(248, 249, 250, 0.8); padding: 12px; border-bottom: 1px solid #eee; text-align: left; width: 35%; color: #666; border-radius: 8px 0 0 8px; }
-        .info-table td { padding: 12px; border-bottom: 1px solid #eee; color: #333; font-weight: 600; }
-        .modal-footer-center { display: flex; justify-content: center; margin-top: 25px; }
+        /* 푸터 */
+        .main-footer { text-align: center; padding: 40px 0; color: #9aa; font-size: 0.85rem; letter-spacing: -0.02em; }
 
-        .main-footer { text-align: center; padding: 20px; color: #777; font-size: 0.9rem; margin-top: 40px; }
+        /* 모달 시스템 */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
+        .modal-content { background: white; margin: 5% auto; padding: 0; border-radius: 28px; width: 480px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.25); }
+        .modal-header { background: #f8fafc; padding: 25px 30px; border-bottom: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; font-size: 1.25rem; color: #2d3748; font-weight: 800; }
+        .info-table { width: 100%; border-collapse: collapse; }
+        .info-table th { padding: 18px 25px; background: #fcfdfe; text-align: left; color: #718096; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; width: 35%; }
+        .info-table td { padding: 18px 25px; color: #2d3748; font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid #f1f5f9; }
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <div class="bg-shapes">
-        <div class="deco-shape shape-triangle deco-1"></div>
-        <div class="deco-shape shape-square deco-2"></div>
-        <div class="deco-shape shape-circle deco-3"></div>
-    </div>
 
     <header class="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo">
-                <i class="fa-solid fa-seedling"></i> SAEDAM
-            </a>
+        <div class="content-container">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="새담" class="logo-img">
+                </a>
 
-            <nav class="nav-wrapper">
-                <ul class="menu-list">
-                    <li><a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}"><i class="fa-solid fa-calendar-check"></i> 메인달력</a></li>
-                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li><a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}"><i class="fa-solid fa-users-gear"></i> 회원관리</a></li>
-                    {% endif %}
-                    <li><a href="/approval" class="menu-item"><i class="fa-solid fa-file-signature"></i> 사내결재</a></li>
-                    <li class="dropdown">
-                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}"><i class="fa-solid fa-print"></i> 증명서발급</a>
-                        <div class="dropdown-content">
-                            <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서신청</a>
-                            <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 증명신청현황</a>
+                <nav>
+                    <ul class="menu-list">
+                        <li><a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}"><i class="fa-solid fa-house-chimney"></i> 메인</a></li>
+                        
+                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                        <li><a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}"><i class="fa-solid fa-user-gear"></i> 인사관리</a></li>
+                        {% endif %}
+                        
+                        <li><a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}"><i class="fa-solid fa-stamp"></i> 전자결재</a></li>
+                        
+                        <li class="dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}"><i class="fa-solid fa-file-invoice"></i> 증명서</a>
+                            <div class="dropdown-content">
+                                <a href="/document/apply"><i class="fa-solid fa-pen-clip"></i> 증명서 신청</a>
+                                <a href="/document/admin"><i class="fa-solid fa-list-check"></i> 신청 현황</a>
+                            </div>
+                        </li>
+
+                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                        <li><a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}"><i class="fa-solid fa-signature"></i> 전자계약</a></li>
+                        {% endif %}
+
+                        <li class="dropdown">
+                            <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2;"><i class="fa-solid fa-briefcase"></i> 업무지원</a>
+                            <div class="dropdown-content">
+                                <a href="/payroll"><i class="fa-solid fa-paper-plane"></i> 명세서 발송</a>
+                                <a href="/excel-generator"><i class="fa-solid fa-table"></i> 입금용 엑셀 생성</a>
+                                <a href="/attendance"><i class="fa-solid fa-clock"></i> 근태 관리</a>
+                            </div>
+                        </li>
+                    </ul>
+                </nav>
+
+                <div class="user-section">
+                    {% if session.get('user_name') %}
+                    <div class="user-profile" onclick="openMyInfoModal()">
+                        <div class="user-icon-circle">
+                             {{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}
                         </div>
-                    </li>
-                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li><a href="/contract/admin" class="menu-item"><i class="fa-solid fa-file-contract"></i> 전자계약</a></li>
+                        <div class="user-info-text">
+                            <span class="user-name">{{ session['user_name'] }}</span>
+                            <span class="user-role">{{ session.get('role', '구성원') }}</span>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
+                        <i class="fa-solid fa-power-off"></i>
+                    </a>
                     {% endif %}
-                    <li><a href="javascript:void(0);" class="menu-item menu-register" onclick="openRegisterModal()"><i class="fa-solid fa-user-plus"></i> 가입신청</a></li>
-                </ul>
-            </nav>
-
-            <div class="user-section">
-                {% if session.get('user_name') %}
-                <span class="user-name">
-                    <strong class="user-name-link" onclick="openMyInfoModal()">{{ session['user_name'] }}</strong>님 환영합니다
-                </span>
-                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃"><i class="fa-solid fa-right-from-bracket"></i></a>
-                {% endif %}
+                </div>
             </div>
         </div>
     </header>
@@ -190,115 +286,59 @@
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
 
-    <div id="registerModal" class="modal">
+    <div id="myInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-pen-to-square"></i> 신규 가입 신청</h3>
-                <span class="close-modal" onclick="closeRegisterModal()">&times;</span>
+                <h3><i class="fa-solid fa-id-card-clip"></i> 마이 프로필</h3>
+                <span style="cursor:pointer; font-size:1.5rem; color:#ccc;" onclick="closeMyInfoModal()">&times;</span>
             </div>
-            <form id="modalRegForm">
-                <div class="modal-form-group">
-                    <input type="text" id="m_name" placeholder="성명" required>
-                    <input type="password" id="m_password" maxlength="10" placeholder="비밀번호 (10자 이내 복합문자)" required>
-                    <input type="text" id="m_rrn" placeholder="주민번호 (000000-0000000)" required>
-                    <select id="m_position">
-                        <option value="사원">사원</option>
-                        <option value="팀장">팀장</option>
-                        <option value="실장">실장</option>
-                        <option value="계약직">계약직</option>
-                        <option value="안전코디">안전코디</option>
-                        <option value="전담코디">전담코디</option>
-                        <option value="센터장">센터장</option>
-                        <option value="대표이사">대표이사</option>
-                    </select>
-                    <input type="text" id="m_phone" placeholder="연락처 (010-0000-0000)">
-                    <button type="button" class="btn-modal-submit" onclick="submitModalRegister()">등록 신청하기</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="myInfoModal" class="modal">
-        <div class="modal-content modal-info-content">
-            <div class="modal-header">
-                <h3 id="myInfoModalTitle"><i class="fa-solid fa-id-card"></i> 내 회원 정보</h3>
-                <span class="close-modal" onclick="closeMyInfoModal()">&times;</span>
-            </div>
-            <div id="myInfoLoading" style="text-align: center; padding: 20px;">정보를 불러오는 중...</div>
+            <div id="myInfoLoading" style="text-align: center; padding: 40px; color:#667;">데이터 로드 중...</div>
             <div id="myInfoDisplay" style="display: none;">
-                <table class="info-table" id="myInfoTable">
-                </table>
-            </div>
-            <div class="modal-footer-center">
-                <button type="button" class="btn-modal-submit" style="width: 120px;" onclick="closeMyInfoModal()">확인</button>
+                <table class="info-table" id="myInfoTable"></table>
+                <div style="padding: 25px; text-align: center;">
+                    <button type="button" style="background:#4a90e2; color:white; border:none; padding:12px 40px; border-radius:14px; font-weight:bold; cursor:pointer;" onclick="closeMyInfoModal()">확인</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        function openRegisterModal() { document.getElementById('registerModal').style.display = "block"; }
-        function closeRegisterModal() { document.getElementById('registerModal').style.display = "none"; }
-
-        async function submitModalRegister() {
-            const data = {
-                name: document.getElementById('m_name').value,
-                password: document.getElementById('m_password').value,
-                rrn: document.getElementById('m_rrn').value,
-                position: document.getElementById('m_position').value,
-                phone: document.getElementById('m_phone').value
-            };
-
-            if(!data.name || !data.password || !data.rrn) {
-                alert("성명, 비밀번호, 주민번호는 필수 입력 사항입니다."); return;
-            }
-            const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
-            if(!pwRegex.test(data.password)) {
-                alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다."); return;
-            }
-
-            try {
-                const res = await fetch('/user/register', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                if(res.ok) {
-                    alert("가입 신청이 완료되었습니다! 관리자 승인 후 부여된 사번으로 로그인해주세요.");
-                    closeRegisterModal(); document.getElementById('modalRegForm').reset();
-                } else { alert("오류: " + result.message); }
-            } catch (e) { alert("서버와 통신 중 오류가 발생했습니다."); }
-        }
-
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
             const display = document.getElementById('myInfoDisplay');
             const table = document.getElementById('myInfoTable');
-            const title = document.getElementById('myInfoModalTitle');
 
-            modal.style.display = "block"; loading.style.display = "block"; display.style.display = "none";
+            modal.style.display = "block";
+            loading.style.display = "block";
+            display.style.display = "none";
 
             try {
-                const res = await fetch('/user/my_info'); const result = await res.json();
+                const res = await fetch('/user/my_info'); 
+                const result = await res.json();
                 if (result.status === 'success') {
                     const data = result.data;
-                    title.innerHTML = `<i class="fa-solid fa-id-card"></i> ${data['이름']}님의 등록정보`;
-                    const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '주소', '입사일'];
+                    const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '입사일'];
                     let html = '';
                     order.forEach(key => {
-                        if (data.hasOwnProperty(key)) { html += `<tr><th>${key}</th><td>${data[key] || '-'}</td></tr>`; }
+                        if (data[key]) {
+                            html += `<tr><th>${key}</th><td>${data[key]}</td></tr>`;
+                        }
                     });
                     table.innerHTML = html;
-                    loading.style.display = "none"; display.style.display = "block";
-                } else { alert(result.message); closeMyInfoModal(); }
-            } catch (e) { alert("데이터를 가져오는 중 오류가 발생했습니다."); closeMyInfoModal(); }
+                    loading.style.display = "none";
+                    display.style.display = "block";
+                }
+            } catch (e) {
+                console.error("Profile load error", e);
+                closeMyInfoModal();
+            }
         }
 
         function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
 
         window.onclick = function(event) {
-            const regModal = document.getElementById('registerModal'); const infoModal = document.getElementById('myInfoModal');
-            if (event.target == regModal) closeRegisterModal();
-            if (event.target == infoModal) closeMyInfoModal();
+            if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal();
         }
     </script>
 
