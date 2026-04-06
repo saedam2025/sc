@@ -39,10 +39,26 @@
 
     .invite-form-card { background: white; padding: 40px; border-radius: 28px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); border: 1px solid #eee; max-height: 95vh; overflow-y: auto;}
     
-    /* 프로필 아이콘 선택기 스타일 */
+    /* 프로필 아이콘 선택기 기본 스타일 */
     .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
     .profile-icon-option.selected { border-color: #4a90e2; background: #e7f5ff; }
     .profile-icon-option:hover { background: #f8f9fa; }
+
+    /* 이모지 선택창 전용 스크롤 박스 스타일 */
+    .emoji-scroll-box {
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 5px; 
+        margin-bottom: 10px;
+        max-height: 130px; 
+        overflow-y: auto;
+        border: 1px solid #dee2e6; 
+        padding: 10px; 
+        border-radius: 10px;
+        background: #fff;
+    }
+    .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+    .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
 </style>
 {% endblock %}
 
@@ -56,7 +72,7 @@
         
         <div class="modal-field">
             <label>프로필 아이콘 선택</label>
-            <div id="icon-container-invite" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;"></div>
+            <div id="icon-container-invite" class="emoji-scroll-box"></div>
             <input type="hidden" id="profile_icon" value="🐶">
         </div>
 
@@ -190,7 +206,7 @@ function openDirectRegisterModal() {
     document.getElementById('modalBody').innerHTML = `
         <div class="modal-field">
             <label>프로필 아이콘 선택</label>
-            <div id="icon-container-direct" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px;"></div>
+            <div id="icon-container-direct" class="emoji-scroll-box"></div>
             <input type="hidden" id="reg_profile_icon" value="🐶">
         </div>
         <div class="modal-field"><label>성명</label><input type="text" id="reg_name"></div>
@@ -295,9 +311,6 @@ async function deleteUser(dbId) {
     const r = await res.json(); alert(r.message); if(res.ok) loadAllUsers();
 }
 
-// --------------------------------------------------------
-// [새로 추가된 초대 메일 발송 팝업 기능]
-// --------------------------------------------------------
 function openInviteModal() {
     document.getElementById('modalTitle').innerText = "가입 초대 메일 발송";
     document.getElementById('modalBody').innerHTML = `
@@ -336,7 +349,6 @@ async function submitInvite() {
         document.getElementById('modalSubmitBtn').disabled = false;
     }
 }
-// --------------------------------------------------------
 
 function closeModal() { 
     document.getElementById('userModal').style.display = 'none'; 
