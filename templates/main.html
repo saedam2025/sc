@@ -20,27 +20,23 @@
     /* --- 우측 리스트 폰트/여백 축소 & 아코디언 UI 스타일 --- */
     .glass-event-card {
         background: rgba(255, 255, 255, 0.7); border-radius: 10px;
-        padding: 10px 12px; /* 여백 축소 */
-        margin-bottom: 8px; /* 카드간 간격 축소 */
+        padding: 10px 12px;
+        margin-bottom: 8px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.02);
         cursor: pointer; transition: background 0.2s;
     }
     .glass-event-card:hover { background: rgba(255, 255, 255, 0.95); }
     
     .card-header { display: flex; justify-content: space-between; align-items: center; }
-    .card-title { font-size: 0.85rem; font-weight: 700; color: #222; } /* 폰트 축소 */
+    .card-title { font-size: 0.85rem; font-weight: 700; color: #222; }
     
-    /* 뱃지 아이콘 스타일 */
     .badge-wrap { margin-top: 5px; display: flex; gap: 4px; flex-wrap: wrap; }
-    .status-badge { 
-        font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: white; display: inline-flex; align-items: center; gap: 3px; 
-    }
+    .status-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: white; display: inline-flex; align-items: center; gap: 3px; }
     .badge-in { background: #4a90e2; }
     .badge-out { background: #e67e22; }
     .badge-meet { background: #9b59b6; }
     .badge-etc { background: #7b8a9e; }
 
-    /* 아코디언 상세 정보창 (기본 숨김) */
     .card-details {
         display: none; margin-top: 10px; padding-top: 10px;
         border-top: 1px dashed rgba(0,0,0,0.15); font-size: 0.75rem; color: #444; line-height: 1.5;
@@ -50,6 +46,37 @@
 
     .modal-input { width:100%; padding:12px; margin-bottom:15px; border:1px solid #ddd; border-radius:8px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
     .modal-input:focus { border-color: #4a90e2; outline: none; background: #fff; }
+
+    /* --- 달력 내 이벤트(스케줄) 스타일 커스텀 (배경 제거 & 아이콘 렌더링용) --- */
+    .fc-event {
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        cursor: pointer;
+    }
+    
+    .custom-cal-event {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.8em;
+        padding: 2px 4px;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    
+    .cal-owner { font-weight: 700; color: #333; }
+    .cal-icons i { font-size: 0.9em; margin-right: 2px; }
+    .cal-icon-in { color: #4a90e2; }
+    .cal-icon-out { color: #e67e22; }
+    .cal-icon-meet { color: #9b59b6; }
+    .cal-icon-etc { color: #7b8a9e; }
+    
+    .cal-holiday { color: #e74c3c; font-weight: 700; } /* 휴가/근태용 붉은 텍스트 */
+
+    /* 더보기 팝업(Popover) 스타일 */
+    .fc-popover { border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 1050; }
+    .fc-popover-header { background: #f8f9fa; border-radius: 12px 12px 0 0; padding: 10px; font-weight: bold; }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
@@ -58,7 +85,8 @@
             <div id='calendar'></div>
         </div>
 
-        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: 850px;"> <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;">
+        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: 850px;">
+            <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;">
                 <i class="fa-solid fa-calendar-day"></i> TODAY 
                 <span style="font-size: 0.7em; color: #777; font-weight: 500; margin-left: 5px;">{{ today_str }}</span>
             </h3>
@@ -103,7 +131,6 @@
                 {% for event in weekly_events %}
                 <div class="glass-event-card" style="border-left: 4px solid {{ event.color | default('#4a90e2') }};" onclick="toggleDetails(this)">
                     <div style="font-size: 0.7rem; color: #7b8a9e; margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
-                    
                     <div class="card-header">
                         <span class="card-title">{{ event.title }}</span>
                         <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
@@ -154,7 +181,6 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
-  // 아코디언 토글 스크립트
   function toggleDetails(card) {
       const details = card.querySelector('.card-details');
       const icon = card.querySelector('.toggle-icon');
@@ -179,7 +205,44 @@
       locale: 'ko',
       headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
       events: {{ events | tojson | safe }},
-      height: 850, /* 달력 세로 사이즈 약 20% 확대 고정 (기존 auto) */
+      height: 850,
+      
+      /* 달력 셀 높이 고정 및 초과 시 '+X개 더보기' 팝업 설정 */
+      dayMaxEvents: true, 
+
+      /* 커스텀 렌더링: 텍스트 대신 이름+아이콘 표시 */
+      eventContent: function(arg) {
+          let props = arg.event.extendedProps;
+          let html = '<div class="custom-cal-event">';
+          
+          // owner 값이 없으면 휴가/근태 데이터 (붉은 텍스트로 표시)
+          if (!props.owner) {
+              html += `<span class="cal-holiday">${arg.event.title}</span>`;
+          } else {
+              // 업무 데이터 (이름 + 뱃지 아이콘)
+              html += `<span class="cal-owner">[${props.owner}]</span><span class="cal-icons">`;
+              if (props.inside) html += '<i class="fa-solid fa-building-user cal-icon-in"></i>';
+              if (props.outside) html += '<i class="fa-solid fa-person-walking-luggage cal-icon-out"></i>';
+              if (props.meeting) html += '<i class="fa-solid fa-handshake cal-icon-meet"></i>';
+              if (props.note) html += '<i class="fa-solid fa-comment-dots cal-icon-etc"></i>';
+              html += '</span>';
+          }
+          html += '</div>';
+          return { html: html };
+      },
+
+      /* 마우스 오버(Hover) 시 브라우저 기본 툴팁으로 상세 내용 표시 */
+      eventDidMount: function(info) {
+          let props = info.event.extendedProps;
+          if (props.owner) {
+              let tooltipText = `[${props.owner} 일정]\n`;
+              if (props.inside) tooltipText += `내근: ${props.inside}\n`;
+              if (props.outside) tooltipText += `외근: ${props.outside}\n`;
+              if (props.meeting) tooltipText += `회의: ${props.meeting}\n`;
+              if (props.note) tooltipText += `기타: ${props.note}`;
+              info.el.title = tooltipText.trim();
+          }
+      },
 
       dayCellDidMount: function(arg) {
         const d = arg.date;
@@ -204,20 +267,6 @@
       dateClick: function(info) {
         document.getElementById('taskDate').value = info.dateStr;
         document.getElementById('taskModal').style.display = 'block';
-      },
-
-      eventClick: function(info) {
-        // 기존의 alert 팝업 대신 내역을 확인할 수 있도록 유지하거나 제외할 수 있음
-        // 우측 리스트에 아코디언이 있으므로 달력 클릭시에도 간략히 보여줍니다.
-        const p = info.event.extendedProps;
-        if(p.owner) {
-            let msg = `[${p.owner} 일정상세]\n`;
-            if(p.inside) msg += `내근: ${p.inside}\n`;
-            if(p.outside) msg += `외근: ${p.outside}\n`;
-            if(p.meeting) msg += `회의: ${p.meeting}\n`;
-            if(p.note) msg += `기타: ${p.note}\n`;
-            alert(msg);
-        }
       }
     });
     calendar.render();
@@ -232,7 +281,6 @@
       if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
       if (!taskOwner) { alert('담당자 정보가 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
 
-      // 회의(meeting) 항목을 분리하여 서버로 전송하도록 폼 파라미터 매칭
       const data = {
           date: taskDate,
           owner: taskOwner,
