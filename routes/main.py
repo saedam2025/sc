@@ -3,11 +3,10 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import holidays
 import os
-from .database import get_db # 새로 만든 database.py import
+from .database import get_db
 
 main_bp = Blueprint('main', __name__)
 
-# 파일 업로드 설정
 UPLOAD_FOLDER = '/mnt/data/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -47,9 +46,16 @@ def index():
                     "start": date_str,
                     "color": cat_colors[cat],
                     "extendedProps": {
+                        "task_id": row['id'], # 수정 및 삭제를 위한 DB 고유 ID 추가
                         "owner": owner, "category": cat,
                         "task_title": row[t_col], "task_time": row[h_col] or '',
-                        "note": note or ''
+                        "note": note or '',
+                        # 수정 폼에 불러오기 위한 전체 카테고리 데이터
+                        "cat_회의_제목": row['cat_meeting_title'] or '', "cat_회의_시간": row['cat_meeting_time'] or '',
+                        "cat_면접_제목": row['cat_interview_title'] or '', "cat_면접_시간": row['cat_interview_time'] or '',
+                        "cat_미팅_제목": row['cat_miting_title'] or '', "cat_미팅_시간": row['cat_miting_time'] or '',
+                        "cat_외근_제목": row['cat_out_title'] or '', "cat_외근_시간": row['cat_out_time'] or '',
+                        "cat_기타_제목": row['cat_etc_title'] or '', "cat_기타_시간": row['cat_etc_time'] or ''
                     }
                 })
 
@@ -68,7 +74,7 @@ def index():
             }
         })
 
-    # 3. 날짜 계산 및 그룹핑 (우측 판넬용)
+    # 3. 날짜 계산 및 그룹핑
     today = datetime.now()
     today_date = today.date()
     tomorrow_date = today_date + timedelta(days=1)
@@ -105,22 +111,25 @@ def index():
         today_grouped[cat].sort(key=lambda x: x['start'])
         weekly_grouped[cat].sort(key=lambda x: x['start'])
 
-    # 공휴일
     kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
     holidays_dict = {str(date): str(name) for date, name in kr_holidays.items()}
 
-    # 4. 게시판 데이터 로드 (최신 10개)
+    # 4. 게시판 & 메시지 로드
     board_posts = conn.execute("SELECT * FROM board ORDER BY created_at DESC LIMIT 10").fetchall()
-    
-    # 5. 수신 메시지 로드
     messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 20", (current_user,)).fetchall()
+
+    # 5. 셀렉트 박스용 전체 유저 목록 추출
+    db_users = conn.execute("SELECT DISTINCT owner FROM tasks WHERE owner IS NOT NULL AND owner != '' UNION SELECT DISTINCT owner FROM attendance WHERE owner IS NOT NULL AND owner != ''").fetchall()
+    user_list = sorted(list(set([u['owner'] for u in db_users])))
+    if current_user not in user_list: user_list.append(current_user)
 
     conn.close()
 
     return render_template('main.html', 
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
                            cats=cats, today_str=today.strftime('%Y년 %m월 %d일'), holidays_dict=holidays_dict,
-                           current_user=current_user, board_posts=board_posts, messages=messages)
+                           current_user=current_user, board_posts=board_posts, messages=messages,
+                           user_list=user_list)
 
 @main_bp.route('/save_task', methods=['POST'])
 def save_task():
@@ -145,6 +154,44 @@ def save_task():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@main_bp.route('/update_task/<int:task_id>', methods=['POST'])
+def update_task(task_id):
+    try:
+        data = request.get_json()
+        owner = session.get('user_name') # 보안상 세션의 사용자 이름 활용
+        conn = get_db()
+        conn.execute('''
+            UPDATE tasks SET 
+            date=?, year=?,
+            cat_meeting_title=?, cat_meeting_time=?, cat_interview_title=?, cat_interview_time=?,
+            cat_miting_title=?, cat_miting_time=?, cat_out_title=?, cat_out_time=?,
+            cat_etc_title=?, cat_etc_time=?, note=?
+            WHERE id=? AND owner=?
+        ''', (
+            data.get('date'), data.get('date', '')[:4],
+            data.get('회의_제목'), data.get('회의_시간'), data.get('면접_제목'), data.get('면접_시간'),
+            data.get('미팅_제목'), data.get('미팅_시간'), data.get('외근_제목'), data.get('외근_시간'),
+            data.get('기타_제목'), data.get('기타_시간'), data.get('note'),
+            task_id, owner
+        ))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@main_bp.route('/delete_task/<int:task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    try:
+        owner = session.get('user_name')
+        conn = get_db()
+        conn.execute("DELETE FROM tasks WHERE id=? AND owner=?", (task_id, owner))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @main_bp.route('/save_board', methods=['POST'])
 def save_board():
     title = request.form.get('title')
@@ -156,13 +203,44 @@ def save_board():
     
     if file and file.filename:
         filename = secure_filename(file.filename)
-        # 한글 파일명 깨짐 방지 처리 필요 시 uuid 사용 권장
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
 
     conn = get_db()
     conn.execute("INSERT INTO board (title, content, author, filename, filepath) VALUES (?, ?, ?, ?, ?)", 
                  (title, content, author, filename, filepath))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+@main_bp.route('/update_board/<int:post_id>', methods=['POST'])
+def update_board(post_id):
+    title = request.form.get('title')
+    content = request.form.get('content')
+    author = session.get('user_name')
+    
+    file = request.files.get('file')
+    conn = get_db()
+    
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        conn.execute("UPDATE board SET title=?, content=?, filename=?, filepath=? WHERE id=? AND author=?", 
+                     (title, content, filename, filepath, post_id, author))
+    else:
+        conn.execute("UPDATE board SET title=?, content=? WHERE id=? AND author=?", 
+                     (title, content, post_id, author))
+    
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+@main_bp.route('/delete_board/<int:post_id>', methods=['DELETE'])
+def delete_board(post_id):
+    author = session.get('user_name')
+    conn = get_db()
+    conn.execute("DELETE FROM board WHERE id=? AND author=?", (post_id, author))
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
