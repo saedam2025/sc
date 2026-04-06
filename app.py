@@ -12,14 +12,13 @@ from routes.contract import contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
 from routes.board import board_bp
-from routes.db_handler import init_files, read_excel_db, OWNER_FILE
+
+# [수정됨] 엑셀 db_handler 대신 새로 만든 SQLite 데이터베이스 모듈 임포트
+from routes.database import get_db
 
 app = Flask(__name__)
 # 세션 보안을 위한 키 설정
 app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
-
-# 서버 시작 시 엑셀 파일 초기화
-init_files()
 
 # 로그인 체크 제외 대상 (인트라넷 로그인 관련, 정적 파일 + 외부용 서비스 경로)
 EXEMPT_ROUTES = [
@@ -33,7 +32,7 @@ EXEMPT_ROUTES = [
     'contract.login',           # 계약자 로그인/본인인증 페이지
     'contract.contract_list',   # 계약 목록
     'contract.contract',        # 계약서 보기
-    'contract.save_contract',    # 계약 완료 및 서명 저장
+    'contract.save_contract',   # 계약 완료 및 서명 저장
     # --- 증명서 신청 시스템 예외 경로 (외부 강사용) ---
     'document.apply'            # 강사 경력증명서 직접 신청 페이지 (로그인 없이 접근 가능)
 ]
@@ -45,7 +44,6 @@ def check_login():
         return None
     
     # 2. 세션에 사번(emp_no)이 없으면 인트라넷 로그인 페이지로 리다이렉트
-    # 외부 계약자나 증명서 신청 페이지는 위 EXEMPT_ROUTES에서 이미 통과됨
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
 
@@ -61,26 +59,24 @@ def login():
     emp_no = data.get('emp_no')
     password = data.get('password')
     
-    df = read_excel_db(OWNER_FILE)
-    if df.empty:
-        return jsonify({"status": "error", "message": "사용자 정보가 없습니다."}), 404
+    # [수정됨] 엑셀 대신 SQLite DB에서 사용자 정보 조회
+    conn = get_db()
+    user = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
+    conn.close()
+    
+    if not user:
+        return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
 
-    user = df[(df['사번'].astype(str) == str(emp_no)) & (df['암호'].astype(str) == str(password))]
-    
-    if not user.empty:
-        u_info = user.iloc[0]
-        if u_info['승인상태'] != '승인':
-            return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
+    if user['status'] != '승인':
+        return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
             
-        # 세션 저장 (직급 및 레벨 정보 저장)
-        session['emp_no'] = str(u_info['사번'])
-        session['user_name'] = u_info['이름']
-        session['user_level'] = int(u_info['레벨'])
-        session['role'] = str(u_info['직급']) # 직급 데이터를 세션에 저장
-        
-        return jsonify({"status": "success"})
+    # 세션 저장 (직급 및 레벨 정보 저장)
+    session['emp_no'] = str(user['emp_no'])
+    session['user_name'] = user['name']
+    session['user_level'] = int(user['level'])
+    session['role'] = str(user['position']) # 직급 데이터를 세션에 저장
     
-    return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
+    return jsonify({"status": "success"})
 
 # --- 내 회원정보 조회 API (인트라넷 사용자용) ---
 @app.route('/user/my_info')
@@ -89,17 +85,18 @@ def get_my_info():
         return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
     
     try:
-        df = read_excel_db(OWNER_FILE)
-        # 사번으로 해당 행 찾기
-        user_row = df[df['사번'].astype(str) == session['emp_no']]
+        # [수정됨] 엑셀 대신 SQLite DB에서 현재 로그인한 사용자 정보 조회
+        conn = get_db()
+        user_row = conn.execute("SELECT * FROM users WHERE emp_no=?", (session['emp_no'],)).fetchone()
+        conn.close()
         
-        if user_row.empty:
+        if not user_row:
             return jsonify({"status": "error", "message": "정보를 찾을 수 없습니다."}), 404
             
         # 모든 정보를 딕셔너리로 변환 (보안을 위해 암호는 제외)
-        info_dict = user_row.iloc[0].to_dict()
-        if '암호' in info_dict:
-            del info_dict['암호']
+        info_dict = dict(user_row)
+        if 'password' in info_dict:
+            del info_dict['password']
             
         return jsonify({"status": "success", "data": info_dict})
     except Exception as e:
