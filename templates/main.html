@@ -35,7 +35,7 @@
     .list-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; transition: background 0.2s; }
     .list-item:hover { background: rgba(255,255,255,0.9); }
     .list-item:last-child { border-bottom: none; }
-    .unread-badge { background: #e74c3c; color: white; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
+    .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
     .msg-unread { font-weight: bold; background: #fff8e1; }
     
     .btn-action { background: #eee; border:none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
@@ -137,12 +137,15 @@
 
             <div id="list-partners" style="flex: 1; overflow-y: auto; background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px;">
                 {% for partner in chat_partners %}
-                <div class="list-item" onclick="openChat('{{ partner }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 10px;">
+                <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 10px;">
                     <div style="width:35px; height:35px; background:#e9ecef; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#495057;">
                         <i class="fa-solid fa-user"></i>
                     </div>
                     <div style="flex: 1;">
-                        <strong style="color: #333; font-size: 0.95rem;">{{ partner }}</strong>
+                        <strong style="color: #333; font-size: 0.95rem;">{{ partner.name }}</strong>
+                        {% if partner.unread > 0 %}
+                        <span class="unread-badge">{{ partner.unread }}</span>
+                        {% endif %}
                     </div>
                     <i class="fa-regular fa-comment-dots" style="color:#aaa;"></i>
                 </div>
@@ -392,7 +395,7 @@
                   }
               }
 
-              // 보낸 메시지는 연노랑 바탕으로 수정
+              // 보낸 메시지는 연노랑 바탕으로 수정 + 삭제 버튼 활성화
               if(c.sender === currentUser) {
                   box.innerHTML += `
                   <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
@@ -406,6 +409,7 @@
                       </div>
                   </div>`;
               } else {
+                  // 받은 메시지는 삭제 버튼 제거
                   box.innerHTML += `
                   <div style="align-self: flex-start; max-width: 80%; display:flex; flex-direction:column; align-items:flex-start;">
                       <div style="background:#fff; color:#333; padding:10px 14px; border-radius:15px 15px 15px 0; font-size:0.9rem; word-break:break-all; border:1px solid #e0e0e0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
@@ -413,7 +417,7 @@
                           ${fileHtml}
                       </div>
                       <div style="font-size:0.7rem; color:#999; margin-top:4px;">
-                          ${timeStr} · <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span>
+                          ${timeStr}
                       </div>
                   </div>`;
               }
