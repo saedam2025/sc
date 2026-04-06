@@ -126,9 +126,9 @@ const avatarEmojis = [
     // 🐶 동물들
     '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
     // 😎 귀여운 얼굴 & 판타지 캐릭터
-    '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦹','🧙','🧚','🧛',
+    '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
     // 👑 직급, 역할, 업무 관련
-    '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','🏆','💪',
+    '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
     // 🍎 음식 & 식물
     '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
 ];
@@ -295,7 +295,56 @@ async function deleteUser(dbId) {
     const r = await res.json(); alert(r.message); if(res.ok) loadAllUsers();
 }
 
-function closeModal() { document.getElementById('userModal').style.display = 'none'; document.getElementById('adminPass').value = ''; }
+// --------------------------------------------------------
+// [새로 추가된 초대 메일 발송 팝업 기능]
+// --------------------------------------------------------
+function openInviteModal() {
+    document.getElementById('modalTitle').innerText = "가입 초대 메일 발송";
+    document.getElementById('modalBody').innerHTML = `
+        <div class="modal-field">
+            <label>초대받을 대상의 이메일 주소</label>
+            <input type="email" id="invite_email" placeholder="example@email.com">
+            <p style="font-size:0.8em; color:#868e96; margin-top:8px;">* 입력한 이메일로 가입 링크가 전송됩니다.</p>
+        </div>
+    `;
+    document.getElementById('adminArea').style.display = 'none';
+    document.getElementById('modalSubmitBtn').innerText = "메일 발송";
+    document.getElementById('modalSubmitBtn').onclick = submitInvite;
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitInvite() {
+    const email = document.getElementById('invite_email').value;
+    if (!email) return alert("이메일 주소를 입력해주세요.");
+
+    document.getElementById('modalSubmitBtn').innerText = "발송 중...";
+    document.getElementById('modalSubmitBtn').disabled = true;
+
+    try {
+        const res = await fetch('/user/send_invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        const d = await res.json();
+        alert(d.message);
+        if (res.ok) closeModal();
+    } catch (e) {
+        alert("메일 발송 중 오류가 발생했습니다.");
+    } finally {
+        document.getElementById('modalSubmitBtn').innerText = "메일 발송";
+        document.getElementById('modalSubmitBtn').disabled = false;
+    }
+}
+// --------------------------------------------------------
+
+function closeModal() { 
+    document.getElementById('userModal').style.display = 'none'; 
+    document.getElementById('adminPass').value = ''; 
+    if(document.getElementById('modalSubmitBtn')) {
+        document.getElementById('modalSubmitBtn').disabled = false;
+    }
+}
 
 window.onload = () => {
     {% if mode == 'invite' %}
