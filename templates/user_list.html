@@ -145,6 +145,9 @@ async function loadAllUsers() {
         let pCount = 1, mCount = 1;
 
         currentUserData.forEach((u, i) => {
+            // DB의 고유 ID를 사용하도록 설정
+            const dbId = u.id; 
+
             if(u.승인상태 === '대기') {
                 pBody.innerHTML += `<tr><td>${pCount++}</td><td><b>${u.이름}</b></td><td>${u.직급}</td><td><span class="status-badge status-pending">대기</span></td><td><button onclick="openApproveModal(${i})" class="action-btn btn-approve">승인</button></td></tr>`;
             } else {
@@ -156,8 +159,8 @@ async function loadAllUsers() {
                     <td style="color:#666;">${u.입사일||'-'}</td><td style="color:#e03131;">${u.퇴사일||'-'}</td>
                     <td>
                         <button onclick="openEditModal(${i})" class="action-btn btn-edit">수정</button>
-                        <button onclick="processRetire(${i})" class="action-btn btn-retire">퇴직</button>
-                        <button onclick="deleteUser(${i})" class="action-btn btn-delete">삭제</button>
+                        <button onclick="processRetire(${dbId})" class="action-btn btn-retire">퇴직</button>
+                        <button onclick="deleteUser(${dbId})" class="action-btn btn-delete">삭제</button>
                     </td>
                 </tr>`;
             }
@@ -196,7 +199,6 @@ async function submitDirectRegister() {
     };
     if(!data.name || !data.password || !data.rrn) return alert("필수 정보를 입력하세요.");
     
-    // 비밀번호 정규식 검증
     const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
     if(!pwRegex.test(data.password)) return alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
 
@@ -217,7 +219,6 @@ async function registerUser() {
     };
     if(!data.name || !data.password || !data.rrn) return alert("필수 정보를 입력하세요.");
     
-    // 비밀번호 정규식 검증
     const pwRegex = /^[A-Za-z0-9!@#$%^&*()_+]{1,10}$/;
     if(!pwRegex.test(data.password)) return alert("비밀번호는 10자 이내의 영문, 숫자, 특수문자 조합만 가능합니다.");
 
@@ -227,21 +228,22 @@ async function registerUser() {
 }
 
 function openApproveModal(i) {
+    const u = currentUserData[i];
     document.getElementById('modalTitle').innerText = "가입 승인";
     document.getElementById('modalBody').innerHTML = `<div class="modal-field"><label>직급 선택</label><select id="modal_pos">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>`;
     document.getElementById('adminArea').style.display = 'block';
-    document.getElementById('modalSubmitBtn').onclick = () => submitApprove(i);
+    document.getElementById('modalSubmitBtn').onclick = () => submitApprove(u.id); // DB ID 전달
     document.getElementById('userModal').style.display = 'block';
 }
 
-async function submitApprove(i) {
-    const res = await fetch('/user/approve', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: document.getElementById('adminPass').value, user_idx: i, approved_position: document.getElementById('modal_pos').value }) });
+async function submitApprove(dbId) {
+    const res = await fetch('/user/approve', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: document.getElementById('adminPass').value, user_idx: dbId, approved_position: document.getElementById('modal_pos').value }) });
     const r = await res.json(); alert(r.message); if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
-async function processRetire(i) {
+async function processRetire(dbId) {
     if(!confirm("퇴직 처리하시겠습니까?\n퇴직일이 오늘 날짜로 기록됩니다.")) return;
-    const res = await fetch('/user/retire', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_idx: i }) });
+    const res = await fetch('/user/retire', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_idx: dbId }) });
     const r = await res.json(); alert(r.message); loadAllUsers();
 }
 
@@ -258,18 +260,18 @@ function openEditModal(i) {
         <div class="modal-field"><label>이메일</label><input type="email" id="modal_email" value="${u.이메일||''}"></div>
     `;
     document.getElementById('adminArea').style.display = 'block';
-    document.getElementById('modalSubmitBtn').onclick = () => submitUpdate(i);
+    document.getElementById('modalSubmitBtn').onclick = () => submitUpdate(u.id); // DB ID 전달
     document.getElementById('userModal').style.display = 'block';
 }
 
-async function submitUpdate(i) {
-    const res = await fetch('/user/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: document.getElementById('adminPass').value, user_idx: i, position: document.getElementById('modal_pos').value, level: document.getElementById('modal_level').value, phone: document.getElementById('modal_phone').value, email: document.getElementById('modal_email').value }) });
+async function submitUpdate(dbId) {
+    const res = await fetch('/user/update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: document.getElementById('adminPass').value, user_idx: dbId, position: document.getElementById('modal_pos').value, level: document.getElementById('modal_level').value, phone: document.getElementById('modal_phone').value, email: document.getElementById('modal_email').value }) });
     const r = await res.json(); alert(r.message); if(res.ok) { closeModal(); loadAllUsers(); }
 }
 
-async function deleteUser(i) {
+async function deleteUser(dbId) {
     const p = prompt("관리자 암호:"); if(!p) return;
-    const res = await fetch('/user/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: p, user_idx: i }) });
+    const res = await fetch('/user/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: p, user_idx: dbId }) });
     const r = await res.json(); alert(r.message); if(res.ok) loadAllUsers();
 }
 
