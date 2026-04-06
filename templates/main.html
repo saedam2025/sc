@@ -41,6 +41,10 @@
     .btn-action { background: #eee; border:none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
     .btn-edit { color: #4a90e2; }
     .btn-delete { color: #e74c3c; }
+
+    /* 채팅 스크롤바 디자인 커스텀 */
+    #chatBox::-webkit-scrollbar { width: 6px; }
+    #chatBox::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
@@ -115,28 +119,83 @@
             </div>
         </div>
 
-        <div class="col-msg glass-box" style="flex: 3; height: 350px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <div class="col-msg glass-box" style="flex: 3; height: 350px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="color: #9b59b6; margin: 0; font-weight: 800; font-size: 1.1rem;">
                     <i class="fa-solid fa-envelope"></i> 내 쪽지함
-                    <span id="unreadBadge" class="unread-badge" style="display:none;">0</span>
                 </h3>
-                <button onclick="document.getElementById('msgModal').style.display='block'" style="background:#9b59b6; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-size:0.8rem;">쪽지보내기</button>
+                <button onclick="document.getElementById('msgModal').style.display='block'" style="background:#9b59b6; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; font-size:0.8rem;">새 쪽지</button>
             </div>
-            <div style="background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px;">
-                {% for msg in messages %}
-                <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="readMessage({{ msg.id }}, this)" style="cursor: pointer; flex-direction: column; align-items: flex-start;">
+            
+            <div style="display: flex; gap: 15px; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 10px;">
+                <span id="tab-recv" style="cursor:pointer; font-weight:bold; color:#9b59b6; font-size:0.9rem;" onclick="switchMsgTab('recv')">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
+                <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:#aaa; font-size:0.9rem;" onclick="switchMsgTab('sent')">보낸 쪽지</span>
+            </div>
+
+            <div id="list-recv" style="flex: 1; overflow-y: auto; background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px;">
+                {% for msg in received_messages %}
+                <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
                         <span style="color: #444;">From: <strong>{{ msg.sender }}</strong></span>
                         <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
                     </div>
-                    <div style="color: #666;">{{ msg.content }}</div>
+                    <div style="color: #666; font-size:0.8rem;">{{ msg.content }}</div>
                 </div>
                 {% else %}
-                <p style="text-align: center; color: #aaa; font-size: 0.85rem;">수신된 쪽지가 없습니다.</p>
+                <p style="text-align: center; color: #aaa; font-size: 0.85rem;">받은 쪽지가 없습니다.</p>
+                {% endfor %}
+            </div>
+
+            <div id="list-sent" style="flex: 1; overflow-y: auto; background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px; display: none;">
+                {% for msg in sent_messages %}
+                <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                        <span style="color: #444;">To: <strong>{{ msg.receiver }}</strong></span>
+                        <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
+                    </div>
+                    <div style="color: #666; font-size:0.8rem;">{{ msg.content }}</div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: #aaa; font-size: 0.85rem;">보낸 쪽지가 없습니다.</p>
                 {% endfor %}
             </div>
         </div>
+    </div>
+</div>
+
+<div id="chatModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="background:#fff; margin:5% auto; padding:25px; width:450px; height:600px; border-radius:20px; position:relative; display:flex; flex-direction:column; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+        <span onclick="closeChat()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
+        <h3 style="color: #9b59b6; margin-top: 0; margin-bottom: 15px; font-weight:800;">
+            <i class="fa-solid fa-comments"></i> <span id="chatPartnerName"></span>님과의 대화
+        </h3>
+        
+        <div id="chatBox" style="flex:1; overflow-y:auto; background:#f4f6f9; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
+        </div>
+        
+        <div style="display:flex; gap:8px;">
+            <input type="text" id="chatInput" class="modal-input" style="margin-bottom:0; flex:1; border-radius:10px;" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()">
+            <button onclick="sendChatReply()" style="background:#9b59b6; color:white; border:none; padding:0 20px; border-radius:10px; font-weight:bold; cursor:pointer; transition: background 0.3s;">전송</button>
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="background:#fff; margin:10% auto; padding:25px; width:400px; border-radius:15px; position:relative;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px;">&times;</span>
+        <h3 style="color: #9b59b6; margin-top: 0;"><i class="fa-solid fa-paper-plane"></i> 새 쪽지 보내기</h3>
+        <form id="msgForm">
+            <select id="msgReceiver" class="modal-input" required style="background: #fff; cursor: pointer;">
+                <option value="">수신자를 선택하세요</option>
+                {% for u in user_list %}
+                    {% if u != current_user %}
+                    <option value="{{ u }}">{{ u }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
+            <button type="button" onclick="sendNewMessage()" style="width:100%; background:#9b59b6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">전송하기</button>
+        </form>
     </div>
 </div>
 
@@ -163,34 +222,13 @@
             <i class="fa-regular fa-clock"></i> <span id="detailDate"></span>
         </div>
         <div id="detailContent" style="min-height: 120px; font-size: 0.95rem; line-height: 1.6; color: #333; white-space: pre-wrap; margin-bottom: 20px;"></div>
-        
         <div id="detailFileWrap" style="display:none; background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:20px; font-size:0.85rem;">
             <i class="fa-solid fa-paperclip" style="color:#4a90e2;"></i> 첨부파일: <a id="detailFile" href="#" target="_blank" style="color:#4a90e2; text-decoration:none; font-weight:bold;"></a>
         </div>
-        
         <div id="detailActions" style="display:none; text-align: right; border-top: 1px solid #eee; padding-top: 15px;">
             <button class="btn-action btn-edit" onclick="editBoardFromDetail()">수정</button>
             <button class="btn-action btn-delete" onclick="deleteBoardFromDetail()">삭제</button>
         </div>
-    </div>
-</div>
-
-<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
-    <div class="modal-content" style="background:#fff; margin:10% auto; padding:25px; width:400px; border-radius:15px; position:relative;">
-        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px;">&times;</span>
-        <h3 style="color: #9b59b6; margin-top: 0;"><i class="fa-solid fa-paper-plane"></i> 쪽지 보내기</h3>
-        <form id="msgForm">
-            <select id="msgReceiver" class="modal-input" required style="background: #fff; cursor: pointer;">
-                <option value="">수신자를 선택하세요</option>
-                {% for u in user_list %}
-                    {% if u != current_user %}
-                    <option value="{{ u }}">{{ u }}</option>
-                    {% endif %}
-                {% endfor %}
-            </select>
-            <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
-            <button type="button" onclick="sendMessage()" style="width:100%; background:#9b59b6; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">전송하기</button>
-        </form>
     </div>
 </div>
 
@@ -199,7 +237,8 @@
         <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: #aaa;">&times;</span>
         <h3 id="taskModalTitle" style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
         <form id="taskForm">
-            <input type="hidden" id="taskId"> <input type="date" id="taskDate" class="modal-input" required readonly style="background-color: #f0f4f8;">
+            <input type="hidden" id="taskId">
+            <input type="date" id="taskDate" class="modal-input" required readonly style="background-color: #f0f4f8;">
             <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background-color: #f0f4f8; color: #555;">
             <div style="background: #fdfdfd; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 15px;">
                 {% for c in ['회의','면접','미팅','외근','기타'] %}
@@ -226,9 +265,138 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
-  window.taskDataMap = window.taskDataMap || {}; // 수정을 위한 일정 데이터 전역 보관
+  window.taskDataMap = window.taskDataMap || {};
   const currentUser = '{{ current_user }}';
 
+  // 쪽지 탭 전환 함수
+  function switchMsgTab(tab) {
+      if(tab === 'recv') {
+          document.getElementById('list-recv').style.display = 'block';
+          document.getElementById('list-sent').style.display = 'none';
+          document.getElementById('tab-recv').style.fontWeight = 'bold';
+          document.getElementById('tab-recv').style.color = '#9b59b6';
+          document.getElementById('tab-sent').style.fontWeight = 'normal';
+          document.getElementById('tab-sent').style.color = '#aaa';
+      } else {
+          document.getElementById('list-recv').style.display = 'none';
+          document.getElementById('list-sent').style.display = 'block';
+          document.getElementById('tab-sent').style.fontWeight = 'bold';
+          document.getElementById('tab-sent').style.color = '#9b59b6';
+          document.getElementById('tab-recv').style.fontWeight = 'normal';
+          document.getElementById('tab-recv').style.color = '#aaa';
+      }
+  }
+
+  // --- 채팅 관련 로직 ---
+  let currentChatPartner = null;
+
+  async function openChat(partnerName) {
+      currentChatPartner = partnerName;
+      document.getElementById('chatPartnerName').innerText = partnerName;
+      document.getElementById('chatModal').style.display = 'block';
+      await refreshChatBox();
+      checkUnreadMessages(); // 모달 오픈 시 읽음 처리되므로 뱃지 업데이트
+  }
+
+  function closeChat() {
+      document.getElementById('chatModal').style.display = 'none';
+      currentChatPartner = null;
+      location.reload(); // 메시지 리스트 갱신을 위해 새로고침
+  }
+
+  async function refreshChatBox() {
+      if(!currentChatPartner) return;
+      try {
+          const res = await fetch(`/get_chat_history/${currentChatPartner}`);
+          const chats = await res.json();
+          
+          const box = document.getElementById('chatBox');
+          box.innerHTML = '';
+          
+          chats.forEach(c => {
+              const timeStr = c.sent_at.substring(5, 16);
+              if(c.sender === currentUser) {
+                  // 내가 보낸 메시지 (우측 정렬, 보라색 말풍선)
+                  box.innerHTML += `
+                  <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
+                      <div style="background:#9b59b6; color:white; padding:10px 14px; border-radius:15px 15px 0 15px; font-size:0.9rem; word-break:break-all; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                          ${c.content}
+                      </div>
+                      <div style="font-size:0.7rem; color:#999; margin-top:4px;">
+                          <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span> · ${timeStr} 
+                          <span style="color:${c.is_read ? '#aaa' : '#9b59b6'}">${c.is_read ? '' : '안읽음'}</span>
+                      </div>
+                  </div>`;
+              } else {
+                  // 상대가 보낸 메시지 (좌측 정렬, 흰색 말풍선)
+                  box.innerHTML += `
+                  <div style="align-self: flex-start; max-width: 80%; display:flex; flex-direction:column; align-items:flex-start;">
+                      <div style="background:#fff; color:#333; padding:10px 14px; border-radius:15px 15px 15px 0; font-size:0.9rem; word-break:break-all; border:1px solid #e0e0e0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                          ${c.content}
+                      </div>
+                      <div style="font-size:0.7rem; color:#999; margin-top:4px;">
+                          ${timeStr} · <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span>
+                      </div>
+                  </div>`;
+              }
+          });
+          // 새 메시지가 오면 스크롤을 맨 아래로
+          box.scrollTop = box.scrollHeight;
+      } catch(e) {}
+  }
+
+  async function sendChatReply() {
+      const input = document.getElementById('chatInput');
+      const content = input.value.trim();
+      if(!content || !currentChatPartner) return;
+      
+      const data = { receiver: currentChatPartner, content: content };
+      try {
+          const res = await fetch('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+          if(res.ok) { 
+              input.value = '';
+              await refreshChatBox();
+          }
+      } catch (e) { alert("오류 발생"); }
+  }
+
+  async function deleteChatMsg(msgId) {
+      if(!confirm("이 메시지를 완전히 삭제하시겠습니까?")) return;
+      try {
+          const res = await fetch(`/delete_message/${msgId}`, { method: 'DELETE' });
+          if(res.ok) { await refreshChatBox(); }
+      } catch(e) {}
+  }
+
+  // 완전히 새로운 대상에게 처음 메시지 보내기 모달용
+  async function sendNewMessage() {
+      const receiver = document.getElementById('msgReceiver').value;
+      const content = document.getElementById('msgContent').value;
+      if(!receiver) { alert("수신자를 선택해주세요."); return; }
+      if(!content) { alert("내용을 입력해주세요."); return; }
+
+      const data = { receiver: receiver, content: content };
+      try {
+          const res = await fetch('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+          if(res.ok) { 
+              document.getElementById('msgModal').style.display='none'; 
+              document.getElementById('msgForm').reset();
+              openChat(receiver); // 전송 성공 시 채팅방 바로 열기
+          }
+      } catch (e) { alert("오류 발생"); }
+  }
+
+  async function checkUnreadMessages() {
+      try {
+          const res = await fetch('/check_messages');
+          const data = await res.json();
+          const badge = document.getElementById('unreadBadge');
+          if (data.unread > 0) { badge.innerText = data.unread; badge.style.display = 'inline-block'; } 
+          else { badge.style.display = 'none'; }
+      } catch (e) {}
+  }
+
+  // --- 기존 캘린더/게시판 자바스크립트 생략 없이 유지 ---
   function toggleDetails(card) {
       const details = card.querySelector('.card-details');
       const icon = card.querySelector('.toggle-icon');
@@ -272,16 +440,14 @@
                   }
               }
           },
-          // 빈 칸 클릭 시 새 일정 등록 모달 오픈
           dateClick: function(info) {
               document.getElementById('taskForm').reset();
-              document.getElementById('taskId').value = ''; // ID 초기화
+              document.getElementById('taskId').value = ''; 
               document.getElementById('taskOwner').value = currentUser;
               document.getElementById('taskDate').value = info.dateStr;
               document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
               document.getElementById('taskModal').style.display = 'block';
           },
-          // 이벤트 클릭 시 당일 일정 요약 모달 오픈 (본인 일정 시 수정/삭제 가능)
           eventClick: function(info) {
               info.jsEvent.preventDefault();
               const clickDate = info.event.startStr.split('T')[0];
@@ -294,12 +460,12 @@
 
               document.getElementById('dayEventsTitle').innerText = clickDate + " 상세 일정";
               let html = '';
-              let renderedTaskIds = new Set(); // 중복 수정/삭제 버튼 방지용
+              let renderedTaskIds = new Set(); 
 
               dayEvents.forEach(ev => {
                   let p = ev.extendedProps; 
                   let bgColor = ev.backgroundColor || '#4a90e2';
-                  if(p.task_id) window.taskDataMap[p.task_id] = p; // 데이터 맵핑
+                  if(p.task_id) window.taskDataMap[p.task_id] = p; 
                   
                   html += `<div style="border-left: 4px solid ${bgColor}; padding: 10px; margin-bottom: 10px; background: #f8f9fa; border-radius: 6px;">`;
                   
@@ -313,7 +479,6 @@
                   }
                   if (p.note) html += `<div style="font-size: 0.8rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;"><strong>비고:</strong> ${p.note}</div>`;
                   
-                  // 본인이 작성한 일정이면 하단에 수정/삭제 버튼 추가
                   if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
                       html += `<div style="text-align:right; margin-top:8px; border-top:1px dashed #ddd; padding-top:8px;">
                                   <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>
@@ -333,13 +498,12 @@
       checkUnreadMessages();
   });
 
-  // --- 일정 수정 및 삭제 스크립트 ---
   function editTask(taskId, dateStr) {
       document.getElementById('dayEventsModal').style.display = 'none'; 
       const props = window.taskDataMap[taskId];
       document.getElementById('taskForm').reset();
       
-      document.getElementById('taskId').value = taskId; // 수정 모드 전환
+      document.getElementById('taskId').value = taskId; 
       document.getElementById('taskDate').value = dateStr;
       document.getElementById('taskOwner').value = props.owner;
       
@@ -360,12 +524,11 @@
   }
 
   async function deleteTask(taskId) {
-      if(!confirm("이 일정을 정말 삭제하시겠습니까?\n(해당 일자에 입력하신 모든 카테고리 항목이 함께 삭제됩니다)")) return;
+      if(!confirm("이 일정을 정말 삭제하시겠습니까?")) return;
       try {
           const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
           if(res.ok) { alert("일정이 삭제되었습니다."); location.reload(); }
-          else { alert("삭제에 실패했습니다."); }
-      } catch(e) { alert("오류 발생"); }
+      } catch(e) {}
   }
 
   function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
@@ -381,17 +544,15 @@
           data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value || '';
       });
 
-      // ID 존재 여부에 따라 저장 혹은 업데이트 라우트로 연결
       const url = taskId ? `/update_task/${taskId}` : '/save_task';
 
       try {
           const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if(res.ok) { alert(taskId ? "일정이 성공적으로 수정되었습니다." : "일정이 성공적으로 등록되었습니다."); location.reload(); } 
-          else { alert("등록/수정 실패"); }
-      } catch (e) { alert("오류 발생"); }
+          if(res.ok) { alert(taskId ? "수정되었습니다." : "등록되었습니다."); location.reload(); } 
+      } catch (e) {}
   }
 
-  // --- 사내 게시판 (상세보기, 작성, 수정, 삭제) ---
+  // --- 사내 게시판 스크립트 ---
   let currentBoardId = null;
 
   function openBoardForm() {
@@ -416,9 +577,7 @@
           document.getElementById('detailFile').innerText = filename;
           document.getElementById('detailFile').href = '/uploads/' + filename;
           fileWrap.style.display = 'block';
-      } else {
-          fileWrap.style.display = 'none';
-      }
+      } else { fileWrap.style.display = 'none'; }
 
       if(author === currentUser) { document.getElementById('detailActions').style.display = 'block'; } 
       else { document.getElementById('detailActions').style.display = 'none'; }
@@ -436,11 +595,11 @@
   }
 
   async function deleteBoardFromDetail() {
-      if(!confirm("이 게시글을 정말 삭제하시겠습니까?")) return;
+      if(!confirm("삭제하시겠습니까?")) return;
       try {
           const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' });
           if(res.ok) { alert("삭제되었습니다."); location.reload(); }
-      } catch (e) { alert("오류 발생"); }
+      } catch (e) {}
   }
 
   async function saveBoard() {
@@ -452,44 +611,9 @@
       if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
 
       let url = id ? `/update_board/${id}` : '/save_board'; 
-      
       try {
           const res = await fetch(url, { method: 'POST', body: formData });
           if(res.ok) { alert(id ? "수정되었습니다." : "등록되었습니다."); location.reload(); }
-      } catch (e) { alert("오류 발생"); }
-  }
-
-  // --- 쪽지 관련 로직 ---
-  async function sendMessage() {
-      const receiver = document.getElementById('msgReceiver').value;
-      if(!receiver) { alert("수신자를 선택해주세요."); return; }
-
-      const data = { receiver: receiver, content: document.getElementById('msgContent').value };
-      try {
-          const res = await fetch('/send_message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          if(res.ok) { alert("쪽지를 보냈습니다."); document.getElementById('msgModal').style.display='none'; }
-      } catch (e) { alert("오류 발생"); }
-  }
-
-  async function checkUnreadMessages() {
-      try {
-          const res = await fetch('/check_messages');
-          const data = await res.json();
-          const badge = document.getElementById('unreadBadge');
-          if (data.unread > 0) { badge.innerText = data.unread; badge.style.display = 'inline-block'; } 
-          else { badge.style.display = 'none'; }
-      } catch (e) {}
-  }
-
-  async function readMessage(msgId, element) {
-      if (!element.classList.contains('msg-unread')) return;
-      try {
-          const res = await fetch(`/read_message/${msgId}`, { method: 'POST' });
-          if (res.ok) {
-              element.classList.remove('msg-unread');
-              element.style.background = 'transparent';
-              checkUnreadMessages();
-          }
       } catch (e) {}
   }
 </script>
