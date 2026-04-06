@@ -12,13 +12,19 @@ from routes.contract import contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
 from routes.board import board_bp
+from routes.payroll import payroll_bp  # [신규] 급여 명세서 발송 시스템
 
-# [수정됨] 엑셀 db_handler 대신 새로 만든 SQLite 데이터베이스 모듈 임포트
+# 엑셀 대신 SQLite DB를 사용하도록 설정된 데이터베이스 모듈 임포트
 from routes.database import get_db
 
 app = Flask(__name__)
-# 세션 보안을 위한 키 설정
+
+# 세션 보안을 위한 키 설정 (환경 변수 권장)
 app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
+
+# 구글 메일 발송을 위한 환경 변수 (시스템 설정에 맞춰 수정 필요)
+# os.environ['MAIL_USERNAME'] = 'saedam2025@gmail.com'
+# os.environ['MAIL_PASSWORD'] = 'your_app_password'
 
 # 로그인 체크 제외 대상 (인트라넷 로그인 관련, 정적 파일 + 외부용 서비스 경로)
 EXEMPT_ROUTES = [
@@ -34,7 +40,8 @@ EXEMPT_ROUTES = [
     'contract.contract',        # 계약서 보기
     'contract.save_contract',   # 계약 완료 및 서명 저장
     # --- 증명서 신청 시스템 예외 경로 (외부 강사용) ---
-    'document.apply'            # 강사 경력증명서 직접 신청 페이지 (로그인 없이 접근 가능)
+    'document.apply',           # 강사 경력증명서 직접 신청 페이지 (로그인 없이 접근 가능)
+    # --- 급여 명세서 관련은 내부 직원이 사용하므로 제외 목록에 넣지 않음 ---
 ]
 
 @app.before_request
@@ -59,7 +66,7 @@ def login():
     emp_no = data.get('emp_no')
     password = data.get('password')
     
-    # [수정됨] 엑셀 대신 SQLite DB에서 사용자 정보 조회
+    # SQLite DB에서 사용자 정보 조회
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
     conn.close()
@@ -85,7 +92,7 @@ def get_my_info():
         return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
     
     try:
-        # [수정됨] 엑셀 대신 SQLite DB에서 현재 로그인한 사용자 정보 조회
+        # SQLite DB에서 현재 로그인한 사용자 정보 조회
         conn = get_db()
         user_row = conn.execute("SELECT * FROM users WHERE emp_no=?", (session['emp_no'],)).fetchone()
         conn.close()
@@ -116,12 +123,17 @@ app.register_blueprint(contract_bp, url_prefix='/contract')
 app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')
 app.register_blueprint(board_bp, url_prefix='/board')
+# [신규 추가] 급여 명세서 발송 시스템 연결
+app.register_blueprint(payroll_bp, url_prefix='/payroll')
 
 @app.errorhandler(404)
 def page_not_found(e):
     return "페이지를 찾을 수 없습니다. 경로를 확인해주세요.", 404
 
 if __name__ == '__main__':
+    # 업로드 파일 저장을 위한 필수 폴더 생성
+    os.makedirs('static', exist_ok=True)
+    
     # Render 등 배포 환경의 포트 설정 대응
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
