@@ -128,6 +128,14 @@ def index():
     received_messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
     sent_messages = conn.execute("SELECT * FROM messages WHERE sender=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
 
+    # 5-1. 대화 상대 로드 (나와 쪽지를 주고받은 기록이 있는 사람)
+    partners_query = conn.execute('''
+        SELECT DISTINCT sender AS partner FROM messages WHERE receiver=?
+        UNION
+        SELECT DISTINCT receiver AS partner FROM messages WHERE sender=?
+    ''', (current_user, current_user)).fetchall()
+    chat_partners = [p['partner'] for p in partners_query if p['partner'] != current_user]
+
     # 6. 셀렉트 박스용 회원 명단
     db_users = conn.execute("SELECT name FROM users WHERE status='승인'").fetchall()
     user_list = sorted(list(set([u['name'] for u in db_users])))
@@ -139,6 +147,7 @@ def index():
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
                            cats=cats, today_str=today.strftime('%Y년 %m월 %d일'), holidays_dict=holidays_dict,
                            current_user=current_user, board_posts=board_posts, 
+                           chat_partners=chat_partners,
                            received_messages=received_messages, sent_messages=sent_messages,
                            user_list=user_list)
 
