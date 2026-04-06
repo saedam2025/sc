@@ -2,19 +2,32 @@
 
 {% block content %}
 <style>
-    .fc { font-size: 0.85em; }
-    .fc .fc-toolbar-title { font-size: 1.3em !important; font-weight: 800; color: #222; }
+    /* 달력 글자 크기 조정 */
+    .fc { font-size: 0.8em; }
+    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: 800; color: #222; }
     .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
     .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
     .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
     
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
-    .holiday-name { font-size: 0.75em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
+    .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
 
     .glass-box {
         background: rgba(255, 255, 255, 0.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-        padding: 30px;
+        border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        padding: 20px;
+    }
+
+    /* 달력 이벤트 스타일 정의 (아이콘만 표시용) */
+    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
+    .fc-event-main {
+        padding: 1px 3px;
+        font-weight: 700;
+        font-size: 0.75em;
+        border-radius: 4px;
+        display: inline-block;
+        color: white; /* 카테고리 색상 배경 위에 흰색 글씨 */
+        margin: 1px;
     }
 
     .glass-event-card {
@@ -23,41 +36,24 @@
         cursor: pointer; transition: background 0.2s;
     }
     .glass-event-card:hover { background: rgba(255, 255, 255, 0.95); }
-    
     .card-header { display: flex; justify-content: space-between; align-items: center; }
     .card-title { font-size: 0.85rem; font-weight: 700; color: #222; }
+    .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,0.15); font-size: 0.75rem; color: #444; line-height: 1.5; }
     
-    .card-details {
-        display: none; margin-top: 10px; padding-top: 10px;
-        border-top: 1px dashed rgba(0,0,0,0.15); font-size: 0.75rem; color: #444; line-height: 1.5;
-    }
-    
-    /* 모달 폼 스타일 개편 */
     .modal-input { width:100%; padding:10px; margin-bottom:10px; border:1px solid #ddd; border-radius:8px; box-sizing: border-box; background: rgba(255,255,255,0.8); }
-    .modal-input:focus { border-color: #4a90e2; outline: none; background: #fff; }
-    
     .task-input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .task-input-group label { width: 45px; font-weight: bold; font-size: 0.85rem; color: #555; text-align: right; }
     .task-input-group input[type="text"] { flex: 1; margin-bottom: 0; }
     .task-input-group input[type="time"] { width: 110px; flex: 0 0 110px; margin-bottom: 0; }
-
-    /* 달력 이벤트 디자인 */
-    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
-    .custom-cal-event {
-        display: flex; align-items: center; gap: 4px; font-size: 0.8em; padding: 2px 4px; white-space: nowrap; overflow: hidden;
-    }
-    .cal-owner { font-weight: 800; }
-    .cal-title { color: #333; }
-    .cal-holiday { color: #e74c3c; font-weight: 700; } 
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
-    <div class="row" style="display: flex; gap: 30px;">
-        <div class="col-calendar glass-box" style="flex: 7;">
+    <div class="row" style="display: flex; gap: 20px; align-items: flex-start;">
+        <div class="col-calendar glass-box" style="flex: 7; height: 680px; overflow: hidden;">
             <div id='calendar'></div>
         </div>
 
-        <div class="col-today glass-box" style="flex: 3; overflow-y: auto; max-height: 850px;">
+        <div class="col-today glass-box" style="flex: 3; height: 680px; overflow-y: auto;">
             <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;">
                 <i class="fa-solid fa-calendar-day"></i> TODAY 
                 <span style="font-size: 0.7em; color: #777; font-weight: 500; margin-left: 5px;">{{ today_str }}</span>
@@ -68,28 +64,23 @@
                 {% for cat in cats %}
                     {% if today_grouped[cat] %}
                         {% set today_empty = false %}
-                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
-                            <strong>{{ cat }}</strong>
-                        </h4>
+                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
                         {% for event in today_grouped[cat] %}
                         <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
                             <div class="card-header">
-                                <span class="card-title">{{ event.title }}</span>
-                                <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
+                                <span class="card-title">{{ event.display_title_detailed }}</span> <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
                             </div>
                             {% if event.extendedProps.note or event.extendedProps.task_time %}
                             <div class="card-details">
-                                {% if event.extendedProps.task_time %}<p><strong>시간:</strong> {{ event.extendedProps.task_time }}</p>{% endif %}
-                                {% if event.extendedProps.note %}<p><strong>비고:</strong> {{ event.extendedProps.note }}</p>{% endif %}
+                                {% if event.extendedProps.task_time %}<div><strong>시간:</strong> {{ event.extendedProps.task_time }}</div>{% endif %}
+                                {% if event.extendedProps.note %}<div style="margin-top:5px;"><strong>비고:</strong> {{ event.extendedProps.note }}</div>{% endif %}
                             </div>
                             {% endif %}
                         </div>
                         {% endfor %}
                     {% endif %}
                 {% endfor %}
-                {% if today_empty %}
-                    <p style="color: #aaa; text-align: center; margin-top: 30px; font-weight: 500; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>
-                {% endif %}
+                {% if today_empty %}<p style="color: #aaa; text-align: center; margin-top: 30px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
             </div>
 
             <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.15); margin: 20px 0;">
@@ -104,83 +95,50 @@
                 {% for cat in cats %}
                     {% if weekly_grouped[cat] %}
                         {% set weekly_empty = false %}
-                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 4px;">
-                            <strong>{{ cat }}</strong>
-                        </h4>
+                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: #555; border-bottom: 1px solid #ddd; padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
                         {% for event in weekly_grouped[cat] %}
                         <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
                             <div style="font-size: 0.7rem; color: #7b8a9e; margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
                             <div class="card-header">
-                                <span class="card-title">{{ event.title }}</span>
-                                <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
+                                <span class="card-title">{{ event.display_title_detailed }}</span> <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #999; transition: transform 0.2s;"></i>
                             </div>
-                            {% if event.extendedProps.note or event.extendedProps.task_time %}
-                            <div class="card-details">
-                                {% if event.extendedProps.task_time %}<p><strong>시간:</strong> {{ event.extendedProps.task_time }}</p>{% endif %}
-                                {% if event.extendedProps.note %}<p><strong>비고:</strong> {{ event.extendedProps.note }}</p>{% endif %}
-                            </div>
-                            {% endif %}
                         </div>
                         {% endfor %}
                     {% endif %}
                 {% endfor %}
-                {% if weekly_empty %}
-                    <p style="color: #aaa; text-align: center; margin-top: 30px; font-weight: 500; font-size: 0.85rem;">예정된 주간 일정이 없습니다.</p>
-                {% endif %}
+                {% if weekly_empty %}<p style="color: #aaa; text-align: center; margin-top: 30px; font-size: 0.85rem;">예정된 주간 일정이 없습니다.</p>{% endif %}
             </div>
-
         </div>
     </div>
 </div>
 
 <div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
-    <div class="modal-content" style="background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); margin:10% auto; padding:30px; width:450px; border-radius:20px; position:relative; border:1px solid rgba(255,255,255,0.8); box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
-        <span onclick="closeTaskModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color: #aaa;">&times;</span>
-        <h3 id="modalTitle" style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
+    <div class="modal-content" style="background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); margin:10% auto; padding:25px; width:420px; border-radius:20px; position:relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: #aaa;">&times;</span>
+        <h3 style="color: #4a90e2; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
         <form id="taskForm">
             <input type="date" id="taskDate" class="modal-input" required readonly style="background-color: #f0f4f8;">
             <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background-color: #f0f4f8; color: #555;">
-            
             <div style="background: #fdfdfd; padding: 15px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 15px;">
+                {% for c in ['회의','면접','미팅','외근','기타'] %}
                 <div class="task-input-group">
-                    <label>회의</label>
-                    <input type="text" id="cat_회의_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_회의_시간" class="modal-input">
+                    <label>{{ c }}</label>
+                    <input type="text" id="cat_{{ c }}_제목" class="modal-input" placeholder="제목">
+                    <input type="time" id="cat_{{ c }}_시간" class="modal-input">
                 </div>
-                <div class="task-input-group">
-                    <label>면접</label>
-                    <input type="text" id="cat_면접_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_면접_시간" class="modal-input">
-                </div>
-                <div class="task-input-group">
-                    <label>미팅</label>
-                    <input type="text" id="cat_미팅_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_미팅_시간" class="modal-input">
-                </div>
-                <div class="task-input-group">
-                    <label>외근</label>
-                    <input type="text" id="cat_외근_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_외근_시간" class="modal-input">
-                </div>
-                <div class="task-input-group">
-                    <label>기타</label>
-                    <input type="text" id="cat_기타_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_기타_시간" class="modal-input">
-                </div>
+                {% endfor %}
             </div>
-
-            <textarea id="taskNote" class="modal-input" placeholder="비고 및 내용 (전체 항목 공통)" style="height:70px; resize: none;"></textarea>
-            
-            <button type="button" onclick="saveTask()" style="width:100%; background:#4a90e2; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem; transition: background 0.3s;">일정 저장하기</button>
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 내용 (전체 항목 공통)" style="height:60px; resize: none;"></textarea>
+            <button type="button" onclick="saveTask()" style="width:100%; background:#4a90e2; color:white; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem;">일정 저장하기</button>
         </form>
     </div>
 </div>
 
 <div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
-    <div class="modal-content" style="background:rgba(255,255,255,0.95); margin:8% auto; padding:30px; width:400px; border-radius:20px; position:relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
-        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
-        <h3 id="dayEventsTitle" style="color: #2c3e50; margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; font-weight: 800;"></h3>
-        <div id="dayEventsContent" style="max-height: 500px; overflow-y: auto; padding-right: 5px;"></div>
+    <div class="modal-content" style="background:rgba(255,255,255,0.95); margin:8% auto; padding:25px; width:380px; border-radius:20px; position:relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
+        <h3 id="dayEventsTitle" style="color: #2c3e50; margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 800;"></h3>
+        <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto;"></div>
     </div>
 </div>
 
@@ -189,7 +147,7 @@
   function toggleDetails(card) {
       const details = card.querySelector('.card-details');
       const icon = card.querySelector('.toggle-icon');
-      if(details) {
+      if(details && icon) {
           if (details.style.display === 'block') {
               details.style.display = 'none';
               icon.style.transform = 'rotate(0deg)';
@@ -209,23 +167,24 @@
       locale: 'ko',
       headerToolbar: { left: 'prev,next today', center: 'title', right: '' },
       events: {{ events | tojson | safe }},
-      height: 850,
-      
-      fixedWeekCount: false, // 달력을 5주 또는 필요에 따라 탄력적으로 보여주어 6주 강제 출력을 방지합니다.
+      height: 640, // 달력 영역 높이(680px)에서 헤더 등을 제외한 순수 달력 높이
+      fixedWeekCount: false,
       dayMaxEvents: true, 
 
+      // 달력 내 이벤트 표시 방식 수정 (아이콘만 표시)
       eventContent: function(arg) {
-          let props = arg.event.extendedProps;
-          let html = '<div class="custom-cal-event">';
-          
-          if (props.category === "근태/휴가" || !props.owner) {
-              html += `<span class="cal-holiday">${arg.event.title}</span>`;
+          const props = arg.event.extendedProps;
+          const cat = props.category;
+          let label = "";
+
+          // '근태/휴가'이거나 담당자가 없으면(공휴일) 원본 제목 사용
+          if (cat === "근태/휴가" || !props.owner) {
+              label = arg.event.title;
           } else {
-              html += `<span class="cal-owner" style="color:${arg.event.backgroundColor};">[${props.owner}]</span> `;
-              html += `<span class="cal-title">${props.task_title}</span>`;
+              // 그 외 항목은 대괄호 아이콘 형태만 표시
+              label = "[" + cat + "]";
           }
-          html += '</div>';
-          return { html: html };
+          return { html: '<div class="fc-event-main" style="background-color:' + arg.event.backgroundColor + '">' + label + '</div>' };
       },
 
       eventDidMount: function(info) {
@@ -241,36 +200,28 @@
       dayCellDidMount: function(arg) {
         const d = arg.date;
         const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-        
         if (holidays[dateStr]) {
             arg.el.classList.add('holiday-day');
             let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
-            
             if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
                 let holidaySpan = document.createElement('span');
                 holidaySpan.className = 'holiday-name';
                 holidaySpan.innerText = holidays[dateStr];
                 dayTopEl.appendChild(holidaySpan);
-
-                let dayNumberEl = dayTopEl.querySelector('.fc-daygrid-day-number');
-                if (dayNumberEl) { dayNumberEl.style.color = '#e74c3c'; }
             }
         }
       },
 
       dateClick: function(info) {
+        document.getElementById('taskForm').reset();
         document.getElementById('taskDate').value = info.dateStr;
         document.getElementById('taskModal').style.display = 'block';
       },
 
-      // 텍스트(이벤트) 클릭 시 당일 일정 모아보기 모달 창 오픈
       eventClick: function(info) {
         info.jsEvent.preventDefault();
-        
         const clickDate = info.event.startStr.split('T')[0];
         const allEvents = calendar.getEvents();
-        
-        // 클릭한 날짜에 해당하는 모든 이벤트 필터링
         const dayEvents = allEvents.filter(e => {
             const s = e.startStr.split('T')[0];
             let eDate = e.endStr ? e.endStr.split('T')[0] : s;
@@ -283,30 +234,23 @@
         });
 
         document.getElementById('dayEventsTitle').innerText = clickDate + " 상세 일정";
-        
         let html = '';
         dayEvents.forEach(ev => {
             let p = ev.extendedProps;
             let bgColor = ev.backgroundColor || '#4a90e2';
-            
-            html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: #f8f9fa; border-radius: 6px;">`;
-            html += `<div style="font-weight: bold; color: #333; font-size: 0.95rem; margin-bottom: 4px;">${ev.title}</div>`;
-            
-            if (p.category && p.category !== "근태/휴가") {
-                html += `<div style="font-size: 0.8rem; color: #555;">`;
-                html += `<span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px;">${p.category}</span>`;
+            html += `<div style="border-left: 4px solid ${bgColor}; padding: 10px; margin-bottom: 10px; background: #f8f9fa; border-radius: 6px;">`;
+            if (p.category === "근태/휴가" || !p.owner) {
+                html += `<div style="font-weight: bold; color: #333;">${ev.title}</div>`;
+            } else {
+                html += `<div style="font-weight: bold; color: #333; margin-bottom: 4px;">[${p.owner}] ${p.task_title}</div>`;
+                html += `<div style="font-size: 0.8rem; color: #555;"><span style="display:inline-block; background:${bgColor}; color:white; padding:1px 5px; border-radius:3px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
                 if(p.task_time) html += ` <strong>시간:</strong> ${p.task_time}`;
                 html += `</div>`;
             }
-            if (p.note) {
-                html += `<div style="font-size: 0.8rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;"><strong>비고:</strong> ${p.note}</div>`;
-            }
+            if (p.note) html += `<div style="font-size: 0.8rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #ddd;"><strong>비고:</strong> ${p.note}</div>`;
             html += `</div>`;
         });
-
-        if (!html) html = '<p style="color:#aaa; text-align:center;">등록된 일정이 없습니다.</p>';
-
-        document.getElementById('dayEventsContent').innerHTML = html;
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:#aaa; text-align:center;">일정이 없습니다.</p>';
         document.getElementById('dayEventsModal').style.display = 'block';
       }
     });
@@ -318,25 +262,18 @@
   async function saveTask() {
       const taskDate = document.getElementById('taskDate').value;
       const taskOwner = document.getElementById('taskOwner').value;
-      
       if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
-      if (!taskOwner) { alert('담당자 정보가 없습니다. 새로고침 후 다시 시도해주세요.'); return; }
-
+      
       const data = {
           date: taskDate,
           owner: taskOwner,
-          회의_제목: document.getElementById('cat_회의_제목').value || '',
-          회의_시간: document.getElementById('cat_회의_시간').value || '',
-          면접_제목: document.getElementById('cat_면접_제목').value || '',
-          면접_시간: document.getElementById('cat_면접_시간').value || '',
-          미팅_제목: document.getElementById('cat_미팅_제목').value || '',
-          미팅_시간: document.getElementById('cat_미팅_시간').value || '',
-          외근_제목: document.getElementById('cat_외근_제목').value || '',
-          외근_시간: document.getElementById('cat_외근_시간').value || '',
-          기타_제목: document.getElementById('cat_기타_제목').value || '',
-          기타_시간: document.getElementById('cat_기타_시간').value || '',
           note: document.getElementById('taskNote').value || ''
       };
+      const cats = ['회의','면접','미팅','외근','기타'];
+      cats.forEach(c => {
+          data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value || '';
+          data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value || '';
+      });
 
       try {
           const res = await fetch('/save_task', {
@@ -344,18 +281,9 @@
               headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
               body: JSON.stringify(data)
           });
-          
-          if(res.ok) {
-              alert("업무가 성공적으로 등록되었습니다.");
-              location.reload(); 
-          } else {
-              const errText = await res.text();
-              console.error("백엔드 에러:", errText);
-              alert(`등록 실패 (코드: ${res.status}). 콘솔을 확인해주세요.`);
-          }
-      } catch (error) {
-          alert("등록 중 오류가 발생했습니다.");
-      }
+          if(res.ok) { alert("업무가 성공적으로 등록되었습니다."); location.reload(); } 
+          else { const errText = await res.text(); alert("등록 실패. 콘솔을 확인해주세요."); console.error(errText); }
+      } catch (error) { alert("등록 중 오류가 발생했습니다."); console.error(error); }
   }
 </script>
 {% endblock %}
