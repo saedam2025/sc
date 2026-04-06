@@ -7,346 +7,246 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
     <style>
+        /* === 다이나믹 테마 변수 === */
         :root {
+            --body-bg: #f8fafc;
             --primary-color: #4a90e2;
-            --primary-light: #7eb6f1;
             --primary-dark: #357abd;
-            --success-color: #2ecc71;
-            --text-dark: #222222;
-            --text-gray: #6b7280;
-            --border-color: #e5e7eb;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            
+            /* 카드 및 위젯 재질 */
+            --card-bg: rgba(255, 255, 255, 0.6);
+            --card-border: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            --card-backdrop: blur(24px);
+            
+            --input-bg: rgba(255, 255, 255, 0.8);
+            --input-text: #1e293b;
+            --widget-bg: rgba(255, 255, 255, 0.7);
+            --widget-hover: rgba(255, 255, 255, 1);
+            --widget-border: rgba(255, 255, 255, 1);
+            --tooltip-bg: rgba(15, 23, 42, 0.95);
+            --tooltip-text: #ffffff;
+            
+            /* 배경 효과 색상 */
+            --effect-color1: transparent;
+            --effect-color2: transparent;
+            --effect-color3: transparent;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Pretendard', sans-serif;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
 
         body {
-            display: flex;
-            flex-direction: column;
-            gap: 20px; 
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #eef4fc 0%, #f8faff 100%); 
-            position: relative;
-            overflow: hidden;
-            /* ★ 하단 여백 10vh를 주어 전체 요소를 위로 안정감 있게 끌어올림 ★ */
-            padding: 20px 20px 15vh 20px; 
+            display: flex; flex-direction: column; gap: 20px; 
+            align-items: center; justify-content: center; min-height: 100vh;
+            position: relative; overflow: hidden; padding: 20px 20px 15vh 20px; 
+            background: var(--body-bg); background-size: 400% 400%;
+            animation: gradientBG 20s ease infinite; transition: background 1.5s ease;
         }
 
-        /* 1. 기하학적 육각형 라인 패턴 배경 */
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='73' viewBox='0 0 28 49'%3E%3Cg fill='none' stroke='%23d0e1f5' stroke-width='1'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM0 49l14-8 14 8M0 0l14 8 14-8'/%3E%3C/g%3E%3C/svg%3E");
-            background-repeat: repeat;
-            opacity: 0.9;
-            z-index: 0;
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+        /* ====================================================
+           ✨ 배경 애니메이션 효과 (별, 물방울, 블롭 등)
+           ==================================================== */
+        .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
+        .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
+        .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
+        .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
+        @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
+        @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
+
+        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
+
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
+        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
+        .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
+        .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
+        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
+        .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
+        .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
+        @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
+
+        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+        .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
+        .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
+        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+
+        .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
+        @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
+
+        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+        .line-pos { animation: slideLinePos infinite linear; }
+        .line-neg { animation: slideLineNeg infinite linear; }
+        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+        @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+
+        #bg-effect-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
+
+        /* ====================================================
+           🚀 로그인창 및 위젯 애니메이션
+           ==================================================== */
+           
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(40px) scale(0.95); filter: blur(10px); }
+            100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
 
-        /* 2. 흩뿌려진 미니 도형 */
-        .bg-shapes {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            overflow: hidden;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        .deco-shape {
-            position: absolute;
-            opacity: 0.6;
-            animation: floatShape 15s infinite alternate ease-in-out;
-        }
-
-        @keyframes floatShape {
-            0% { transform: translate(0, 0) rotate(0deg); }
-            100% { transform: translate(30px, -30px) rotate(45deg); }
-        }
-
-        .shape-triangle {
-            width: 0; height: 0;
-            border-left: 25px solid transparent;
-            border-right: 25px solid transparent;
-            border-bottom: 45px solid rgba(147, 192, 242, 0.7);
-        }
-
-        .shape-square {
-            width: 45px; height: 45px;
-            background-color: rgba(176, 210, 248, 0.7);
-            border-radius: 8px;
-        }
-        
-        .shape-circle {
-            width: 180px; height: 180px;
-            background-color: rgba(126, 182, 241, 0.4);
-            border-radius: 50%;
-            filter: blur(15px);
-        }
-
-        /* 도형 위치 */
-        .deco-1 { top: 20%; left: 30%; transform: rotate(15deg); }
-        .deco-2 { top: 40%; right: 25%; animation-delay: -2s; transform: rotate(-10deg); } 
-        .deco-3 { top: 60%; left: 35%; animation-delay: -4s; transform: rotate(45deg); } 
-        .deco-4 { top: 75%; right: 20%; animation-delay: -1s; }
-        .deco-5 { top: 30%; left: 15%; animation-delay: -6s; transform: rotate(30deg); }
-        .deco-6 { top: 45%; right: 40%; animation-delay: -3s; } 
-        .deco-7 { top: 25%; left: 55%; animation-delay: -5s; transform: rotate(-25deg); } 
-        .deco-8 { top: 50%; left: 50%; transform: translate(-50%, -50%); animation-delay: -7s; } 
-
-        /* 가로형 로그인 카드 (글래스모피즘) */
         .login-wrapper {
-            position: relative;
-            z-index: 2;
-            background: rgba(255, 255, 255, 0.3); 
-            backdrop-filter: blur(5px); 
-            -webkit-backdrop-filter: blur(5px);
-            padding: 50px;
-            border-radius: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08); 
-            border: 1px solid rgba(255, 255, 255, 0.7); 
-            border-top: 1px solid rgba(255, 255, 255, 1);
-            border-left: 1px solid rgba(255, 255, 255, 1);
-            width: 100%;
-            max-width: 650px; 
-            
-            opacity: 0;
-            transform: translateY(30px) scale(0.95);
-            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); 
-        }
-
-        .login-wrapper.appear {
-            opacity: 1;
-            transform: translateY(0) scale(1); 
-        }
-
-        /* 하단 추가 정보 대시보드 */
-        .info-panel {
-            position: relative;
-            z-index: 2;
-            width: 100%;
-            max-width: 650px;
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
-            border-radius: 18px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.7);
-            border-top: 1px solid rgba(255, 255, 255, 1);
-            border-left: 1px solid rgba(255, 255, 255, 1);
-            
-            display: flex;
-            gap: 15px;
-            
-            opacity: 0;
-            transform: translateY(30px) scale(0.95);
-            transition: all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s; 
-        }
-
-        .info-panel.appear {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-
-        /* 정보 위젯 개별 박스 공통 */
-        .info-widget {
-            flex: 1;
-            background: rgba(255, 255, 255, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            border-radius: 12px;
-            padding: 15px 10px;
-            text-align: center;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            cursor: default;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-width: 0; 
-            position: relative; 
-        }
-
-        .info-widget:hover {
-            background: rgba(255, 255, 255, 0.85);
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-        }
-
-        /* 풍선도움말 (말풍선 기능) 공통 스타일 */
-        .info-widget::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%) translateY(-10px);
-            background: rgba(34, 34, 34, 0.95);
-            color: #ffffff;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 13px;
-            font-weight: 500;
-            line-height: 1.4;
-            white-space: normal;
-            word-break: keep-all;
-            width: max-content;
-            max-width: 250px;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            z-index: 100;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        }
-
-        /* 말풍선 꼬리표(삼각형) */
-        .info-widget::before {
-            content: '';
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%) translateY(-2px);
-            border: 7px solid transparent;
-            border-top-color: rgba(34, 34, 34, 0.95);
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            z-index: 100;
-        }
-
-        /* 툴팁 활성화 위젯(점심, 격언) 호버 효과 */
-        .info-widget[data-tooltip]:hover::after {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(-15px);
-        }
-        
-        .info-widget[data-tooltip]:hover::before {
-            opacity: 1;
-            visibility: visible;
-            transform: translateX(-50%) translateY(-3px);
-        }
-
-        .widget-title {
-            font-size: 12px;
-            color: var(--text-gray);
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-
-        .widget-title i {
-            color: var(--primary-color);
-        }
-
-        .widget-content {
-            font-size: 15px;
-            font-weight: 700;
+            position: relative; z-index: 2; 
+            background: var(--card-bg); 
+            backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop);
+            padding: 50px; border-radius: 28px;
+            box-shadow: var(--card-shadow), inset 0 0 0 1px var(--card-border); 
+            border: 1px solid var(--card-border); 
+            width: 100%; max-width: 650px; 
             color: var(--text-dark);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
+            animation: slideUpFade 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            transition: background 0.5s, border 0.5s, box-shadow 0.5s; 
         }
 
-        .text-up { color: #e11d48 !important; }
-        .text-down { color: #2563eb !important; }
+        .info-panel {
+            position: relative; z-index: 2; width: 100%; max-width: 650px;
+            background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop);
+            border-radius: 20px; padding: 20px;
+            box-shadow: var(--card-shadow), inset 0 0 0 1px var(--card-border);
+            border: 1px solid var(--card-border);
+            display: flex; gap: 15px;
+            opacity: 0; 
+            animation: slideUpFade 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+            transition: background 0.5s, border 0.5s, box-shadow 0.5s; 
+        }
+
+        @keyframes cascadeIn {
+            0% { opacity: 0; transform: translateY(15px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        .login-header { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.1s forwards; opacity: 0; }
+        .form-left > div > .input-group:nth-child(1) { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+        .form-left > div > .input-group:nth-child(2) { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.3s forwards; opacity: 0; }
+        .checkbox-group { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+        .btn-login { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.3s forwards; opacity: 0; }
+        .logo-container { animation: cascadeIn 0.6s cubic-bezier(0.25, 1, 0.3, 1) 0.4s forwards; opacity: 0; }
+
+        /* 정보 위젯 */
+        .info-widget {
+            flex: 1; background: var(--widget-bg); border: 1px solid var(--widget-border);
+            border-radius: 14px; padding: 15px 10px; text-align: center;
+            transition: all 0.4s ease; cursor: default;
+            display: flex; flex-direction: column; justify-content: center; min-width: 0; position: relative; 
+            color: var(--text-dark);
+        }
+        .info-widget:hover { background: var(--widget-hover); transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); border-color: var(--primary-color); }
+
+        /* 풍선도움말 */
+        .info-widget::after { content: attr(data-tooltip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-10px); background: var(--tooltip-bg); color: var(--tooltip-text); padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 600; line-height: 1.4; white-space: normal; word-break: keep-all; width: max-content; max-width: 250px; opacity: 0; visibility: hidden; pointer-events: none; transition: all 0.3s ease; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .info-widget::before { content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-2px); border: 7px solid transparent; border-top-color: var(--tooltip-bg); opacity: 0; visibility: hidden; pointer-events: none; transition: all 0.3s ease; z-index: 100; }
+        .info-widget[data-tooltip]:hover::after { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-15px); }
+        .info-widget[data-tooltip]:hover::before { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-3px); }
+
+        .widget-title { font-size: 12px; color: var(--text-gray); font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .widget-title i { color: var(--primary-color); }
+        .widget-content { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
         .text-small { font-size: 13px; font-weight: 500; }
-        .fade-in { opacity: 1; transition: opacity 0.3s ease; }
 
         /* 헤더 영역 */
-        .login-header {
-            margin-bottom: 35px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            padding-bottom: 20px;
-            display: flex;
-            justify-content: space-between; 
-            align-items: flex-end;
-        }
-
+        .login-header { margin-bottom: 35px; border-bottom: 1px solid var(--card-border); padding-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
         .header-titles { text-align: left; }
-        .logo-text { font-size: 28px; font-weight: 800; color: var(--text-dark); letter-spacing: -0.5px; }
-        .logo-subtext { font-size: 14px; color: rgba(0, 0, 0, 0.6); margin-top: 5px; font-weight: 500; }
+        .logo-text { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; transition: color 0.5s; }
+        .logo-subtext { font-size: 14px; color: var(--text-gray); margin-top: 5px; font-weight: 500; transition: color 0.5s;}
 
-        .header-widget { text-align: right; background: transparent; border: none; padding: 0; margin-bottom: 5px; }
-        .widget-time { font-size: 20px; font-weight: 800; color: var(--primary-dark); letter-spacing: 1px; font-variant-numeric: tabular-nums; }
-        .widget-date { font-size: 11px; color: rgba(0, 0, 0, 0.6); margin-top: 2px; font-weight: 500; }
-        .widget-weather { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-dark); }
+        .header-widget { text-align: right; margin-bottom: 5px; }
+        .widget-time { font-size: 20px; font-weight: 800; color: var(--primary-color); letter-spacing: 1px; font-variant-numeric: tabular-nums; transition: color 0.5s;}
+        .widget-date { font-size: 11px; color: var(--text-gray); margin-top: 2px; font-weight: 500; }
+        .widget-weather { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 6px; font-size: 13px; font-weight: 600; }
         .widget-weather i { color: #f59e0b; font-size: 14px; }
 
         /* 폼 레이아웃 */
         .form-layout { display: flex; gap: 40px; align-items: stretch; }
         .form-left { flex: 1.2; display: flex; flex-direction: column; justify-content: space-between; }
-        .form-right { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border-left: 1px dashed rgba(0, 0, 0, 0.15); padding-left: 40px; }
+        .form-right { flex: 1; display: flex; flex-direction: column; justify-content: space-between; align-items: center; border-left: 1px dashed var(--card-border); padding-left: 40px; transition: border-color 0.5s;}
 
+        /* 입력창 디자인 */
         .input-group { position: relative; margin-bottom: 15px; }
-        .input-group i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #7b8a9e; font-size: 15px; }
-        .input-group input {
-            width: 100%; padding: 14px 16px 14px 45px; border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 12px; font-size: 14px;
-            background: rgba(255, 255, 255, 0.6); outline: none; color: var(--text-dark); transition: all 0.3s ease;
-        }
-        .input-group input:focus { border-color: var(--primary-color); background: rgba(255, 255, 255, 0.95); box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15); }
+        .input-group i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-gray); font-size: 15px; transition: color 0.3s; z-index: 2; }
+        .input-group input { width: 100%; padding: 15px 16px 15px 45px; border: 1px solid var(--card-border); border-radius: 14px; font-size: 14px; background: var(--input-bg); outline: none; color: var(--input-text); transition: all 0.3s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+        .input-group input::placeholder { color: var(--text-gray); opacity: 0.8; }
+        .input-group input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(255,255,255,0.2); }
+        .input-group input:focus + i { color: var(--primary-color); }
 
-        .btn-login {
-            width: 100%; height: 52px; background: var(--primary-dark); color: #ffffff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(53, 122, 189, 0.25);
-        }
-        .btn-login:hover { background: #2b6299; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(53, 122, 189, 0.4); }
-        .btn-login::after {
-            content: ''; position: absolute; top: 0; left: -150%; width: 100%; height: 100%;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
-            transform: skewX(-25deg); animation: shine 3s ease-in-out infinite; 
-        }
+        .checkbox-group { font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 5px; padding-left: 4px; }
 
+        /* 접속 버튼 */
+        .btn-login { width: 100%; height: 54px; background: var(--primary-dark); color: #ffffff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); filter: brightness(1.1); }
+        .btn-login::after { content: ''; position: absolute; top: 0; left: -150%; width: 100%; height: 100%; background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0) 100%); transform: skewX(-25deg); animation: shine 3s ease-in-out infinite; }
         @keyframes shine { 0% { left: -150%; } 20% { left: 150%; } 100% { left: 150%; } }
 
-        .logo-container { margin-top: 20px; }
+        /* ====================================================
+           🎨 로고 이미지 배경/테두리 제거 (핵심 수정 영역)
+           ==================================================== */
+        .logo-container { 
+            margin-top: 20px; 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); 
+            display: flex; 
+            justify-content: center;
+            background: transparent !important; /* 배경 투명 */
+            border: none !important;           /* 테두리 제거 */
+            box-shadow: none !important;       /* 그림자 제거 */
+        }
+
+        .logo-container img {
+            /* GIF의 흰색 배경을 투명하게 처리 */
+            mix-blend-mode: multiply; 
+            filter: contrast(1.1); /* 선명도 조절 */
+            display: block;
+            border: none !important;
+        }
+
+        .logo-container:hover { 
+            transform: scale(1.08) translateY(-3px) !important; 
+        }
+
+        /* 랜덤 테마 변경 버튼 */
+        .theme-btn { position: fixed; bottom: 20px; right: 20px; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.4); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
+        .theme-btn:hover { background: rgba(255,255,255,0.4); transform: translateY(-2px); }
 
         @media (max-width: 600px) {
             body { padding: 40px 15px 15px 15px; justify-content: flex-start; overflow-y: auto; }
             .login-wrapper { padding: 35px 25px; }
-            .login-header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .login-header { flex-direction: column; align-items: flex-start; gap: 15px; padding-bottom: 15px;}
             .header-widget { text-align: left; width: 100%; margin-bottom: 0; }
             .widget-weather { justify-content: flex-start; }
             .form-layout { flex-direction: column; gap: 25px; }
-            .form-right { border-left: none; border-top: 1px dashed rgba(0, 0, 0, 0.15); padding-left: 0; padding-top: 25px; }
-            
-            .info-panel {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-                padding: 15px;
-            }
+            .form-right { border-left: none; border-top: 1px dashed var(--card-border); padding-left: 0; padding-top: 25px; }
+            .info-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; }
         }
     </style>
 </head>
 <body>
     
-    <div class="bg-shapes">
-        <div class="deco-shape deco-1"></div>
-        <div class="deco-shape deco-2"></div>
-        <div class="deco-shape deco-3"></div>
-        <div class="deco-shape deco-4"></div>
-        <div class="deco-shape deco-5"></div>
-        <div class="deco-shape deco-6"></div>
-        <div class="deco-shape deco-7"></div>
-        <div class="deco-shape deco-8"></div>
-    </div>
+    <div id="bg-effect-container"></div>
 
     <div class="login-wrapper" id="loginCard">
-        
         <div class="login-header">
             <div class="header-titles">
                 <h1 class="logo-text">새담 INTRANET</h1>
-                <p class="logo-subtext">새담청소년교육문화원 임직원 전용 로그인</p>
+                <p class="logo-subtext" id="themeNameDesc">새담청소년교육문화원 임직원 전용 로그인</p>
             </div>
             
             <div class="header-widget">
@@ -371,8 +271,8 @@
                         <i class="fa-solid fa-lock"></i>
                     </div>
                 </div>
-                <div style="font-size: 13px; color: rgba(0,0,0,0.6); cursor: pointer;">
-                    <label><input type="checkbox" id="remember_me"> 사번 저장하기</label>
+                <div class="checkbox-group">
+                    <label style="cursor: pointer;"><input type="checkbox" id="remember_me" style="margin-right: 5px; accent-color: var(--primary-color);"> 사번 저장하기</label>
                 </div>
             </div>
 
@@ -390,15 +290,11 @@
     <div class="info-panel" id="infoPanel">
         <div class="info-widget" id="lunch-wrapper" title="무엇을 먹을지 고민이라면?">
             <div class="widget-title"><i class="fa-solid fa-utensils"></i> 점심 추천</div>
-            <div class="widget-content text-small fade-in" id="widget-lunch">
-                <i class="fa-solid fa-spinner fa-spin"></i> 고르는 중...
-            </div>
+            <div class="widget-content text-small fade-in" id="widget-lunch">로딩중...</div>
         </div>
         <div class="info-widget" title="수원시 실시간 미세먼지 농도">
             <div class="widget-title"><i class="fa-solid fa-mask"></i> 미세먼지 (수원)</div>
-            <div class="widget-content" id="widget-dust">
-                <i class="fa-solid fa-spinner fa-spin"></i> 로딩중...
-            </div>
+            <div class="widget-content" id="widget-dust">로딩중...</div>
         </div>
         <div class="info-widget" title="오늘 로그인 버튼을 누른 횟수 (실제 카운트)">
             <div class="widget-title"><i class="fa-solid fa-users"></i> 금일 접속자</div>
@@ -410,30 +306,272 @@
         </div>
     </div>
 
+    <button class="theme-btn" onclick="triggerEntranceAnimation()">
+        <i class="fa-solid fa-dice"></i> 테마 랜덤 변경 (Multi-Style)
+    </button>
+
     <script>
-        window.onload = () => {
-            const shapes = document.querySelectorAll('.deco-shape');
-            const shapeTypes = ['shape-triangle', 'shape-square', 'shape-circle'];
-            shapes.forEach(shape => {
-                const randomType = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
-                shape.classList.add(randomType);
-            });
+        // === 다이나믹 테마 생성 엔진 ===
+        const uiStyles = ['glass', 'solid', 'glow'];
+        const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
+        
+        const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
+        const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
 
-            setTimeout(() => {
-                document.getElementById('loginCard').classList.add('appear');
-                document.getElementById('infoPanel').classList.add('appear');
-            }, 100);
+        const generatedThemes = [];
 
-            const saved = localStorage.getItem('saved_sd_emp');
-            if(saved) { 
-                document.getElementById('emp_no').value = saved; 
-                document.getElementById('remember_me').checked = true; 
+        for (let i = 0; i < 1100; i++) {
+            const hue = Math.floor((i / 1100) * 360);
+            const useComplementary = (i % 5 === 0);
+            const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+            
+            let effectType;
+            if(i >= 1000) {
+                const geoEffects = ['geometry', 'rings', 'polygons', 'lines'];
+                effectType = geoEffects[i % geoEffects.length];
+            } else {
+                effectType = effectsList[i % effectsList.length];
             }
+            
+            const isDark = i % 2 === 0;
+            const uiStyle = uiStyles[i % uiStyles.length]; 
+            
+            const styleNameKOR = uiStyle === 'glass' ? "유리" : (uiStyle === 'solid' ? "솔리드" : "네온");
+            const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+            
+            let vars = {};
+            
+            if (isDark) {
+                const primary = `hsl(${pointHue}, 80%, 60%)`;
+                const primaryDark = `hsl(${pointHue}, 80%, 40%)`;
+                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 10%), hsl(${(hue + 45) % 360}, 50%, 5%), hsl(${(hue - 45 + 360) % 360}, 40%, 10%))`;
+                
+                vars = {
+                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                    "--text-dark": "#ffffff", "--text-gray": "#cbd5e1",
+                    "--input-text": "#ffffff", "--tooltip-bg": "rgba(255, 255, 255, 0.95)", "--tooltip-text": "#0f172a",
+                    "--effect-color1": `hsl(${hue}, 80%, 50%)`, 
+                    "--effect-color2": `hsl(${(hue + 40) % 360}, 80%, 50%)`, 
+                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 80%, 50%)`
+                };
+
+                if (uiStyle === 'glass') {
+                    vars["--card-bg"] = "rgba(20, 20, 30, 0.4)"; vars["--card-border"] = "rgba(255, 255, 255, 0.15)";
+                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.15)";
+                    vars["--input-bg"] = "rgba(0, 0, 0, 0.4)"; vars["--widget-bg"] = "rgba(30, 30, 45, 0.5)"; 
+                    vars["--widget-hover"] = "rgba(45, 45, 60, 0.8)"; vars["--widget-border"] = "rgba(255, 255, 255, 0.15)";
+                } else if (uiStyle === 'solid') {
+                    vars["--card-bg"] = "#1e293b"; vars["--card-border"] = "transparent";
+                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 50px rgba(0, 0, 0, 0.5)";
+                    vars["--input-bg"] = "#0f172a"; vars["--widget-bg"] = "#0f172a"; 
+                    vars["--widget-hover"] = "#334155"; vars["--widget-border"] = "transparent";
+                } else if (uiStyle === 'glow') {
+                    vars["--card-bg"] = "rgba(0, 0, 0, 0.6)"; vars["--card-border"] = primary;
+                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 30px ${primaryDark}`;
+                    vars["--input-bg"] = "rgba(0,0,0,0.5)"; vars["--widget-bg"] = "rgba(0,0,0,0.5)"; 
+                    vars["--widget-hover"] = "rgba(0,0,0,0.8)"; vars["--widget-border"] = primaryDark;
+                }
+            } else {
+                const primary = `hsl(${pointHue}, 70%, 50%)`;
+                const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
+                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
+                
+                vars = {
+                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                    "--text-dark": "#0f172a", "--text-gray": "#64748b",
+                    "--input-text": "#1e293b", "--tooltip-bg": "rgba(15, 23, 42, 0.95)", "--tooltip-text": "#ffffff",
+                    "--effect-color1": `hsl(${hue}, 70%, 75%)`, 
+                    "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, 
+                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`
+                };
+
+                if (uiStyle === 'glass') {
+                    vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
+                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
+                    vars["--input-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; 
+                    vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
+                } else if (uiStyle === 'solid') {
+                    vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
+                    vars["--input-bg"] = "#f1f5f9"; vars["--widget-bg"] = "#f1f5f9"; 
+                    vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+                } else if (uiStyle === 'glow') {
+                    vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
+                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
+                    vars["--input-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-bg"] = "rgba(255,255,255,0.5)"; 
+                    vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
+                }
+            }
+            
+            generatedThemes.push({ name: name, type: effectType, vars: vars });
+        }
+
+        generatedThemes.sort(() => Math.random() - 0.5);
+
+        let currentThemeIndex = -1;
+
+        window.onload = () => {
+            initRandomTheme();
+            
+            try {
+                const saved = localStorage.getItem('saved_sd_emp');
+                if(saved) { 
+                    document.getElementById('emp_no').value = saved; 
+                    document.getElementById('remember_me').checked = true; 
+                }
+            } catch(e) {}
 
             initWidgets(); 
             setInterval(updateTime, 1000);
             updateTime();
         };
+
+        function triggerEntranceAnimation() {
+            const wrapper = document.getElementById('loginCard');
+            const panel = document.getElementById('infoPanel');
+            const inners = document.querySelectorAll('.login-header, .input-group, .checkbox-group, .btn-login, .logo-container');
+            
+            wrapper.style.transition = 'all 0.4s ease';
+            wrapper.style.opacity = '0';
+            wrapper.style.transform = 'translateY(15px)';
+            
+            panel.style.transition = 'all 0.4s ease';
+            panel.style.opacity = '0';
+            panel.style.transform = 'translateY(15px)';
+            
+            setTimeout(() => {
+                initRandomTheme();
+                
+                wrapper.style.transition = '';
+                panel.style.transition = '';
+                
+                [wrapper, panel, ...inners].forEach(el => {
+                    el.style.opacity = '';
+                    el.style.transform = '';
+                    el.style.animation = 'none'; 
+                    void el.offsetWidth; 
+                    el.style.animation = ''; 
+                });
+            }, 400); 
+        }
+
+        function initRandomTheme() {
+            let newIndex = Math.floor(Math.random() * generatedThemes.length);
+            while (newIndex === currentThemeIndex) {
+                newIndex = Math.floor(Math.random() * generatedThemes.length);
+            }
+            currentThemeIndex = newIndex;
+            
+            const t = generatedThemes[currentThemeIndex];
+            
+            for (const [key, value] of Object.entries(t.vars)) {
+                document.documentElement.style.setProperty(key, value);
+            }
+
+            document.getElementById('themeNameDesc').innerText = `[Theme ${currentThemeIndex + 1}/1100] ${t.name}`;
+
+            const container = document.getElementById('bg-effect-container');
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                container.innerHTML = ''; 
+                
+                if (t.type === 'stars') {
+                    container.innerHTML = `
+                        <div class="stars-small"></div>
+                        <div class="stars-medium"></div>
+                        <div class="stars-large"></div>
+                        <div class="shooting-star" style="top:20%; right:-10%;"></div>
+                        <div class="shooting-star" style="top:50%; right:-20%; animation-delay:4s; animation-duration:12s;"></div>
+                    `;
+                } else if (t.type === 'bubbles') {
+                    for(let i=0; i<30; i++) {
+                        let b = document.createElement('div');
+                        b.className = 'bubble';
+                        b.style.left = Math.random() * 100 + '%';
+                        b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px';
+                        b.style.animationDuration = (Math.random() * 8 + 4) + 's';
+                        b.style.animationDelay = (Math.random() * 5) + 's';
+                        container.appendChild(b);
+                    }
+                } else if (t.type === 'blobs') {
+                    container.innerHTML = `
+                        <div class="blob blob-1" style="background: var(--effect-color1)"></div>
+                        <div class="blob blob-2" style="background: var(--effect-color2)"></div>
+                        <div class="blob blob-3" style="background: var(--effect-color3)"></div>
+                    `;
+                } else if (t.type === 'orbs') {
+                    container.innerHTML = `
+                        <div class="glow-orb orb-1" style="background: var(--effect-color1)"></div>
+                        <div class="glow-orb orb-2" style="background: var(--effect-color2)"></div>
+                        <div class="glow-orb orb-3" style="background: var(--effect-color3)"></div>
+                        <div class="cyber-grid"></div>
+                    `;
+                } else if (t.type === 'waves') {
+                    container.innerHTML = `
+                        <div class="wave" style="background: var(--effect-color1); opacity:0.3"></div>
+                        <div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div>
+                        <div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>
+                    `;
+                } else if (t.type === 'geometry') {
+                    for(let i=0; i<15; i++) {
+                        let el = document.createElement('div');
+                        el.className = 'shape-box';
+                        if(i%3===0) el.style.borderRadius = '50%'; 
+                        if(i%4===0) el.style.borderRadius = '30% 70% 70% 30% / 30% 30% 70% 70%';
+                        el.style.left = Math.random() * 100 + '%';
+                        let size = Math.random() * 60 + 20;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                        el.style.animationDelay = (Math.random() * 10) + 's';
+                        el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                        container.appendChild(el);
+                    }
+                } else if (t.type === 'rings') {
+                    for(let i=0; i<6; i++) {
+                        let el = document.createElement('div');
+                        el.className = 'glass-ring';
+                        el.style.left = (Math.random() * 80 + 10) + '%';
+                        el.style.top = (Math.random() * 80 + 10) + '%';
+                        let size = Math.random() * 300 + 150;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.marginLeft = -(size/2) + 'px';
+                        el.style.marginTop = -(size/2) + 'px';
+                        el.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                        el.style.animationDelay = -(Math.random() * 5) + 's';
+                        el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                        container.appendChild(el);
+                    }
+                } else if (t.type === 'polygons') {
+                    for(let i=0; i<15; i++) {
+                        let el = document.createElement('div');
+                        el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon');
+                        el.style.left = Math.random() * 100 + '%';
+                        let size = Math.random() * 80 + 30;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                        el.style.animationDelay = (Math.random() * 10) + 's';
+                        el.style.background = `var(--effect-color${(i%3)+1})`;
+                        container.appendChild(el);
+                    }
+                } else if (t.type === 'lines') {
+                    for(let i=0; i<12; i++) {
+                        let el = document.createElement('div');
+                        el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg');
+                        el.style.top = (Math.random() * 150 - 25) + '%';
+                        el.style.animationDuration = (Math.random() * 8 + 5) + 's';
+                        el.style.animationDelay = (Math.random() * 5) + 's';
+                        el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`;
+                        container.appendChild(el);
+                    }
+                }
+                
+                container.style.opacity = '1';
+            }, 300); 
+        }
 
         function updateTime() {
             const now = new Date();
@@ -441,126 +579,75 @@
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
-            const dateStr = now.toLocaleDateString('ko-KR', dateOptions);
             
             document.getElementById('liveTime').textContent = `${hours}:${minutes}:${seconds}`;
-            document.getElementById('liveDate').textContent = dateStr;
+            document.getElementById('liveDate').textContent = now.toLocaleDateString('ko-KR', dateOptions);
         }
 
         function initWidgets() {
-            /* 1. 오늘의 점심 메뉴 랜덤 추천 (총 50가지) */
             const lunches = [
                 "🔥 매콤달콤 제육볶음", "🍲 얼큰한 김치찌개", "🍱 바삭바삭 돈까스", "🍜 호로록 짜장면", "🍣 깔끔한 초밥 세트",
-                "🥗 가벼운 샐러드", "🍔 든든한 수제버거", "🥘 뜨끈한 국밥 한그릇", "🍕 피자 한 조각", "🍝 고소한 파스타",
-                "🍳 든든한 돌솥비빔밥", "🍲 구수한 차돌된장찌개", "🥘 햄사리 듬뿍 부대찌개", "🥩 달달한 뚝배기 불고기", "🍖 든든하고 얼큰한 뼈해장국",
-                "🥣 진한 국물 순대국", "🌶️ 분식의 정석! 떡볶이와 튀김", "🐙 스트레스 풀리는 낙지볶음", "🍜 불향 가득 해물짬뽕", "🍚 고슬고슬 볶음밥과 짜장소스",
-                "🔥 얼얼하고 중독성 있는 마라탕", "🍜 진한 국물의 돈코츠 라멘", "🍛 토핑 가득 일본식 카레라이스", "🍲 비 오는 날 생각나는 우동", "🍤 바삭한 튀김이 일품인 텐동",
-                "🥪 커피와 함께하는 신선한 샌드위치", "🍜 국물이 시원한 베트남 쌀국수", "🐟 입에서 사르르 녹는 연어덮밥", "🥟 속이 꽉 찬 만두전골", "🥬 야들야들한 보쌈정식",
-                "🦑 쫄깃 매콤 오징어볶음", "🍳 반숙 계란 톡! 김치볶음밥", "🥘 보양식 느낌 낭낭한 갈비탕", "🐔 철판에 볶아먹는 춘천 닭갈비", "🍲 얼큰하고 파향 가득한 육개장",
-                "🍗 단짠단짠 밥도둑 안동 찜닭", "🧊 시원하고 쫄깃한 냉면 (물/비빔)", "🍲 바지락 듬뿍 시원한 칼국수", "🍚 톡톡 터지는 식감, 돌솥 알밥", "🐟 노릇노릇 고소한 생선구이 백반",
-                "🥢 매콤달콤 부드러운 마파두부 덮밥", "🍛 달짝지근 촉촉한 가츠동", "🥩 짭조름한 소고기 듬뿍 규동", "🍜 시원한 국물에 푹 찍어먹는 메밀소바", "🇹🇭 팟타이",
-                "🍚 불맛 입힌 인도네시아 나시고랭", "🥗 건강하고 가벼운 하와이안 포케볼", "🌮 멕시칸 풍미 가득! 타코와 브리또", "🧀 꾸덕꾸덕 진한 크림 리조또", "🍱 가성비 최고! 편의점 신상 도시락"
+                "🥗 가벼운 샐러드", "🍔 든든한 수제버거", "🥘 뜨끈한 국밥 한그릇", "🍕 피자 한 조각", "🍝 고소한 파스타"
             ];
             const randomLunch = lunches[Math.floor(Math.random() * lunches.length)];
             document.getElementById('widget-lunch').textContent = randomLunch;
-            // ★ 말풍선 툴팁 데이터 업데이트 ★
             document.getElementById('lunch-wrapper').setAttribute('data-tooltip', randomLunch);
 
-            /* 2. 실시간 미세먼지 */
             fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=37.2636&longitude=127.0286&current=pm10')
-                .then(response => response.json())
+                .then(res => res.json())
                 .then(data => {
                     const pm10 = data.current.pm10;
-                    let status = "좋음";
-                    let color = "#2ecc71";
+                    let status = "좋음", color = "var(--success-color)";
                     if (pm10 > 30) { status = "보통"; color = "#f59e0b"; } 
-                    if (pm10 > 80) { status = "나쁨"; color = "#e11d48"; } 
-                    if (pm10 > 150) { status = "매우나쁨"; color = "#9013fe"; } 
-                    document.getElementById('widget-dust').innerHTML = `<span style="color:${color}; font-weight:800;">${status} <span style="font-size:12px;">(${pm10}㎍/㎥)</span></span>`;
-                })
-                .catch(error => {
-                    document.getElementById('widget-dust').innerHTML = `<span style="color:red; font-size:12px;">정보 불러오기 실패</span>`;
+                    if (pm10 > 80) { status = "나쁨"; color = "#ef4444"; } 
+                    document.getElementById('widget-dust').innerHTML = `<span style="color:${color}; font-weight:800;">${status} <span style="font-size:12px; color:var(--text-gray); font-weight:400;">(${pm10})</span></span>`;
+                }).catch(() => {
+                    document.getElementById('widget-dust').innerHTML = `<span style="color:#ef4444; font-size:12px;">정보 불러오기 실패</span>`;
                 });
 
-            /* 3. 오늘 접속자 수 */
-            let currentLoginCount = localStorage.getItem('today_login_count');
-            if (!currentLoginCount) {
-                currentLoginCount = 125; 
-                localStorage.setItem('today_login_count', currentLoginCount);
+            try {
+                let currentCount = localStorage.getItem('today_login_count') || 125;
+                document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
+            } catch(e) {
+                document.getElementById('widget-users').innerHTML = `125 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
             }
-            document.getElementById('widget-users').innerHTML = `${currentLoginCount} 명 <span style="font-size:11px; color:#2ecc71;">●</span>`;
 
-            /* 4. 오늘의 격언 */
             const quotes = [
-                "성공은 매일 반복한 작은 노력들의 합이다. - 로버트 콜리어", "미래는 현재 우리가 무엇을 하는가에 달려 있다. - 마하트마 간디",
-                "시작하는 방법은 그만 말하고 이제 행동하는 것이다. - 월트 디즈니", "멈추지 않는 이상, 얼마나 천천히 가는지는 중요하지 않다. - 공자",
-                "나는 실패한 것이 아니다. 단지 1만 가지 방법이 틀렸다는 것을 발견했을 뿐이다. - 토머스 에디슨", "상상력은 지식보다 중요하다. - 알베르트 아인슈타인",
-                "위대한 일을 하려면 자신이 하는 일을 사랑해야 한다. - 스티브 잡스", "당신이 할 수 있다고 믿든, 할 수 없다고 믿든, 믿는 대로 된다. - 헨리 포드",
-                "성공은 최종이 아니고, 실패는 치명적이지 않다. 중요한 것은 계속하는 용기다. - 윈스턴 처칠", "인생은 자신을 찾는 것이 아니라 자신을 만드는 것이다. - 조지 버나드 쇼",
-                "행동은 모든 성공의 기초이다. - 파블로 피카소", "기회는 우연이 아니라 선택이다. - 짐 론",
-                "배우기를 멈추는 순간 우리는 늙기 시작한다. - 헨리 포드", "미래를 예측하는 가장 좋은 방법은 그것을 창조하는 것이다. - 피터 드러커",
-                "성공의 비밀은 평범한 일을 비범하게 하는 데 있다. - 존 D. 록펠러", "행복은 준비된 마음에서 나온다. - 아리스토텔레스",
-                "용기는 두려움이 없는 것이 아니라 두려움을 이겨내는 것이다. - 넬슨 만델라", "교육의 목적은 지식을 늘리는 것이 아니라 생각하는 법을 배우는 것이다. - 알베르트 아인슈타인",
-                "시작하는 방법은 말하는 것을 멈추고 행동하는 것이다. - 월트 디즈니", "노력은 배신하지 않는다. - 마이클 조던",
-                "실패는 더 현명하게 다시 시작할 수 있는 기회다. - 헨리 포드", "위대한 변화는 작은 한 걸음에서 시작된다. - 라오쯔",
-                "자신을 이기는 것이 가장 큰 승리다. - 플라톤", "성공은 준비와 기회가 만나는 곳에서 이루어진다. - 보비 언서",
-                "당신의 시간은 한정되어 있으니 다른 사람의 삶을 사느라 낭비하지 마라. - 스티브 잡스", "변화는 삶의 법칙이다. - 존 F. 케네디",
-                "성공은 결코 우연이 아니다. - 펠레", "행복은 선택이다. - 달라이 라마",
-                "가장 큰 위험은 아무 위험도 감수하지 않는 것이다. - 마크 저커버그", "노력 없이 얻는 것은 없다. - 나폴레옹 보나파르트",
-                "성공은 열정을 잃지 않고 실패를 거듭하는 능력이다. - 윈스턴 처칠", "당신이 보는 것이 당신이 된다. - 마하트마 간디",
-                "행동하지 않는 생각은 꿈에 불과하다. - 로버트 H. 슐러", "작은 기회로부터 위대한 일이 시작된다. - 데모스테네스",
-                "끈기는 모든 것을 이긴다. - 벤자민 프랭클린", "당신의 한계는 당신이 정한다. - 브라이언 트레이시",
-                "성공은 반복된 작은 노력의 합이다. - 로버트 콜리어", "꿈을 꾸는 자만이 미래를 만든다. - 빅터 위고",
-                "지금 이 순간을 살아라. - 호라티우스", "불가능은 노력하지 않는 자의 변명이다. - 나폴레옹 보나파르트",
-                "성공하려면 먼저 자신을 믿어야 한다. - 랄프 왈도 에머슨", "행동은 두려움을 이기는 최고의 방법이다. - 데일 카네기",
-                "노력은 반드시 보답한다. - 손정의", "기회는 준비된 사람의 몫이다. - 루이 파스퇴르",
-                "인생은 도전의 연속이다. - 헬렌 켈러", "오늘 할 일을 내일로 미루지 마라. - 벤자민 프랭클린",
-                "당신이 포기하지 않는 한 실패는 없다. - 엘론 머스크", "성공은 자신을 극복하는 데서 시작된다. - 아리스토텔레스"
+                "성공은 매일 반복한 작은 노력들의 합이다.", "미래는 현재 우리가 무엇을 하는가에 달려 있다.",
+                "시작하는 방법은 그만 말하고 이제 행동하는 것이다.", "멈추지 않는 이상, 얼마나 천천히 가는지는 중요하지 않다."
             ];
             const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
             document.getElementById('widget-quote').textContent = randomQuote;
             document.getElementById('quote-wrapper').setAttribute('data-tooltip', randomQuote);
         }
 
-        function handleEnter(e) {
-            if (e.key === 'Enter') doLogin();
-        }
+        function handleEnter(e) { if (e.key === 'Enter') doLogin(); }
 
         async function doLogin() {
             const emp_no = document.getElementById('emp_no').value;
             const password = document.getElementById('password').value;
-            if(!emp_no || !password) {
-                alert('사번과 비밀번호를 모두 입력해주세요.');
-                return;
-            }
+            if(!emp_no || !password) { alert('사번과 비밀번호를 모두 입력해주세요.'); return; }
 
-            let currentCount = parseInt(localStorage.getItem('today_login_count') || "125");
-            currentCount += 1;
-            localStorage.setItem('today_login_count', currentCount);
-            document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:#2ecc71;">●</span>`;
+            try {
+                let currentCount = parseInt(localStorage.getItem('today_login_count') || "125") + 1;
+                localStorage.setItem('today_login_count', currentCount);
+                document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
+            } catch (e) {}
 
             try {
                 const res = await fetch('/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ emp_no, password })
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ emp_no, password })
                 });
-
                 if(res.ok) {
-                    if(document.getElementById('remember_me').checked) {
-                        localStorage.setItem('saved_sd_emp', emp_no);
-                    } else {
-                        localStorage.removeItem('saved_sd_emp');
-                    }
-                    setTimeout(() => {
-                        location.href = '/';
-                    }, 500); 
+                    try {
+                        document.getElementById('remember_me').checked ? localStorage.setItem('saved_sd_emp', emp_no) : localStorage.removeItem('saved_sd_emp');
+                    } catch (e) {}
+                    setTimeout(() => location.href = '/', 500); 
                 } else {
-                    const err = await res.json();
-                    alert(err.message || '로그인에 실패했습니다.');
+                    const err = await res.json(); alert(err.message || '로그인에 실패했습니다.');
                 }
             } catch (error) {
-                alert('서버와 통신하는 중 오류가 발생했습니다. (접속자 수는 카운트되었습니다!)');
+                alert('서버와 통신하는 중 오류가 발생했습니다. (임시 접속 카운트 완료)');
             }
         }
     </script>
