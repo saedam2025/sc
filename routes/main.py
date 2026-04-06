@@ -46,11 +46,10 @@ def index():
                     "start": date_str,
                     "color": cat_colors[cat],
                     "extendedProps": {
-                        "task_id": row['id'], # 수정 및 삭제를 위한 DB 고유 ID 추가
+                        "task_id": row['id'], 
                         "owner": owner, "category": cat,
                         "task_title": row[t_col], "task_time": row[h_col] or '',
                         "note": note or '',
-                        # 수정 폼에 불러오기 위한 전체 카테고리 데이터
                         "cat_회의_제목": row['cat_meeting_title'] or '', "cat_회의_시간": row['cat_meeting_time'] or '',
                         "cat_면접_제목": row['cat_interview_title'] or '', "cat_면접_시간": row['cat_interview_time'] or '',
                         "cat_미팅_제목": row['cat_miting_title'] or '', "cat_미팅_시간": row['cat_miting_time'] or '',
@@ -114,23 +113,25 @@ def index():
     kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
     holidays_dict = {str(date): str(name) for date, name in kr_holidays.items()}
 
-    # 4. 게시판 & 메시지 로드
+    # 4. 게시판 로드
     board_posts = conn.execute("SELECT * FROM board ORDER BY created_at DESC LIMIT 10").fetchall()
-    messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 20", (current_user,)).fetchall()
+    
+    # 5. 메시지 로드 (받은 쪽지, 보낸 쪽지 분리)
+    received_messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
+    sent_messages = conn.execute("SELECT * FROM messages WHERE sender=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
 
-    # 5. 셀렉트 박스용 전체 유저 목록 추출 (회원 DB에서 '승인'된 유저만 가져옴)
+    # 6. 셀렉트 박스용 회원 명단
     db_users = conn.execute("SELECT name FROM users WHERE status='승인'").fetchall()
     user_list = sorted(list(set([u['name'] for u in db_users])))
-    
-    if current_user not in user_list: 
-        user_list.append(current_user)
+    if current_user not in user_list: user_list.append(current_user)
 
     conn.close()
 
     return render_template('main.html', 
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
                            cats=cats, today_str=today.strftime('%Y년 %m월 %d일'), holidays_dict=holidays_dict,
-                           current_user=current_user, board_posts=board_posts, messages=messages,
+                           current_user=current_user, board_posts=board_posts, 
+                           received_messages=received_messages, sent_messages=sent_messages,
                            user_list=user_list)
 
 @main_bp.route('/save_task', methods=['POST'])
@@ -160,7 +161,7 @@ def save_task():
 def update_task(task_id):
     try:
         data = request.get_json()
-        owner = session.get('user_name') # 보안상 세션의 사용자 이름 활용
+        owner = session.get('user_name')
         conn = get_db()
         conn.execute('''
             UPDATE tasks SET 
@@ -251,6 +252,8 @@ def delete_board(post_id):
 def download_file(name):
     return send_from_directory(UPLOAD_FOLDER, name)
 
+# --- 메시지/쪽지 관련 API ---
+
 @main_bp.route('/send_message', methods=['POST'])
 def send_message():
     data = request.get_json()
@@ -264,6 +267,39 @@ def send_message():
     conn.close()
     return jsonify({"status": "success"})
 
+# 특정 사용자와의 전체 대화 내역 불러오기 (채팅 모달용)
+@main_bp.route('/get_chat_history/<other_user>')
+def get_chat_history(other_user):
+    current_user = session.get('user_name')
+    conn = get_db()
+    
+    # 상대방이 보낸 메시지 중 내가 수신자인 메시지는 '읽음(1)' 처리
+    conn.execute("UPDATE messages SET is_read=1 WHERE receiver=? AND sender=?", (current_user, other_user))
+    conn.commit()
+    
+    # 나와 상대방이 주고받은 모든 메시지 시간순 정렬로 로드
+    chat = conn.execute('''
+        SELECT * FROM messages 
+        WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) 
+        ORDER BY sent_at ASC
+    ''', (current_user, other_user, other_user, current_user)).fetchall()
+    
+    conn.close()
+    
+    result = [{"id": c['id'], "sender": c['sender'], "receiver": c['receiver'], "content": c['content'], "sent_at": c['sent_at'], "is_read": c['is_read']} for c in chat]
+    return jsonify(result)
+
+# 메시지 삭제 API (본인이 쓴 글이든 받은 글이든 물리적 삭제)
+@main_bp.route('/delete_message/<int:msg_id>', methods=['DELETE'])
+def delete_message(msg_id):
+    current_user = session.get('user_name')
+    conn = get_db()
+    # 권한 보호: 현재 로그인한 사용자가 보냈거나 받은 메시지만 삭제 가능
+    conn.execute("DELETE FROM messages WHERE id=? AND (sender=? OR receiver=?)", (msg_id, current_user, current_user))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
 @main_bp.route('/check_messages')
 def check_messages():
     current_user = session.get('user_name')
@@ -273,11 +309,3 @@ def check_messages():
     unread_count = conn.execute("SELECT COUNT(*) as count FROM messages WHERE receiver=? AND is_read=0", (current_user,)).fetchone()['count']
     conn.close()
     return jsonify({"unread": unread_count})
-
-@main_bp.route('/read_message/<int:msg_id>', methods=['POST'])
-def read_message(msg_id):
-    conn = get_db()
-    conn.execute("UPDATE messages SET is_read=1 WHERE id=?", (msg_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success"})
