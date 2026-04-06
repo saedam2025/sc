@@ -54,6 +54,16 @@ def init_db():
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
     )''')
 
+    # 6. 전자결재(Approvals) 테이블 [★신규 추가★]
+    c.execute('''CREATE TABLE IF NOT EXISTS approvals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_type TEXT, title TEXT, drafter TEXT,
+        approver_1 TEXT, approver_2 TEXT, status TEXT DEFAULT '대기',
+        doc_data TEXT, filename TEXT, filepath TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
     # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가 (에러 무시)
     try:
         c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
@@ -62,7 +72,6 @@ def init_db():
         pass 
 
     try:
-        # 회원별 프로필 이모지 아이콘 저장 컬럼 (기본값: 사람모양)
         c.execute("ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'")
     except sqlite3.OperationalError:
         pass
