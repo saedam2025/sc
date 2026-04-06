@@ -23,13 +23,13 @@ def index():
     
     conn = get_db()
 
-    # [DB 자동 업데이트] 기존 쪽지 테이블에 파일첨부용 컬럼이 없으면 자동 추가 (에러 방지용)
+    # [DB 자동 업데이트] 기존 쪽지 테이블에 파일첨부용 컬럼이 없으면 자동 추가
     try:
         conn.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         conn.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
         conn.commit()
     except:
-        pass # 이미 컬럼이 존재하면 통과
+        pass 
     
     # 1. 일정(Tasks) 로드
     tasks = conn.execute('SELECT * FROM tasks').fetchall()
@@ -124,17 +124,29 @@ def index():
     # 4. 게시판 로드
     board_posts = conn.execute("SELECT * FROM board ORDER BY created_at DESC LIMIT 10").fetchall()
     
-    # 5. 메시지 로드 (받은 쪽지, 보낸 쪽지 분리)
+    # 5. 메시지 로드 (받은 쪽지, 보낸 쪽지)
     received_messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
     sent_messages = conn.execute("SELECT * FROM messages WHERE sender=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
 
-    # 5-1. 대화 상대 로드 (나와 쪽지를 주고받은 기록이 있는 사람)
+    # 5-1. 대화 상대 로드 (최신 메시지 순 정렬 & 안 읽은 메시지 뱃지 카운트)
     partners_query = conn.execute('''
-        SELECT DISTINCT sender AS partner FROM messages WHERE receiver=?
-        UNION
-        SELECT DISTINCT receiver AS partner FROM messages WHERE sender=?
-    ''', (current_user, current_user)).fetchall()
-    chat_partners = [p['partner'] for p in partners_query if p['partner'] != current_user]
+        SELECT 
+            CASE WHEN sender = ? THEN receiver ELSE sender END AS partner,
+            MAX(sent_at) AS last_msg_time,
+            SUM(CASE WHEN receiver = ? AND is_read = 0 THEN 1 ELSE 0 END) AS unread_count
+        FROM messages 
+        WHERE sender = ? OR receiver = ?
+        GROUP BY CASE WHEN sender = ? THEN receiver ELSE sender END
+        ORDER BY last_msg_time DESC
+    ''', (current_user, current_user, current_user, current_user, current_user)).fetchall()
+    
+    chat_partners = []
+    for p in partners_query:
+        if p['partner'] != current_user: 
+            chat_partners.append({
+                'name': p['partner'],
+                'unread': p['unread_count']
+            })
 
     # 6. 셀렉트 박스용 회원 명단
     db_users = conn.execute("SELECT name FROM users WHERE status='승인'").fetchall()
@@ -275,8 +287,6 @@ def download_file(name):
 @main_bp.route('/send_message', methods=['POST'])
 def send_message():
     sender = session.get('user_name', '익명')
-    
-    # multipart/form-data 처리를 위해 request.form 과 request.files 사용
     receiver = request.form.get('receiver')
     content = request.form.get('content', '')
     
@@ -311,7 +321,6 @@ def get_chat_history(other_user):
     
     conn.close()
     
-    # DB에 filename 컬럼이 정상 추가된 상태이므로 안전하게 가져오기
     result = []
     for c in chat:
         fname = c['filename'] if 'filename' in c.keys() else ''
@@ -327,7 +336,8 @@ def get_chat_history(other_user):
 def delete_message(msg_id):
     current_user = session.get('user_name')
     conn = get_db()
-    conn.execute("DELETE FROM messages WHERE id=? AND (sender=? OR receiver=?)", (msg_id, current_user, current_user))
+    # 자신의 글만 삭제 가능하도록 권한 강화 (보낸 사람이 현재 사용자인 경우만)
+    conn.execute("DELETE FROM messages WHERE id=? AND sender=?", (msg_id, current_user))
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
