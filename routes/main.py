@@ -13,8 +13,14 @@ def index():
     events = []
     
     if not df_tasks.empty:
+        # 엑셀의 빈 칸(NaN)을 빈 문자열('')로 변환하여 프론트엔드 조건문 오류 방지
+        df_tasks = df_tasks.fillna('')
+        
         for idx, row in df_tasks.iterrows():
-            title = f"[{row['담당자']}] {row['내근업무'] or row['외근업무']}"
+            # 내근, 외근, 회의 순으로 값이 있는 것을 대표 제목으로 사용
+            title_task = row['내근업무'] or row['외근업무'] or row['회의'] or "일정"
+            title = f"[{row['담당자']}] {title_task}"
+            
             events.append({
                 "id": f"task_{idx}",
                 "title": title,
@@ -24,6 +30,7 @@ def index():
                     "owner": str(row['담당자']),
                     "inside": str(row['내근업무']),
                     "outside": str(row['외근업무']),
+                    "meeting": str(row['회의']),  # <-- 프론트엔드에 전달될 회의 데이터 추가
                     "note": str(row['비고'])
                 }
             })
@@ -31,6 +38,7 @@ def index():
     # 2. 근태/휴가(attendance.xlsx) 중 승인된 항목 추가
     df_attend = read_excel_db(ATTEND_FILE)
     if not df_attend.empty:
+        df_attend = df_attend.fillna('')
         approved = df_attend[df_attend['승인상태'] == '승인']
         for idx, row in approved.iterrows():
             events.append({
@@ -88,7 +96,6 @@ def index():
                            holidays_dict=holidays_dict,
                            current_user=current_user)
 
-# --- 새로 추가된 일정 저장 라우트 (404 에러 해결) ---
 @main_bp.route('/save_task', methods=['POST'])
 def save_task():
     try:
@@ -110,7 +117,7 @@ def save_task():
         # 기존 엑셀 데이터 읽기
         df_tasks = read_excel_db(EXCEL_FILE)
 
-        # 새 데이터 구성 (db_handler.py의 컬럼 기준에 맞춤)
+        # 새 데이터 구성
         new_row = pd.DataFrame([{
             '연도': year,
             '날짜': date_str,
