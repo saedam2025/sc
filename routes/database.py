@@ -1,11 +1,11 @@
 import sqlite3
 import os
 
-DB_FILE = '/mnt/data/saedam.db'
+DB_FILE = '/mnt/data/saedam.db' # 렌더 영구저장소 경로
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row # 결과를 딕셔너리처럼 접근 가능하게 함
+    conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
@@ -24,7 +24,7 @@ def init_db():
         note TEXT
     )''')
     
-    # 2. 근태/휴가 테이블 (기존 attendance.xlsx 대체)
+    # 2. 근태(Attendance) 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner TEXT, type TEXT, start_date TEXT, end_date TEXT, status TEXT
@@ -38,16 +38,23 @@ def init_db():
         filename TEXT, filepath TEXT
     )''')
     
-    # 4. 메시지 테이블
+    # 4. 메시지(쪽지) 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         sender TEXT, receiver TEXT, content TEXT, 
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_read INTEGER DEFAULT 0
     )''')
+
+    # 5. 회원 관리(Users) 테이블 [★신규 추가★]
+    c.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_no TEXT, name TEXT, password TEXT, position TEXT, level INTEGER,
+        rrn TEXT, email TEXT, phone TEXT,
+        join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
+    )''')
     
     conn.commit()
     conn.close()
 
-# 서버 시작 시 DB가 없으면 자동 생성
 init_db()

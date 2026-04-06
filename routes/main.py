@@ -118,10 +118,12 @@ def index():
     board_posts = conn.execute("SELECT * FROM board ORDER BY created_at DESC LIMIT 10").fetchall()
     messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 20", (current_user,)).fetchall()
 
-    # 5. 셀렉트 박스용 전체 유저 목록 추출
-    db_users = conn.execute("SELECT DISTINCT owner FROM tasks WHERE owner IS NOT NULL AND owner != '' UNION SELECT DISTINCT owner FROM attendance WHERE owner IS NOT NULL AND owner != ''").fetchall()
-    user_list = sorted(list(set([u['owner'] for u in db_users])))
-    if current_user not in user_list: user_list.append(current_user)
+    # 5. 셀렉트 박스용 전체 유저 목록 추출 (회원 DB에서 '승인'된 유저만 가져옴)
+    db_users = conn.execute("SELECT name FROM users WHERE status='승인'").fetchall()
+    user_list = sorted(list(set([u['name'] for u in db_users])))
+    
+    if current_user not in user_list: 
+        user_list.append(current_user)
 
     conn.close()
 
