@@ -11,19 +11,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
-        /* 기본 배경 및 애니메이션 */
+        /* 1) 단순하고 심플한 직선 디자인 테마 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: #ffffff;  /* 이미지 컨셉: 순백색 배경 */
+            background: #ffffff;
             min-height: 100vh;
             margin: 0;
-            overflow-x: hidden;
             color: #111;
         }
-
-        /* 배경 데코레이션 제거 또는 극소화 (이미지 미니멀리즘 반영) */
-        body::before { display: none; }
-        .bg-shapes { display: none; }
 
         .content-container {
             max-width: 1550px !important;
@@ -31,176 +26,145 @@
             margin: 0 auto;
         }
 
-        /* --- [이미지 컨셉: 블랙 & 화이트 미니멀 네비게이션] --- */
+        /* 네비게이션바 직선 스타일 */
         .navbar {
-            padding: 30px 0; /* 위아래 여백을 충분히 주어 여유로운 느낌 */
+            background: #ffffff;
+            border-bottom: 1px solid #eeeeee; /* 하단 직선 구분선 */
             position: sticky;
             top: 0;
             z-index: 1000;
-            background: #fff; /* 스크롤 시에도 백색 유지 */
         }
 
         .nav-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: transparent; /* 테두리, 배경 제거 */
-            border: none;
-            border-radius: 0; 
-            padding: 0;
-            box-shadow: none; /* 그림자 제거 */
+            padding: 0 20px;
+            height: 70px; /* 고정 높이로 심플함 강조 */
+            max-width: 1550px;
             margin: 0 auto;
         }
 
-        /* 로고 스타일 (이미지처럼 좌측 상단 배치) */
-        .logo {
+        /* 로고 설정: logo01.jpg */
+        .logo-img { 
+            height: 40px; 
+            width: auto; 
+            display: block; 
+        }
+
+        /* 메인 메뉴 목록 */
+        .menu-list { 
+            display: flex; 
+            list-style: none; 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; /* 네비게이션바 높이 전체 사용 */
+            align-items: center; 
+        }
+        
+        .menu-item-wrapper {
+            position: relative;
+            height: 100%;
             display: flex;
             align-items: center;
         }
-        .logo-img { height: 45px; width: auto; display: block; }
 
-        /* --- [이미지 컨셉의 핵심: 블랙 & 화이트 메뉴] --- */
-        .menu-list { display: flex; gap: 5px; list-style: none; margin: 0; padding: 0; align-items: center; }
-        
         .menu-item {
-            color: #111; /* 이미지 컨셉: 블랙 텍스트 */
+            color: #111;
             text-decoration: none; 
-            font-weight: 500; /* 이미지처럼 너무 두껍지 않게 */
-            padding: 12px 24px;
-            border-radius: 30px; /* 이미지처럼 둥근 형태 유지 */
-            transition: all 0.25s ease-in-out; 
+            font-weight: 500; 
+            padding: 0 25px;
+            height: 100%;
             display: flex; 
             align-items: center; 
             gap: 8px;
             font-size: 1rem;
-            position: relative;
+            transition: background 0.2s;
         }
 
-        .menu-item i { font-size: 1rem; color: #555; transition: color 0.3s; }
-
-        /* 이미지 호버 효과: 블랙 배경 + 화이트 텍스트 */
+        /* 호버 시 블랙 배경에 화이트 텍스트 (직선 강조) */
         .menu-item:hover {
-            background: #111; /* 이미지 컨셉: 호버 시 블랙 배경 */
-            color: #fff; /* 이미지 컨셉: 호버 시 화이트 텍스트 */
+            background: #111111;
+            color: #ffffff;
         }
-        .menu-item:hover i { color: #fff; }
+        .menu-item:hover i { color: #ffffff; }
 
-        /* 활성화된 메뉴 상태 (이미지에는 없지만 필요하므로 그레이 톤으로 세련되게 처리) */
         .menu-item.active {
-            background: #f0f0f0;
-            color: #111;
-            font-weight: 700;
+            font-weight: 800;
+            background: #f8f8f8;
         }
-        .menu-item.active i { color: #111; }
 
-        /* --- [이미지 컨셉의 핵심: 드롭다운 디자인] --- */
-        .dropdown { position: relative; }
+        /* 2) 틈 없는 풀다운 메뉴 구성 */
+        .dropdown { height: 100%; }
+        
         .dropdown-content {
-            display: block;
+            display: none; /* 기본적으로 숨김 */
             position: absolute;
-            top: 130%;
-            left: 50%;
-            transform: translateX(-50%) translateY(10px);
-            background: #fff; /* 이미지 컨셉: 드롭다운 화이트 */
-            min-width: 220px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* 은은한 그림자 */
-            border-radius: 20px;
+            top: 100%; /* 메인 메뉴 바로 아래 붙임 */
+            left: 0;
+            background: #111111; /* 메뉴 호버 색상과 일치시켜 통일감 부여 */
+            min-width: 200px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
             z-index: 1100;
-            border: 1px solid #f0f0f0;
-            overflow: hidden;
-            opacity: 0;
-            pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
-            padding: 8px;
+            padding: 0;
+            border-top: 1px solid #333; /* 본체와 구분선 */
         }
 
-        .dropdown:hover .dropdown-content {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
+        /* 래퍼에 호버했을 때 메뉴 보이기 (틈새 방지 핵심) */
+        .menu-item-wrapper:hover .dropdown-content {
+            display: block;
         }
 
         .dropdown-content a {
-            color: #111;
-            padding: 12px 20px;
+            color: #eeeeee;
+            padding: 15px 20px;
             text-decoration: none;
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            border-radius: 14px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #222;
             transition: background 0.2s;
         }
 
         .dropdown-content a:hover {
-            background-color: #f5f5f5; /* 이미지 컨셉: 드롭다운 호버 그레이 */
-            color: #111;
+            background: #333333;
+            color: #ffffff;
         }
 
-        /* --- [이미지 컨셉: 우측 정렬 유저 섹션] --- */
+        /* 우측 유저 섹션 */
         .user-section {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding-left: 0;
-            border-left: none;
+            gap: 20px;
         }
 
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 30px;
-            transition: background 0.2s;
-            border: 1px solid #eee; /* 이미지처럼 깔끔한 테두리 */
+            font-size: 0.95rem;
+            font-weight: 600;
         }
-        .user-profile:hover { background: #f9f9f9; }
-
-        .user-icon-circle {
-            width: 38px;
-            height: 38px;
-            background: #f0f0f0;
-            border-radius: 50%; /* 이미지 프로필 원형 처리 */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
-        }
-
-        .user-info-text { display: flex; flex-direction: column; }
-        .user-name { font-size: 0.95rem; font-weight: 700; color: #111; }
-        .user-role { font-size: 0.75rem; color: #888; font-weight: 500; }
 
         .btn-logout { 
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #111; /* 이미지 컨셉: 로그아웃도 블랙 */
-            background: #fff;
-            border-radius: 50%;
-            transition: all 0.3s;
+            font-size: 1.1rem;
+            color: #e03131;
             text-decoration: none;
-            border: 1px solid #eee;
+            padding: 5px;
         }
-        .btn-logout:hover { background: #e03131; color: white; border-color: #e03131; }
 
-        /* 푸터 (이미지 컨셉에 맞춰 미니멀하게) */
-        .main-footer { text-align: center; padding: 50px 0; color: #999; font-size: 0.9rem; letter-spacing: -0.02em; border-top: 1px solid #eee; }
-
-        /* 모달 시스템 (삭제/수정 없이 유지) */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
-        .modal-content { background: white; margin: 5% auto; padding: 0; border-radius: 28px; width: 480px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.25); }
-        .modal-header { background: #f8fafc; padding: 25px 30px; border-bottom: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { margin: 0; font-size: 1.25rem; color: #2d3748; font-weight: 800; }
+        /* 모달 시스템 */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 10% auto; padding: 0; border-radius: 0; width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f8f8; }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; }
         .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 18px 25px; background: #fcfdfe; text-align: left; color: #718096; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; width: 35%; }
-        .info-table td { padding: 18px 25px; color: #2d3748; font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid #f1f5f9; }
+        .info-table th { padding: 15px 20px; background: #fafafa; text-align: left; color: #666; border-bottom: 1px solid #eee; width: 35%; font-size: 0.85rem; }
+        .info-table td { padding: 15px 20px; color: #111; font-weight: 600; border-bottom: 1px solid #eee; }
+
+        .main-footer { text-align: center; padding: 50px 0; color: #999; font-size: 0.85rem; border-top: 1px solid #eee; margin-top: 50px; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -208,61 +172,74 @@
 <body>
 
     <header class="navbar">
-        <div class="content-container">
-            <div class="nav-container">
-                <a href="/" class="logo">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="새담" class="logo-img">
-                </a>
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <img src="{{ url_for('static', filename='logo01.jpg') }}" alt="SAEDAM" class="logo-img">
+            </a>
 
-                <nav>
-                    <ul class="menu-list">
-                        <li><a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}"><i class="fa-solid fa-house-chimney"></i> 메인</a></li>
-                        
-                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                        <li><a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}"><i class="fa-solid fa-user-gear"></i> 인사관리</a></li>
-                        {% endif %}
-                        
-                        <li><a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}"><i class="fa-solid fa-stamp"></i> 전자결재</a></li>
-                        
-                        <li class="dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}"><i class="fa-solid fa-file-invoice"></i> 증명서</a>
-                            <div class="dropdown-content">
-                                <a href="/document/apply"><i class="fa-solid fa-pen-clip"></i> 증명서 신청</a>
-                                <a href="/document/admin"><i class="fa-solid fa-list-check"></i> 신청 현황</a>
-                            </div>
-                        </li>
-
-                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                        <li><a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}"><i class="fa-solid fa-signature"></i> 전자계약</a></li>
-                        {% endif %}
-
-                        <li class="dropdown">
-                            <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2; font-weight: 700;"><i class="fa-solid fa-briefcase"></i> 업무지원</a>
-                            <div class="dropdown-content">
-                                <a href="/payroll"><i class="fa-solid fa-paper-plane"></i> 명세서 발송</a>
-                                <a href="/excel-generator"><i class="fa-solid fa-table"></i> 입금용 엑셀 생성</a>
-                                <a href="/attendance"><i class="fa-solid fa-clock"></i> 근태 관리</a>
-                            </div>
-                        </li>
-                    </ul>
-                </nav>
-
-                <div class="user-section">
-                    {% if session.get('user_name') %}
-                    <div class="user-profile" onclick="openMyInfoModal()">
-                        <div class="user-icon-circle">
-                             {{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}
-                        </div>
-                        <div class="user-info-text">
-                            <span class="user-name">{{ session['user_name'] }}</span>
-                            <span class="user-role">{{ session.get('role', '구성원') }}</span>
-                        </div>
-                    </div>
-                    <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
-                        <i class="fa-solid fa-power-off"></i>
-                    </a>
+            <nav style="height: 100%;">
+                <ul class="menu-list">
+                    <li class="menu-item-wrapper">
+                        <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
+                            <i class="fa-solid fa-calendar-days"></i> 메인달력
+                        </a>
+                    </li>
+                    
+                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                    <li class="menu-item-wrapper">
+                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-user-gear"></i> 인사관리
+                        </a>
+                    </li>
                     {% endif %}
+                    
+                    <li class="menu-item-wrapper">
+                        <a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-file-signature"></i> 사내결재
+                        </a>
+                    </li>
+                    
+                    <li class="menu-item-wrapper dropdown">
+                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-print"></i> 증명서발급
+                        </a>
+                        <div class="dropdown-content">
+                            <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서 신청</a>
+                            <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 신청 현황</a>
+                        </div>
+                    </li>
+
+                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                    <li class="menu-item-wrapper">
+                        <a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-file-contract"></i> 전자계약
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="menu-item-wrapper dropdown">
+                        <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2; font-weight: 700;">
+                            <i class="fa-solid fa-briefcase"></i> 업무지원
+                        </a>
+                        <div class="dropdown-content">
+                            <a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i> 명세서 발송</a>
+                            <a href="/excel-generator"><i class="fa-solid fa-file-excel"></i> 입금용 엑셀 생성</a>
+                            <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i> 근태 관리</a>
+                        </div>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="user-section">
+                {% if session.get('user_name') %}
+                <div class="user-profile" onclick="openMyInfoModal()">
+                    <span>{{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}</span>
+                    <span><strong>{{ session['user_name'] }}</strong>님</span>
                 </div>
+                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+                {% endif %}
             </div>
         </div>
     </header>
@@ -280,21 +257,20 @@
     <div id="myInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-id-card-clip"></i> 마이 프로필</h3>
-                <span style="cursor:pointer; font-size:1.5rem; color:#ccc;" onclick="closeMyInfoModal()">&times;</span>
+                <h3>내 프로필 정보</h3>
+                <span style="cursor:pointer; font-size:1.2rem;" onclick="closeMyInfoModal()">&times;</span>
             </div>
-            <div id="myInfoLoading" style="text-align: center; padding: 40px; color:#667;">데이터 로드 중...</div>
+            <div id="myInfoLoading" style="text-align: center; padding: 30px;">데이터 로드 중...</div>
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
-                <div style="padding: 25px; text-align: center;">
-                    <button type="button" style="background:#111; color:white; border:none; padding:12px 40px; border-radius:14px; font-weight:bold; cursor:pointer;" onclick="closeMyInfoModal()">확인</button>
+                <div style="padding: 20px; text-align: center;">
+                    <button type="button" style="background:#111; color:white; border:none; padding:10px 30px; cursor:pointer; font-weight:bold;" onclick="closeMyInfoModal()">닫기</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 마이페이지 기능 유지
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
@@ -322,7 +298,6 @@
                     display.style.display = "block";
                 }
             } catch (e) {
-                console.error("Profile load error", e);
                 closeMyInfoModal();
             }
         }
