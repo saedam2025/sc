@@ -35,6 +35,8 @@
     .list-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; transition: background 0.2s; }
     .list-item:hover { background: rgba(255,255,255,0.9); }
     .list-item:last-child { border-bottom: none; }
+    
+    /* 읽지 않은 쪽지 뱃지 (숫자 아이콘) */
     .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
     .msg-unread { font-weight: bold; background: #fff8e1; }
     
@@ -42,7 +44,6 @@
     .btn-edit { color: #4a90e2; }
     .btn-delete { color: #e74c3c; }
 
-    /* 채팅방 커스텀 스타일 */
     #chatBox::-webkit-scrollbar { width: 6px; }
     #chatBox::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
     .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
@@ -113,7 +114,7 @@
                         <strong>{{ post.title }}</strong> 
                         {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:#4a90e2; margin-left:5px;"></i>{% endif %}
                     </div>
-                    <div style="font-size: 0.75rem; color: #777;">{{ post.author }} | {{ post.created_at[:10] }}</div>
+                    <div style="font-size: 0.75rem; color: #777;">{{ user_icons.get(post.author, '👤') }} {{ post.author }} | {{ post.created_at[:10] }}</div>
                 </div>
                 {% else %}
                 <p style="text-align: center; color: #aaa; font-size: 0.85rem;">등록된 게시글이 없습니다.</p>
@@ -138,9 +139,7 @@
             <div id="list-partners" style="flex: 1; overflow-y: auto; background: rgba(255,255,255,0.7); border-radius: 10px; padding: 10px;">
                 {% for partner in chat_partners %}
                 <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 10px;">
-                    <div style="width:35px; height:35px; background:#e9ecef; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#495057;">
-                        <i class="fa-solid fa-user"></i>
-                    </div>
+                    <div style="font-size: 1.8rem;">{{ user_icons.get(partner.name, '👤') }}</div>
                     <div style="flex: 1;">
                         <strong style="color: #333; font-size: 0.95rem;">{{ partner.name }}</strong>
                         {% if partner.unread > 0 %}
@@ -158,7 +157,7 @@
                 {% for msg in received_messages %}
                 <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                        <span style="color: #444;">From: <strong>{{ msg.sender }}</strong></span>
+                        <span style="color: #444;">From: {{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
                         <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
                     </div>
                     <div style="color: #666; font-size:0.8rem;">
@@ -174,7 +173,7 @@
                 {% for msg in sent_messages %}
                 <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start;">
                     <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                        <span style="color: #444;">To: <strong>{{ msg.receiver }}</strong></span>
+                        <span style="color: #444;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
                         <span style="font-size: 0.7rem; color: #999;">{{ msg.sent_at[5:16] }}</span>
                     </div>
                     <div style="color: #666; font-size:0.8rem;">
@@ -192,14 +191,13 @@
 <div id="chatModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
     <div class="modal-content" style="background:#fff; margin:5% auto; padding:25px; width:450px; height:600px; border-radius:20px; position:relative; display:flex; flex-direction:column; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
         <span onclick="closeChat()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
-        <h3 style="color: #9b59b6; margin-top: 0; margin-bottom: 15px; font-weight:800;">
-            <i class="fa-solid fa-comments"></i> <span id="chatPartnerName"></span>님과의 대화
+        <h3 style="color: #9b59b6; margin-top: 0; margin-bottom: 15px; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span id="chatPartnerIcon" style="font-size:1.5rem;">👤</span> <span id="chatPartnerName"></span>님과의 대화
         </h3>
         
         <div id="chatBox" style="flex:1; overflow-y:auto; background:#f4f6f9; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;"></div>
         
         <div style="display:flex; gap:8px; align-items:center; position:relative;">
-            
             <label for="chatFile" style="cursor:pointer; color:#9b59b6; font-size:1.2rem; padding:5px;"><i class="fa-solid fa-paperclip"></i></label>
             <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
             
@@ -210,6 +208,7 @@
                 <span class="emoji-item" onclick="addEmoji('chatInput', '🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('chatInput', '🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('chatInput', '💖')">💖</span><span class="emoji-item" onclick="addEmoji('chatInput', '🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('chatInput', '✨')">✨</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('chatInput', '👏')">👏</span>
                 <span class="emoji-item" onclick="addEmoji('chatInput', '🙌')">🙌</span><span class="emoji-item" onclick="addEmoji('chatInput', '😅')">😅</span><span class="emoji-item" onclick="addEmoji('chatInput', '😋')">😋</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤩')">🤩</span><span class="emoji-item" onclick="addEmoji('chatInput', '😴')">😴</span><span class="emoji-item" onclick="addEmoji('chatInput', '🥳')">🥳</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤫')">🤫</span>
                 <span class="emoji-item" onclick="addEmoji('chatInput', '🤝')">🤝</span><span class="emoji-item" onclick="addEmoji('chatInput', '💪')">💪</span><span class="emoji-item" onclick="addEmoji('chatInput', '📝')">📝</span><span class="emoji-item" onclick="addEmoji('chatInput', '💡')">💡</span><span class="emoji-item" onclick="addEmoji('chatInput', '💯')">💯</span><span class="emoji-item" onclick="addEmoji('chatInput', '📌')">📌</span><span class="emoji-item" onclick="addEmoji('chatInput', '🚀')">🚀</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '👑')">👑</span><span class="emoji-item" onclick="addEmoji('chatInput', '👔')">👔</span><span class="emoji-item" onclick="addEmoji('chatInput', '💼')">💼</span><span class="emoji-item" onclick="addEmoji('chatInput', '🎯')">🎯</span><span class="emoji-item" onclick="addEmoji('chatInput', '💻')">💻</span><span class="emoji-item" onclick="addEmoji('chatInput', '🌱')">🌱</span><span class="emoji-item" onclick="addEmoji('chatInput', '🔰')">🔰</span>
             </div>
 
             <div style="flex:1; display:flex; flex-direction:column; position:relative;">
@@ -243,6 +242,7 @@
                     <span class="emoji-item" onclick="addEmoji('msgContent', '🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('msgContent', '🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('msgContent', '💖')">💖</span><span class="emoji-item" onclick="addEmoji('msgContent', '🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('msgContent', '✨')">✨</span><span class="emoji-item" onclick="addEmoji('msgContent', '🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('msgContent', '👏')">👏</span>
                     <span class="emoji-item" onclick="addEmoji('msgContent', '🙌')">🙌</span><span class="emoji-item" onclick="addEmoji('msgContent', '😅')">😅</span><span class="emoji-item" onclick="addEmoji('msgContent', '😋')">😋</span><span class="emoji-item" onclick="addEmoji('msgContent', '🤩')">🤩</span><span class="emoji-item" onclick="addEmoji('msgContent', '😴')">😴</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥳')">🥳</span><span class="emoji-item" onclick="addEmoji('msgContent', '🤫')">🤫</span>
                     <span class="emoji-item" onclick="addEmoji('msgContent', '🤝')">🤝</span><span class="emoji-item" onclick="addEmoji('msgContent', '💪')">💪</span><span class="emoji-item" onclick="addEmoji('msgContent', '📝')">📝</span><span class="emoji-item" onclick="addEmoji('msgContent', '💡')">💡</span><span class="emoji-item" onclick="addEmoji('msgContent', '💯')">💯</span><span class="emoji-item" onclick="addEmoji('msgContent', '📌')">📌</span><span class="emoji-item" onclick="addEmoji('msgContent', '🚀')">🚀</span>
+                    <span class="emoji-item" onclick="addEmoji('msgContent', '👑')">👑</span><span class="emoji-item" onclick="addEmoji('msgContent', '👔')">👔</span><span class="emoji-item" onclick="addEmoji('msgContent', '💼')">💼</span><span class="emoji-item" onclick="addEmoji('msgContent', '🎯')">🎯</span><span class="emoji-item" onclick="addEmoji('msgContent', '💻')">💻</span><span class="emoji-item" onclick="addEmoji('msgContent', '🌱')">🌱</span><span class="emoji-item" onclick="addEmoji('msgContent', '🔰')">🔰</span>
                 </div>
                 <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
             </div>
@@ -321,8 +321,8 @@
 <script>
   window.taskDataMap = window.taskDataMap || {};
   const currentUser = '{{ current_user }}';
+  const userIcons = {{ user_icons | tojson | safe }};
 
-  // 쪽지함 탭 스위칭 (대화 상대 추가)
   function switchMsgTab(tab) {
       ['partners', 'recv', 'sent'].forEach(t => {
           document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
@@ -331,7 +331,6 @@
       });
   }
 
-  // --- 채팅, 파일첨부, 이모티콘 로직 ---
   let currentChatPartner = null;
 
   function toggleEmojiPicker(pickerId) {
@@ -360,6 +359,7 @@
   async function openChat(partnerName) {
       currentChatPartner = partnerName;
       document.getElementById('chatPartnerName').innerText = partnerName;
+      document.getElementById('chatPartnerIcon').innerText = userIcons[partnerName] || '👤';
       document.getElementById('chatModal').style.display = 'block';
       await refreshChatBox();
       checkUnreadMessages();
@@ -395,7 +395,6 @@
                   }
               }
 
-              // 보낸 메시지는 연노랑 바탕으로 수정 + 삭제 버튼 활성화
               if(c.sender === currentUser) {
                   box.innerHTML += `
                   <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
@@ -409,15 +408,16 @@
                       </div>
                   </div>`;
               } else {
-                  // 받은 메시지는 삭제 버튼 제거
                   box.innerHTML += `
-                  <div style="align-self: flex-start; max-width: 80%; display:flex; flex-direction:column; align-items:flex-start;">
-                      <div style="background:#fff; color:#333; padding:10px 14px; border-radius:15px 15px 15px 0; font-size:0.9rem; word-break:break-all; border:1px solid #e0e0e0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                          ${c.content}
-                          ${fileHtml}
-                      </div>
-                      <div style="font-size:0.7rem; color:#999; margin-top:4px;">
-                          ${timeStr}
+                  <div style="align-self: flex-start; max-width: 80%; display:flex; gap:10px;">
+                      <div style="font-size: 2rem;">${userIcons[c.sender] || '👤'}</div>
+                      <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                          <div style="font-size:0.8rem; color:#555; margin-bottom:3px; font-weight:bold;">${c.sender}</div>
+                          <div style="background:#fff; color:#333; padding:10px 14px; border-radius:0 15px 15px 15px; font-size:0.9rem; word-break:break-all; border:1px solid #e0e0e0; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                              ${c.content}
+                              ${fileHtml}
+                          </div>
+                          <div style="font-size:0.7rem; color:#999; margin-top:4px;">${timeStr}</div>
                       </div>
                   </div>`;
               }
@@ -492,7 +492,6 @@
       } catch (e) {}
   }
 
-  // --- 기존 캘린더 로직 (생략 없이 유지) ---
   function toggleDetails(card) {
       const details = card.querySelector('.card-details');
       const icon = card.querySelector('.toggle-icon');
@@ -648,7 +647,6 @@
       } catch (e) {}
   }
 
-  // --- 기존 사내 게시판 스크립트 ---
   let currentBoardId = null;
 
   function openBoardForm() {
