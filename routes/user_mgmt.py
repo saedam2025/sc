@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect
+from routes.db_handler import read_excel_db, write_excel_db, OWNER_FILE
+import pandas as pd
 import base64
 import smtplib
 import os
@@ -6,7 +8,6 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# database.py에서 DB 연결 함수 가져오기 (경로에 맞게 수정 필요 시 수정)
 from .database import get_db 
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
@@ -21,16 +22,11 @@ GROUP_CODE_MAP = {
     "센터장": "04", "전담코디": "05", "안전코디": "05", "계약직": "05", "임시회원": "00"
 }
 
-# DB 기반 사번 생성 함수
 def generate_sd_emp_no(conn, position):
     group_code = GROUP_CODE_MAP.get(position, "05")
     prefix = f"sd{group_code}"
-    
     row = conn.execute("SELECT emp_no FROM users WHERE emp_no LIKE ? ORDER BY emp_no DESC LIMIT 1", (f"{prefix}%",)).fetchone()
-    
-    if not row or not row['emp_no']:
-        return f"{prefix}001"
-    
+    if not row or not row['emp_no']: return f"{prefix}001"
     last_no_str = row['emp_no'][-3:]
     next_no = int(last_no_str) + 1
     return f"{prefix}{next_no:03d}"
@@ -98,16 +94,16 @@ def register():
     try:
         data = request.json
         conn = get_db()
-        
         dup = conn.execute("SELECT id FROM users WHERE name=? AND rrn=?", (data['name'], data.get('rrn', ''))).fetchone()
         if dup:
             conn.close()
             return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
 
+        icon = data.get('profile_icon', '👤')
         conn.execute('''
-            INSERT INTO users (name, password, position, level, rrn, email, phone, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, '대기')
-        ''', (data['name'], str(data['password']), data['position'], 10, data.get('rrn', ''), data.get('email', ''), data.get('phone', '')))
+            INSERT INTO users (name, password, position, level, rrn, email, phone, status, profile_icon)
+            VALUES (?, ?, ?, ?, ?, ?, ?, '대기', ?)
+        ''', (data['name'], str(data['password']), data['position'], 10, data.get('rrn', ''), data.get('email', ''), data.get('phone', ''), icon))
         
         conn.commit()
         conn.close()
@@ -191,17 +187,11 @@ def get_user_list():
     
     result = []
     for u in users:
+        icon = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
         result.append({
-            "id": u['id'], # DB의 고유 ID값
-            "사번": u['emp_no'] or '',
-            "이름": u['name'] or '',
-            "직급": u['position'] or '',
-            "레벨": u['level'] or 10,
-            "주민번호": u['rrn'] or '',
-            "이메일": u['email'] or '',
-            "전화번호": u['phone'] or '',
-            "입사일": u['join_date'] or '',
-            "퇴사일": u['retire_date'] or '',
-            "승인상태": u['status'] or ''
+            "id": u['id'], "사번": u['emp_no'] or '', "이름": u['name'] or '',
+            "직급": u['position'] or '', "레벨": u['level'] or 10, "주민번호": u['rrn'] or '',
+            "이메일": u['email'] or '', "전화번호": u['phone'] or '', "입사일": u['join_date'] or '',
+            "퇴사일": u['retire_date'] or '', "승인상태": u['status'] or '', "아이콘": icon
         })
     return jsonify(result)

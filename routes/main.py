@@ -23,14 +23,20 @@ def index():
     
     conn = get_db()
 
-    # [DB 자동 업데이트] 기존 쪽지 테이블에 파일첨부용 컬럼이 없으면 자동 추가
+    # [DB 컬럼 자동 확인 및 추가]
     try:
         conn.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         conn.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
         conn.commit()
     except:
         pass 
-    
+        
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'")
+        conn.commit()
+    except:
+        pass
+
     # 1. 일정(Tasks) 로드
     tasks = conn.execute('SELECT * FROM tasks').fetchall()
     for row in tasks:
@@ -81,7 +87,7 @@ def index():
             }
         })
 
-    # 3. 날짜 계산 및 그룹핑
+    # 3. 날짜 계산 및 그룹핑 (우측 판넬)
     today = datetime.now()
     today_date = today.date()
     tomorrow_date = today_date + timedelta(days=1)
@@ -124,11 +130,11 @@ def index():
     # 4. 게시판 로드
     board_posts = conn.execute("SELECT * FROM board ORDER BY created_at DESC LIMIT 10").fetchall()
     
-    # 5. 메시지 로드 (받은 쪽지, 보낸 쪽지)
+    # 5. 메시지 로드 (받은 쪽지, 보낸 쪽지 분리)
     received_messages = conn.execute("SELECT * FROM messages WHERE receiver=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
     sent_messages = conn.execute("SELECT * FROM messages WHERE sender=? ORDER BY sent_at DESC LIMIT 50", (current_user,)).fetchall()
 
-    # 5-1. 대화 상대 로드 (최신 메시지 순 정렬 & 안 읽은 메시지 뱃지 카운트)
+    # 6. 대화 상대 로드 (최신 메시지 순 정렬 및 안 읽은 메시지 개수 조회)
     partners_query = conn.execute('''
         SELECT 
             CASE WHEN sender = ? THEN receiver ELSE sender END AS partner,
@@ -148,10 +154,18 @@ def index():
                 'unread': p['unread_count']
             })
 
-    # 6. 셀렉트 박스용 회원 명단
-    db_users = conn.execute("SELECT name FROM users WHERE status='승인'").fetchall()
+    # 7. 전체 회원 명단 및 프로필 아이콘 로드
+    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인'").fetchall()
     user_list = sorted(list(set([u['name'] for u in db_users])))
-    if current_user not in user_list: user_list.append(current_user)
+    
+    user_icons = {}
+    for u in db_users:
+        user_icons[u['name']] = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
+        
+    if current_user not in user_icons:
+        user_icons[current_user] = '👤'
+    if current_user not in user_list: 
+        user_list.append(current_user)
 
     conn.close()
 
@@ -161,7 +175,7 @@ def index():
                            current_user=current_user, board_posts=board_posts, 
                            chat_partners=chat_partners,
                            received_messages=received_messages, sent_messages=sent_messages,
-                           user_list=user_list)
+                           user_list=user_list, user_icons=user_icons)
 
 @main_bp.route('/save_task', methods=['POST'])
 def save_task():
@@ -281,8 +295,7 @@ def delete_board(post_id):
 def download_file(name):
     return send_from_directory(UPLOAD_FOLDER, name)
 
-
-# --- 메시지/쪽지 관련 API (파일첨부 기능 추가) ---
+# --- 메시지/쪽지 관련 API ---
 
 @main_bp.route('/send_message', methods=['POST'])
 def send_message():
@@ -310,6 +323,7 @@ def get_chat_history(other_user):
     current_user = session.get('user_name')
     conn = get_db()
     
+    # 상대방이 보낸 메시지를 확인하면 '읽음' 처리
     conn.execute("UPDATE messages SET is_read=1 WHERE receiver=? AND sender=?", (current_user, other_user))
     conn.commit()
     
@@ -336,7 +350,7 @@ def get_chat_history(other_user):
 def delete_message(msg_id):
     current_user = session.get('user_name')
     conn = get_db()
-    # 자신의 글만 삭제 가능하도록 권한 강화 (보낸 사람이 현재 사용자인 경우만)
+    # 보안: 본인이 전송한 글(sender)만 삭제할 수 있도록 제한
     conn.execute("DELETE FROM messages WHERE id=? AND sender=?", (msg_id, current_user))
     conn.commit()
     conn.close()

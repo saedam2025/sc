@@ -46,7 +46,7 @@ def init_db():
         is_read INTEGER DEFAULT 0
     )''')
 
-    # 5. 회원 관리(Users) 테이블 [★신규 추가★]
+    # 5. 회원 관리(Users) 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         emp_no TEXT, name TEXT, password TEXT, position TEXT, level INTEGER,
@@ -54,12 +54,18 @@ def init_db():
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
     )''')
 
-    # [업데이트] 기존 messages 테이블에 파일 컬럼이 없다면 자동 추가 (에러 무시)
+    # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가 (에러 무시)
     try:
         c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         c.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
     except sqlite3.OperationalError:
         pass 
+
+    try:
+        # 회원별 프로필 이모지 아이콘 저장 컬럼 (기본값: 사람모양)
+        c.execute("ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'")
+    except sqlite3.OperationalError:
+        pass
     
     conn.commit()
     conn.close()
