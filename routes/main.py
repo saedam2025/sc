@@ -40,13 +40,10 @@ def index():
                 time_val = str(row.get(time_key, '')).strip()
                 
                 if title_val:
-                    disp_title = f"[{owner}] {title_val}"
-                    if time_val:
-                        disp_title += f" ({time_val})"
-                        
+                    # 달력에는 [회의] 형태만 표시, 오른쪽 판넬은 상세 유지
                     events.append({
                         "id": f"task_{idx}_{cat}",
-                        "title": disp_title,
+                        "title": title_val, # 원본 제목 유지 (상세창용)
                         "start": date_str,
                         "color": cat_colors[cat],
                         "extendedProps": {
@@ -65,7 +62,7 @@ def index():
         approved = df_attend[df_attend['승인상태'] == '승인']
         for idx, row in approved.iterrows():
             events.append({
-                "title": f"[{row['담당자']}] {row['구분']}",
+                "title": str(row['구분']),
                 "start": str(row['시작일']),
                 "end": str(row['종료일']),
                 "color": cat_colors['근태/휴가'],
@@ -79,7 +76,7 @@ def index():
                 }
             })
 
-    # 3. 날짜 계산 및 카테고리별 그룹핑 (오늘 및 주간 일정)
+    # 3. 날짜 계산 및 카테고리별 그룹핑 (오늘 및 주간 일정) - 오른쪽 판넬용
     today = datetime.now()
     today_date = today.date()
     tomorrow_date = today_date + timedelta(days=1)
@@ -92,21 +89,37 @@ def index():
         try:
             start_date = datetime.strptime(e['start'][:10], '%Y-%m-%d').date()
             end_date = start_date
-            # 종료일이 있는 경우 전날까지로 계산 (FullCalendar의 end는 exclusive 속성)
             if 'end' in e and e['end']:
-                end_date = datetime.strptime(e['end'][:10], '%Y-%m-%d').date() - timedelta(days=1)
-                
+                # FullCalendar end is exclusive
+                end_date_orig = datetime.strptime(e['end'][:10], '%Y-%m-%d').date()
+                if e.get('allDay'):
+                     end_date = end_date_orig - timedelta(days=1)
+                else:
+                     end_date = end_date_orig
+
             cat = e.get('extendedProps', {}).get('category', '기타')
             
+            # 오른쪽 판넬용 상세 제목 구성
+            owner = e.get('extendedProps', {}).get('owner', '')
+            task_title = e.get('extendedProps', {}).get('task_title', '')
+            task_time = e.get('extendedProps', {}).get('task_time', '')
+            
+            display_title_detailed = f"[{owner}] {task_title}"
+            if task_time:
+                display_title_detailed += f" ({task_time})"
+            
+            event_copy = e.copy()
+            event_copy['display_title_detailed'] = display_title_detailed
+
             # 오늘 일정 포함 여부 확인
             if start_date <= today_date <= end_date:
                 if cat in today_grouped:
-                    today_grouped[cat].append(e)
+                    today_grouped[cat].append(event_copy)
             
-            # 주간 일정 포함 여부 확인 (내일 ~ 7일 뒤 기간과 겹치는 경우)
+            # 주간 일정 포함 여부 확인
             if start_date <= next_week_date and end_date >= tomorrow_date:
                 if cat in weekly_grouped:
-                    weekly_grouped[cat].append(e)
+                    weekly_grouped[cat].append(event_copy)
                     
         except ValueError:
             continue
@@ -120,11 +133,7 @@ def index():
     kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
     holidays_dict = {}
     for date, name in kr_holidays.items():
-        name_str = str(name)
-        if "대체" in name_str:
-            holidays_dict[str(date)] = "대체공휴일"
-        else:
-            holidays_dict[str(date)] = name_str
+        holidays_dict[str(date)] = str(name)
 
     current_user = session.get('user_name', '배서현') 
 
@@ -141,42 +150,25 @@ def index():
 def save_task():
     try:
         data = request.get_json()
-        if not data:
-            return jsonify({"status": "error", "message": "데이터가 없습니다."}), 400
+        if not data: return jsonify({"status": "error", "message": "데이터가 없습니다."}), 400
 
         date_str = data.get('date', '')
         owner = data.get('owner', '')
         year = date_str[:4] if date_str else ''
-
         df_tasks = read_excel_db(EXCEL_FILE)
 
-        # 새로운 엑셀 스키마로 저장 (항목별 제목, 시간 분리)
         new_row = pd.DataFrame([{
-            '연도': year,
-            '날짜': date_str,
-            '담당자': owner,
-            '회의_제목': data.get('회의_제목', ''),
-            '회의_시간': data.get('회의_시간', ''),
-            '면접_제목': data.get('면접_제목', ''),
-            '면접_시간': data.get('면접_시간', ''),
-            '미팅_제목': data.get('미팅_제목', ''),
-            '미팅_시간': data.get('미팅_시간', ''),
-            '외근_제목': data.get('외근_제목', ''),
-            '외근_시간': data.get('외근_시간', ''),
-            '기타_제목': data.get('기타_제목', ''),
-            '기타_시간': data.get('기타_시간', ''),
+            '연도': year, '날짜': date_str, '담당자': owner,
+            '회의_제목': data.get('회의_제목', ''), '회의_시간': data.get('회의_시간', ''),
+            '면접_제목': data.get('면접_제목', ''), '면접_시간': data.get('면접_시간', ''),
+            '미팅_제목': data.get('미팅_제목', ''), '미팅_시간': data.get('미팅_시간', ''),
+            '외근_제목': data.get('외근_제목', ''), '외근_시간': data.get('외근_시간', ''),
+            '기타_제목': data.get('기타_제목', ''), '기타_시간': data.get('기타_시간', ''),
             '비고': data.get('note', '')
         }])
 
-        if df_tasks.empty:
-            df_tasks = new_row
-        else:
-            df_tasks = pd.concat([df_tasks, new_row], ignore_index=True)
-            
+        df_tasks = pd.concat([df_tasks, new_row], ignore_index=True) if not df_tasks.empty else new_row
         write_excel_db(df_tasks, EXCEL_FILE)
-
         return jsonify({"status": "success", "message": "일정 등록 완료"})
-
     except Exception as e:
-        print(f"서버 에러 상세: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
