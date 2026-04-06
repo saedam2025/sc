@@ -22,6 +22,14 @@ def index():
     events = []
     
     conn = get_db()
+
+    # [DB 자동 업데이트] 기존 쪽지 테이블에 파일첨부용 컬럼이 없으면 자동 추가 (에러 방지용)
+    try:
+        conn.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
+        conn.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
+        conn.commit()
+    except:
+        pass # 이미 컬럼이 존재하면 통과
     
     # 1. 일정(Tasks) 로드
     tasks = conn.execute('SELECT * FROM tasks').fetchall()
@@ -252,32 +260,40 @@ def delete_board(post_id):
 def download_file(name):
     return send_from_directory(UPLOAD_FOLDER, name)
 
-# --- 메시지/쪽지 관련 API ---
+
+# --- 메시지/쪽지 관련 API (파일첨부 기능 추가) ---
 
 @main_bp.route('/send_message', methods=['POST'])
 def send_message():
-    data = request.get_json()
     sender = session.get('user_name', '익명')
-    receiver = data.get('receiver')
-    content = data.get('content')
     
+    # multipart/form-data 처리를 위해 request.form 과 request.files 사용
+    receiver = request.form.get('receiver')
+    content = request.form.get('content', '')
+    
+    file = request.files.get('file')
+    filename, filepath = '', ''
+    
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+
     conn = get_db()
-    conn.execute("INSERT INTO messages (sender, receiver, content) VALUES (?, ?, ?)", (sender, receiver, content))
+    conn.execute("INSERT INTO messages (sender, receiver, content, filename, filepath) VALUES (?, ?, ?, ?, ?)", 
+                 (sender, receiver, content, filename, filepath))
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
 
-# 특정 사용자와의 전체 대화 내역 불러오기 (채팅 모달용)
 @main_bp.route('/get_chat_history/<other_user>')
 def get_chat_history(other_user):
     current_user = session.get('user_name')
     conn = get_db()
     
-    # 상대방이 보낸 메시지 중 내가 수신자인 메시지는 '읽음(1)' 처리
     conn.execute("UPDATE messages SET is_read=1 WHERE receiver=? AND sender=?", (current_user, other_user))
     conn.commit()
     
-    # 나와 상대방이 주고받은 모든 메시지 시간순 정렬로 로드
     chat = conn.execute('''
         SELECT * FROM messages 
         WHERE (sender=? AND receiver=?) OR (sender=? AND receiver=?) 
@@ -286,15 +302,22 @@ def get_chat_history(other_user):
     
     conn.close()
     
-    result = [{"id": c['id'], "sender": c['sender'], "receiver": c['receiver'], "content": c['content'], "sent_at": c['sent_at'], "is_read": c['is_read']} for c in chat]
+    # DB에 filename 컬럼이 정상 추가된 상태이므로 안전하게 가져오기
+    result = []
+    for c in chat:
+        fname = c['filename'] if 'filename' in c.keys() else ''
+        result.append({
+            "id": c['id'], "sender": c['sender'], "receiver": c['receiver'], 
+            "content": c['content'], "sent_at": c['sent_at'], "is_read": c['is_read'],
+            "filename": fname
+        })
+        
     return jsonify(result)
 
-# 메시지 삭제 API (본인이 쓴 글이든 받은 글이든 물리적 삭제)
 @main_bp.route('/delete_message/<int:msg_id>', methods=['DELETE'])
 def delete_message(msg_id):
     current_user = session.get('user_name')
     conn = get_db()
-    # 권한 보호: 현재 로그인한 사용자가 보냈거나 받은 메시지만 삭제 가능
     conn.execute("DELETE FROM messages WHERE id=? AND (sender=? OR receiver=?)", (msg_id, current_user, current_user))
     conn.commit()
     conn.close()

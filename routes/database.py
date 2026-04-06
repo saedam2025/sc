@@ -53,6 +53,13 @@ def init_db():
         rrn TEXT, email TEXT, phone TEXT,
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
     )''')
+
+    # [업데이트] 기존 messages 테이블에 파일 컬럼이 없다면 자동 추가 (에러 무시)
+    try:
+        c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
+        c.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
+    except sqlite3.OperationalError:
+        pass 
     
     conn.commit()
     conn.close()
