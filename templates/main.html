@@ -182,7 +182,7 @@
               label = arg.event.title;
           } else {
               // 그 외 항목은 대괄호 아이콘 형태만 표시
-              label = "[" + cat + "]";
+              label = cat;
           }
           return { html: '<div class="fc-event-main" style="background-color:' + arg.event.backgroundColor + '">' + label + '</div>' };
       },
