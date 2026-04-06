@@ -1,44 +1,356 @@
 {% extends 'base.html' %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/user_mgmt.css') }}">
-<style>
-    .approval-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-    .status-wait { background: #fff4e6; color: #d9480f; }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="content-container">
-    <div class="mgmt-header">
-        <h2><i class="fa-solid fa-file-signature"></i> 사내결재 관리</h2>
-        <p>상신된 결재 서류를 확인하고 승인/반려 처리를 진행합니다.</p>
-    </div>
+<style>
+    .dashboard-container { padding: 0 0 20px 0; background-color: transparent; font-family: 'Pretendard', sans-serif; }
+    .glass-box { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.8); border-radius: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05); padding: 20px; }
+    
+    .approval-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .btn-new-draft { background: #4a90e2; color: white; padding: 10px 20px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 10px rgba(74, 144, 226, 0.3); }
+    .btn-new-draft:hover { background: #357abd; transform: translateY(-2px); }
 
-    <div class="approval-card">
-        <table class="approve-table">
-            <thead>
-                <tr>
-                    <th>번호</th>
-                    <th>결재양식</th>
-                    <th>제목</th>
-                    <th>기안자</th>
-                    <th>기안일</th>
-                    <th>상태</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>1</td>
-                    <td>지출결의서</td>
-                    <td>3월 소모품 구매 건</td>
-                    <td>홍길동</td>
-                    <td>2026-03-31</td>
-                    <td><span class="status-badge status-wait">결재대기</span></td>
-                </tr>
+    .nav-tabs { display: flex; gap: 20px; border-bottom: 2px solid #dee2e6; margin-bottom: 20px; }
+    .nav-tab { padding: 10px 5px; font-weight: bold; color: #adb5bd; cursor: pointer; transition: 0.2s; position: relative; }
+    .nav-tab.active { color: #4a90e2; }
+    .nav-tab.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: #4a90e2; border-radius: 3px; }
+
+    .approval-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .approval-table th { background: rgba(248, 249, 250, 0.5); padding: 15px; color: #495057; border-bottom: 1px solid #dee2e6; font-size: 0.9em; }
+    .approval-table td { padding: 15px; border-bottom: 1px solid #f1f3f5; font-size: 0.95em; color: #333; cursor: pointer; transition: 0.2s; }
+    .approval-table tbody tr:hover { background: rgba(255, 255, 255, 0.8); }
+    
+    .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+    .st-대기 { background: #fff3cd; color: #f59f00; }
+    .st-1차승인 { background: #e7f5ff; color: #228be6; }
+    .st-완료 { background: #d3f9d8; color: #2b8a3e; }
+    .st-반려 { background: #ffe3e3; color: #c92a2a; }
+
+    .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
+    .modal-content { background: white; margin: 4% auto; padding: 30px; width: 600px; border-radius: 20px; position: relative; max-height: 85vh; overflow-y: auto; box-shadow: 0 15px 40px rgba(0,0,0,0.2); }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; color: #495057; margin-bottom: 5px; font-size: 0.9em; }
+    .form-control { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; background: #f8f9fa; }
+    .form-control:focus { outline: none; border-color: #4a90e2; background: white; }
+
+    .action-btn { padding: 12px 24px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; color: white; }
+    .btn-approve { background: #28a745; }
+    .btn-reject { background: #dc3545; }
+    
+    /* 동적 양식 데이터 출력부 */
+    .detail-box { background: #f8f9fa; padding: 20px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 20px; line-height: 1.6; }
+    .detail-item { display: flex; border-bottom: 1px dashed #dee2e6; padding: 8px 0; }
+    .detail-item:last-child { border-bottom: none; }
+    .detail-key { font-weight: bold; color: #555; width: 120px; flex-shrink: 0; }
+</style>
+
+<div class="dashboard-container">
+    <div class="glass-box" style="min-height: 700px;">
+        <div class="approval-header">
+            <h2 style="margin: 0; color: #2c3e50;"><i class="fa-solid fa-signature"></i> 사내 전자결재</h2>
+            <button class="btn-new-draft" onclick="openDraftModal()"><i class="fa-solid fa-pen-nib"></i> 새 결재 상신</button>
+        </div>
+
+        <div class="nav-tabs">
+            <div class="nav-tab active" id="tab-pending" onclick="switchTab('pending')">내 결재함 (수신)</div>
+            <div class="nav-tab" id="tab-draft" onclick="switchTab('draft')">기안 진행함 (발신)</div>
+            <div class="nav-tab" id="tab-completed" onclick="switchTab('completed')">결재 완료함 (보관)</div>
+        </div>
+
+        <div id="view-pending">
+            <table class="approval-table">
+                <thead><tr><th>종류</th><th>제목</th><th>기안자</th><th>기안일시</th><th>상태</th></tr></thead>
+                <tbody>
+                    {% for doc in pending_docs %}
+                    <tr onclick="openDetailModal({{ doc.id }})">
+                        <td><span style="font-weight:bold; color:#4a90e2;">[{{ doc.doc_type }}]</span></td>
+                        <td>{{ doc.title }}</td>
+                        <td>{{ doc.drafter }}</td>
+                        <td style="color:#868e96; font-size:0.9em;">{{ doc.created_at[:16] }}</td>
+                        <td><span class="status-badge st-{{ doc.status }}">{{ doc.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#adb5bd;">현재 결재할 문서가 없습니다.</td></tr>
+                    {% endfor %}
                 </tbody>
-        </table>
+            </table>
+        </div>
+
+        <div id="view-draft" style="display: none;">
+            <table class="approval-table">
+                <thead><tr><th>종류</th><th>제목</th><th>결재자 (1차/2차)</th><th>기안일시</th><th>상태</th></tr></thead>
+                <tbody>
+                    {% for doc in my_drafts %}
+                    <tr onclick="openDetailModal({{ doc.id }})">
+                        <td><span style="font-weight:bold; color:#4a90e2;">[{{ doc.doc_type }}]</span></td>
+                        <td>{{ doc.title }}</td>
+                        <td style="font-size:0.9em;">{{ doc.approver_1 }} / {{ doc.approver_2 or '전결' }}</td>
+                        <td style="color:#868e96; font-size:0.9em;">{{ doc.created_at[:16] }}</td>
+                        <td><span class="status-badge st-{{ doc.status }}">{{ doc.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#adb5bd;">상신한 문서가 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div id="view-completed" style="display: none;">
+            <table class="approval-table">
+                <thead><tr><th>종류</th><th>제목</th><th>기안자</th><th>최종처리일시</th><th>결과</th></tr></thead>
+                <tbody>
+                    {% for doc in completed_docs %}
+                    <tr onclick="openDetailModal({{ doc.id }})">
+                        <td><span style="font-weight:bold; color:#4a90e2;">[{{ doc.doc_type }}]</span></td>
+                        <td>{{ doc.title }}</td>
+                        <td>{{ doc.drafter }}</td>
+                        <td style="color:#868e96; font-size:0.9em;">{{ doc.updated_at[:16] }}</td>
+                        <td><span class="status-badge st-{{ doc.status }}">{{ doc.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" style="text-align:center; padding:30px; color:#adb5bd;">완료된 결재가 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<div id="draftModal" class="modal">
+    <div class="modal-content">
+        <span onclick="document.getElementById('draftModal').style.display='none'" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
+        <h3 style="color:#4a90e2; margin-top:0; margin-bottom:20px;"><i class="fa-solid fa-pen-to-square"></i> 기안서 작성</h3>
+        
+        <div class="form-group">
+            <label>결재 문서 종류</label>
+            <select id="draftType" class="form-control" onchange="changeDraftForm()">
+                <option value="기안서">기안서 (일반)</option>
+                <option value="보고서">보고서</option>
+                <option value="업무일지">업무일지</option>
+                <option value="회의록">회의록</option>
+                <option value="지출결의서">지출결의서</option>
+                <option value="휴가원">휴가원</option>
+                <option value="퇴직원">퇴직원</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>문서 제목</label>
+            <input type="text" id="draftTitle" class="form-control" placeholder="예: 2026년 4월 비품 구매 품의" required>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <div class="form-group" style="flex:1;">
+                <label>1차 결재자 (필수)</label>
+                <select id="app1" class="form-control" required>
+                    <option value="">선택하세요</option>
+                    {% for u in user_list %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="flex:1;">
+                <label>2차 결재자 (선택)</label>
+                <select id="app2" class="form-control">
+                    <option value="">전결 (1차 승인 시 즉시 완료)</option>
+                    {% for u in user_list %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div id="dynamic-expense" style="display:none; background:#e9ecef; padding:15px; border-radius:10px; margin-bottom:15px;">
+            <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;"><label>지출일자</label><input type="date" id="expDate" class="form-control"></div>
+                <div class="form-group" style="flex:1;"><label>지출금액 (원)</label><input type="number" id="expAmount" class="form-control" placeholder="숫자만 입력"></div>
+            </div>
+            <div class="form-group"><label>계정과목 (분류)</label><input type="text" id="expCategory" class="form-control" placeholder="예: 복리후생비, 소모품비 등"></div>
+        </div>
+
+        <div id="dynamic-leave" style="display:none; background:#e9ecef; padding:15px; border-radius:10px; margin-bottom:15px;">
+            <div class="form-group"><label>휴가 구분</label>
+                <select id="leaveType" class="form-control"><option>연차</option><option>오전반차</option><option>오후반차</option><option>병가</option><option>경조휴가</option></select>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;"><label>시작일</label><input type="date" id="leaveStart" class="form-control"></div>
+                <div class="form-group" style="flex:1;"><label>종료일</label><input type="date" id="leaveEnd" class="form-control"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>상세 내용 (사유 등)</label>
+            <textarea id="draftContent" class="form-control" style="height:150px; resize:none;" required placeholder="내용을 자세히 작성해 주세요."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label><i class="fa-solid fa-paperclip"></i> 증빙 파일 첨부</label>
+            <input type="file" id="draftFile" class="form-control">
+        </div>
+
+        <button type="button" onclick="submitApproval()" style="width:100%; background:#4a90e2; color:white; border:none; padding:15px; border-radius:10px; font-weight:bold; font-size:1.1em; cursor:pointer; margin-top:10px;">상신하기</button>
+    </div>
+</div>
+
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <span onclick="document.getElementById('detailModal').style.display='none'" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:#aaa;">&times;</span>
+        <h3 id="dt_type" style="color:#868e96; margin-top:0; margin-bottom:5px; font-size:1rem;"></h3>
+        <h2 id="dt_title" style="color:#212529; margin-top:0; margin-bottom:15px;"></h2>
+        
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid #dee2e6; padding-bottom:10px; margin-bottom:20px; font-size:0.9em; color:#495057;">
+            <div><strong>기안자:</strong> <span id="dt_drafter"></span></div>
+            <div><strong>상태:</strong> <span id="dt_status" class="status-badge"></span></div>
+        </div>
+
+        <div style="background:#e7f5ff; padding:15px; border-radius:10px; margin-bottom:20px; font-size:0.9em;">
+            <strong>결재선:</strong> 1차 <span id="dt_app1" style="color:#1971c2;"></span> ➡️ 최종 <span id="dt_app2" style="color:#1971c2;"></span>
+        </div>
+
+        <div class="detail-box" id="dt_dynamic_box">
+            </div>
+
+        <div id="dt_fileWrap" style="display:none; font-size:0.9em; margin-bottom:20px;">
+            <i class="fa-solid fa-paperclip" style="color:#4a90e2;"></i> 첨부파일: <a id="dt_fileLink" href="#" target="_blank" style="font-weight:bold; text-decoration:none; color:#4a90e2;"></a>
+        </div>
+
+        <div id="actionArea" style="display:none; text-align:center; margin-top:30px; border-top:1px dashed #dee2e6; padding-top:20px;">
+            <button class="action-btn btn-reject" onclick="processApproval('reject')"><i class="fa-solid fa-xmark"></i> 반려</button>
+            <button class="action-btn btn-approve" onclick="processApproval('approve')" style="margin-left:15px;"><i class="fa-solid fa-check"></i> 결재 승인</button>
+        </div>
+        <input type="hidden" id="currentDocId">
+    </div>
+</div>
+
+<script>
+const currentUser = '{{ current_user }}';
+
+// 탭 스위칭 로직
+function switchTab(tab) {
+    ['pending', 'draft', 'completed'].forEach(t => {
+        document.getElementById('view-' + t).style.display = (t === tab) ? 'block' : 'none';
+        document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    });
+}
+
+// 상신 폼 동적 변경
+function changeDraftForm() {
+    const type = document.getElementById('draftType').value;
+    document.getElementById('dynamic-expense').style.display = (type === '지출결의서') ? 'block' : 'none';
+    document.getElementById('dynamic-leave').style.display = (type === '휴가원') ? 'block' : 'none';
+}
+
+function openDraftModal() {
+    document.getElementById('draftType').value = '기안서';
+    changeDraftForm();
+    document.getElementById('draftTitle').value = '';
+    document.getElementById('draftContent').value = '';
+    document.getElementById('draftFile').value = '';
+    document.getElementById('draftModal').style.display = 'block';
+}
+
+// 결재 문서 저장 (JSON 변환 포함)
+async function submitApproval() {
+    const type = document.getElementById('draftType').value;
+    const title = document.getElementById('draftTitle').value;
+    const app1 = document.getElementById('app1').value;
+    const app2 = document.getElementById('app2').value;
+    
+    if(!title || !app1) return alert("제목과 1차 결재자는 필수입니다.");
+
+    // 입력 항목을 JSON 딕셔너리로 조립
+    let docData = {};
+    if (type === '지출결의서') {
+        docData['지출일자'] = document.getElementById('expDate').value;
+        docData['지출금액'] = document.getElementById('expAmount').value + " 원";
+        docData['계정과목'] = document.getElementById('expCategory').value;
+    } else if (type === '휴가원') {
+        docData['휴가구분'] = document.getElementById('leaveType').value;
+        docData['시작일'] = document.getElementById('leaveStart').value;
+        docData['종료일'] = document.getElementById('leaveEnd').value;
+    }
+    docData['상세내용'] = document.getElementById('draftContent').value; // 공통
+
+    let formData = new FormData();
+    formData.append('doc_type', type);
+    formData.append('title', title);
+    formData.append('approver_1', app1);
+    formData.append('approver_2', app2);
+    formData.append('doc_data', JSON.stringify(docData));
+    
+    let fileInput = document.getElementById('draftFile');
+    if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+    try {
+        const res = await fetch('/approval/submit', { method: 'POST', body: formData });
+        const d = await res.json();
+        alert(d.message);
+        if(res.ok) location.reload();
+    } catch(e) { alert("상신 중 오류가 발생했습니다."); }
+}
+
+// 결재 문서 상세 조회 및 액션 권한 체크
+async function openDetailModal(docId) {
+    try {
+        const res = await fetch(`/approval/detail/${docId}`);
+        if(!res.ok) return alert("문서를 불러올 수 없습니다.");
+        const doc = await res.json();
+        
+        document.getElementById('currentDocId').value = doc.id;
+        document.getElementById('dt_type').innerText = `[${doc.doc_type}]`;
+        document.getElementById('dt_title').innerText = doc.title;
+        document.getElementById('dt_drafter').innerText = doc.drafter;
+        document.getElementById('dt_status').innerText = doc.status;
+        document.getElementById('dt_status').className = `status-badge st-${doc.status}`;
+        document.getElementById('dt_app1').innerText = doc.approver_1;
+        document.getElementById('dt_app2').innerText = doc.approver_2 || '전결';
+
+        // JSON 데이터 출력
+        const box = document.getElementById('dt_dynamic_box');
+        box.innerHTML = '';
+        if(doc.doc_data) {
+            const parsed = JSON.parse(doc.doc_data);
+            for(let key in parsed) {
+                box.innerHTML += `<div class="detail-item"><div class="detail-key">${key}</div><div style="flex:1; white-space:pre-wrap;">${parsed[key]}</div></div>`;
+            }
+        }
+
+        // 파일 처리
+        const fWrap = document.getElementById('dt_fileWrap');
+        if(doc.filename) {
+            document.getElementById('dt_fileLink').innerText = doc.filename;
+            document.getElementById('dt_fileLink').href = `/uploads/${doc.filename}`;
+            fWrap.style.display = 'block';
+        } else { fWrap.style.display = 'none'; }
+
+        // 내 결재 순서인지 권한 확인
+        const isApp1 = (doc.status === '대기' && doc.approver_1 === currentUser);
+        const isApp2 = (doc.status === '1차승인' && doc.approver_2 === currentUser);
+        
+        if (isApp1 || isApp2) {
+            document.getElementById('actionArea').style.display = 'block';
+        } else {
+            document.getElementById('actionArea').style.display = 'none';
+        }
+
+        document.getElementById('detailModal').style.display = 'block';
+    } catch(e) {}
+}
+
+// 승인 / 반려 처리
+async function processApproval(actionStr) {
+    const docId = document.getElementById('currentDocId').value;
+    const msg = actionStr === 'approve' ? "이 결재를 승인하시겠습니까?" : "결재를 반려하시겠습니까?\n(기안자에게 반려 쪽지가 전송됩니다)";
+    if(!confirm(msg)) return;
+
+    try {
+        const res = await fetch(`/approval/action/${docId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionStr })
+        });
+        const d = await res.json();
+        if(res.ok) {
+            alert("정상 처리되었습니다.");
+            location.reload();
+        } else { alert("처리 중 오류가 발생했습니다."); }
+    } catch(e) {}
+}
+</script>
 {% endblock %}
