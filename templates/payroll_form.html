@@ -1,74 +1,133 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="content-container" style="max-width: 800px; margin-top: 40px;">
-    <div style="background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-        <h2 style="margin-top:0; color:#1f3c88;"><i class="fa-solid fa-envelope-open-text"></i> 스마트 명세서 발송 시스템</h2>
-        <hr style="border:0; border-top:1px solid #eee; margin: 20px 0;">
+<div class="content-container" style="max-width: 900px; margin-top: 40px;">
+    <div style="background: white; padding: 40px; border-radius: 0; border: 1px solid #eee; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+        <h2 style="margin-top:0; color:#111; font-weight: 800;"><i class="fa-solid fa-envelope-open-text"></i> 스마트 명세서 발송 시스템</h2>
+        <p style="color: #666; font-size: 0.9rem;">대상별(강사/직원) 자동 분류 발송 및 광고 삽입 기능을 지원합니다.</p>
+        <hr style="border:0; border-top:1px solid #eee; margin: 30px 0;">
 
-        <form id="payroll-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+        <form id="payroll-form" enctype="multipart/form-data">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
                 <div>
-                    <label style="font-weight: bold; display: block; margin-bottom: 8px;">지급 날짜</label>
-                    <input type="date" id="send_date" name="send_date" class="form-control" required style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 10px; font-size: 0.9rem;">지급 날짜</label>
+                    <input type="date" id="send_date" name="send_date" class="form-control" required style="width:100%; padding:12px; border:1px solid #ddd; outline: none;">
                 </div>
                 <div>
-                    <label style="font-weight: bold; display: block; margin-bottom: 8px;">발송 간격 (초)</label>
-                    <input type="number" name="interval" value="2" step="0.5" class="form-control" style="width:100%; padding:10px; border-radius:10px; border:1px solid #ddd;">
-                    <small style="color: #888;">* 구글 스팸방지를 위해 2초 이상 권장</small>
+                    <label style="font-weight: bold; display: block; margin-bottom: 10px; font-size: 0.9rem;">발송 간격 (초)</label>
+                    <input type="number" name="interval" value="2" step="0.5" min="0.5" class="form-control" style="width:100%; padding:12px; border:1px solid #ddd; outline: none;">
+                    <small style="color: #888;">* 스팸 방지를 위해 2초 이상을 권장합니다.</small>
                 </div>
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label style="font-weight: bold; display: block; margin-bottom: 8px;">명세서 엑셀 파일</label>
-                <input type="file" name="excel" accept=".xlsx" required style="width:100%; padding:10px; border: 1px dashed #4a90e2; border-radius:10px;">
+            <div style="margin-bottom: 30px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 10px; font-size: 0.9rem;">명세서 엑셀 파일 (.xlsx)</label>
+                <input type="file" name="excel" id="excel" accept=".xlsx" required style="width:100%; padding:15px; border: 2px dashed #eee; cursor: pointer;">
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
-                <div><label style="font-weight:bold;">광고이미지 1</label><input type="file" name="ad1" accept="image/*"></div>
-                <div><label style="font-weight:bold;">광고이미지 2</label><input type="file" name="ad2" accept="image/*"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 35px;">
+                <div>
+                    <label style="font-weight:bold; display: block; margin-bottom: 10px;">광고 이미지 1</label>
+                    <input type="file" name="ad1" id="ad1" accept="image/*" onchange="previewImg(this, 'p1')">
+                    <div id="p1" style="margin-top:10px; width:100%; height:120px; border:1px solid #eee; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fafafa;">
+                        <span style="color:#ccc; font-size:0.8rem;">미리보기 없음</span>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-weight:bold; display: block; margin-bottom: 10px;">광고 이미지 2</label>
+                    <input type="file" name="ad2" id="ad2" accept="image/*" onchange="previewImg(this, 'p2')">
+                    <div id="p2" style="margin-top:10px; width:100%; height:120px; border:1px solid #eee; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#fafafa;">
+                        <span style="color:#ccc; font-size:0.8rem;">미리보기 없음</span>
+                    </div>
+                </div>
             </div>
 
-            <button type="submit" id="submit-btn" style="width:100%; background:#1f3c88; color:white; border:none; padding:15px; border-radius:15px; font-weight:bold; cursor:pointer;">
-                <i class="fa-solid fa-paper-plane"></i> 발송 시작하기
+            <button type="submit" id="submit-btn" style="width:100%; background:#111; color:white; border:none; padding:18px; font-weight:bold; font-size:1.1rem; cursor:pointer; transition: 0.3s;">
+                <i class="fa-solid fa-paper-plane"></i> 명세서 발송 시작하기
             </button>
         </form>
 
-        <div id="status-panel" style="display:none; margin-top:30px; padding:20px; background:#f8f9fa; border-radius:15px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                <span id="status-text" style="font-weight:bold; color:#4a90e2;">준비 중...</span>
-                <span id="progress-percent">0%</span>
+        <div id="status-panel" style="display:none; margin-top:40px; padding:25px; background:#f9f9f9; border:1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom:15px;">
+                <span id="status-text" style="font-weight:bold; color:#111; font-size: 1.1rem;">🚀 발송 중...</span>
+                <span id="progress-percent" style="font-weight: 800; color: #4a90e2; font-size: 1.2rem;">0%</span>
             </div>
-            <div style="width:100%; height:100px; overflow-y:auto; border:1px solid #ddd; background:white; padding:10px; font-size:0.85rem;" id="name-list">
+            <div style="width:100%; height:200px; overflow-y:auto; border:1px solid #eee; background:white; padding:15px; font-size:0.9rem; line-height: 2;" id="name-list">
                 </div>
         </div>
     </div>
 </div>
 
 <script>
+// 1. 페이지 로드 시 오늘 날짜 세팅
+window.onload = function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('send_date').value = today;
+};
+
+// 2. 이미지 미리보기 함수
+function previewImg(input, targetId) {
+    const target = document.getElementById(targetId);
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            target.innerHTML = `<img src="${e.target.result}" style="width:100%; height:100%; object-fit:contain;">`;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// 3. 발송 요청 및 상태 체크
 document.getElementById('payroll-form').onsubmit = async (e) => {
     e.preventDefault();
-    if(!confirm("명세서 발송을 시작하시겠습니까?")) return;
+    if(!confirm("입력하신 정보로 명세서 발송을 시작하시겠습니까?")) return;
 
     const formData = new FormData(e.target);
-    document.getElementById('submit-btn').disabled = true;
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.style.background = "#ccc";
     document.getElementById('status-panel').style.display = 'block';
+    document.getElementById('name-list').innerHTML = "";
 
-    const res = await fetch('/payroll/send', { method: 'POST', body: formData });
-    
-    const interval = setInterval(async () => {
-        const statusRes = await fetch('/payroll/status');
-        const data = await statusRes.json();
+    try {
+        const res = await fetch('/payroll/send', { method: 'POST', body: formData });
+        const result = await res.json();
         
-        const percent = Math.round((data.sent_count / data.total_count) * 100);
-        document.getElementById('progress-percent').innerText = `${percent}% (${data.sent_count}/${data.total_count})`;
-        document.getElementById('name-list').innerHTML = data.sent_names.map(name => `• ${name} 발송완료`).join('<br>');
-        
-        if(!data.is_running && data.sent_count === data.total_count) {
-            clearInterval(interval);
-            document.getElementById('status-text').innerText = "✅ 모든 발송이 완료되었습니다.";
-            alert("발송 완료!");
+        if(result.status === 'error') {
+            alert(result.message);
+            submitBtn.disabled = false;
+            return;
         }
-    }, 2000);
+
+        // 2초마다 상태를 체크하여 화면 업데이트
+        const checkInterval = setInterval(async () => {
+            const statusRes = await fetch('/payroll/status');
+            const data = await statusRes.json();
+            
+            if (data.total_count > 0) {
+                const percent = Math.round((data.sent_count / data.total_count) * 100);
+                document.getElementById('progress-percent').innerText = `${percent}% (${data.sent_count}/${data.total_count})`;
+                document.getElementById('name-list').innerHTML = data.sent_names.map(name => 
+                    `<div style="border-bottom:1px solid #f5f5f5;"><i class="fa-solid fa-check" style="color:green;"></i> <b>${name}</b>님께 발송 완료</div>`
+                ).join('');
+                
+                // 리스트 하단으로 자동 스크롤
+                const listDiv = document.getElementById('name-list');
+                listDiv.scrollTop = listDiv.scrollHeight;
+            }
+
+            if(!data.is_running && data.sent_count >= data.total_count && data.total_count > 0) {
+                clearInterval(checkInterval);
+                document.getElementById('status-text').innerText = "✅ 발송이 모두 완료되었습니다.";
+                alert("모든 명세서가 성공적으로 발송되었습니다!");
+                submitBtn.disabled = false;
+                submitBtn.style.background = "#111";
+            }
+        }, 2000);
+
+    } catch (err) {
+        alert("서버 통신 중 오류가 발생했습니다.");
+        submitBtn.disabled = false;
+    }
 };
 </script>
 {% endblock %}
