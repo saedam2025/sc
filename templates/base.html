@@ -14,24 +14,16 @@
         /* 기본 배경 및 애니메이션 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: #f0f4f8; 
+            background: #ffffff;  /* 이미지 컨셉: 순백색 배경 */
             min-height: 100vh;
             margin: 0;
             overflow-x: hidden;
+            color: #111;
         }
 
-        /* 배경 기하학적 문양 강화 */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: 
-                radial-gradient(at 0% 0%, rgba(74, 144, 226, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(155, 89, 182, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(26, 188, 156, 0.1) 0px, transparent 50%),
-                radial-gradient(at 0% 100%, rgba(241, 196, 15, 0.1) 0px, transparent 50%);
-            z-index: -2;
-        }
+        /* 배경 데코레이션 제거 또는 극소화 (이미지 미니멀리즘 반영) */
+        body::before { display: none; }
+        .bg-shapes { display: none; }
 
         .content-container {
             max-width: 1550px !important;
@@ -39,73 +31,69 @@
             margin: 0 auto;
         }
 
-        /* --- [세련된 플로팅 네비게이션바] --- */
+        /* --- [이미지 컨셉: 블랙 & 화이트 미니멀 네비게이션] --- */
         .navbar {
-            padding: 20px 0;
+            padding: 30px 0; /* 위아래 여백을 충분히 주어 여유로운 느낌 */
             position: sticky;
             top: 0;
             z-index: 1000;
+            background: #fff; /* 스크롤 시에도 백색 유지 */
         }
 
         .nav-container {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: rgba(255, 255, 255, 0.7); 
-            backdrop-filter: blur(15px); 
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 24px; 
-            padding: 10px 30px;
-            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.08);
+            background: transparent; /* 테두리, 배경 제거 */
+            border: none;
+            border-radius: 0; 
+            padding: 0;
+            box-shadow: none; /* 그림자 제거 */
             margin: 0 auto;
-            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         }
 
-        /* 로고 스타일 */
+        /* 로고 스타일 (이미지처럼 좌측 상단 배치) */
         .logo {
             display: flex;
             align-items: center;
-            transition: transform 0.3s;
         }
-        .logo:hover { transform: scale(1.05); }
-        .logo-img { height: 42px; width: auto; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+        .logo-img { height: 45px; width: auto; display: block; }
 
-        /* 메뉴 리스트 */
-        .menu-list { display: flex; gap: 8px; list-style: none; margin: 0; padding: 0; align-items: center; }
+        /* --- [이미지 컨셉의 핵심: 블랙 & 화이트 메뉴] --- */
+        .menu-list { display: flex; gap: 5px; list-style: none; margin: 0; padding: 0; align-items: center; }
         
         .menu-item {
-            color: #445; 
+            color: #111; /* 이미지 컨셉: 블랙 텍스트 */
             text-decoration: none; 
-            font-weight: 600; 
-            padding: 10px 20px;
-            border-radius: 16px; 
-            transition: all 0.3s ease; 
+            font-weight: 500; /* 이미지처럼 너무 두껍지 않게 */
+            padding: 12px 24px;
+            border-radius: 30px; /* 이미지처럼 둥근 형태 유지 */
+            transition: all 0.25s ease-in-out; 
             display: flex; 
             align-items: center; 
             gap: 8px;
-            font-size: 0.95rem;
+            font-size: 1rem;
             position: relative;
         }
 
-        .menu-item i { font-size: 1rem; color: #789; transition: color 0.3s; }
+        .menu-item i { font-size: 1rem; color: #555; transition: color 0.3s; }
 
-        /* 호버 효과: 배경색 대신 세련된 강조 방식 */
+        /* 이미지 호버 효과: 블랙 배경 + 화이트 텍스트 */
         .menu-item:hover {
-            background: rgba(255, 255, 255, 0.8);
-            color: #4a90e2;
+            background: #111; /* 이미지 컨셉: 호버 시 블랙 배경 */
+            color: #fff; /* 이미지 컨셉: 호버 시 화이트 텍스트 */
         }
-        .menu-item:hover i { color: #4a90e2; }
+        .menu-item:hover i { color: #fff; }
 
-        /* 활성화된 메뉴 상태 */
+        /* 활성화된 메뉴 상태 (이미지에는 없지만 필요하므로 그레이 톤으로 세련되게 처리) */
         .menu-item.active {
-            background: #4a90e2;
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+            background: #f0f0f0;
+            color: #111;
+            font-weight: 700;
         }
-        .menu-item.active i { color: #fff; }
+        .menu-item.active i { color: #111; }
 
-        /* --- [드롭다운 메뉴의 고급화] --- */
+        /* --- [이미지 컨셉의 핵심: 드롭다운 디자인] --- */
         .dropdown { position: relative; }
         .dropdown-content {
             display: block;
@@ -113,17 +101,17 @@
             top: 130%;
             left: 50%;
             transform: translateX(-50%) translateY(10px);
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            min-width: 200px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.12);
-            border-radius: 18px;
+            background: #fff; /* 이미지 컨셉: 드롭다운 화이트 */
+            min-width: 220px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* 은은한 그림자 */
+            border-radius: 20px;
             z-index: 1100;
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            border: 1px solid #f0f0f0;
             overflow: hidden;
             opacity: 0;
             pointer-events: none;
-            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+            padding: 8px;
         }
 
         .dropdown:hover .dropdown-content {
@@ -133,76 +121,79 @@
         }
 
         .dropdown-content a {
-            color: #556;
+            color: #111;
             padding: 12px 20px;
             text-decoration: none;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 0.9rem;
+            gap: 12px;
+            font-size: 0.95rem;
             font-weight: 500;
+            border-radius: 14px;
             transition: background 0.2s;
         }
 
         .dropdown-content a:hover {
-            background-color: #f0f7ff;
-            color: #4a90e2;
+            background-color: #f5f5f5; /* 이미지 컨셉: 드롭다운 호버 그레이 */
+            color: #111;
         }
 
-        /* --- [사용자 정보 및 로그아웃 구역] --- */
+        /* --- [이미지 컨셉: 우측 정렬 유저 섹션] --- */
         .user-section {
             display: flex;
             align-items: center;
             gap: 15px;
-            padding-left: 20px;
-            border-left: 1px solid rgba(0,0,0,0.08);
+            padding-left: 0;
+            border-left: none;
         }
 
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
             cursor: pointer;
-            padding: 5px 12px;
-            border-radius: 14px;
+            padding: 8px 16px;
+            border-radius: 30px;
             transition: background 0.2s;
+            border: 1px solid #eee; /* 이미지처럼 깔끔한 테두리 */
         }
-        .user-profile:hover { background: rgba(0,0,0,0.03); }
+        .user-profile:hover { background: #f9f9f9; }
 
         .user-icon-circle {
             width: 38px;
             height: 38px;
-            background: #eef2f6;
-            border-radius: 12px;
+            background: #f0f0f0;
+            border-radius: 50%; /* 이미지 프로필 원형 처리 */
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.3rem;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
         }
 
         .user-info-text { display: flex; flex-direction: column; }
-        .user-name { font-size: 0.9rem; font-weight: 700; color: #223; }
-        .user-role { font-size: 0.7rem; color: #889; font-weight: 600; }
+        .user-name { font-size: 0.95rem; font-weight: 700; color: #111; }
+        .user-role { font-size: 0.75rem; color: #888; font-weight: 500; }
 
         .btn-logout { 
-            width: 38px;
-            height: 38px;
+            width: 40px;
+            height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #e03131;
-            background: #fff0f0;
-            border-radius: 12px;
+            color: #111; /* 이미지 컨셉: 로그아웃도 블랙 */
+            background: #fff;
+            border-radius: 50%;
             transition: all 0.3s;
             text-decoration: none;
+            border: 1px solid #eee;
         }
-        .btn-logout:hover { background: #e03131; color: white; transform: rotate(15deg); }
+        .btn-logout:hover { background: #e03131; color: white; border-color: #e03131; }
 
-        /* 푸터 */
-        .main-footer { text-align: center; padding: 40px 0; color: #9aa; font-size: 0.85rem; letter-spacing: -0.02em; }
+        /* 푸터 (이미지 컨셉에 맞춰 미니멀하게) */
+        .main-footer { text-align: center; padding: 50px 0; color: #999; font-size: 0.9rem; letter-spacing: -0.02em; border-top: 1px solid #eee; }
 
-        /* 모달 시스템 */
+        /* 모달 시스템 (삭제/수정 없이 유지) */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
         .modal-content { background: white; margin: 5% auto; padding: 0; border-radius: 28px; width: 480px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.25); }
         .modal-header { background: #f8fafc; padding: 25px 30px; border-bottom: 1px solid #edf2f7; display: flex; justify-content: space-between; align-items: center; }
@@ -246,7 +237,7 @@
                         {% endif %}
 
                         <li class="dropdown">
-                            <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2;"><i class="fa-solid fa-briefcase"></i> 업무지원</a>
+                            <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2; font-weight: 700;"><i class="fa-solid fa-briefcase"></i> 업무지원</a>
                             <div class="dropdown-content">
                                 <a href="/payroll"><i class="fa-solid fa-paper-plane"></i> 명세서 발송</a>
                                 <a href="/excel-generator"><i class="fa-solid fa-table"></i> 입금용 엑셀 생성</a>
@@ -296,13 +287,14 @@
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
                 <div style="padding: 25px; text-align: center;">
-                    <button type="button" style="background:#4a90e2; color:white; border:none; padding:12px 40px; border-radius:14px; font-weight:bold; cursor:pointer;" onclick="closeMyInfoModal()">확인</button>
+                    <button type="button" style="background:#111; color:white; border:none; padding:12px 40px; border-radius:14px; font-weight:bold; cursor:pointer;" onclick="closeMyInfoModal()">확인</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // 마이페이지 기능 유지
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
