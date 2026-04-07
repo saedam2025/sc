@@ -2,15 +2,13 @@ import os
 import time
 import threading
 import pandas as pd
-from flask import Blueprint, render_template, request, jsonify, current_app
+from flask import Blueprint, render_template, request, jsonify, current_app, url_for
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 
 payroll_bp = Blueprint('payroll', __name__)
 
-# 발송 상태 전역 변수 (processed_count 추가로 진행률 정확도 100% 보장)
 mail_status = {
     'is_running': False,
     'total_count': 0,
@@ -20,47 +18,38 @@ mail_status = {
     'errors': []
 }
 
-# [수정됨] HTML에서 인자를 1개 보내든 2개 보내든 모두 처리하는 똑똑한 만능 safe_amount 함수
 def safe_amount(*args):
     try:
         value = 0
         if len(args) == 2:
-            # 1. safe_amount(row, '기본급') 형태로 호출했을 때
             if hasattr(args[0], 'get') and isinstance(args[1], str):
                 value = args[0].get(args[1], 0)
-            # 2. safe_amount(값, 0) 등 다른 2개 인자로 호출했을 때 (예비용)
             else:
                 value = args[0]
         elif len(args) == 1:
-            # 3. safe_amount(row['기본급']) 형태로 호출했을 때
             value = args[0]
 
-        # 빈 값이나 NaN 처리
         if pd.isna(value) or str(value).strip() == "" or value is None:
             return "0"
-            
-        # 숫자로 변환 후 소수점 버리고 천 단위 콤마 추가
         return f"{int(float(value)):,}"
     except Exception:
-        # 그 외 문자열이 들어오거나 에러가 나면 0 반환 방어
         return "0"
 
 def get_template_path(user_type):
-    """직원 구분을 유연하게 자동 인식하여 템플릿을 매칭합니다."""
     u_type = str(user_type).replace(' ', '')
     if '근로' in u_type: return 'payroll/employee_worker.html'
     if '사업' in u_type: return 'payroll/employee_business.html'
     if '퇴직' in u_type: return 'payroll/retired.html'
-    return 'payroll/teacher.html' # 일치하는 게 없으면 기본 강사 템플릿
+    return 'payroll/teacher.html' 
 
-def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
+def send_payroll_mail(row, user_type, send_date, base_url):
     SENDER_EMAIL = os.environ.get('MAIL_USERNAME')
     SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD')
     
     if not SENDER_EMAIL or not SENDER_PASSWORD:
         return False, "메일 서버(구글 앱 비밀번호) 설정이 되어있지 않습니다."
 
-    msg = MIMEMultipart('related')
+    msg = MIMEMultipart('alternative')
     target_name = str(row.get('직원명', row.get('강사명', '성함없음'))).strip()
     msg['Subject'] = f"[{send_date}] {target_name}님 급여(수수료) 명세서 안내"
     msg['From'] = f"새담 인트라넷 <{SENDER_EMAIL}>"
@@ -69,26 +58,28 @@ def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
     if "@" not in msg['To']:
         return False, f"{target_name}님의 이메일 주소가 올바르지 않습니다."
 
-    # 템플릿 자동 매칭
     tpl_path = get_template_path(user_type)
     
+    # URL 링크 방식으로 이미지 주소 생성 (Render 서버 주소 기반)
+    # url_for(_external=True)를 사용하여 http://도메인/static/... 형태의 절대 경로를 만듭니다.
+    logo_url = base_url + "/static/logo01.jpg"
+    ad1_url = base_url + "/static/payroll_ad1.jpg"
+    ad2_url = base_url + "/static/payroll_ad2.jpg"
+    
     try:
-        html_content = render_template(tpl_path, row=row, send_date=send_date, safe_amount=safe_amount)
+        # 템플릿에 이미지 URL들을 변수로 전달
+        html_content = render_template(
+            tpl_path, 
+            row=row, 
+            send_date=send_date, 
+            safe_amount=safe_amount,
+            logo_url=logo_url,
+            ad1_url=ad1_url,
+            ad2_url=ad2_url
+        )
         msg.attach(MIMEText(html_content, 'html'))
 
-        # 광고 이미지 및 로고 첨부 로직
-        img_configs = [
-            ('logo_image', os.path.join(current_app.root_path, 'static', 'logo01.jpg')), 
-            ('ad1_image', ad1_path), 
-            ('ad2_image', ad2_path)
-        ]
-        
-        for cid, path in img_configs:
-            if path and os.path.exists(path):
-                with open(path, 'rb') as f:
-                    img = MIMEImage(f.read())
-                    img.add_header('Content-ID', f'<{cid}>')
-                    msg.attach(img)
+        # 기존의 무거운 MIMEImage 첨부 코드는 모두 삭제되었습니다 (URL 방식으로 대체)
 
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
@@ -98,7 +89,7 @@ def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
     except Exception as e:
         return False, str(e)
 
-def payroll_worker(app, df, send_date, interval, ad1, ad2):
+def payroll_worker(app, df, send_date, interval, base_url):
     global mail_status
     
     with app.app_context():
@@ -111,7 +102,8 @@ def payroll_worker(app, df, send_date, interval, ad1, ad2):
 
         for _, row in df.iterrows():
             u_type = str(row.get('직원구분', '강사')).strip()
-            success, err_msg = send_payroll_mail(row, u_type, send_date, ad1, ad2)
+            # base_url을 전달하여 스레드 내에서도 절대 경로를 생성할 수 있게 함
+            success, err_msg = send_payroll_mail(row, u_type, send_date, base_url)
             
             if success:
                 mail_status['sent_count'] += 1
@@ -128,7 +120,29 @@ def payroll_worker(app, df, send_date, interval, ad1, ad2):
 
 @payroll_bp.route('/')
 def index():
-    return render_template('payroll_form.html', user_icons={})
+    return render_template('payroll/payroll_form.html', user_icons={})
+
+# [추가됨] 광고 이미지 단독 업로드 API
+@payroll_bp.route('/upload_ad', methods=['POST'])
+def upload_ad():
+    if 'image' not in request.files:
+        return jsonify({"status": "error", "message": "이미지 파일이 없습니다."})
+        
+    file = request.files['image']
+    ad_type = request.form.get('type') # 'ad1' 또는 'ad2'
+    
+    if ad_type not in ['ad1', 'ad2']:
+        return jsonify({"status": "error", "message": "잘못된 요청입니다."})
+        
+    if file and file.filename:
+        static_folder = os.path.join(current_app.root_path, 'static')
+        os.makedirs(static_folder, exist_ok=True)
+        # 덮어쓰기 저장
+        filepath = os.path.join(static_folder, f'payroll_{ad_type}.jpg')
+        file.save(filepath)
+        return jsonify({"status": "success"})
+        
+    return jsonify({"status": "error", "message": "업로드 실패"})
 
 @payroll_bp.route('/send', methods=['POST'])
 def start_send():
@@ -141,14 +155,11 @@ def start_send():
     
     try:
         file = request.files['excel']
-        
-        # 여러 탭 중 '이메일' 컬럼이 있는 시트를 자동 탐색합니다.
         xls = pd.read_excel(file, sheet_name=None, header=2)
         df = None
         for sheet_name, sheet_df in xls.items():
             if '이메일' in sheet_df.columns:
                 df = sheet_df
-                # 직원구분 컬럼이 없을 경우 시트 이름을 기준으로 임시 부여
                 if '직원구분' not in df.columns:
                     df['직원구분'] = sheet_name 
                 break
@@ -156,7 +167,6 @@ def start_send():
         if df is None:
             return jsonify({"status": "error", "message": "어떤 시트에서도 3번째 줄에 '이메일' 항목을 찾을 수 없습니다."})
 
-        # 유효한 이메일 골라내기
         df = df.dropna(how='all').fillna("")
         df = df[df['이메일'].astype(str).str.contains('@')]
             
@@ -166,22 +176,15 @@ def start_send():
         send_date = request.form.get('send_date')
         interval = request.form.get('interval', 2)
         
-        # 안전한 광고 이미지 경로 설정
-        static_folder = os.path.join(current_app.root_path, 'static')
-        os.makedirs(static_folder, exist_ok=True)
-        
-        ad1 = request.files.get('ad1')
-        ad2 = request.files.get('ad2')
-        ad1_path = os.path.join(static_folder, 'payroll_ad1.jpg') if ad1 and ad1.filename else None
-        ad2_path = os.path.join(static_folder, 'payroll_ad2.jpg') if ad2 and ad2.filename else None
-        
-        if ad1_path: ad1.save(ad1_path)
-        if ad2_path: ad2.save(ad2_path)
+        # 폼 데이터에서 광고 이미지 처리 로직 제거 (이제 별도 API로 업로드됨)
 
         mail_status.update({'sent_count': 0, 'processed_count': 0, 'sent_names': [], 'errors': [], 'total_count': len(df)})
 
         app = current_app._get_current_object()
-        threading.Thread(target=payroll_worker, args=(app, df, send_date, interval, ad1_path, ad2_path)).start()
+        # 발송 시 사용할 절대 도메인 주소 획득 (예: https://saedam-intranet.onrender.com)
+        base_url = request.host_url.rstrip('/')
+        
+        threading.Thread(target=payroll_worker, args=(app, df, send_date, interval, base_url)).start()
         
         return jsonify({"status": "success"})
     except Exception as e:
