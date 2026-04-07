@@ -14,7 +14,7 @@
         /* 기본 설정 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: #f4f7f9; /* 배경을 살짝 밝은 그레이 톤으로 변경하여 콘텐츠가 돋보이게 함 */
+            background: #f4f7f9; 
             min-height: 100vh;
             margin: 0;
             color: #333;
@@ -27,10 +27,10 @@
             padding-top: 30px;
         }
 
-        /* 네비게이션바 깔끔하고 모던한 스타일로 변경 */
+        /* 네비게이션바 */
         .navbar {
             background: #ffffff;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* 직선 경계선 대신 부드러운 그림자 */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); 
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -61,7 +61,7 @@
             padding: 0; 
             height: 100%;
             align-items: center; 
-            gap: 10px; /* 메뉴 간격 추가 */
+            gap: 10px; 
         }
         
         .menu-item-wrapper {
@@ -71,13 +71,12 @@
             align-items: center;
         }
 
-        /* 메인 메뉴 아이템 디자인 개선 */
         .menu-item {
             color: #444;
             text-decoration: none; 
             font-weight: 600; 
-            padding: 10px 18px; /* 버튼처럼 보이도록 패딩 조절 */
-            border-radius: 8px; /* 둥근 모서리 */
+            padding: 10px 18px; 
+            border-radius: 8px; 
             display: flex; 
             align-items: center; 
             gap: 8px;
@@ -85,42 +84,38 @@
             transition: all 0.2s ease-in-out;
         }
 
-        /* 호버 시 부드러운 컬러 배경 */
         .menu-item:hover {
             background: #f0f4f8;
-            color: #2c7be5; /* 새담 느낌의 신뢰감 있는 블루 컬러 */
+            color: #2c7be5; 
         }
         .menu-item:hover i { color: #2c7be5; }
 
-        /* 선택된 메뉴 디자인 변경 */
         .menu-item.active {
             color: #2c7be5 !important;
             font-weight: 700;
             border-bottom: 2px solid #2c7be5;
-            border-radius: 0; /* 언더라인이 자연스럽게 */
-            background-color: transparent; /* 배경색 제거 */
-            box-shadow: none; /* 그림자 제거 */
+            border-radius: 0; 
+            background-color: transparent; 
+            box-shadow: none; 
         }
 
-        /* 풀다운 메뉴 디자인 변경 */
         .dropdown { height: 100%; }
         
         .dropdown-content {
             display: none; 
             position: absolute;
-            top: 85%; /* 너무 딱 붙지 않게 약간 여백 조정 */
+            top: 85%; 
             left: 50%;
-            transform: translateX(-50%); /* 가운데 정렬 드롭다운 */
-            background: #ffffff; /* 화이트 테마 */
+            transform: translateX(-50%); 
+            background: #ffffff; 
             min-width: 200px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08); /* 부드럽고 넓은 그림자 */
-            border-radius: 10px; /* 둥근 박스 */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
+            border-radius: 10px; 
             border: 1px solid #eef0f3;
             z-index: 1100;
-            padding: 10px 0; /* 상하 여백 */
+            padding: 10px 0; 
         }
 
-        /* 마우스가 메뉴 래퍼 위나 드롭다운 사이 틈을 지나갈 때 숨겨지지 않도록 설정 */
         .menu-item-wrapper::after {
             content: '';
             position: absolute;
@@ -132,7 +127,7 @@
 
         .menu-item-wrapper:hover .dropdown-content {
             display: block;
-            animation: fadeIn 0.2s ease; /* 부드러운 등장 효과 */
+            animation: fadeIn 0.2s ease; 
         }
 
         @keyframes fadeIn {
@@ -155,14 +150,31 @@
         .dropdown-content a:hover {
             background: #f8f9fa;
             color: #2c7be5;
-            padding-left: 25px; /* 호버 시 살짝 우측으로 밀리는 애니메이션 효과 */
+            padding-left: 25px; 
         }
 
         /* 우측 유저 섹션 */
         .user-section {
             display: flex;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
+        }
+
+        /* 화이트보드 메모장 아이콘 버튼 */
+        .btn-memo {
+            color: #a0aec0;
+            font-size: 1.3rem;
+            text-decoration: none;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-memo:hover {
+            color: #2c7be5;
+            background: #f0f4f8;
         }
 
         .user-profile {
@@ -193,7 +205,7 @@
             color: #e53e3e;
         }
 
-        /* === 내 정보 모달 유리(Glass) 스타일로 개선 === */
+        /* 내 정보 모달 스타일 */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
         .modal-content { 
             background: rgba(255, 255, 255, 0.7) !important; 
@@ -222,7 +234,6 @@
         }
         .btn-close-modal:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
-        /* 모달 내 입력 폼 (비밀번호 변경용) */
         .glass-input {
             width: 100%; padding: 12px; margin-bottom: 10px; 
             border: 1px solid rgba(255,255,255,0.9); 
@@ -307,6 +318,10 @@
 
             <div class="user-section">
                 {% if session.get('user_name') %}
+                <a href="/memo" class="btn-memo" title="개인 화이트보드 메모장">
+                    <i class="fa-solid fa-chalkboard"></i>
+                </a>
+
                 <div class="user-profile" onclick="openMyInfoModal()">
                     <span>{{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}</span>
                     <span><strong>{{ session['user_name'] }}</strong>님</span>
@@ -348,7 +363,7 @@
                     <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button type="button" class="btn-primary-glass" onclick="changeMyPassword()">변경 완료</button>
-                        <button type="button" class="btn-secondary-glass" onclick="togglePasswordForm()">취소</button>
+                        <button type="button" class="btn-close-modal" style="width: 100%;" onclick="togglePasswordForm()">취소</button>
                     </div>
                 </div>
 
@@ -370,7 +385,6 @@
             const pwdSection = document.getElementById('passwordChangeSection');
             const toggleBtn = document.getElementById('btnTogglePwd');
 
-            // 초기화
             modal.style.display = "block";
             loading.style.display = "block";
             errorDiv.style.display = "none";
@@ -379,7 +393,6 @@
             toggleBtn.style.display = "block";
             table.innerHTML = "";
 
-            // 폼 초기화
             document.getElementById('currPwd').value = '';
             document.getElementById('newPwd').value = '';
             document.getElementById('confirmPwd').value = '';
@@ -392,7 +405,6 @@
                     const data = result.data;
                     let html = '';
                     
-                    // 영문 키값을 한글로 매핑하는 사전 (다양한 백엔드 변수 대응)
                     const keyMap = {
                         'id': '고유번호', 'emp_no': '사원번호(사번)', 'username': '아이디', 
                         'name': '이름', 'position': '직급', 'role': '직책', 'department': '부서', 
@@ -403,13 +415,12 @@
                     };
 
                     for (const [key, value] of Object.entries(data)) {
-                        // 비밀번호 관련 항목은 모달 표에서 제외
                         const lowerKey = key.toLowerCase();
                         if (lowerKey.includes('password') || lowerKey.includes('pwd') || lowerKey.includes('hash')) {
                             continue;
                         }
 
-                        const displayKey = keyMap[key] || key; // 한글 매핑이 있으면 한글로, 없으면 원래 키값 사용
+                        const displayKey = keyMap[key] || key; 
                         const displayValue = (value === null || value === '') ? '-' : value;
                         html += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
                     }
@@ -431,21 +442,19 @@
             }
         }
 
-        // 비밀번호 변경 폼 토글
         function togglePasswordForm() {
             const pwdSection = document.getElementById('passwordChangeSection');
             const toggleBtn = document.getElementById('btnTogglePwd');
             
             if (pwdSection.style.display === 'none') {
                 pwdSection.style.display = 'block';
-                toggleBtn.style.display = 'none'; // 열렸을 땐 버튼 숨김
+                toggleBtn.style.display = 'none'; 
             } else {
                 pwdSection.style.display = 'none';
                 toggleBtn.style.display = 'block';
             }
         }
 
-        // 비밀번호 변경 요청 전송
         async function changeMyPassword() {
             const currPwd = document.getElementById('currPwd').value;
             const newPwd = document.getElementById('newPwd').value;
@@ -467,16 +476,10 @@
             }
 
             try {
-                // 해당 API 주소는 실제 백엔드 환경에 맞추어 수정될 수 있습니다.
                 const res = await fetch('/user/change_password', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        current_password: currPwd,
-                        new_password: newPwd
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password: currPwd, new_password: newPwd })
                 });
 
                 const result = await res.json();
