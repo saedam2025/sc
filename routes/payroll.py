@@ -114,7 +114,7 @@ def start_send():
     
     try:
         file = request.files['excel']
-        df = pd.read_excel(file).dropna(how='all').fillna("")
+        df = pd.read_excel(file, header=2).dropna(how='all').fillna("")
         
         # '이메일' 칼럼에 '@'가 포함된 유효한 데이터만 필터링
         if '이메일' in df.columns:
