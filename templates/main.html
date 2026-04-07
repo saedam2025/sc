@@ -256,12 +256,8 @@
                 <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
                     <i class="fa-solid fa-users"></i> 접속 중인 직원
                 </h3>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    {% for u in user_list %}
-                    <div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;">
-                        <span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> {{ u }}
-                    </div>
-                    {% endfor %}
+                <div id="activeUserContainer" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 0.8rem; color: var(--text-gray);">실시간 접속자 정보를 불러오는 중...</span>
                 </div>
             </div>
 
@@ -595,7 +591,7 @@
         renderSchoolVisitStats();
     });
 
-    // === 외근 중 학교 방문 통계 생성 함수 ===
+    // === 외근 중 학교 방문 통계 생성 함수 (OO초, OO초등학교 정확히 추출) ===
     function renderSchoolVisitStats() {
         const events = {{ events | tojson | safe }};
         let schoolCounts = {};
@@ -603,11 +599,25 @@
         events.forEach(e => {
             if (e.extendedProps && e.extendedProps.category === '외근') {
                 const title = e.extendedProps.task_title || '';
-                // '학교'라는 단어가 포함된 외근 일정만 추출
-                if (title.includes('학교')) {
-                    // 띄어쓰기를 기준으로 학교 이름 추출 시도 (완벽하지 않을 수 있으나 대략적인 분류)
-                    const words = title.split(' ');
-                    const schoolName = words.find(w => w.includes('학교')) || '기타 학교';
+                let schoolName = null;
+                
+                // 단어 단위로 쪼개서 학교명 패턴 찾기
+                const words = title.split(/[ ,]+/);
+                for (let w of words) {
+                    // 단어가 '초', '초등학교', '중', '중학교', '고', '고등학교', '학교'로 끝나는지 확인
+                    if (w.endsWith('초등학교') || w.endsWith('초') || 
+                        w.endsWith('중학교') || w.endsWith('중') || 
+                        w.endsWith('고등학교') || w.endsWith('고') || 
+                        w.endsWith('학교')) {
+                        // 너무 짧은 단어(예: "기초", "1초") 제외. (수원초, 매탄고 등 최소 2글자 이상 반영)
+                        if (w.length >= 2 && !/^\d+초$/.test(w)) {
+                            schoolName = w;
+                            break; // 첫 번째로 찾은 학교명 사용
+                        }
+                    }
+                }
+
+                if (schoolName) {
                     schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
                 }
             }
@@ -619,9 +629,9 @@
             return;
         }
 
-        // 객체를 배열로 변환 후 횟수 기준 내림차순 정렬
+        // 방문 횟수 기준 내림차순 정렬
         const sortedSchools = Object.entries(schoolCounts).sort((a, b) => b[1] - a[1]);
-        const maxCount = sortedSchools[0][1]; // 가장 큰 방문 횟수 (게이지 100% 기준)
+        const maxCount = sortedSchools[0][1]; 
         
         let html = '';
         sortedSchools.forEach(([school, count]) => {
@@ -649,6 +659,35 @@
                 setTimeout(() => { fill.style.width = targetWidth; }, 50);
             });
         }, 100);
+    }
+
+    // === 접속 중인 직원 실시간 업데이트 ===
+    async function fetchActiveUsers() {
+        try {
+            // 백엔드의 접속자 조회 API 호출
+            const res = await fetch('/get_active_users');
+            if (res.ok) {
+                const data = await res.json();
+                
+                // 백엔드 반환 형태가 배열이거나 { active_users: [...] } 형태일 경우 모두 대응
+                const users = Array.isArray(data) ? data : (data.active_users || data.users || []);
+                const container = document.getElementById('activeUserContainer');
+                
+                if (users && users.length > 0) {
+                    let html = '';
+                    users.forEach(u => {
+                        html += `<div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;">
+                            <span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> ${u}
+                        </div>`;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-gray);">접속 중인 직원이 없습니다.</span>';
+                }
+            }
+        } catch (e) {
+            console.error('접속자 목록 업데이트 오류:', e);
+        }
     }
 
     // === 기존 달력 및 게시판 스크립트 ===
@@ -838,7 +877,7 @@
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
             events: {{ events | tojson | safe }},
-            height: 510, // 달력 크기 축소 반영 (기존 640에서 컨테이너 높이에 맞게 조정)
+            height: 510, // 달력 크기 축소 반영
             fixedWeekCount: false, dayMaxEvents: true,
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
@@ -920,8 +959,13 @@
         });
         calendar.render();
 
+        // 10초마다 읽지 않은 쪽지 확인
         setInterval(checkUnreadMessages, 10000);
         checkUnreadMessages();
+        
+        // 10초마다 실시간 접속자 목록 업데이트 실행
+        setInterval(fetchActiveUsers, 10000);
+        fetchActiveUsers(); // 초기 실행
     });
 
     function editTask(taskId, dateStr) {
