@@ -20,14 +20,30 @@ mail_status = {
     'errors': []
 }
 
-# [추가됨] 엑셀의 빈 값, NaN 등을 0으로 안전하게 변환하고 콤마를 찍어주는 함수
-def safe_amount(value):
+# [수정됨] HTML에서 인자를 1개 보내든 2개 보내든 모두 처리하는 똑똑한 만능 safe_amount 함수
+def safe_amount(*args):
     try:
-        if pd.isna(value) or value == "" or value is None:
+        value = 0
+        if len(args) == 2:
+            # 1. safe_amount(row, '기본급') 형태로 호출했을 때
+            if hasattr(args[0], 'get') and isinstance(args[1], str):
+                value = args[0].get(args[1], 0)
+            # 2. safe_amount(값, 0) 등 다른 2개 인자로 호출했을 때 (예비용)
+            else:
+                value = args[0]
+        elif len(args) == 1:
+            # 3. safe_amount(row['기본급']) 형태로 호출했을 때
+            value = args[0]
+
+        # 빈 값이나 NaN 처리
+        if pd.isna(value) or str(value).strip() == "" or value is None:
             return "0"
+            
+        # 숫자로 변환 후 소수점 버리고 천 단위 콤마 추가
         return f"{int(float(value)):,}"
-    except (ValueError, TypeError):
-        return str(value)
+    except Exception:
+        # 그 외 문자열이 들어오거나 에러가 나면 0 반환 방어
+        return "0"
 
 def get_template_path(user_type):
     """직원 구분을 유연하게 자동 인식하여 템플릿을 매칭합니다."""
@@ -57,11 +73,10 @@ def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
     tpl_path = get_template_path(user_type)
     
     try:
-        # [수정됨] html_content 렌더링 부분에 safe_amount=safe_amount 추가
         html_content = render_template(tpl_path, row=row, send_date=send_date, safe_amount=safe_amount)
         msg.attach(MIMEText(html_content, 'html'))
 
-        # 광고 이미지 및 로고 첨부 로직 (경로가 존재하는 경우에만 정확히 작동)
+        # 광고 이미지 및 로고 첨부 로직
         img_configs = [
             ('logo_image', os.path.join(current_app.root_path, 'static', 'logo01.jpg')), 
             ('ad1_image', ad1_path), 
@@ -127,7 +142,7 @@ def start_send():
     try:
         file = request.files['excel']
         
-        # [핵심] 여러 탭 중 '이메일' 컬럼이 있는 시트를 자동 탐색합니다.
+        # 여러 탭 중 '이메일' 컬럼이 있는 시트를 자동 탐색합니다.
         xls = pd.read_excel(file, sheet_name=None, header=2)
         df = None
         for sheet_name, sheet_df in xls.items():
