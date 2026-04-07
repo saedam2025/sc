@@ -48,7 +48,7 @@
 
         /* 로고 설정 */
         .logo-img { 
-            height: 70px; 
+            height: 55px; 
             width: auto; 
             display: block; 
         }
@@ -92,7 +92,7 @@
         }
         .menu-item:hover i { color: #2c7be5; }
 
-        /* 선택된 메뉴 디자인 변경 - 사용자의 요청 반영 (사각형 제거, 텍스트 색상 변경, 언더라인 추가) */
+        /* 선택된 메뉴 디자인 변경 */
         .menu-item.active {
             color: #2c7be5 !important;
             font-weight: 700;
@@ -193,29 +193,53 @@
             color: #e53e3e;
         }
 
-        /* 모달 시스템 디자인 개선 */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
-        .modal-content { background: white; margin: 8% auto; padding: 0; border-radius: 12px; width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); overflow: hidden; }
-        .modal-header { padding: 20px 25px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
-        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 700; color: #2d3748; }
+        /* === 내 정보 모달 유리(Glass) 스타일로 개선 === */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
+        .modal-content { 
+            background: rgba(255, 255, 255, 0.7) !important; 
+            backdrop-filter: blur(24px) !important; 
+            -webkit-backdrop-filter: blur(24px) !important;
+            border: 1px solid rgba(255, 255, 255, 0.9) !important; 
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15) !important;
+            margin: 8% auto; padding: 0; border-radius: 15px; width: 450px; overflow: hidden; 
+        }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.6); display: flex; justify-content: space-between; align-items: center; background: transparent; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #2c7be5; }
         .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 15px 25px; background: #f8fafc; text-align: left; color: #64748b; border-bottom: 1px solid #edf2f7; width: 35%; font-size: 0.9rem; font-weight: 600; }
-        .info-table td { padding: 15px 25px; color: #2d3748; font-weight: 600; border-bottom: 1px solid #edf2f7; font-size: 0.95rem; }
+        .info-table th { padding: 15px 25px; background: rgba(255,255,255,0.4); text-align: left; color: #444; border-bottom: 1px solid rgba(255,255,255,0.6); width: 35%; font-size: 0.9rem; font-weight: 700; }
+        .info-table td { padding: 15px 25px; color: #1e293b; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.1); font-size: 0.95rem; }
 
         .btn-close-modal {
-            background: #2d3748; 
-            color: white; 
-            border: none; 
+            background: rgba(255,255,255,0.8); 
+            color: #444; 
+            border: 1px solid rgba(255,255,255,0.9); 
             padding: 10px 30px; 
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer; 
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.95rem;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
-        .btn-close-modal:hover { background: #1a202c; }
+        .btn-close-modal:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
-        .main-footer { text-align: center; padding: 40px 0; color: #a0aec0; font-size: 0.85rem; border-top: 1px solid #edf2f7; margin-top: 50px; background: #ffffff; }
+        /* 모달 내 입력 폼 (비밀번호 변경용) */
+        .glass-input {
+            width: 100%; padding: 12px; margin-bottom: 10px; 
+            border: 1px solid rgba(255,255,255,0.9); 
+            border-radius: 10px; box-sizing: border-box; 
+            background: rgba(255,255,255,0.8); 
+            color: #1e293b; 
+            outline: none; transition: all 0.3s;
+        }
+        .glass-input:focus { border-color: #4a90e2; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+
+        .btn-primary-glass {
+            background: #4a90e2; color: white; border: none; padding: 12px; border-radius: 10px;
+            font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%;
+        }
+        .btn-primary-glass:hover { background: #357abd; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+
+        .main-footer { text-align: center; padding: 40px 0; color: #a0aec0; font-size: 0.85rem; border-top: 1px solid #edf2f7; margin-top: 50px; background: transparent; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -308,14 +332,28 @@
     <div id="myInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>내 프로필 정보</h3>
-                <span style="cursor:pointer; font-size:1.4rem; color: #a0aec0;" onclick="closeMyInfoModal()">&times;</span>
+                <h3><i class="fa-solid fa-id-card"></i> 내 프로필 정보</h3>
+                <span style="cursor:pointer; font-size:1.6rem; color: #a0aec0; transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='#a0aec0'">&times;</span>
             </div>
-            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: #64748b;">데이터를 불러오는 중입니다...</div>
-            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #e53e3e;"></div>
+            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: #64748b; font-weight: 600;">데이터를 불러오는 중입니다...</div>
+            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #e53e3e; font-weight: 600;"></div>
+            
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
-                <div style="padding: 20px; text-align: center; background: #f8fafc;">
+                
+                <div id="passwordChangeSection" style="display: none; padding: 20px; background: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.6);">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: #2c7be5;"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
+                    <input type="password" id="currPwd" class="glass-input" placeholder="현재 비밀번호">
+                    <input type="password" id="newPwd" class="glass-input" placeholder="새 비밀번호">
+                    <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button type="button" class="btn-primary-glass" onclick="changeMyPassword()">변경 완료</button>
+                        <button type="button" class="btn-secondary-glass" onclick="togglePasswordForm()">취소</button>
+                    </div>
+                </div>
+
+                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.6);">
+                    <button type="button" class="btn-close-modal" id="btnTogglePwd" onclick="togglePasswordForm()"><i class="fa-solid fa-key"></i> 비밀번호 변경</button>
                     <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
                 </div>
             </div>
@@ -329,13 +367,22 @@
             const errorDiv = document.getElementById('myInfoError');
             const display = document.getElementById('myInfoDisplay');
             const table = document.getElementById('myInfoTable');
+            const pwdSection = document.getElementById('passwordChangeSection');
+            const toggleBtn = document.getElementById('btnTogglePwd');
 
             // 초기화
             modal.style.display = "block";
             loading.style.display = "block";
             errorDiv.style.display = "none";
             display.style.display = "none";
+            pwdSection.style.display = "none";
+            toggleBtn.style.display = "block";
             table.innerHTML = "";
+
+            // 폼 초기화
+            document.getElementById('currPwd').value = '';
+            document.getElementById('newPwd').value = '';
+            document.getElementById('confirmPwd').value = '';
 
             try {
                 const res = await fetch('/user/my_info'); 
@@ -345,14 +392,23 @@
                     const data = result.data;
                     let html = '';
                     
-                    // 영문 키값이 넘어올 경우를 대비한 매핑 (백엔드 구조에 맞게 자동 대응)
+                    // 영문 키값을 한글로 매핑하는 사전 (다양한 백엔드 변수 대응)
                     const keyMap = {
-                        'emp_no': '사번', 'name': '이름', 'position': '직급', 'level': '레벨',
-                        'ssn': '주민번호', 'phone': '전화번호', 'email': '이메일', 'join_date': '입사일'
+                        'id': '고유번호', 'emp_no': '사원번호(사번)', 'username': '아이디', 
+                        'name': '이름', 'position': '직급', 'role': '직책', 'department': '부서', 
+                        'level': '권한 레벨', 'ssn': '주민등록번호', 'phone': '전화번호', 
+                        'email': '이메일', 'join_date': '입사일', 'address': '주소', 
+                        'bank_name': '급여 은행명', 'account_number': '급여 계좌번호', 
+                        'status': '재직 상태', 'created_at': '계정 생성일', 'updated_at': '최근 수정일'
                     };
 
-                    // 지정된 배열 방식이 아닌 데이터에 있는 모든 키값을 동적으로 화면에 출력
                     for (const [key, value] of Object.entries(data)) {
+                        // 비밀번호 관련 항목은 모달 표에서 제외
+                        const lowerKey = key.toLowerCase();
+                        if (lowerKey.includes('password') || lowerKey.includes('pwd') || lowerKey.includes('hash')) {
+                            continue;
+                        }
+
                         const displayKey = keyMap[key] || key; // 한글 매핑이 있으면 한글로, 없으면 원래 키값 사용
                         const displayValue = (value === null || value === '') ? '-' : value;
                         html += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
@@ -372,6 +428,70 @@
                 loading.style.display = "none";
                 errorDiv.style.display = "block";
                 errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 오류가 발생했습니다.<br><small>${e.message}</small>`;
+            }
+        }
+
+        // 비밀번호 변경 폼 토글
+        function togglePasswordForm() {
+            const pwdSection = document.getElementById('passwordChangeSection');
+            const toggleBtn = document.getElementById('btnTogglePwd');
+            
+            if (pwdSection.style.display === 'none') {
+                pwdSection.style.display = 'block';
+                toggleBtn.style.display = 'none'; // 열렸을 땐 버튼 숨김
+            } else {
+                pwdSection.style.display = 'none';
+                toggleBtn.style.display = 'block';
+            }
+        }
+
+        // 비밀번호 변경 요청 전송
+        async function changeMyPassword() {
+            const currPwd = document.getElementById('currPwd').value;
+            const newPwd = document.getElementById('newPwd').value;
+            const confirmPwd = document.getElementById('confirmPwd').value;
+
+            if (!currPwd || !newPwd || !confirmPwd) {
+                alert('모든 필드를 입력해주세요.');
+                return;
+            }
+
+            if (newPwd !== confirmPwd) {
+                alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+                return;
+            }
+
+            if (newPwd.length < 4) {
+                alert('새 비밀번호는 4자리 이상이어야 합니다.');
+                return;
+            }
+
+            try {
+                // 해당 API 주소는 실제 백엔드 환경에 맞추어 수정될 수 있습니다.
+                const res = await fetch('/user/change_password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        current_password: currPwd,
+                        new_password: newPwd
+                    })
+                });
+
+                const result = await res.json();
+
+                if (res.ok && result.status === 'success') {
+                    alert('비밀번호가 성공적으로 변경되었습니다.');
+                    togglePasswordForm();
+                    document.getElementById('currPwd').value = '';
+                    document.getElementById('newPwd').value = '';
+                    document.getElementById('confirmPwd').value = '';
+                } else {
+                    alert(result.message || '비밀번호 변경에 실패했습니다. 현재 비밀번호를 확인해주세요.');
+                }
+            } catch (e) {
+                alert('서버와 통신 중 오류가 발생했습니다.');
             }
         }
 
