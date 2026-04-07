@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* === 화이트보드 전용 배경 영역 === */
+    #whiteboard {
+        position: relative;
+        width: 100%;
+        height: 80vh;
+        min-height: 700px;
+        background-color: #fdfdfd;
+        background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
+        background-size: 20px 20px;
+        border-radius: 12px;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.05), 0 5px 15px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+    }
+
+    /* 메모장 상단 도구 모음 */
+    .memo-toolbar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+        background: white;
+        padding: 15px 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        align-items: center;
+    }
+
+    .color-btn {
+        width: 30px; height: 30px; border-radius: 50%; border: 2px solid #fff; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s;
+    }
+    .color-btn:hover { transform: scale(1.1); }
+
+    .tool-btn {
+        background: #4a90e2; color: white; border: none; padding: 8px 15px;
+        border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    }
+    .tool-btn:hover { background: #357abd; }
+
+    /* 드래그 가능한 아이템 공통 속성 */
+    .draggable-item {
+        position: absolute;
+        box-shadow: 2px 5px 15px rgba(0,0,0,0.15);
+        border-radius: 4px;
+        transition: box-shadow 0.2s;
+    }
+    .draggable-item:hover { box-shadow: 4px 8px 20px rgba(0,0,0,0.25); }
+    
+    /* 드래그 손잡이 바 */
+    .drag-handle {
+        height: 20px;
+        background: rgba(0,0,0,0.05);
+        cursor: grab;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+    }
+    .drag-handle:active { cursor: grabbing; }
+
+    /* 포스트잇 스타일 */
+    .postit {
+        width: 220px;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+    }
+    .postit textarea {
+        flex: 1;
+        width: 100%;
+        background: transparent;
+        border: none;
+        resize: none;
+        padding: 10px;
+        font-family: 'Pretendard', cursive, sans-serif;
+        font-size: 1.05rem;
+        line-height: 1.5;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+    /* 이미지/파일 썸네일 스타일 */
+    .media-card {
+        background: white;
+        padding-bottom: 10px;
+        text-align: center;
+        width: 200px;
+    }
+    .media-card img {
+        width: 100%;
+        height: auto;
+        cursor: pointer;
+        display: block;
+    }
+    .file-icon {
+        font-size: 4rem;
+        color: #64748b;
+        margin: 20px 0;
+        display: block;
+    }
+    .file-link {
+        display: block;
+        padding: 0 10px;
+        color: #4a90e2;
+        font-weight: 600;
+        text-decoration: none;
+        word-break: break-all;
+    }
+
+    /* X 삭제 버튼 */
+    .btn-delete-memo {
+        position: absolute;
+        top: -10px; right: -10px;
+        background: #e74c3c; color: white; border: none;
+        width: 24px; height: 24px; border-radius: 50%;
+        cursor: pointer; font-size: 12px; font-weight: bold;
+        display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        z-index: 10;
+    }
+    .draggable-item:hover .btn-delete-memo { display: block; }
+
+    /* 큰 이미지 모달 */
+    #imageModal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+    #imageModalContent { display: block; max-width: 90%; max-height: 90%; margin: 2% auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+</style>
+
+<div class="memo-toolbar">
+    <div style="font-weight: 800; font-size: 1.2rem; color: #2c3e50; margin-right: 20px;">
+        <i class="fa-solid fa-chalkboard"></i> 개인 화이트보드
+    </div>
+    
+    <div style="display: flex; gap: 8px; align-items: center; border-right: 2px solid #e2e8f0; padding-right: 20px;">
+        <button class="color-btn" style="background: #fff9b1;" onclick="addPostit('#fff9b1')"></button>
+        <button class="color-btn" style="background: #ffd6e0;" onclick="addPostit('#ffd6e0')"></button>
+        <button class="color-btn" style="background: #bbf0f3;" onclick="addPostit('#bbf0f3')"></button>
+        <button class="color-btn" style="background: #d4f0c0;" onclick="addPostit('#d4f0c0')"></button>
+        <span style="font-size: 0.85rem; color: #64748b; margin-left: 5px;">포스트잇 추가</span>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <label for="memoUpload" class="tool-btn">
+            <i class="fa-solid fa-paperclip"></i> 그림 / 파일 보드에 붙이기
+        </label>
+        <input type="file" id="memoUpload" style="display:none;" onchange="uploadMemoFile(this)">
+    </div>
+</div>
+
+<div id="whiteboard">
+    {% for memo in memos %}
+        {% if memo.type == 'postit' %}
+        <div class="draggable-item postit" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }}; background-color:{{ memo.color }};">
+            <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+            <div class="drag-handle"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
+            <textarea onblur="updateMemoContent({{ memo.id }}, this.value)">{{ memo.content }}</textarea>
+        </div>
+        
+        {% elif memo.type == 'image' %}
+        <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
+            <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+            <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
+            <img src="/uploads/{{ memo.filepath }}" onclick="openImageModal(this.src)" title="클릭하여 확대">
+        </div>
+
+        {% elif memo.type == 'file' %}
+        <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
+            <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+            <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
+            <a href="/uploads/{{ memo.filepath }}" download class="file-link">
+                <i class="fa-solid fa-file-lines file-icon"></i>
+                <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.filepath }}</div>
+            </a>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<div id="imageModal" onclick="this.style.display='none'">
+    <span style="position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+    <img id="imageModalContent">
+</div>
+
+<script>
+    let highestZ = 100;
+
+    // === 포스트잇 추가 ===
+    async function addPostit(color) {
+        try {
+            const res = await fetch('/memo/add_postit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ color: color })
+            });
+            if(res.ok) { location.reload(); }
+        } catch(e) { alert("오류 발생"); }
+    }
+
+    // === 그림/파일 업로드 ===
+    async function uploadMemoFile(input) {
+        if(input.files.length === 0) return;
+        let formData = new FormData();
+        formData.append('file', input.files[0]);
+
+        try {
+            const res = await fetch('/memo/upload_file', { method: 'POST', body: formData });
+            if(res.ok) { location.reload(); }
+            else { alert("파일 업로드 실패"); }
+        } catch(e) { alert("오류 발생"); }
+    }
+
+    // === 포스트잇 내용 자동 저장 ===
+    async function updateMemoContent(id, content) {
+        try {
+            await fetch('/memo/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, content: content })
+            });
+        } catch(e) {}
+    }
+
+    // === 메모/그림/파일 삭제 ===
+    async function deleteMemo(id) {
+        if(!confirm("이 항목을 화이트보드에서 떼어낼까요?")) return;
+        try {
+            const res = await fetch(`/memo/delete/${id}`, { method: 'DELETE' });
+            if(res.ok) { document.getElementById(`memo_${id}`).remove(); }
+        } catch(e) {}
+    }
+
+    // === 이미지 모달 열기 ===
+    function openImageModal(src) {
+        document.getElementById('imageModal').style.display = 'block';
+        document.getElementById('imageModalContent').src = src;
+    }
+
+    // === 마우스 드래그 앤 드롭 구현 ===
+    const whiteboard = document.getElementById('whiteboard');
+    let draggedElement = null;
+    let offsetX = 0, offsetY = 0;
+
+    whiteboard.addEventListener('mousedown', function(e) {
+        if (e.target.closest('.drag-handle')) {
+            draggedElement = e.target.closest('.draggable-item');
+            highestZ++;
+            draggedElement.style.zIndex = highestZ;
+            
+            const rect = draggedElement.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            draggedElement.style.cursor = 'grabbing';
+            e.preventDefault(); 
+        }
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (draggedElement) {
+            const boardRect = whiteboard.getBoundingClientRect();
+            let newX = e.clientX - boardRect.left - offsetX;
+            let newY = e.clientY - boardRect.top - offsetY;
+
+            newX = Math.max(0, Math.min(newX, boardRect.width - draggedElement.offsetWidth));
+            newY = Math.max(0, Math.min(newY, boardRect.height - draggedElement.offsetHeight));
+
+            draggedElement.style.left = newX + 'px';
+            draggedElement.style.top = newY + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', async function(e) {
+        if (draggedElement) {
+            draggedElement.style.cursor = 'default';
+            const id = draggedElement.id.replace('memo_', '');
+            const finalX = parseInt(draggedElement.style.left);
+            const finalY = parseInt(draggedElement.style.top);
+            const z = draggedElement.style.zIndex;
+            
+            draggedElement = null;
+
+            try {
+                await fetch('/memo/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, pos_x: finalX, pos_y: finalY, z_index: z })
+                });
+            } catch(error) {}
+        }
+    });
+</script>
+{% endblock %}

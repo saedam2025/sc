@@ -172,7 +172,7 @@
             align-items: center;
             justify-content: center;
         }
-        .btn-memo:hover {
+        .btn-memo:hover, .btn-memo.active {
             color: #2c7be5;
             background: #f0f4f8;
         }
@@ -318,7 +318,7 @@
 
             <div class="user-section">
                 {% if session.get('user_name') %}
-                <a href="/memo" class="btn-memo" title="개인 화이트보드 메모장">
+                <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
                     <i class="fa-solid fa-chalkboard"></i>
                 </a>
 
