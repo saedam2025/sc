@@ -20,6 +20,15 @@ mail_status = {
     'errors': []
 }
 
+# [추가됨] 엑셀의 빈 값, NaN 등을 0으로 안전하게 변환하고 콤마를 찍어주는 함수
+def safe_amount(value):
+    try:
+        if pd.isna(value) or value == "" or value is None:
+            return "0"
+        return f"{int(float(value)):,}"
+    except (ValueError, TypeError):
+        return str(value)
+
 def get_template_path(user_type):
     """직원 구분을 유연하게 자동 인식하여 템플릿을 매칭합니다."""
     u_type = str(user_type).replace(' ', '')
@@ -48,7 +57,8 @@ def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
     tpl_path = get_template_path(user_type)
     
     try:
-        html_content = render_template(tpl_path, row=row, send_date=send_date)
+        # [수정됨] html_content 렌더링 부분에 safe_amount=safe_amount 추가
+        html_content = render_template(tpl_path, row=row, send_date=send_date, safe_amount=safe_amount)
         msg.attach(MIMEText(html_content, 'html'))
 
         # 광고 이미지 및 로고 첨부 로직 (경로가 존재하는 경우에만 정확히 작동)
