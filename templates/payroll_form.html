@@ -59,10 +59,11 @@
 
 <script>
 // 1. 페이지 로드 시 오늘 날짜 세팅
-window.onload = function() {
+document.addEventListener('DOMContentLoaded', function() {
     const today = new Date().toISOString().split('T')[0];
-    document.getElementById('send_date').value = today;
-};
+    const dateInput = document.getElementById('send_date');
+    if(dateInput) dateInput.value = today;
+});
 
 // 2. 이미지 미리보기 함수
 function previewImg(input, targetId) {
@@ -73,61 +74,88 @@ function previewImg(input, targetId) {
             target.innerHTML = `<img src="${e.target.result}" style="width:100%; height:100%; object-fit:contain;">`;
         };
         reader.readAsDataURL(input.files[0]);
+    } else {
+        target.innerHTML = '<span style="color:#ccc; font-size:0.8rem;">미리보기 없음</span>';
     }
 }
 
-// 3. 발송 요청 및 상태 체크
-document.getElementById('payroll-form').onsubmit = async (e) => {
-    e.preventDefault();
+// 3. 폼 전송 이벤트 (이벤트 리스너 방식으로 변경)
+document.getElementById('payroll-form').addEventListener('submit', async function(e) {
+    e.preventDefault(); // 폼 기본 제출 막기
+    
     if(!confirm("입력하신 정보로 명세서 발송을 시작하시겠습니까?")) return;
 
-    const formData = new FormData(e.target);
+    // e.target 대신 this를 사용하여 폼 데이터 수집의 안정성 확보
+    const formData = new FormData(this);
     const submitBtn = document.getElementById('submit-btn');
+    
+    // UI 상태 변경
     submitBtn.disabled = true;
     submitBtn.style.background = "#ccc";
     document.getElementById('status-panel').style.display = 'block';
-    document.getElementById('name-list').innerHTML = "";
+    document.getElementById('name-list').innerHTML = "<div style='color:#666;'>서버에 발송을 요청하는 중입니다...</div>";
+    document.getElementById('status-text').innerText = "⏳ 발송 준비 중...";
+    document.getElementById('progress-percent').innerText = "0%";
 
     try {
-        const res = await fetch('/payroll/send', { method: 'POST', body: formData });
+        const res = await fetch('/payroll/send', { 
+            method: 'POST', 
+            body: formData 
+        });
+        
         const result = await res.json();
         
         if(result.status === 'error') {
             alert(result.message);
             submitBtn.disabled = false;
+            submitBtn.style.background = "#111";
+            document.getElementById('status-panel').style.display = 'none';
             return;
         }
 
+        document.getElementById('status-text').innerText = "🚀 발송 중...";
+
         // 2초마다 상태를 체크하여 화면 업데이트
         const checkInterval = setInterval(async () => {
-            const statusRes = await fetch('/payroll/status');
-            const data = await statusRes.json();
-            
-            if (data.total_count > 0) {
-                const percent = Math.round((data.sent_count / data.total_count) * 100);
-                document.getElementById('progress-percent').innerText = `${percent}% (${data.sent_count}/${data.total_count})`;
-                document.getElementById('name-list').innerHTML = data.sent_names.map(name => 
-                    `<div style="border-bottom:1px solid #f5f5f5;"><i class="fa-solid fa-check" style="color:green;"></i> <b>${name}</b>님께 발송 완료</div>`
-                ).join('');
+            try {
+                const statusRes = await fetch('/payroll/status');
+                const data = await statusRes.json();
                 
-                // 리스트 하단으로 자동 스크롤
-                const listDiv = document.getElementById('name-list');
-                listDiv.scrollTop = listDiv.scrollHeight;
-            }
+                if (data.total_count > 0) {
+                    const percent = Math.round((data.sent_count / data.total_count) * 100);
+                    document.getElementById('progress-percent').innerText = `${percent}% (${data.sent_count}/${data.total_count})`;
+                    
+                    if (data.sent_names.length > 0) {
+                        document.getElementById('name-list').innerHTML = data.sent_names.map(name => 
+                            `<div style="border-bottom:1px solid #f5f5f5; padding:5px 0;"><i class="fa-solid fa-check" style="color:green;"></i> <b>${name}</b>님께 발송 완료</div>`
+                        ).join('');
+                    }
+                    
+                    // 리스트 하단으로 자동 스크롤
+                    const listDiv = document.getElementById('name-list');
+                    listDiv.scrollTop = listDiv.scrollHeight;
+                }
 
-            if(!data.is_running && data.sent_count >= data.total_count && data.total_count > 0) {
-                clearInterval(checkInterval);
-                document.getElementById('status-text').innerText = "✅ 발송이 모두 완료되었습니다.";
-                alert("모든 명세서가 성공적으로 발송되었습니다!");
-                submitBtn.disabled = false;
-                submitBtn.style.background = "#111";
+                // 발송 완료 조건 확인
+                if(!data.is_running && data.sent_count >= data.total_count && data.total_count > 0) {
+                    clearInterval(checkInterval);
+                    document.getElementById('status-text').innerText = "✅ 발송이 모두 완료되었습니다.";
+                    alert("모든 명세서가 성공적으로 발송되었습니다!");
+                    submitBtn.disabled = false;
+                    submitBtn.style.background = "#111";
+                }
+            } catch (statusErr) {
+                console.error("상태 확인 중 오류:", statusErr);
             }
         }, 2000);
 
     } catch (err) {
-        alert("서버 통신 중 오류가 발생했습니다.");
+        console.error("발송 요청 중 오류:", err);
+        alert("서버 통신 중 오류가 발생했습니다. 개발자 도구(F12)의 콘솔창을 확인해주세요.");
         submitBtn.disabled = false;
+        submitBtn.style.background = "#111";
+        document.getElementById('status-panel').style.display = 'none';
     }
-};
+});
 </script>
 {% endblock %}
