@@ -54,7 +54,7 @@ def index():
     
     conn = get_db()
 
-    # [DB 컬럼 자동 확인 및 추가]
+    # [DB 컬럼 및 테이블 자동 확인 및 추가]
     try:
         conn.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         conn.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
@@ -64,6 +64,22 @@ def index():
         
     try:
         conn.execute("ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'")
+        conn.commit()
+    except:
+        pass
+
+    # 내 메모장 DB 테이블 자동 생성 (없을 경우)
+    try:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS memos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                owner TEXT UNIQUE,
+                content TEXT,
+                filename TEXT,
+                filepath TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
     except:
         pass
@@ -198,6 +214,9 @@ def index():
     if current_user not in user_list: 
         user_list.append(current_user)
 
+    # 8. 개인 메모 로드 (현재 사용자용)
+    my_memo = conn.execute("SELECT * FROM memos WHERE owner = ?", (current_user,)).fetchone()
+
     conn.close()
 
     return render_template('main.html', 
@@ -206,7 +225,7 @@ def index():
                            current_user=current_user, board_posts=board_posts, 
                            chat_partners=chat_partners,
                            received_messages=received_messages, sent_messages=sent_messages,
-                           user_list=user_list, user_icons=user_icons)
+                           user_list=user_list, user_icons=user_icons, my_memo=my_memo)
 
 @main_bp.route('/save_task', methods=['POST'])
 def save_task():
@@ -396,3 +415,48 @@ def check_messages():
     unread_count = conn.execute("SELECT COUNT(*) as count FROM messages WHERE receiver=? AND is_read=0", (current_user,)).fetchone()['count']
     conn.close()
     return jsonify({"unread": unread_count})
+
+# --- 내 메모장 DB 저장 관련 API ---
+
+@main_bp.route('/save_my_memo', methods=['POST'])
+def save_my_memo():
+    content = request.form.get('content', '')
+    owner = session.get('user_name')
+    
+    if not owner:
+        return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+
+    file = request.files.get('file')
+    filename, filepath = '', ''
+    
+    if file and file.filename:
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+
+    conn = get_db()
+    
+    # 기존 메모가 있는지 확인
+    existing_memo = conn.execute("SELECT * FROM memos WHERE owner = ?", (owner,)).fetchone()
+    
+    if existing_memo:
+        # 새로운 파일 업로드가 없다면, 기존 파일 정보 유지
+        if not filename:
+            filename = existing_memo['filename'] if existing_memo['filename'] else ''
+            filepath = existing_memo['filepath'] if existing_memo['filepath'] else ''
+            
+        conn.execute('''
+            UPDATE memos 
+            SET content = ?, filename = ?, filepath = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE owner = ?
+        ''', (content, filename, filepath, owner))
+    else:
+        conn.execute('''
+            INSERT INTO memos (owner, content, filename, filepath)
+            VALUES (?, ?, ?, ?)
+        ''', (owner, content, filename, filepath))
+        
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "success"})
