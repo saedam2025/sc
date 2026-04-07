@@ -10,6 +10,37 @@ main_bp = Blueprint('main', __name__)
 UPLOAD_FOLDER = '/mnt/data/uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# === 실시간 접속자 상태 관리를 위한 전역 변수 ===
+active_users = {}
+ACTIVE_TIMEOUT = 5  # 5분(300초) 이내에 활동이 없으면 접속 종료로 간주
+
+@main_bp.before_request
+def update_last_active():
+    """요청이 들어올 때마다 현재 사용자의 마지막 활동 시간을 갱신합니다."""
+    user_name = session.get('user_name')
+    if user_name:
+        active_users[user_name] = datetime.now()
+
+@main_bp.route('/get_active_users', methods=['GET'])
+def get_active_users():
+    """현재 접속 중인 직원 목록을 반환하는 API"""
+    now = datetime.now()
+    active_user_list = []
+    
+    # 딕셔너리를 순회하며 5분 이내 활동한 사람만 추출
+    # list()로 감싸서 순회 도중 딕셔너리 크기가 변경되어 발생하는 오류 방지
+    for user, last_active in list(active_users.items()):
+        if now - last_active <= timedelta(minutes=ACTIVE_TIMEOUT):
+            active_user_list.append(user)
+        else:
+            # 5분이 지나 오프라인 상태가 된 사용자는 딕셔너리에서 제거
+            del active_users[user]
+            
+    # 가나다순으로 정렬하여 보기 좋게 표시
+    active_user_list.sort()
+    return jsonify({"active_users": active_user_list})
+
+
 @main_bp.route('/')
 def index():
     cats = ['회의', '면접', '미팅', '외근', '기타', '근태/휴가']
