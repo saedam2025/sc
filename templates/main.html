@@ -2,7 +2,7 @@
 
 {% block content %}
 <style>
-    /* === 다이나믹 테마 변수 (로그인 화면과 동일) === */
+    /* === 다이나믹 테마 변수 (유리 속성 고정) === */
     :root {
         --body-bg: #f8fafc;
         --primary-color: #4a90e2;
@@ -191,17 +191,22 @@
     /* 랜덤 테마 버튼 */
     .theme-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); border: 1px solid var(--card-border); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 1000; box-shadow: var(--card-shadow); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
     .theme-btn:hover { background: var(--widget-hover); transform: translateY(-2px); }
+
+    /* 통계 게이지 바 스타일 */
+    .stat-bar-bg { background: var(--input-bg); border-radius: 6px; height: 12px; overflow: hidden; border: 1px solid var(--card-border); margin-top: 5px; }
+    .stat-bar-fill { background: var(--primary-color); height: 100%; border-radius: 6px; transition: width 1.5s ease-out; }
 </style>
 
 <div id="bg-effect-container"></div>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
     <div class="row" style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
-        <div class="col-calendar glass-box" style="flex: 7; height: 680px; overflow: hidden;">
+        
+        <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden;">
             <div id='calendar'></div>
         </div>
 
-        <div class="col-today glass-box" style="flex: 3; height: 680px; overflow-y: auto;">
+        <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
             </div>
@@ -244,12 +249,91 @@
                 {% endif %}{% endfor %}
             </div>
         </div>
+
+        <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px;">
+            
+            <div class="glass-box" style="flex: 0 0 140px; overflow-y: auto; padding: 15px;">
+                <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
+                    <i class="fa-solid fa-users"></i> 접속 중인 직원
+                </h3>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    {% for u in user_list %}
+                    <div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;">
+                        <span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> {{ u }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="glass-box col-msg" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.05rem;">
+                        <i class="fa-solid fa-envelope"></i> 쪽지함
+                    </h3>
+                    <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight: 600;"><i class="fa-solid fa-pen"></i> 쓰기</button>
+                </div>
+                
+                <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
+                    <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.85rem;" onclick="switchMsgTab('partners')">상대</span>
+                    <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('recv')">받음 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
+                    <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('sent')">보냄</span>
+                </div>
+
+                <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                    {% for partner in chat_partners %}
+                    <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
+                        <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
+                        <div style="flex: 1;">
+                            <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
+                            {% if partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
+                        </div>
+                        <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">대화 기록이 없습니다.</p>
+                    {% endfor %}
+                </div>
+
+                <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                    {% for msg in received_messages %}
+                    <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
+                        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                            <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
+                            <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                        </div>
+                        <div style="color: var(--text-gray); font-size:0.8rem;">
+                            {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
+                    {% endfor %}
+                </div>
+
+                <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                    {% for msg in sent_messages %}
+                    <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
+                        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                            <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
+                            <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                        </div>
+                        <div style="color: var(--text-gray); font-size:0.8rem;">
+                            {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row" style="display: flex; gap: 20px;">
-        <div class="col-board glass-box" style="flex: 7; height: 350px; overflow-y: auto;">
+        
+        <div class="col-board glass-box" style="flex: 5; height: 350px; overflow-y: auto;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
                 <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
             </div>
             <div style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
@@ -270,68 +354,15 @@
             </div>
         </div>
 
-        <div class="col-msg glass-box" style="flex: 3; height: 350px; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.1rem;">
-                    <i class="fa-solid fa-envelope"></i> 내 쪽지함
+        <div class="col-stats glass-box" style="flex: 5; height: 350px; overflow-y: auto;">
+            <div style="margin-bottom: 15px;">
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: #e67e22 !important;">
+                    <i class="fa-solid fa-school"></i> 외근 중 학교 방문 통계
                 </h3>
-                <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;"><i class="fa-solid fa-paper-plane"></i> 새 쪽지</button>
+                <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: var(--text-gray);">달력에 등록된 외근(학교 포함) 일정을 기반으로 한 누적 통계입니다.</p>
             </div>
-            
-            <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
-                <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.9rem;" onclick="switchMsgTab('partners')">대화 상대</span>
-                <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.9rem;" onclick="switchMsgTab('recv')">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
-                <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.9rem;" onclick="switchMsgTab('sent')">보낸 쪽지</span>
-            </div>
-
-            <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
-                {% for partner in chat_partners %}
-                <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
-                    <div style="font-size: 1.8rem;">{{ user_icons.get(partner.name, '👤') }}</div>
-                    <div style="flex: 1;">
-                        <strong style="color: var(--text-dark); font-size: 0.95rem;">{{ partner.name }}</strong>
-                        {% if partner.unread > 0 %}
-                        <span class="unread-badge">{{ partner.unread }}</span>
-                        {% endif %}
-                    </div>
-                    <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
+            <div id="schoolStatsContainer" style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 15px;">
                 </div>
-                {% else %}
-                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">대화 기록이 없습니다.</p>
-                {% endfor %}
-            </div>
-
-            <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
-                {% for msg in received_messages %}
-                <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 12px;">
-                    <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                        <span style="color: var(--text-dark);">From: {{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
-                        <span style="font-size: 0.7rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
-                    </div>
-                    <div style="color: var(--text-gray); font-size:0.85rem;">
-                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
-                    </div>
-                </div>
-                {% else %}
-                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">받은 쪽지가 없습니다.</p>
-                {% endfor %}
-            </div>
-
-            <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
-                {% for msg in sent_messages %}
-                <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 12px;">
-                    <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                        <span style="color: var(--text-dark);">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
-                        <span style="font-size: 0.7rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
-                    </div>
-                    <div style="color: var(--text-gray); font-size:0.85rem;">
-                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
-                    </div>
-                </div>
-                {% else %}
-                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">보낸 쪽지가 없습니다.</p>
-                {% endfor %}
-            </div>
         </div>
     </div>
 </div>
@@ -558,8 +589,67 @@
         }, 300); 
     }
 
-    // 초기 테마 설정
-    document.addEventListener('DOMContentLoaded', initRandomTheme);
+    // 초기 테마 설정 및 통계 위젯 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+        initRandomTheme();
+        renderSchoolVisitStats();
+    });
+
+    // === 외근 중 학교 방문 통계 생성 함수 ===
+    function renderSchoolVisitStats() {
+        const events = {{ events | tojson | safe }};
+        let schoolCounts = {};
+        
+        events.forEach(e => {
+            if (e.extendedProps && e.extendedProps.category === '외근') {
+                const title = e.extendedProps.task_title || '';
+                // '학교'라는 단어가 포함된 외근 일정만 추출
+                if (title.includes('학교')) {
+                    // 띄어쓰기를 기준으로 학교 이름 추출 시도 (완벽하지 않을 수 있으나 대략적인 분류)
+                    const words = title.split(' ');
+                    const schoolName = words.find(w => w.includes('학교')) || '기타 학교';
+                    schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
+                }
+            }
+        });
+        
+        const container = document.getElementById('schoolStatsContainer');
+        if (Object.keys(schoolCounts).length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">통계 데이터가 없습니다.</p>';
+            return;
+        }
+
+        // 객체를 배열로 변환 후 횟수 기준 내림차순 정렬
+        const sortedSchools = Object.entries(schoolCounts).sort((a, b) => b[1] - a[1]);
+        const maxCount = sortedSchools[0][1]; // 가장 큰 방문 횟수 (게이지 100% 기준)
+        
+        let html = '';
+        sortedSchools.forEach(([school, count]) => {
+            const pct = (count / maxCount) * 100;
+            html += `
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-dark); font-weight: 600;">
+                    <span><i class="fa-solid fa-location-dot" style="color: var(--primary-color);"></i> ${school}</span>
+                    <strong>${count}회</strong>
+                </div>
+                <div class="stat-bar-bg">
+                    <div class="stat-bar-fill" style="width: ${pct}%;"></div>
+                </div>
+            </div>`;
+        });
+        
+        container.innerHTML = html;
+        
+        // 애니메이션 트리거 (width 0에서 원래 %로 늘어남)
+        setTimeout(() => {
+            const fills = container.querySelectorAll('.stat-bar-fill');
+            fills.forEach(fill => {
+                const targetWidth = fill.style.width;
+                fill.style.width = '0%';
+                setTimeout(() => { fill.style.width = targetWidth; }, 50);
+            });
+        }, 100);
+    }
 
     // === 기존 달력 및 게시판 스크립트 ===
     window.taskDataMap = window.taskDataMap || {};
@@ -748,7 +838,8 @@
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
             events: {{ events | tojson | safe }},
-            height: 640, fixedWeekCount: false, dayMaxEvents: true,
+            height: 510, // 달력 크기 축소 반영 (기존 640에서 컨테이너 높이에 맞게 조정)
+            fixedWeekCount: false, dayMaxEvents: true,
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
