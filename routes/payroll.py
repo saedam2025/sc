@@ -184,6 +184,10 @@ def start_send():
         # 발송 시 사용할 절대 도메인 주소 획득 (예: https://saedam-intranet.onrender.com)
         base_url = request.host_url.rstrip('/')
         
+        # [수정된 부분] HTTPS 강제 변환
+        if base_url.startswith("http://") and "localhost" not in base_url and "127.0.0.1" not in base_url:
+            base_url = base_url.replace("http://", "https://")
+        
         threading.Thread(target=payroll_worker, args=(app, df, send_date, interval, base_url)).start()
         
         return jsonify({"status": "success"})
