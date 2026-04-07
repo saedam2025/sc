@@ -92,10 +92,14 @@
         }
         .menu-item:hover i { color: #2c7be5; }
 
+        /* 선택된 메뉴 디자인 변경 - 사용자의 요청 반영 (사각형 제거, 텍스트 색상 변경, 언더라인 추가) */
         .menu-item.active {
-            font-weight: 800;
-            color: #2c7be5;
-            background: #e8f1fb;
+            color: #2c7be5 !important;
+            font-weight: 700;
+            border-bottom: 2px solid #2c7be5;
+            border-radius: 0; /* 언더라인이 자연스럽게 */
+            background-color: transparent; /* 배경색 제거 */
+            box-shadow: none; /* 그림자 제거 */
         }
 
         /* 풀다운 메뉴 디자인 변경 */
