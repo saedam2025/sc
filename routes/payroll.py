@@ -97,7 +97,7 @@ def payroll_worker(df, send_date, interval, ad1, ad2):
 
 @payroll_bp.route('/')
 def index():
-    return render_template('payroll/payroll_form.html') # 경로 주의
+    return render_template('payroll_form.html', user_icons={})
 
 @payroll_bp.route('/send', methods=['POST'])
 def start_send():
