@@ -145,7 +145,25 @@ def memo_update():
 def memo_delete(memo_id):
     owner = session.get('user_name')
     conn = get_db()
-    conn.execute("DELETE FROM whiteboard_memos WHERE id = ? AND owner = ?", (memo_id, owner))
-    conn.commit()
+    
+    # 1. DB에서 삭제할 메모의 정보(타입과 파일경로)를 먼저 조회합니다.
+    memo = conn.execute("SELECT type, filepath FROM whiteboard_memos WHERE id = ? AND owner = ?", (memo_id, owner)).fetchone()
+    
+    if memo:
+        # 2. DB 레코드 삭제
+        conn.execute("DELETE FROM whiteboard_memos WHERE id = ? AND owner = ?", (memo_id, owner))
+        conn.commit()
+        
+        # 3. 첨부파일(file)이나 이미지(image) 타입이고, filepath가 존재하면 서버 물리 파일도 삭제
+        if memo['type'] in ['file', 'image'] and memo['filepath']:
+            file_path = os.path.join(UPLOAD_FOLDER, memo['filepath'])
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception as e:
+                    # 파일 삭제 중 권한 오류 등이 발생할 경우 앱이 뻗지 않도록 예외 처리
+                    print(f"파일 삭제 실패: {e}")
+                    pass
+                    
     conn.close()
     return jsonify({"status": "success"})
