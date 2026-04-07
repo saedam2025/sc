@@ -1,42 +1,32 @@
-<!-- teacher.html -->
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <style>
-    body {
-      font-family: 'Nanum Gothic', sans-serif;
-      background-color: #f4f6f9;
-      margin: 0;
-      padding: 0;
-    }
+    body { font-family: 'Nanum Gothic', sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
   </style>
 </head>
 <body style="font-family:'Malgun Gothic', sans-serif; background:#f5f7fa; padding:30px;">
-
 <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:1120px;">
   <tr valign="top">
-
-      <!-- 왼쪽 투명 공간 (광고와 균형 맞춤, 이부분만 삽입하면 됨) -->
-      <td style="width:70px;">&nbsp;</td>
-
+    <td style="width:70px;">&nbsp;</td>
     <td style="width:50px;">&nbsp;</td>
     <td style="width:690px; background:#fff; padding:40px 30px; border:2px solid #ccc; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.06);">
       <h2 style="text-align:center; color:#ffffff; background:#1f3c88; padding:16px 0; border-radius:6px; font-size:22px;">센터장 근로자 지급명세서</h2><br>
-      <p style="text-align:right; font-size:13px; color:#555;">지급일: {{ today }}&nbsp;</p>
+      <p style="text-align:right; font-size:13px; color:#555;">지급일: {{ send_date }}&nbsp;</p>
 
       <table style="width:100%; table-layout: fixed; margin-bottom:20px; font-size:13px; border-collapse: collapse; text-align: center;">
         <tr>
           <td style="width:20%; border:1px solid #ccc; padding:12px; background:#f0f4f8;"><strong>성 명</strong></td>
-          <td style="width:30%; border:1px solid #ccc; padding:12px;">{{ name }}</td>
+          <td style="width:30%; border:1px solid #ccc; padding:12px;">{{ row.get('직원명', row.get('강사명', '')) }}</td>
           <td style="width:20%; border:1px solid #ccc; padding:12px; background:#f0f4f8;"><strong>지급은행</strong></td>
-          <td style="width:30%; border:1px solid #ccc; padding:12px;">{{ bank }}</td>
+          <td style="width:30%; border:1px solid #ccc; padding:12px;">{{ row.get('은행', row.get('지급은행', row.get('은행명', ''))) }}</td>
         </tr>
         <tr>
           <td style="background:#f0f4f8; border:1px solid #ccc; padding:12px;"><strong>지급항목</strong></td>
-          <td style="border:1px solid #ccc; padding:12px;">{{ job }} {{ subject }}</td>
+          <td style="border:1px solid #ccc; padding:12px;">{{ row.get('직책', row.get('직원구분', '')) }} {{ row.get('과목', row.get('강의명', '')) }}</td>
           <td style="background:#f0f4f8; border:1px solid #ccc; padding:12px;"><strong>계좌번호</strong></td>
-          <td style="border:1px solid #ccc; padding:12px;">{{ account }}</td>
+          <td style="border:1px solid #ccc; padding:12px;">{{ row.get('계좌번호', '') }}</td>
         </tr>
       </table>
 
@@ -85,7 +75,7 @@
 
       <table style="width:100%; table-layout:fixed; border-collapse: collapse; font-size:13px; margin-top:25px;">
         <tr><th style="background:#dfe9f5; border:1px solid #ccc; padding:12px; text-align:center;">기타 항목의 내역</th></tr>
-        <tr><td style="border:1px solid #ccc; padding:24px 12px; height:80px; vertical-align:top;">{{ remark|safe }}</td></tr>
+        <tr><td style="border:1px solid #ccc; padding:24px 12px; height:80px; vertical-align:top;">{{ row.get('비고', row.get('기타사항', ''))|replace('\n', '<br>')|safe }}</td></tr>
       </table>
 
       <table style="width:100%; table-layout:fixed; border-collapse: collapse; font-size:13px; font-weight:bold; margin-top:20px;">
@@ -97,7 +87,7 @@
         </tr>
         <tr style="background:#fef6e4;">
           <td colspan="2" style="border:1px solid #ccc; border-right:none; padding:14px; font-size:18px; text-align:center;">실 수령액</td>
-          <td colspan="2" style="border:1px solid #ccc; border-left:none; padding:14px; font-size:18px; text-align: right;">{{ "{:,}".format(real_amount) }} 원</td>
+          <td colspan="2" style="border:1px solid #ccc; border-left:none; padding:14px; font-size:18px; text-align: right;">{{ safe_amount(row, '차인지급액') }} 원</td>
         </tr>
       </table>
 
@@ -111,21 +101,16 @@
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); overflow:hidden;">
         <tr><td><img src="cid:ad1_image" style="width:100%; display:block;" alt="알림1"></td></tr>
         <tr><td style="padding:6px; font-size:12px; color:#555; text-align:center; background:#f9f9f9;">
-          📢 <a href="mailto:saedam2025@gmail.com" style="color:#1f3c88; font-weight:bold; text-decoration:none;">
-            강사료 관련문의: saedam2025@gmail.com
-          </a>
+          📢 <a href="mailto:saedam2025@gmail.com" style="color:#1f3c88; font-weight:bold; text-decoration:none;">강사료 관련문의: saedam2025@gmail.com</a>
         </td></tr>
       </table>
       <div style="height:14px;"></div>
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); overflow:hidden;">
         <tr><td><img src="cid:ad2_image" style="width:100%; display:block;" alt="알림2"></td></tr>
-        <tr><td style="padding:6px; font-size:12px; color:#555; text-align:center; background:#f9f9f9;">
-          (사)새담청소년교육문화원
-        </td></tr>
+        <tr><td style="padding:6px; font-size:12px; color:#555; text-align:center; background:#f9f9f9;">(사)새담청소년교육문화원</td></tr>
       </table>
     </td>
   </tr>
 </table>
-
 </body>
 </html>
