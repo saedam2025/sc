@@ -2,7 +2,7 @@ import os
 import time
 import threading
 import pandas as pd
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -72,28 +72,32 @@ def send_payroll_mail(row, user_type, send_date, ad1_path, ad2_path):
     except Exception as e:
         return False, str(e)
 
-def payroll_worker(df, send_date, interval, ad1, ad2):
+def payroll_worker(app, df, send_date, interval, ad1, ad2):
     """별도 쓰레드에서 순차 발송"""
     global mail_status
-    mail_status['is_running'] = True
-    mail_status['total_count'] = len(df)
-    mail_status['sent_count'] = 0
-    mail_status['sent_names'] = []
+    
+    with app.app_context():
+        mail_status['is_running'] = True
+        mail_status['total_count'] = len(df)
+        mail_status['sent_count'] = 0
+        mail_status['sent_names'] = []
+        mail_status['errors'] = []
 
-    for _, row in df.iterrows():
-        u_type = str(row.get('직원구분', '강사')).strip()
-        success, err_msg = send_payroll_mail(row, u_type, send_date, ad1, ad2)
-        
-        if success:
-            mail_status['sent_count'] += 1
-            name = str(row.get('직원명', row.get('강사명', 'Unknown')))
-            mail_status['sent_names'].append(name)
-        else:
-            mail_status['errors'].append(f"오류: {err_msg}")
-        
-        time.sleep(float(interval))
+        for _, row in df.iterrows():
+            u_type = str(row.get('직원구분', '강사')).strip()
+            success, err_msg = send_payroll_mail(row, u_type, send_date, ad1, ad2)
+            
+            if success:
+                mail_status['sent_count'] += 1
+                name = str(row.get('직원명', row.get('강사명', 'Unknown')))
+                mail_status['sent_names'].append(name)
+            else:
+                mail_status['errors'].append(f"오류: {err_msg}")
+                print(f"❌ 발송 실패: {err_msg}")
+            
+            time.sleep(float(interval))
 
-    mail_status['is_running'] = False
+        mail_status['is_running'] = False
 
 @payroll_bp.route('/')
 def index():
@@ -102,7 +106,7 @@ def index():
 @payroll_bp.route('/send', methods=['POST'])
 def start_send():
     global mail_status
-    if mail_status['is_running']:
+    if mail_status.get('is_running'):
         return jsonify({"status": "error", "message": "이미 발송이 진행 중입니다."})
 
     if 'excel' not in request.files: 
@@ -110,9 +114,16 @@ def start_send():
     
     try:
         file = request.files['excel']
-        df = pd.read_excel(file).fillna("")
-        # 데이터가 없는 빈 행 제거
-        df = df[df.iloc[:, 0] != ""]
+        df = pd.read_excel(file).dropna(how='all').fillna("")
+        
+        # '이메일' 칼럼에 '@'가 포함된 유효한 데이터만 필터링
+        if '이메일' in df.columns:
+            df = df[df['이메일'].astype(str).str.contains('@')]
+        else:
+            return jsonify({"status": "error", "message": "엑셀 파일에 '이메일' 열이 필요합니다."})
+            
+        if len(df) == 0:
+            return jsonify({"status": "error", "message": "유효한 이메일 주소가 있는 대상자가 없습니다."})
         
         send_date = request.form.get('send_date')
         interval = request.form.get('interval', 2)
@@ -129,7 +140,10 @@ def start_send():
         # 쓰레드 시작 전 상태 초기화
         mail_status.update({'sent_count': 0, 'sent_names': [], 'errors': [], 'total_count': len(df)})
 
-        threading.Thread(target=payroll_worker, args=(df, send_date, interval, ad1_path, ad2_path)).start()
+        # 현재 플라스크 앱 객체를 스레드로 전달
+        app = current_app._get_current_object()
+        threading.Thread(target=payroll_worker, args=(app, df, send_date, interval, ad1_path, ad2_path)).start()
+        
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": f"파일 처리 중 오류: {str(e)}"})
