@@ -192,9 +192,6 @@
     .theme-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); border: 1px solid var(--card-border); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 1000; box-shadow: var(--card-shadow); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
     .theme-btn:hover { background: var(--widget-hover); transform: translateY(-2px); }
 
-    /* 통계 게이지 바 스타일 */
-    .stat-bar-bg { background: var(--input-bg); border-radius: 6px; height: 12px; overflow: hidden; border: 1px solid var(--card-border); margin-top: 5px; }
-    .stat-bar-fill { background: var(--primary-color); height: 100%; border-radius: 6px; transition: width 1.5s ease-out; }
 </style>
 
 <div id="bg-effect-container"></div>
@@ -350,15 +347,16 @@
             </div>
         </div>
 
-        <div class="col-stats glass-box" style="flex: 5; height: 350px; overflow-y: auto;">
-            <div style="margin-bottom: 15px;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: #e67e22 !important;">
-                    <i class="fa-solid fa-school"></i> 외근 중 학교 방문 통계
+        <div class="col-memo glass-box" style="flex: 5; height: 350px; display: flex; flex-direction: column;">
+            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: #27ae60 !important;">
+                    <i class="fa-solid fa-note-sticky"></i> 내 메모장
                 </h3>
-                <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: var(--text-gray);">달력에 등록된 외근(학교 포함) 일정을 기반으로 한 누적 통계입니다.</p>
+                <span id="memoSaveStatus" style="font-size: 0.75rem; color: var(--text-gray); font-weight: 600;">
+                    <i class="fa-solid fa-cloud-arrow-down"></i> 자동 저장됨
+                </span>
             </div>
-            <div id="schoolStatsContainer" style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 15px;">
-                </div>
+            <textarea id="personalMemo" style="flex: 1; resize: none; margin-bottom: 0; padding: 15px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--input-text); font-family: inherit; font-size: 0.95rem; line-height: 1.6; outline: none; transition: box-shadow 0.3s;" placeholder="오늘 해야 할 일이나 떠오르는 아이디어를 자유롭게 적어보세요! (입력 후 1초 뒤 자동으로 브라우저에 저장됩니다)"></textarea>
         </div>
     </div>
 </div>
@@ -494,32 +492,38 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
     // === 다이나믹 테마 엔진 생성 (유리 테마 고정 및 다크/검정 모드 완전히 제거) ===
-    const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
-    const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
-    const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
+    const themeConfigs = [
+        { name: "[유리]크리스탈 포레스터", hue: 140, isDark: false, type: "rings" },
+        { name: "[유리]로얄 웨이브", hue: 280, isDark: false, type: "waves" },
+        { name: "[유리]시크릿 선셋", hue: 20, isDark: false, type: "orbs" },
+        { name: "[유리]네온 포레스터", hue: 110, isDark: false, type: "lines" },
+        { name: "[유리]시크릿 선셋2", hue: 35, isDark: false, type: "stars" }, 
+        { name: "[유리]루비 오디세이", hue: 345, isDark: false, type: "blobs" },
+        { name: "[유리]에테르 갤럭시", hue: 260, isDark: false, type: "stars" },
+        { name: "[유리]드림 플레어", hue: 320, isDark: false, type: "bubbles" },
+        { name: "[유리]다아내믹 오디세이", hue: 200, isDark: false, type: "polygons" },
+        { name: "[유리]미스틱 호라이즌", hue: 230, isDark: false, type: "geometry" },
+        { name: "[유리]샤파이어 네블라", hue: 220, isDark: false, type: "orbs" },
+        { name: "[유리]프리즘 네블라", hue: 180, isDark: false, type: "rings" },
+        { name: "[유리]일루전 오션", hue: 195, isDark: false, type: "waves" },
+        { name: "[유리]인피니티 호라이즌", hue: 275, isDark: false, type: "lines" }
+    ];
 
     const generatedThemes = [];
 
-    for (let i = 0; i < 1100; i++) {
-        const hue = Math.floor((i / 1100) * 360);
-        const useComplementary = (i % 5 === 0);
-        const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+    themeConfigs.forEach(config => {
+        const pointHue = config.hue;
         
-        let effectType = i >= 1000 ? ['geometry', 'rings', 'polygons', 'lines'][i % 4] : effectsList[i % effectsList.length];
-        
-        // 모든 테마의 이름과 스타일을 밝은 '유리' 테마로 고정
-        const name = `[유리] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
-        
-        // 검정색/다크 모드 로직 완전 제거. 모든 배경과 UI는 밝고 화사한 톤으로 고정됨.
+        // 다크 모드 제거, 모두 밝은 톤으로 처리
         const primary = `hsl(${pointHue}, 70%, 50%)`;
         const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
-        const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
+        const bg = `linear-gradient(-45deg, hsl(${config.hue}, 40%, 95%), hsl(${(config.hue + 30) % 360}, 50%, 90%), hsl(${(config.hue - 30 + 360) % 360}, 40%, 95%))`;
         
         const vars = {
             "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
             "--text-dark": "#0f172a", "--text-gray": "#64748b",
             "--input-text": "#1e293b", 
-            "--effect-color1": `hsl(${hue}, 70%, 75%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`,
+            "--effect-color1": `hsl(${config.hue}, 70%, 75%)`, "--effect-color2": `hsl(${(config.hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(config.hue - 40 + 360) % 360}, 70%, 75%)`,
             
             // 밝은 테마 유리(Glass) 고정 속성
             "--card-bg": "rgba(255, 255, 255, 0.6)", "--card-border": "rgba(255, 255, 255, 0.9)",
@@ -528,8 +532,8 @@
             "--widget-hover": "rgba(255, 255, 255, 1)", "--widget-border": "rgba(255, 255, 255, 1)"
         };
         
-        generatedThemes.push({ name: name, type: effectType, vars: vars });
-    }
+        generatedThemes.push({ name: config.name, type: config.type, vars: vars });
+    });
 
     generatedThemes.sort(() => Math.random() - 0.5);
     let currentThemeIndex = -1;
@@ -585,91 +589,55 @@
         }, 300); 
     }
 
-    // 초기 테마 설정 및 통계 위젯 초기화
-    document.addEventListener('DOMContentLoaded', function() {
-        initRandomTheme();
-        renderSchoolVisitStats();
-    });
+    // === 개인 메모장 자동 저장 로직 (localStorage 활용) ===
+    function initPersonalMemo() {
+        const memoInput = document.getElementById('personalMemo');
+        const saveStatus = document.getElementById('memoSaveStatus');
+        const memoKey = 'saedam_personal_memo_' + currentUser; // 로그인된 사용자별로 독립적인 저장소 사용
+        let memoTimeout;
 
-    // === 외근 중 학교 방문 통계 생성 함수 (OO초, OO초등학교 정확히 추출) ===
-    function renderSchoolVisitStats() {
-        const events = {{ events | tojson | safe }};
-        let schoolCounts = {};
-        
-        events.forEach(e => {
-            if (e.extendedProps && e.extendedProps.category === '외근') {
-                const title = e.extendedProps.task_title || '';
-                let schoolName = null;
-                
-                // 단어 단위로 쪼개서 학교명 패턴 찾기
-                const words = title.split(/[ ,]+/);
-                for (let w of words) {
-                    // 단어가 '초', '초등학교', '중', '중학교', '고', '고등학교', '학교'로 끝나는지 확인
-                    if (w.endsWith('초등학교') || w.endsWith('초') || 
-                        w.endsWith('중학교') || w.endsWith('중') || 
-                        w.endsWith('고등학교') || w.endsWith('고') || 
-                        w.endsWith('학교')) {
-                        // 너무 짧은 단어(예: "기초", "1초") 제외. (수원초, 매탄고 등 최소 2글자 이상 반영)
-                        if (w.length >= 2 && !/^\d+초$/.test(w)) {
-                            schoolName = w;
-                            break; // 첫 번째로 찾은 학교명 사용
-                        }
-                    }
-                }
-
-                if (schoolName) {
-                    schoolCounts[schoolName] = (schoolCounts[schoolName] || 0) + 1;
-                }
-            }
-        });
-        
-        const container = document.getElementById('schoolStatsContainer');
-        if (Object.keys(schoolCounts).length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">통계 데이터가 없습니다.</p>';
-            return;
+        // 브라우저에 저장된 이전 메모 불러오기
+        const savedMemo = localStorage.getItem(memoKey);
+        if (savedMemo) {
+            memoInput.value = savedMemo;
         }
 
-        // 방문 횟수 기준 내림차순 정렬
-        const sortedSchools = Object.entries(schoolCounts).sort((a, b) => b[1] - a[1]);
-        const maxCount = sortedSchools[0][1]; 
-        
-        let html = '';
-        sortedSchools.forEach(([school, count]) => {
-            const pct = (count / maxCount) * 100;
-            html += `
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-dark); font-weight: 600;">
-                    <span><i class="fa-solid fa-location-dot" style="color: var(--primary-color);"></i> ${school}</span>
-                    <strong>${count}회</strong>
-                </div>
-                <div class="stat-bar-bg">
-                    <div class="stat-bar-fill" style="width: ${pct}%;"></div>
-                </div>
-            </div>`;
+        // 사용자가 타이핑할 때마다 디바운싱(Debouncing)하여 1초 뒤 자동 저장
+        memoInput.addEventListener('input', function() {
+            saveStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...';
+            saveStatus.style.color = 'var(--primary-color)';
+            
+            clearTimeout(memoTimeout);
+            memoTimeout = setTimeout(() => {
+                localStorage.setItem(memoKey, memoInput.value);
+                saveStatus.innerHTML = '<i class="fa-solid fa-cloud-arrow-down"></i> 자동 저장됨';
+                saveStatus.style.color = 'var(--text-gray)';
+            }, 1000); // 1초 지연 후 저장
         });
         
-        container.innerHTML = html;
-        
-        // 애니메이션 트리거 (width 0에서 원래 %로 늘어남)
-        setTimeout(() => {
-            const fills = container.querySelectorAll('.stat-bar-fill');
-            fills.forEach(fill => {
-                const targetWidth = fill.style.width;
-                fill.style.width = '0%';
-                setTimeout(() => { fill.style.width = targetWidth; }, 50);
-            });
-        }, 100);
+        // 메모장 입력창 포커스 스타일 적용
+        memoInput.addEventListener('focus', function() {
+            this.style.boxShadow = '0 0 0 2px rgba(74, 144, 226, 0.3)';
+            this.style.borderColor = 'var(--primary-color)';
+        });
+        memoInput.addEventListener('blur', function() {
+            this.style.boxShadow = 'none';
+            this.style.borderColor = 'var(--card-border)';
+        });
     }
+
+    // 초기 테마 설정 및 메모장 초기화
+    document.addEventListener('DOMContentLoaded', function() {
+        initRandomTheme();
+        initPersonalMemo();
+    });
 
     // === 접속 중인 직원 실시간 업데이트 ===
     async function fetchActiveUsers() {
         try {
-            // 백엔드의 접속자 조회 API 호출
             const res = await fetch('/get_active_users');
             if (res.ok) {
                 const data = await res.json();
-                
-                // 백엔드 반환 형태가 배열이거나 { active_users: [...] } 형태일 경우 모두 대응
                 const users = Array.isArray(data) ? data : (data.active_users || data.users || []);
                 const container = document.getElementById('activeUserContainer');
                 
@@ -692,7 +660,6 @@
 
     // === 기존 달력 및 게시판 스크립트 ===
     window.taskDataMap = window.taskDataMap || {};
-    const currentUser = '{{ current_user }}';
     const userIcons = {{ user_icons | tojson | safe }};
 
     function switchMsgTab(tab) {
