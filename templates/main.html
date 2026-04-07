@@ -2,37 +2,35 @@
 
 {% block content %}
 <style>
-    /* === 고정 테마 변수 (밝은 유리 스타일) === */
+    /* === 고정 테마 변수 (유리 속성 고정) === */
     :root {
+        /* 폰트 및 포인트 컬러 */
         --primary-color: #4a90e2;
         --primary-dark: #357abd;
-        --text-dark: #1e293b;
-        --text-gray: #64748b;
+        --text-dark: #2c3e50;
+        --text-gray: #7f8c8d;
         
-        /* 고정 유리(Glass) 스타일 속성 */
-        --card-bg: rgba(255, 255, 255, 0.45);
+        /* 유리(Glass) 스타일 속성 고정 */
+        --card-bg: rgba(255, 255, 255, 0.35);
         --card-border: rgba(255, 255, 255, 0.6);
-        --card-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
-        --card-backdrop: blur(12px);
+        --card-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
+        --card-backdrop: blur(16px);
         
-        --input-bg: rgba(255, 255, 255, 0.7);
-        --input-text: #1e293b;
-        --widget-bg: rgba(255, 255, 255, 0.5);
-        --widget-hover: rgba(255, 255, 255, 0.8);
-        --widget-border: rgba(255, 255, 255, 0.7);
+        --input-bg: rgba(255, 255, 255, 0.6);
+        --input-text: #2c3e50;
+        --widget-bg: rgba(255, 255, 255, 0.45);
+        --widget-hover: rgba(255, 255, 255, 0.7);
+        --widget-border: rgba(255, 255, 255, 0.5);
     }
 
-    /* 상위 base.html의 body 및 navbar 강제 오버라이드 */
+    /* 배경 및 기본 설정 */
     body {
-        /* 첨부한 이미지를 배경으로 고정 (Flask의 경우 static 폴더 안에 이미지를 넣으세요) */
-        background-image: url('/static/image_27aa9a.png') !important;
-        background-size: cover !important;
-        background-position: center !important;
-        background-attachment: fixed !important;
-        background-repeat: no-repeat !important;
+        /* 첨부된 이미지와 유사한 부드러운 파스텔 그린/옐로우 그라데이션 */
+        background: linear-gradient(135deg, #f2f5ea 0%, #e6ebe0 100%) !important;
         color: var(--text-dark) !important;
         margin: 0;
         padding: 0;
+        overflow-x: hidden;
     }
     
     .navbar {
@@ -46,6 +44,39 @@
 
     .navbar .menu-item, .navbar .logo, .navbar .user-profile {
         color: var(--text-dark) !important;
+    }
+
+    /* === 배경 숑숑 올라오는 도형 애니메이션 효과 === */
+    #bg-effect-container { 
+        position: fixed; 
+        top: 0; 
+        left: 0; 
+        width: 100vw; 
+        height: 100vh; 
+        z-index: -1; 
+        pointer-events: none; 
+        overflow: hidden; 
+    }
+
+    .floating-shape {
+        position: absolute;
+        bottom: -150px; /* 화면 아래에서 시작 */
+        background: rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        border: 1px solid;
+        box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.03), inset 1px 1px 5px rgba(255, 255, 255, 0.5);
+        animation: floatUp linear infinite;
+    }
+    .shape-circle { border-radius: 50%; }
+    .shape-square { border-radius: 6px; }
+    .shape-diamond { border-radius: 6px; transform: rotate(45deg); }
+
+    @keyframes floatUp {
+        0% { transform: translateY(0) rotate(0deg) scale(0.8); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { transform: translateY(-120vh) rotate(360deg) scale(1.2); opacity: 0; }
     }
 
     /* === 인트라넷 전용 스타일 업데이트 (유리 테마 적용) === */
@@ -71,7 +102,7 @@
     .glass-event-card:hover, .list-item:hover {
         background: var(--widget-hover) !important;
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
     }
 
     .list-item { border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--card-border); }
@@ -87,7 +118,7 @@
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
     .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
-    .fc-event-main { padding: 1px 3px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; }
+    .fc-event-main { padding: 1px 3px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 
     /* 글꼴 및 타이포그래피 */
     .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
@@ -125,7 +156,7 @@
     .btn-edit { color: var(--primary-color) !important; }
     .btn-delete { color: #e74c3c !important; }
     .btn-primary { background: var(--primary-color) !important; color: white !important; transition: all 0.3s; }
-    .btn-primary:hover { background: var(--primary-dark) !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .btn-primary:hover { background: var(--primary-dark) !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
 
     /* 채팅 및 쪽지 스타일 */
     .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
@@ -136,9 +167,11 @@
     .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
     .emoji-item:hover { background: var(--widget-hover); }
 
-    .chat-sent-bubble { background: var(--primary-color); color: #fff; padding: 10px 14px; border-radius: 15px 15px 0 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .chat-sent-bubble { background: var(--primary-color); color: #fff; padding: 10px 14px; border-radius: 15px 15px 0 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
     .chat-recv-bubble { background: var(--input-bg); color: var(--input-text); border: 1px solid var(--card-border); padding: 10px 14px; border-radius: 0 15px 15px 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 </style>
+
+<div id="bg-effect-container"></div>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
     <div class="row" style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
@@ -407,6 +440,50 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
+    // === 배경 애니메이션 효과 (그림과 동일하게 위로 올라오는 원, 네모, 마름모) ===
+    function initFloatingShapes() {
+        const container = document.getElementById('bg-effect-container');
+        container.innerHTML = '';
+        
+        const shapeTypes = ['shape-circle', 'shape-square', 'shape-diamond'];
+        // 이미지에 있는 파스텔톤 윤곽선 색상 배열 (은은한 빨강, 초록, 노랑 등)
+        const borderColors = [
+            'rgba(240, 150, 150, 0.4)', 
+            'rgba(150, 220, 150, 0.4)', 
+            'rgba(230, 230, 150, 0.4)'
+        ];
+
+        // 18개의 도형 생성
+        for (let i = 0; i < 18; i++) {
+            let el = document.createElement('div');
+            const type = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
+            el.className = `floating-shape ${type}`;
+            
+            // X축 위치 랜덤 설정 (0% ~ 100%)
+            el.style.left = Math.random() * 100 + '%';
+            
+            // 도형 크기 랜덤 설정 (기본 20px ~ 60px)
+            let size = Math.random() * 40 + 20; 
+            // 가끔 큰 도형 섞기
+            if (i % 4 === 0) size += 40; 
+            
+            el.style.width = size + 'px';
+            el.style.height = size + 'px';
+            
+            // 애니메이션 속도 및 시작 시간 지연 (15초 ~ 35초)
+            el.style.animationDuration = (Math.random() * 20 + 15) + 's'; 
+            el.style.animationDelay = (Math.random() * 15) + 's';
+            
+            // 윤곽선 색상 랜덤 적용
+            el.style.borderColor = borderColors[Math.floor(Math.random() * borderColors.length)];
+            
+            container.appendChild(el);
+        }
+    }
+
+    // 문서 로드 시 배경 효과 초기화
+    document.addEventListener('DOMContentLoaded', initFloatingShapes);
+
     // === 기존 달력 및 게시판 스크립트 ===
     window.taskDataMap = window.taskDataMap || {};
     const currentUser = '{{ current_user }}';
