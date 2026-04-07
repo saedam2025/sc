@@ -11,25 +11,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
-        /* 1) 단순하고 심플한 직선 디자인 테마 */
+        /* 기본 설정 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: #ffffff;
+            background: #f4f7f9; /* 배경을 살짝 밝은 그레이 톤으로 변경하여 콘텐츠가 돋보이게 함 */
             min-height: 100vh;
             margin: 0;
-            color: #111;
+            color: #333;
         }
 
         .content-container {
             max-width: 1550px !important;
             width: 95% !important;
             margin: 0 auto;
+            padding-top: 30px;
         }
 
-        /* 네비게이션바 직선 스타일 */
+        /* 네비게이션바 깔끔하고 모던한 스타일로 변경 */
         .navbar {
             background: #ffffff;
-            border-bottom: 1px solid #eeeeee; /* 하단 직선 구분선 */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* 직선 경계선 대신 부드러운 그림자 */
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -40,12 +41,12 @@
             align-items: center;
             justify-content: space-between;
             padding: 0 20px;
-            height: 70px; /* 고정 높이로 심플함 강조 */
+            height: 75px; 
             max-width: 1550px;
             margin: 0 auto;
         }
 
-        /* 로고 설정: logo01.jpg */
+        /* 로고 설정 */
         .logo-img { 
             height: 40px; 
             width: auto; 
@@ -58,8 +59,9 @@
             list-style: none; 
             margin: 0; 
             padding: 0; 
-            height: 100%; /* 네비게이션바 높이 전체 사용 */
+            height: 100%;
             align-items: center; 
+            gap: 10px; /* 메뉴 간격 추가 */
         }
         
         .menu-item-wrapper {
@@ -69,67 +71,87 @@
             align-items: center;
         }
 
+        /* 메인 메뉴 아이템 디자인 개선 */
         .menu-item {
-            color: #111;
+            color: #444;
             text-decoration: none; 
-            font-weight: 500; 
-            padding: 0 25px;
-            height: 100%;
+            font-weight: 600; 
+            padding: 10px 18px; /* 버튼처럼 보이도록 패딩 조절 */
+            border-radius: 8px; /* 둥근 모서리 */
             display: flex; 
             align-items: center; 
             gap: 8px;
             font-size: 1rem;
-            transition: background 0.2s;
+            transition: all 0.2s ease-in-out;
         }
 
-        /* 호버 시 블랙 배경에 화이트 텍스트 (직선 강조) */
+        /* 호버 시 부드러운 컬러 배경 */
         .menu-item:hover {
-            background: #111111;
-            color: #ffffff;
+            background: #f0f4f8;
+            color: #2c7be5; /* 새담 느낌의 신뢰감 있는 블루 컬러 */
         }
-        .menu-item:hover i { color: #ffffff; }
+        .menu-item:hover i { color: #2c7be5; }
 
         .menu-item.active {
             font-weight: 800;
-            background: #f8f8f8;
+            color: #2c7be5;
+            background: #e8f1fb;
         }
 
-        /* 2) 틈 없는 풀다운 메뉴 구성 */
+        /* 풀다운 메뉴 디자인 변경 */
         .dropdown { height: 100%; }
         
         .dropdown-content {
-            display: none; /* 기본적으로 숨김 */
+            display: none; 
             position: absolute;
-            top: 100%; /* 메인 메뉴 바로 아래 붙임 */
-            left: 0;
-            background: #111111; /* 메뉴 호버 색상과 일치시켜 통일감 부여 */
+            top: 85%; /* 너무 딱 붙지 않게 약간 여백 조정 */
+            left: 50%;
+            transform: translateX(-50%); /* 가운데 정렬 드롭다운 */
+            background: #ffffff; /* 화이트 테마 */
             min-width: 200px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08); /* 부드럽고 넓은 그림자 */
+            border-radius: 10px; /* 둥근 박스 */
+            border: 1px solid #eef0f3;
             z-index: 1100;
-            padding: 0;
-            border-top: 1px solid #333; /* 본체와 구분선 */
+            padding: 10px 0; /* 상하 여백 */
         }
 
-        /* 래퍼에 호버했을 때 메뉴 보이기 (틈새 방지 핵심) */
+        /* 마우스가 메뉴 래퍼 위나 드롭다운 사이 틈을 지나갈 때 숨겨지지 않도록 설정 */
+        .menu-item-wrapper::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+        }
+
         .menu-item-wrapper:hover .dropdown-content {
             display: block;
+            animation: fadeIn 0.2s ease; /* 부드러운 등장 효과 */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translate(-50%, 10px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
         }
 
         .dropdown-content a {
-            color: #eeeeee;
-            padding: 15px 20px;
+            color: #555;
+            padding: 12px 20px;
             text-decoration: none;
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 0.9rem;
-            border-bottom: 1px solid #222;
-            transition: background 0.2s;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
         .dropdown-content a:hover {
-            background: #333333;
-            color: #ffffff;
+            background: #f8f9fa;
+            color: #2c7be5;
+            padding-left: 25px; /* 호버 시 살짝 우측으로 밀리는 애니메이션 효과 */
         }
 
         /* 우측 유저 섹션 */
@@ -142,29 +164,54 @@
         .user-profile {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             cursor: pointer;
             font-size: 0.95rem;
             font-weight: 600;
+            padding: 8px 12px;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+        
+        .user-profile:hover {
+            background: #f0f4f8;
         }
 
         .btn-logout { 
             font-size: 1.1rem;
-            color: #e03131;
+            color: #a0aec0;
             text-decoration: none;
             padding: 5px;
+            transition: color 0.2s;
+        }
+        
+        .btn-logout:hover {
+            color: #e53e3e;
         }
 
-        /* 모달 시스템 */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
-        .modal-content { background: white; margin: 10% auto; padding: 0; border-radius: 0; width: 450px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f8f8; }
-        .modal-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; }
+        /* 모달 시스템 디자인 개선 */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
+        .modal-content { background: white; margin: 8% auto; padding: 0; border-radius: 12px; width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); overflow: hidden; }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 700; color: #2d3748; }
         .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 15px 20px; background: #fafafa; text-align: left; color: #666; border-bottom: 1px solid #eee; width: 35%; font-size: 0.85rem; }
-        .info-table td { padding: 15px 20px; color: #111; font-weight: 600; border-bottom: 1px solid #eee; }
+        .info-table th { padding: 15px 25px; background: #f8fafc; text-align: left; color: #64748b; border-bottom: 1px solid #edf2f7; width: 35%; font-size: 0.9rem; font-weight: 600; }
+        .info-table td { padding: 15px 25px; color: #2d3748; font-weight: 600; border-bottom: 1px solid #edf2f7; font-size: 0.95rem; }
 
-        .main-footer { text-align: center; padding: 50px 0; color: #999; font-size: 0.85rem; border-top: 1px solid #eee; margin-top: 50px; }
+        .btn-close-modal {
+            background: #2d3748; 
+            color: white; 
+            border: none; 
+            padding: 10px 30px; 
+            border-radius: 6px;
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+        }
+        .btn-close-modal:hover { background: #1a202c; }
+
+        .main-footer { text-align: center; padding: 40px 0; color: #a0aec0; font-size: 0.85rem; border-top: 1px solid #edf2f7; margin-top: 50px; background: #ffffff; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -218,7 +265,7 @@
                     {% endif %}
 
                     <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item" style="color: #4a90e2; font-weight: 700;">
+                        <a href="javascript:void(0);" class="menu-item" style="color: #2c7be5; font-weight: 700;">
                             <i class="fa-solid fa-briefcase"></i> 업무지원
                         </a>
                         <div class="dropdown-content">
@@ -258,13 +305,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3>내 프로필 정보</h3>
-                <span style="cursor:pointer; font-size:1.2rem;" onclick="closeMyInfoModal()">&times;</span>
+                <span style="cursor:pointer; font-size:1.4rem; color: #a0aec0;" onclick="closeMyInfoModal()">&times;</span>
             </div>
-            <div id="myInfoLoading" style="text-align: center; padding: 30px;">데이터 로드 중...</div>
+            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: #64748b;">데이터를 불러오는 중입니다...</div>
+            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #e53e3e;"></div>
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
-                <div style="padding: 20px; text-align: center;">
-                    <button type="button" style="background:#111; color:white; border:none; padding:10px 30px; cursor:pointer; font-weight:bold;" onclick="closeMyInfoModal()">닫기</button>
+                <div style="padding: 20px; text-align: center; background: #f8fafc;">
+                    <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
                 </div>
             </div>
         </div>
@@ -274,35 +322,58 @@
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
+            const errorDiv = document.getElementById('myInfoError');
             const display = document.getElementById('myInfoDisplay');
             const table = document.getElementById('myInfoTable');
 
+            // 초기화
             modal.style.display = "block";
             loading.style.display = "block";
+            errorDiv.style.display = "none";
             display.style.display = "none";
+            table.innerHTML = "";
 
             try {
                 const res = await fetch('/user/my_info'); 
                 const result = await res.json();
-                if (result.status === 'success') {
+                
+                if (result.status === 'success' && result.data) {
                     const data = result.data;
-                    const order = ['사번', '이름', '직급', '레벨', '주민번호', '전화번호', '이메일', '입사일'];
                     let html = '';
-                    order.forEach(key => {
-                        if (data[key]) {
-                            html += `<tr><th>${key}</th><td>${data[key]}</td></tr>`;
-                        }
-                    });
+                    
+                    // 영문 키값이 넘어올 경우를 대비한 매핑 (백엔드 구조에 맞게 자동 대응)
+                    const keyMap = {
+                        'emp_no': '사번', 'name': '이름', 'position': '직급', 'level': '레벨',
+                        'ssn': '주민번호', 'phone': '전화번호', 'email': '이메일', 'join_date': '입사일'
+                    };
+
+                    // 지정된 배열 방식이 아닌 데이터에 있는 모든 키값을 동적으로 화면에 출력
+                    for (const [key, value] of Object.entries(data)) {
+                        const displayKey = keyMap[key] || key; // 한글 매핑이 있으면 한글로, 없으면 원래 키값 사용
+                        const displayValue = (value === null || value === '') ? '-' : value;
+                        html += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
+                    }
+
+                    if (html === '') {
+                        html = '<tr><td colspan="2" style="text-align:center;">표시할 데이터가 없습니다.</td></tr>';
+                    }
+
                     table.innerHTML = html;
                     loading.style.display = "none";
                     display.style.display = "block";
+                } else {
+                    throw new Error(result.message || '데이터를 불러오지 못했습니다.');
                 }
             } catch (e) {
-                closeMyInfoModal();
+                loading.style.display = "none";
+                errorDiv.style.display = "block";
+                errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 오류가 발생했습니다.<br><small>${e.message}</small>`;
             }
         }
 
-        function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+        function closeMyInfoModal() { 
+            document.getElementById('myInfoModal').style.display = "none"; 
+        }
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal();
