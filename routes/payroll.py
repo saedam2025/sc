@@ -120,7 +120,7 @@ def payroll_worker(app, df, send_date, interval, base_url):
 
 @payroll_bp.route('/')
 def index():
-    return render_template('payroll/payroll_form.html', user_icons={})
+    return render_template('payroll_form.html', user_icons={})
 
 # [추가됨] 광고 이미지 단독 업로드 API
 @payroll_bp.route('/upload_ad', methods=['POST'])
