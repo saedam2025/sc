@@ -12,7 +12,8 @@ from routes.contract import contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
 from routes.board import board_bp
-from routes.payroll import payroll_bp  # [신규] 급여 명세서 발송 시스템
+from routes.payroll import payroll_bp  # 급여 명세서 발송 시스템
+from routes.memo import memo_bp        # [신규] 개인 화이트보드 메모장 시스템
 
 # 엑셀 대신 SQLite DB를 사용하도록 설정된 데이터베이스 모듈 임포트
 from routes.database import get_db
@@ -116,15 +117,13 @@ def logout():
 
 # --- Blueprint 등록 ---
 app.register_blueprint(main_bp)
-# 증명서 관리/신청 시스템 연결 (/document/apply 등)
 app.register_blueprint(document_bp, url_prefix='/document')
-# 강사 계약 시스템 연결
 app.register_blueprint(contract_bp, url_prefix='/contract')
 app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')
 app.register_blueprint(board_bp, url_prefix='/board')
-# [신규 추가] 급여 명세서 발송 시스템 연결
 app.register_blueprint(payroll_bp, url_prefix='/payroll')
+app.register_blueprint(memo_bp, url_prefix='/memo')  # [신규 추가] 화이트보드 메모장 라우트 등록
 
 @app.errorhandler(404)
 def page_not_found(e):
