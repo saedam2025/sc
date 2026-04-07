@@ -466,8 +466,7 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
-    // === 다이나믹 테마 엔진 생성 (유리 테마 고정 로직) ===
-    const uiStyles = ['glass']; // 'solid', 'glow' 제거
+    // === 다이나믹 테마 엔진 생성 (유리 테마 고정 및 다크/검정 모드 완전히 제거) ===
     const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
     const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
     const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
@@ -480,49 +479,27 @@
         const pointHue = useComplementary ? (hue + 180) % 360 : hue;
         
         let effectType = i >= 1000 ? ['geometry', 'rings', 'polygons', 'lines'][i % 4] : effectsList[i % effectsList.length];
-        const isDark = i % 2 === 0;
-        const uiStyle = uiStyles[i % uiStyles.length]; 
         
-        const styleNameKOR = "유리"; // 항상 유리 속성으로 고정
-        const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+        // 모든 테마의 이름과 스타일을 밝은 '유리' 테마로 고정
+        const name = `[유리] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
         
-        let vars = {};
+        // 검정색/다크 모드 로직 완전 제거. 모든 배경과 UI는 밝고 화사한 톤으로 고정됨.
+        const primary = `hsl(${pointHue}, 70%, 50%)`;
+        const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
+        const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
         
-        if (isDark) {
-            const primary = `hsl(${pointHue}, 80%, 60%)`;
-            const primaryDark = `hsl(${pointHue}, 80%, 40%)`;
-            const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 10%), hsl(${(hue + 45) % 360}, 50%, 5%), hsl(${(hue - 45 + 360) % 360}, 40%, 10%))`;
+        const vars = {
+            "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+            "--text-dark": "#0f172a", "--text-gray": "#64748b",
+            "--input-text": "#1e293b", 
+            "--effect-color1": `hsl(${hue}, 70%, 75%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`,
             
-            vars = {
-                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
-                "--text-dark": "#ffffff", "--text-gray": "#cbd5e1",
-                "--input-text": "#ffffff",
-                "--effect-color1": `hsl(${hue}, 80%, 50%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 80%, 50%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 80%, 50%)`,
-                
-                // 다크 모드 - 유리(Glass) 고정 속성
-                "--card-bg": "rgba(20, 20, 30, 0.5)", "--card-border": "rgba(255, 255, 255, 0.15)",
-                "--card-backdrop": "blur(24px)", "--card-shadow": "0 15px 40px rgba(0, 0, 0, 0.3)",
-                "--input-bg": "rgba(0, 0, 0, 0.4)", "--widget-bg": "rgba(30, 30, 45, 0.5)", 
-                "--widget-hover": "rgba(50, 50, 70, 0.8)", "--widget-border": "rgba(255, 255, 255, 0.15)"
-            };
-        } else {
-            const primary = `hsl(${pointHue}, 70%, 50%)`;
-            const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
-            const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
-            
-            vars = {
-                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
-                "--text-dark": "#0f172a", "--text-gray": "#64748b",
-                "--input-text": "#1e293b", 
-                "--effect-color1": `hsl(${hue}, 70%, 75%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`,
-                
-                // 라이트 모드 - 유리(Glass) 고정 속성
-                "--card-bg": "rgba(255, 255, 255, 0.6)", "--card-border": "rgba(255, 255, 255, 0.9)",
-                "--card-backdrop": "blur(24px)", "--card-shadow": "0 15px 40px rgba(0, 0, 0, 0.1)",
-                "--input-bg": "rgba(255, 255, 255, 0.8)", "--widget-bg": "rgba(255, 255, 255, 0.7)", 
-                "--widget-hover": "rgba(255, 255, 255, 1)", "--widget-border": "rgba(255, 255, 255, 1)"
-            };
-        }
+            // 밝은 테마 유리(Glass) 고정 속성
+            "--card-bg": "rgba(255, 255, 255, 0.6)", "--card-border": "rgba(255, 255, 255, 0.9)",
+            "--card-backdrop": "blur(24px)", "--card-shadow": "0 15px 40px rgba(0, 0, 0, 0.1)",
+            "--input-bg": "rgba(255, 255, 255, 0.8)", "--widget-bg": "rgba(255, 255, 255, 0.7)", 
+            "--widget-hover": "rgba(255, 255, 255, 1)", "--widget-border": "rgba(255, 255, 255, 1)"
+        };
         
         generatedThemes.push({ name: name, type: effectType, vars: vars });
     }
