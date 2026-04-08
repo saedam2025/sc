@@ -149,8 +149,6 @@ app.register_blueprint(payroll_bp, url_prefix='/payroll')
 app.register_blueprint(memo_bp, url_prefix='/memo')  
 app.register_blueprint(attendance_bp)  # 근태관리 라우트
 app.register_blueprint(excel_bp)       # [신규 추가] 입금용 엑셀 생성 라우트 등록
-app.register_blueprint(attendance_bp)  # 근태관리 라우트
-app.register_blueprint(excel_bp)       # [신규 추가] 입금용 엑셀 생성 라우트 등록
 app.register_blueprint(explorer_bp, url_prefix='/explorer')  # [신규 추가] 스토리지 탐색기 라우트 등록
 
 @app.errorhandler(404)
