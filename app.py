@@ -63,13 +63,14 @@ def check_login():
 def login_page():
     return render_template('login.html')
 
+# ... (상단 임포트 및 설정 생략 - 기존과 동일)
+
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
     emp_no = data.get('emp_no')
     password = data.get('password')
     
-    # SQLite DB에서 사용자 정보 조회
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
     
@@ -81,31 +82,31 @@ def login():
         conn.close()
         return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
             
-    # --- [신규 추가] 최초 로그인 시 출근 처리 로직 ---
+    # [수정된 부분] 최초 로그인 시 출근 처리 로직 (현재 직급 포함 저장)
     today_date = datetime.now().strftime('%Y-%m-%d')
     current_time = datetime.now().strftime('%H:%M:%S')
 
-    # 오늘 날짜로 해당 사번의 출근 기록이 있는지 확인
     attendance = conn.execute("SELECT * FROM daily_attendance WHERE emp_no=? AND date=?", (str(emp_no), today_date)).fetchone()
+
     if not attendance:
         try:
-            conn.execute("INSERT INTO daily_attendance (emp_no, date, clock_in_time, status) VALUES (?, ?, ?, ?)",
-                         (str(emp_no), today_date, current_time, '근무중'))
+            # INSERT 시 position 컬럼에 user['position'] 값을 넣습니다.
+            conn.execute("INSERT INTO daily_attendance (emp_no, date, clock_in_time, status, position) VALUES (?, ?, ?, ?, ?)",
+                         (str(emp_no), today_date, current_time, '근무중', user['position']))
             conn.commit()
         except Exception as e:
-            # DB 테이블 문제 등으로 에러가 나도 로그인은 정상 처리되도록 예외 처리
             print(f"근태 기록 생성 실패: {e}")
 
     conn.close()
-    # ------------------------------------------------
 
-    # 세션 저장 (직급 및 레벨 정보 저장)
+    # 세션 저장
     session['emp_no'] = str(user['emp_no'])
     session['user_name'] = user['name']
     session['user_level'] = int(user['level'])
-    session['role'] = str(user['position']) # 직급 데이터를 세션에 저장
+    session['role'] = str(user['position'])
     
     return jsonify({"status": "success"})
+
 
 # --- 내 회원정보 조회 API (인트라넷 사용자용) ---
 @app.route('/user/my_info')
