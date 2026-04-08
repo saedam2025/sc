@@ -17,16 +17,9 @@
         overflow: hidden;
     }
 
-    /* 메모장 상단 도구 모음 */
     .memo-toolbar {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 15px;
-        background: white;
-        padding: 15px 25px;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        align-items: center;
+        display: flex; gap: 15px; margin-bottom: 15px; background: white;
+        padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); align-items: center;
     }
 
     .color-btn {
@@ -50,81 +43,59 @@
     }
     .draggable-item:hover { box-shadow: 4px 8px 20px rgba(0,0,0,0.25); }
     
-    /* 드래그 손잡이 바 */
     .drag-handle {
-        height: 20px;
-        background: rgba(0,0,0,0.05);
-        cursor: grab;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-top-left-radius: 4px;
-        border-top-right-radius: 4px;
+        height: 20px; background: rgba(0,0,0,0.05); cursor: grab;
+        display: flex; justify-content: center; align-items: center;
+        border-top-left-radius: 4px; border-top-right-radius: 4px;
+        flex-shrink: 0;
     }
     .drag-handle:active { cursor: grabbing; }
 
     /* 포스트잇 스타일 */
     .postit {
-        width: 220px;
-        min-height: 220px;
-        display: flex;
-        flex-direction: column;
+        width: 220px; min-height: 220px; display: flex; flex-direction: column;
     }
     .postit textarea {
-        flex: 1;
-        width: 100%;
-        background: transparent;
-        border: none;
-        resize: none;
-        padding: 10px;
-        font-family: 'Pretendard', cursive, sans-serif;
-        font-size: 1.05rem;
-        line-height: 1.5;
-        outline: none;
-        box-sizing: border-box;
+        flex: 1; width: 100%; background: transparent; border: none; resize: none;
+        padding: 10px; font-family: 'Pretendard', cursive, sans-serif;
+        font-size: 1.05rem; line-height: 1.5; outline: none; box-sizing: border-box;
     }
 
-    /* 이미지/파일 썸네일 스타일 */
+    /* === 미디어 카드 (일반 파일용) === */
     .media-card {
-        background: white;
-        padding-bottom: 10px;
-        text-align: center;
-        width: 200px;
+        background: white; padding-bottom: 10px; text-align: center; width: 200px;
     }
-    .media-card img {
-        width: 100%;
-        height: auto;
-        cursor: pointer;
-        display: block;
+    
+    /* === [핵심 수정] 이미지 카드 전용 (크기 조절 기능 포함) === */
+    .image-card {
+        padding-bottom: 0; /* 내부 꽉 차게 변경 */
+        display: flex; flex-direction: column;
+        resize: both; /* 브라우저 기본 크기 조절 핸들 생성 */
+        overflow: hidden;
+        min-width: 100px; min-height: 100px;
     }
-    .file-icon {
-        font-size: 4rem;
-        color: #64748b;
-        margin: 20px 0;
-        display: block;
+    .image-wrapper {
+        flex: 1; width: 100%; height: 100%;
+        display: flex; justify-content: center; align-items: center;
+        background: #f8fafc; overflow: hidden;
     }
-    .file-link {
-        display: block;
-        padding: 0 10px;
-        color: #4a90e2;
-        font-weight: 600;
-        text-decoration: none;
-        word-break: break-all;
+    .image-wrapper img {
+        width: 100%; height: 100%; object-fit: contain; cursor: pointer; display: block;
     }
+
+    .file-icon { font-size: 4rem; color: #64748b; margin: 20px 0; display: block; }
+    .file-link { display: block; padding: 0 10px; color: #4a90e2; font-weight: 600; text-decoration: none; word-break: break-all; }
 
     /* X 삭제 버튼 */
     .btn-delete-memo {
-        position: absolute;
-        top: -10px; right: -10px;
+        position: absolute; top: -10px; right: -10px;
         background: #e74c3c; color: white; border: none;
         width: 24px; height: 24px; border-radius: 50%;
         cursor: pointer; font-size: 12px; font-weight: bold;
-        display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        z-index: 10;
+        display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10;
     }
     .draggable-item:hover .btn-delete-memo { display: block; }
 
-    /* 큰 이미지 모달 */
     #imageModal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
     #imageModalContent { display: block; max-width: 90%; max-height: 90%; margin: 2% auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 </style>
@@ -160,10 +131,15 @@
         </div>
         
         {% elif memo.type == 'image' %}
-        <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
+        <div class="draggable-item media-card image-card" id="memo_{{ memo.id }}" 
+             style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }}; 
+                    {% if memo.width %}width:{{ memo.width }}px;{% else %}width:250px;{% endif %}
+                    {% if memo.height %}height:{{ memo.height }}px;{% else %}height:250px;{% endif %}">
             <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
             <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
-            <img src="/memo/file/{{ memo.filepath }}" onclick="openImageModal(this.src)" title="클릭하여 확대">
+            <div class="image-wrapper">
+                <img src="/memo/file/{{ memo.filepath }}" onclick="openImageModal(this.src)" title="클릭하여 확대">
+            </div>
         </div>
 
         {% elif memo.type == 'file' %}
@@ -187,12 +163,42 @@
 <script>
     let highestZ = 100;
 
-    // [핵심 수정] 페이지 로드 시 기존 메모들 중 가장 높은 z-index 값을 찾아 highestZ 초기화
     document.querySelectorAll('.draggable-item').forEach(item => {
         let z = parseInt(item.style.zIndex);
-        if (!isNaN(z) && z > highestZ) {
-            highestZ = z;
+        if (!isNaN(z) && z > highestZ) { highestZ = z; }
+    });
+
+    // === [핵심 수정] 그림 크기 조절 감지 및 서버 자동 저장 (ResizeObserver) ===
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            const el = entry.target;
+            const id = el.id.replace('memo_', '');
+            const w = el.offsetWidth;
+            const h = el.offsetHeight;
+            
+            // 크기 조절이 완전히 끝날 때쯤 서버에 저장하도록 0.5초 딜레이(Debouncing) 부여
+            clearTimeout(el.resizeTimeout);
+            el.resizeTimeout = setTimeout(async () => {
+                if (el.dataset.w != w || el.dataset.h != h) {
+                    el.dataset.w = w;
+                    el.dataset.h = h;
+                    try {
+                        await fetch('/memo/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: id, width: w, height: h })
+                        });
+                    } catch(e) {}
+                }
+            }, 500);
         }
+    });
+
+    // 화면의 모든 이미지 카드에 크기 감지기 부착
+    document.querySelectorAll('.image-card').forEach(card => {
+        card.dataset.w = card.offsetWidth;
+        card.dataset.h = card.offsetHeight;
+        resizeObserver.observe(card);
     });
 
     // === 포스트잇 추가 ===
@@ -254,7 +260,7 @@
     whiteboard.addEventListener('mousedown', function(e) {
         if (e.target.closest('.drag-handle')) {
             draggedElement = e.target.closest('.draggable-item');
-            highestZ++; // 드래그 시작 시 무조건 최상단으로 끌어올림
+            highestZ++; 
             draggedElement.style.zIndex = highestZ;
             
             const rect = draggedElement.getBoundingClientRect();
@@ -286,11 +292,10 @@
             const id = draggedElement.id.replace('memo_', '');
             const finalX = parseInt(draggedElement.style.left);
             const finalY = parseInt(draggedElement.style.top);
-            const z = draggedElement.style.zIndex; // 최종 변경된 z-index 캡처
+            const z = draggedElement.style.zIndex;
             
             draggedElement = null;
 
-            // 위치 이동 및 변경된 z-index 값을 DB에 함께 저장
             try {
                 await fetch('/memo/update', {
                     method: 'POST',
