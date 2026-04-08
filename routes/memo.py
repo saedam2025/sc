@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, jsonify, session, request, send_file
+from werkzeug.utils import secure_filename
 import os
 import uuid
 import io
@@ -43,6 +44,19 @@ def memo_board():
     except Exception as e:
         pass
 
+    # [핵심 수정] 기존 테이블에 크기 조절을 위한 width, height 컬럼 안전하게 추가
+    try:
+        conn.execute("ALTER TABLE whiteboard_memos ADD COLUMN width INTEGER")
+        conn.commit()
+    except Exception:
+        pass
+        
+    try:
+        conn.execute("ALTER TABLE whiteboard_memos ADD COLUMN height INTEGER")
+        conn.commit()
+    except Exception:
+        pass
+
     # 현재 로그인된 사용자가 저장해둔 메모와 파일들만 로드
     memos = conn.execute("SELECT * FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchall()
     
@@ -60,7 +74,9 @@ def memo_board():
 
     conn.close()
     
-    return render_template('memo.html', memos=memos, user_icons=user_icons)
+    # 템플릿으로 데이터를 넘길 때 dict 형태로 변환 (width, height 접근 위함)
+    memos_list = [dict(row) for row in memos]
+    return render_template('memo.html', memos=memos_list, user_icons=user_icons)
 
 
 @memo_bp.route('/add_postit', methods=['POST'])
@@ -96,8 +112,7 @@ def memo_upload_file():
     if not file or not file.filename:
         return jsonify({"status": "error", "message": "첨부된 파일이 없습니다."}), 400
         
-    # [원인 해결 핵심] 한글 파일명이 지워지는 secure_filename 대신, 
-    # 슬래시(/, \)만 안전하게 제거하여 한글 원본 이름을 100% 보존합니다.
+    # 한글 파일명이 지워지는 secure_filename 대신, 슬래시만 안전하게 제거하여 원본 이름 보존
     original_filename = file.filename.replace('/', '').replace('\\', '')
     
     # 파일명 겹침 방지 (UUID 사용)
@@ -154,7 +169,6 @@ def serve_secure_file(filename):
     memo = conn.execute("SELECT content FROM whiteboard_memos WHERE filepath = ?", (filename,)).fetchone()
     conn.close()
 
-    # DB에 원본 파일명이 있으면 적용, 만약 옛날 자료라 없으면 파일명 잘라서 복구 시도
     if memo and memo['content']:
         original_filename = memo['content']
     else:
@@ -201,6 +215,14 @@ def memo_update():
         updates.append("content = ?")
         params.append(data['content'])
         
+    # [핵심 수정] 크기 조절 데이터 업데이트
+    if 'width' in data:
+        updates.append("width = ?")
+        params.append(data['width'])
+    if 'height' in data:
+        updates.append("height = ?")
+        params.append(data['height'])
+        
     if not updates:
         return jsonify({"status": "success"})
         
@@ -222,7 +244,7 @@ def memo_delete(memo_id):
     owner = session.get('user_name')
     conn = get_db()
     
-    # 1. DB에서 삭제할 메모의 정보(타입과 파일경로) 조회
+    # 1. DB에서 삭제할 메모의 정보 조회
     memo = conn.execute("SELECT type, filepath FROM whiteboard_memos WHERE id = ? AND owner = ?", (memo_id, owner)).fetchone()
     
     if memo:
@@ -230,16 +252,14 @@ def memo_delete(memo_id):
         conn.execute("DELETE FROM whiteboard_memos WHERE id = ? AND owner = ?", (memo_id, owner))
         conn.commit()
         
-        # 3. filepath가 존재하면 서버 물리 파일(.enc)도 정확히 삭제
+        # 3. 물리 파일 삭제
         if memo['type'] in ['file', 'image'] and memo['filepath']:
-            # memoup 단일 폴더에서 파일 삭제
             file_path = os.path.join(UPLOAD_FOLDER, memo['filepath'])
             
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
                 except Exception as e:
-                    print(f"파일 삭제 실패: {e}")
                     pass
                     
     conn.close()
