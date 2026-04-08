@@ -1,4 +1,5 @@
 from flask import Flask, session, redirect, url_for, request, render_template, jsonify
+from datetime import datetime  # [신규] 출퇴근 시간 기록을 위한 모듈 추가
 import os
 import sys
 
@@ -14,6 +15,7 @@ from routes.approval import approval_bp
 from routes.board import board_bp
 from routes.payroll import payroll_bp  # 급여 명세서 발송 시스템
 from routes.memo import memo_bp        # [신규] 개인 화이트보드 메모장 시스템
+from routes.attendance import attendance_bp # [신규] 근태관리 시스템
 
 # 엑셀 대신 SQLite DB를 사용하도록 설정된 데이터베이스 모듈 임포트
 from routes.database import get_db
@@ -70,14 +72,33 @@ def login():
     # SQLite DB에서 사용자 정보 조회
     conn = get_db()
     user = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
-    conn.close()
     
     if not user:
+        conn.close()
         return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
 
     if user['status'] != '승인':
+        conn.close()
         return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
             
+    # --- [신규 추가] 최초 로그인 시 출근 처리 로직 ---
+    today_date = datetime.now().strftime('%Y-%m-%d')
+    current_time = datetime.now().strftime('%H:%M:%S')
+
+    # 오늘 날짜로 해당 사번의 출근 기록이 있는지 확인
+    attendance = conn.execute("SELECT * FROM daily_attendance WHERE emp_no=? AND date=?", (str(emp_no), today_date)).fetchone()
+    if not attendance:
+        try:
+            conn.execute("INSERT INTO daily_attendance (emp_no, date, clock_in_time, status) VALUES (?, ?, ?, ?)",
+                         (str(emp_no), today_date, current_time, '근무중'))
+            conn.commit()
+        except Exception as e:
+            # DB 테이블 문제 등으로 에러가 나도 로그인은 정상 처리되도록 예외 처리
+            print(f"근태 기록 생성 실패: {e}")
+
+    conn.close()
+    # ------------------------------------------------
+
     # 세션 저장 (직급 및 레벨 정보 저장)
     session['emp_no'] = str(user['emp_no'])
     session['user_name'] = user['name']
@@ -123,7 +144,8 @@ app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')
 app.register_blueprint(board_bp, url_prefix='/board')
 app.register_blueprint(payroll_bp, url_prefix='/payroll')
-app.register_blueprint(memo_bp, url_prefix='/memo')  # [신규 추가] 화이트보드 메모장 라우트 등록
+app.register_blueprint(memo_bp, url_prefix='/memo')  
+app.register_blueprint(attendance_bp)  # [신규 추가] 근태관리 라우트 등록 (url_prefix 없이 등록하여 attendance.py 내부의 라우트를 그대로 사용)
 
 @app.errorhandler(404)
 def page_not_found(e):
