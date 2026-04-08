@@ -66,18 +66,19 @@
         background: white; padding-bottom: 10px; text-align: center; width: 200px;
     }
     
-    /* === [핵심 수정] 이미지 카드 전용 (크기 조절 기능 포함) === */
+    /* === 이미지 카드 전용 (크기 조절 및 비율 유지) === */
     .image-card {
-        padding-bottom: 0; /* 내부 꽉 차게 변경 */
+        padding-bottom: 0; 
         display: flex; flex-direction: column;
-        resize: both; /* 브라우저 기본 크기 조절 핸들 생성 */
+        resize: horizontal; /* 가로 크기만 직접 조절하도록 유도 (세로는 비율 계산) */
         overflow: hidden;
-        min-width: 100px; min-height: 100px;
+        min-width: 100px;
     }
     .image-wrapper {
         flex: 1; width: 100%; height: 100%;
         display: flex; justify-content: center; align-items: center;
         background: #f8fafc; overflow: hidden;
+        position: relative;
     }
     .image-wrapper img {
         width: 100%; height: 100%; object-fit: contain; cursor: pointer; display: block;
@@ -86,15 +87,16 @@
     .file-icon { font-size: 4rem; color: #64748b; margin: 20px 0; display: block; }
     .file-link { display: block; padding: 0 10px; color: #4a90e2; font-weight: 600; text-decoration: none; word-break: break-all; }
 
-    /* X 삭제 버튼 */
+    /* [수정] X 삭제 버튼: 잘림 방지를 위해 카드 내부 우측 상단으로 이동 */
     .btn-delete-memo {
-        position: absolute; top: -10px; right: -10px;
-        background: #e74c3c; color: white; border: none;
+        position: absolute; top: 5px; right: 5px;
+        background: rgba(231, 76, 60, 0.9); color: white; border: none;
         width: 24px; height: 24px; border-radius: 50%;
-        cursor: pointer; font-size: 12px; font-weight: bold;
-        display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10;
+        cursor: pointer; font-size: 14px; font-weight: bold;
+        display: none; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 20;
+        align-items: center; justify-content: center;
     }
-    .draggable-item:hover .btn-delete-memo { display: block; }
+    .draggable-item:hover .btn-delete-memo { display: flex; }
 
     #imageModal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
     #imageModalContent { display: block; max-width: 90%; max-height: 90%; margin: 2% auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -134,7 +136,7 @@
         <div class="draggable-item media-card image-card" id="memo_{{ memo.id }}" 
              style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }}; 
                     {% if memo.width %}width:{{ memo.width }}px;{% else %}width:250px;{% endif %}
-                    {% if memo.height %}height:{{ memo.height }}px;{% else %}height:250px;{% endif %}">
+                    {% if memo.height %}height:{{ memo.height }}px;{% else %}height:auto;{% endif %}">
             <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
             <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
             <div class="image-wrapper">
@@ -168,40 +170,50 @@
         if (!isNaN(z) && z > highestZ) { highestZ = z; }
     });
 
-    // === [핵심 수정] 그림 크기 조절 감지 및 서버 자동 저장 (ResizeObserver) ===
+    // === [핵심 로직] 그림 비율 유지 리사이즈 감지 및 저장 ===
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
             const el = entry.target;
-            const id = el.id.replace('memo_', '');
-            const w = el.offsetWidth;
-            const h = el.offsetHeight;
-            
-            // 크기 조절이 완전히 끝날 때쯤 서버에 저장하도록 0.5초 딜레이(Debouncing) 부여
-            clearTimeout(el.resizeTimeout);
-            el.resizeTimeout = setTimeout(async () => {
-                if (el.dataset.w != w || el.dataset.h != h) {
-                    el.dataset.w = w;
-                    el.dataset.h = h;
-                    try {
-                        await fetch('/memo/update', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: id, width: w, height: h })
-                        });
-                    } catch(e) {}
+            if (!el.classList.contains('image-card')) continue;
+
+            const img = el.querySelector('img');
+            // 이미지가 로드된 상태에서만 비율 계산 가능
+            if (img.naturalWidth > 0) {
+                const ratio = img.naturalHeight / img.naturalWidth;
+                const newWidth = el.offsetWidth;
+                const newHeight = Math.floor(newWidth * ratio);
+
+                // 높이를 비율에 맞춰 강제로 설정 (찌그러짐 방지)
+                if (Math.abs(el.offsetHeight - (newHeight + 20)) > 5) { // 20px은 드래그 핸들 높이
+                    el.style.height = (newHeight + 20) + 'px';
                 }
-            }, 500);
+
+                const id = el.id.replace('memo_', '');
+                
+                // 디바운싱 처리 (연속 호출 방지)
+                clearTimeout(el.resizeTimeout);
+                el.resizeTimeout = setTimeout(async () => {
+                    if (el.dataset.w != newWidth || el.dataset.h != (newHeight + 20)) {
+                        el.dataset.w = newWidth;
+                        el.dataset.h = (newHeight + 20);
+                        try {
+                            await fetch('/memo/update', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: id, width: newWidth, height: (newHeight + 20) })
+                            });
+                        } catch(e) {}
+                    }
+                }, 500);
+            }
         }
     });
 
-    // 화면의 모든 이미지 카드에 크기 감지기 부착
+    // 초기 이미지 카드들에 대해 감시 시작
     document.querySelectorAll('.image-card').forEach(card => {
-        card.dataset.w = card.offsetWidth;
-        card.dataset.h = card.offsetHeight;
         resizeObserver.observe(card);
     });
 
-    // === 포스트잇 추가 ===
     async function addPostit(color) {
         try {
             const res = await fetch('/memo/add_postit', {
@@ -213,7 +225,6 @@
         } catch(e) { alert("오류 발생"); }
     }
 
-    // === 그림/파일 업로드 ===
     async function uploadMemoFile(input) {
         if(input.files.length === 0) return;
         let formData = new FormData();
@@ -226,7 +237,6 @@
         } catch(e) { alert("오류 발생"); }
     }
 
-    // === 포스트잇 내용 자동 저장 ===
     async function updateMemoContent(id, content) {
         try {
             await fetch('/memo/update', {
@@ -237,7 +247,6 @@
         } catch(e) {}
     }
 
-    // === 메모/그림/파일 삭제 ===
     async function deleteMemo(id) {
         if(!confirm("이 항목을 화이트보드에서 떼어낼까요?")) return;
         try {
@@ -246,13 +255,11 @@
         } catch(e) {}
     }
 
-    // === 이미지 모달 열기 ===
     function openImageModal(src) {
         document.getElementById('imageModal').style.display = 'block';
         document.getElementById('imageModalContent').src = src;
     }
 
-    // === 마우스 드래그 앤 드롭 구현 ===
     const whiteboard = document.getElementById('whiteboard');
     let draggedElement = null;
     let offsetX = 0, offsetY = 0;
