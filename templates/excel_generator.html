@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    /* 메인 뷰 컨테이너 애니메이션 */
+    .excel-container {
+        animation: fadeIn 0.5s ease-out forwards;
+        padding: 20px 0;
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 카드형 컨테이너 스타일 */
+    .excel-card {
+        background: white;
+        border-radius: 12px;
+        padding: 35px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        border: 1px solid #f0f2f5;
+        margin-bottom: 30px;
+    }
+
+    .excel-header {
+        border-bottom: 2px solid #f0f2f5;
+        padding-bottom: 20px;
+        margin-bottom: 25px;
+    }
+
+    .excel-header h2 {
+        color: #2c3e50;
+        margin: 0 0 10px 0;
+        font-size: 1.6rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .excel-desc {
+        color: #636e72;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .excel-desc code {
+        background: #f1f5f9;
+        padding: 3px 6px;
+        border-radius: 6px;
+        color: #e83e8c;
+        font-weight: 600;
+    }
+
+    /* 업로드 박스 영역 */
+    .upload-box {
+        background: #f8f9fc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 25px;
+        transition: border-color 0.3s;
+    }
+
+    .upload-box:hover {
+        border-color: #4a90e2;
+    }
+
+    .upload-label {
+        display: block;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 15px;
+    }
+
+    .file-input-wrapper {
+        margin-bottom: 20px;
+    }
+
+    .file-input-wrapper input[type=file] {
+        display: block;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 12px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        color: #475569;
+        cursor: pointer;
+    }
+
+    .btn-submit {
+        background-color: #4a90e2;
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        border-radius: 8px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 10px rgba(74, 144, 226, 0.2);
+    }
+
+    .btn-submit:hover {
+        background-color: #357abd;
+        transform: translateY(-2px);
+    }
+
+    .btn-submit:disabled {
+        background-color: #94a3b8;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* 하단 규칙 안내 박스 */
+    .rules-box {
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .rules-box h4 {
+        margin-top: 0;
+        color: #2c3e50;
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .rules-list {
+        margin: 0;
+        padding-left: 20px;
+        color: #475569;
+        font-size: 0.95rem;
+        line-height: 1.7;
+    }
+
+    .rules-list code {
+        background: #f1f5f9;
+        padding: 2px 5px;
+        border-radius: 4px;
+        color: #4a90e2;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="excel-container">
+    <div class="excel-card">
+        
+        <div class="excel-header">
+            <h2><i class="fa-solid fa-file-excel" style="color: #207245;"></i> 입금용 엑셀 생성기</h2>
+            <p class="excel-desc">
+                모든 시트에서 <code>은행</code>, <code>계좌번호</code>, <code>예금주</code>, <code>입금액</code>만 자동으로 추출합니다. (헤더 기준선은 <b>3번째 줄</b>입니다.)<br>
+                <b>분할 규칙:</b> 시트 순서대로 누적 인원을 합산하다가 <b>{{ chunk_size }}명</b>을 초과하면 직전 시트까지만 한 파일로 압축 생성됩니다.
+            </p>
+        </div>
+
+        <form method="post" action="{{ url_for('excel_generator.deposit_process') }}" enctype="multipart/form-data" id="excelForm">
+            <div class="upload-box">
+                <label for="file" class="upload-label"><i class="fa-solid fa-cloud-arrow-up"></i> 변환할 엑셀 파일(.xlsx)을 업로드해주세요</label>
+                <div class="file-input-wrapper">
+                    <input id="file" name="file" type="file" accept=".xlsx" required />
+                </div>
+                <button class="btn-submit" type="submit" id="submitBtn"><i class="fa-solid fa-wand-magic-sparkles"></i> 변환 & 다운로드 시작</button>
+            </div>
+        </form>
+
+        <div class="rules-box">
+            <h4><i class="fa-solid fa-circle-info" style="color: #4a90e2;"></i> 상세 처리 규칙</h4>
+            <ul class="rules-list">
+                <li>각 시트에서 <code>은행/계좌번호/예금주/입금액</code> 데이터가 모두 존재해야 추출됩니다.</li>
+                <li><code>예금주</code>가 비어있는 행은 제외됩니다.</li>
+                <li><code>계좌번호</code>는 <b>문자형(String)</b>으로 강제 변환되며, 앞자리의 0은 보존되고 띄어쓰기는 제거됩니다.</li>
+                <li>각 결과 파일에서 시트 구간 마지막 행 아래에 <b>시트별 합계(H/I열)</b>가 표기됩니다.</li>
+                <li>전체 총합은 <b>H2/I2열</b>에 기록되며, 모든 데이터 행의 <b>F열</b>에 "새담청소년교육" 문구가 삽입됩니다.</li>
+            </ul>
+        </div>
+        
+        <div style="margin-top: 15px; text-align: right; font-size: 0.85rem; color: #94a3b8;">
+            <i class="fa-solid fa-triangle-exclamation"></i> 에러 발생 시, 원본 파일의 헤더 위치(3행) 및 열 이름의 오타를 확인해주세요.
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const form = document.getElementById("excelForm");
+    const fileInput = document.getElementById("file");
+    const submitBtn = document.getElementById("submitBtn");
+
+    form.addEventListener("submit", () => {
+        if (!fileInput.files.length) return;
+        
+        // 제출 버튼 비활성화 및 텍스트 변경
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 파일 처리 및 변환 중...';
+        submitBtn.style.backgroundColor = "#94a3b8";
+        submitBtn.disabled = true;
+
+        // 다운로드 완료 후 버튼 상태를 복구하기 위해 타임아웃 사용 (대략적인 다운로드 소요 시간 대기)
+        setTimeout(() => {
+            submitBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> 변환 & 다운로드 시작';
+            submitBtn.style.backgroundColor = ""; // 기존 CSS 색상으로 복구
+            submitBtn.disabled = false;
+        }, 3000); 
+    });
+</script>
+{% endblock %}
