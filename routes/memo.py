@@ -8,16 +8,14 @@ from .database import get_db
 
 memo_bp = Blueprint('memo', __name__)
 
-UPLOAD_FOLDER = '/mnt/data/uploads'
+# [수정됨] 이미지, 일반파일 구분 없이 'memoup' 단일 폴더에 모두 저장
+UPLOAD_FOLDER = '/mnt/data/memoup'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # [보안] 1. 암호화 키 설정
 # Render 서버에서 Environment Variables에 FERNET_SECRET_KEY를 등록해서 사용하는 것이 가장 안전합니다.
-# 로컬 테스트를 위해 임시 키를 기본값으로 두었습니다. 
-# 새 키 발급: 파이썬 콘솔에서 from cryptography.fernet import Fernet; print(Fernet.generate_key())
 SECRET_KEY = os.environ.get('FERNET_SECRET_KEY', b'qQp_5wD1uO2-wWzL7vI2jN6_bH9T5_R-3gH8uO1mVpI=') 
 cipher_suite = Fernet(SECRET_KEY)
-
 
 @memo_bp.route('/', strict_slashes=False)
 def memo_board():
@@ -99,6 +97,11 @@ def memo_upload_file():
     # [보안] 2. 파일명 겹침 방지 (UUID 사용)
     unique_id = uuid.uuid4().hex
     saved_filename = f"{unique_id}_{original_filename}.enc" # 암호화 명시
+    
+    ext = original_filename.split('.')[-1].lower()
+    memo_type = 'image' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'file'
+    
+    # [수정됨] memoup 폴더로 단일화
     filepath = os.path.join(UPLOAD_FOLDER, saved_filename)
     
     # [보안] 3. 파일 내용 암호화 및 물리적 저장
@@ -107,9 +110,6 @@ def memo_upload_file():
     
     with open(filepath, 'wb') as f:
         f.write(encrypted_data)
-    
-    ext = original_filename.split('.')[-1].lower()
-    memo_type = 'image' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'file'
     
     conn = get_db()
     cursor = conn.cursor()
@@ -135,6 +135,7 @@ def serve_secure_file(filename):
     if not current_user:
         return "로그인이 필요합니다.", 401
         
+    # [수정됨] memoup 단일 경로에서 파일 찾기
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(filepath):
         return "파일을 찾을 수 없습니다.", 404
@@ -213,7 +214,9 @@ def memo_delete(memo_id):
         
         # 3. filepath가 존재하면 서버 물리 파일(.enc)도 정확히 삭제
         if memo['type'] in ['file', 'image'] and memo['filepath']:
+            # [수정됨] memoup 단일 폴더에서 파일 삭제
             file_path = os.path.join(UPLOAD_FOLDER, memo['filepath'])
+            
             if os.path.exists(file_path):
                 try:
                     os.remove(file_path)
