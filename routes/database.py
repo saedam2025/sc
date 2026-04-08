@@ -30,14 +30,16 @@ def init_db():
         owner TEXT, type TEXT, start_date TEXT, end_date TEXT, status TEXT
     )''')
 
-    # [★신규 추가★] 2-1. 일일 출퇴근(Daily Attendance) 테이블
+    # [수정] 2-1. 일일 출퇴근 테이블 (position 컬럼 추가)
     c.execute('''CREATE TABLE IF NOT EXISTS daily_attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         emp_no TEXT NOT NULL,
         date TEXT NOT NULL,
         clock_in_time TEXT NOT NULL,
         clock_out_time TEXT,
-        status TEXT NOT NULL
+        status TEXT NOT NULL,
+        reason TEXT,
+        position TEXT
     )''')
     
     # 3. 사내 게시판 테이블
@@ -74,17 +76,24 @@ def init_db():
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
-    # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가 (에러 무시)
+    # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가
     try:
         c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         c.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
-    except sqlite3.OperationalError:
-        pass 
+    except sqlite3.OperationalError: pass 
 
     try:
         c.execute("ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'")
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError: pass
+
+    try:
+        c.execute("ALTER TABLE daily_attendance ADD COLUMN reason TEXT")
+    except sqlite3.OperationalError: pass
+
+    # [신규 추가] 기존 출퇴근 테이블에 직급(position) 컬럼 추가
+    try:
+        c.execute("ALTER TABLE daily_attendance ADD COLUMN position TEXT")
+    except sqlite3.OperationalError: pass
     
     conn.commit()
     conn.close()

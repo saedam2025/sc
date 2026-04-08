@@ -1,54 +1,45 @@
 from flask import Blueprint, render_template, request, session, jsonify
 from datetime import datetime
 import sqlite3
-
-# app.py에서 사용하는 데이터베이스 연결 함수 가져오기
 from routes.database import get_db
 
 attendance_bp = Blueprint('attendance', __name__)
 
 @attendance_bp.route('/attendance')
 def attendance_list():
-    # 1. 로그인 정보 및 권한 확인 (세션 기준)
     emp_no = session.get('emp_no')
-    user_level = session.get('user_level', 4) # 기본값 4
+    user_level = session.get('user_level', 4)
     
-    # 파라미터 받기 (기본값: 이번 달)
     target_month = request.args.get('month', datetime.now().strftime('%Y-%m'))
     search_emp_no = request.args.get('search_emp_no', '')
 
     conn = get_db()
     
-    # 2 & 4. 권한에 따른 쿼리 조건 설정 (users 테이블과 JOIN하여 이름도 가져옴)
-    # [수정됨] attendance 테이블에서 daily_attendance 테이블로 변경
+    # [수정됨] u.position 대신 a.position(당시 저장된 직급)을 사용합니다.
     query = """
-        SELECT a.id, a.emp_no, a.date, a.clock_in_time, a.clock_out_time, a.status, u.name as user_name
+        SELECT a.id, a.emp_no, a.date, a.clock_in_time, a.clock_out_time, a.status, a.reason, a.position, u.name as user_name
         FROM daily_attendance a
         JOIN users u ON a.emp_no = u.emp_no
         WHERE a.date LIKE ?
     """
     params = [f"{target_month}-%"]
 
-    # 레벨 4 이하는 본인 것만 보기
     if user_level >= 4:
         query += " AND a.emp_no = ?"
         params.append(str(emp_no))
-    # 관리자가 특정 회원을 검색한 경우
     elif search_emp_no:
         query += " AND a.emp_no = ?"
         params.append(str(search_emp_no))
 
-    # 날짜 내림차순, 출근시간 오름차순 정렬
     query += " ORDER BY a.date DESC, a.clock_in_time ASC"
 
     raw_records = conn.execute(query, params).fetchall()
 
-    # 2. 일별 출근 등수 계산 로직 (딕셔너리로 변환하여 처리)
     records = []
     daily_ranks = {}
     
     for row in raw_records:
-        record = dict(row) # sqlite3.Row 객체를 수정 가능한 딕셔너리로 변환
+        record = dict(row)
         date_str = record['date']
         
         if date_str not in daily_ranks:
@@ -58,7 +49,15 @@ def attendance_list():
         daily_ranks[date_str] += 1
         records.append(record)
 
-    # 관리자용 회원 목록 (셀렉트 박스용)
+    # [수정됨] a.position 값을 기준으로 그룹화합니다.
+    grouped_records = {}
+    for r in records:
+        pos = r.get('position') or '미지정'
+            
+        if pos not in grouped_records:
+            grouped_records[pos] = []
+        grouped_records[pos].append(r)
+
     all_users = []
     if user_level <= 3:
         all_users = [dict(u) for u in conn.execute("SELECT emp_no, name FROM users ORDER BY name").fetchall()]
@@ -67,7 +66,8 @@ def attendance_list():
 
     return render_template(
         'attendance.html', 
-        records=records, 
+        grouped_records=grouped_records,
+        has_records=bool(records),
         current_month=target_month,
         all_users=all_users,
         user_level=user_level,
