@@ -1,0 +1,152 @@
+/* static/css/attendance.css */
+
+/* 메인 컨테이너 및 애니메이션 (base.css의 content-container 내부에 위치) */
+.attendance-container {
+    animation: fadeIn 0.5s ease;
+    padding: 20px 0;
+}
+
+/* 근태 명단 카드 (user_mgmt.css의 mgmt-card 스타일 차용) */
+.attendance-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    border: 1px solid #f0f2f5;
+}
+
+/* 상단 헤더 및 검색 필터 영역 */
+.attendance-header-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.attendance-header-area h2 {
+    color: #2c3e50;
+    margin: 0;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 검색 필터 (월 선택 및 회원 선택) */
+.attendance-filters {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.attendance-filters input[type="month"],
+.attendance-filters select {
+    padding: 10px 15px;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #333;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.attendance-filters input[type="month"]:focus,
+.attendance-filters select:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.btn-search {
+    background-color: #4a90e2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-search:hover {
+    background-color: #357abd;
+}
+
+/* 테이블 스타일 (approve-table 스타일 개선) */
+.attendance-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+}
+
+.attendance-table th {
+    background-color: #f8f9fa;
+    color: #636e72;
+    padding: 15px 12px;
+    font-weight: 700;
+    font-size: 14px;
+    border-bottom: 2px solid #f0f2f5;
+}
+
+.attendance-table td {
+    padding: 15px 12px;
+    border-bottom: 1px solid #f0f2f5;
+    color: #2c3e50;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+.attendance-table tr:hover td {
+    background-color: #fcfdfe;
+}
+
+/* 상태 배지 */
+.status-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-working { background: #e3f2fd; color: #1e88e5; } /* 근무중 */
+.status-out { background: #ebfbee; color: #2b8a3e; }     /* 퇴근 */
+.status-early { background: #fff4e6; color: #d9480f; }   /* 조퇴 */
+
+/* 액션 버튼 (본인 퇴근/조퇴 버튼) */
+.btn-clockout {
+    background-color: transparent;
+    color: #4a90e2;
+    border: 1px solid #4a90e2;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-right: 5px;
+}
+
+.btn-clockout:hover {
+    background-color: #4a90e2;
+    color: white;
+}
+
+.btn-earlyleave {
+    background-color: transparent;
+    color: #fa5252;
+    border: 1px solid #fa5252;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-earlyleave:hover {
+    background-color: #fa5252;
+    color: white;
+}
