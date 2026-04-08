@@ -163,17 +163,16 @@
         <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
             <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
             <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
-            <img src="/uploads/{{ memo.filepath }}" onclick="openImageModal(this.src)" title="클릭하여 확대">
+            <img src="/memo/file/{{ memo.filepath }}" onclick="openImageModal(this.src)" title="클릭하여 확대">
         </div>
 
         {% elif memo.type == 'file' %}
         <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
             <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
             <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
-            <a href="/uploads/{{ memo.filepath }}" download class="file-link">
+            <a href="/memo/file/{{ memo.filepath }}" download class="file-link">
                 <i class="fa-solid fa-file-lines file-icon"></i>
-                <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.filepath }}</div>
-            </a>
+                <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.content }}</div> </a>
         </div>
         {% endif %}
     {% endfor %}
