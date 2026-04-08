@@ -24,10 +24,20 @@ def init_db():
         note TEXT
     )''')
     
-    # 2. 근태(Attendance) 테이블
+    # 2. 근태(Attendance) 테이블 - 기존 연차/휴가 관리용
     c.execute('''CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner TEXT, type TEXT, start_date TEXT, end_date TEXT, status TEXT
+    )''')
+
+    # [★신규 추가★] 2-1. 일일 출퇴근(Daily Attendance) 테이블
+    c.execute('''CREATE TABLE IF NOT EXISTS daily_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_no TEXT NOT NULL,
+        date TEXT NOT NULL,
+        clock_in_time TEXT NOT NULL,
+        clock_out_time TEXT,
+        status TEXT NOT NULL
     )''')
     
     # 3. 사내 게시판 테이블
@@ -54,7 +64,7 @@ def init_db():
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
     )''')
 
-    # 6. 전자결재(Approvals) 테이블 [★신규 추가★]
+    # 6. 전자결재(Approvals) 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS approvals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_type TEXT, title TEXT, drafter TEXT,
