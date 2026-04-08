@@ -4,7 +4,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/attendance.css') }}">
 <style>
-    /* 초기화 버튼 스타일 */
     .btn-reset {
         background-color: #f1f3f5;
         color: #495057;
@@ -22,7 +21,6 @@
         background-color: #e9ecef;
         color: #212529;
     }
-    /* 직급별 타이틀 스타일 */
     .position-title {
         margin-top: 0;
         margin-bottom: 15px;
@@ -31,6 +29,22 @@
         display: flex;
         align-items: center;
         gap: 10px;
+    }
+    /* 신규 삭제 버튼 스타일 */
+    .btn-delete-record {
+        background-color: transparent;
+        color: #adb5bd;
+        border: none;
+        padding: 6px;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-left: 10px;
+    }
+    .btn-delete-record:hover {
+        background-color: #fa5252;
+        color: white;
     }
 </style>
 {% endblock %}
@@ -46,6 +60,13 @@
                 <input type="month" name="month" value="{{ current_month }}">
                 
                 {% if user_level <= 3 %}
+                <select name="search_position">
+                    <option value="">전체 직급</option>
+                    {% for pos in all_positions %}
+                    <option value="{{ pos }}" {% if search_position == pos %}selected{% endif %}>{{ pos }}</option>
+                    {% endfor %}
+                </select>
+
                 <select name="search_emp_no">
                     <option value="">전체 회원</option>
                     {% for u in all_users %}
@@ -110,12 +131,18 @@
                         </td>
                         
                         <td>
-                            {% if row.emp_no|string == current_emp_no|string and not row.clock_out_time %}
-                            <button onclick="handleClockOut({{ row.id }}, '퇴근')" class="btn-clockout">퇴근</button>
-                            <button onclick="handleClockOut({{ row.id }}, '조퇴')" class="btn-earlyleave">조퇴</button>
-                            {% else %}
-                            <span style="color: #adb5bd;">-</span>
-                            {% endif %}
+                            <div style="display: flex; align-items: center; justify-content: center;">
+                                {% if row.emp_no|string == current_emp_no|string and not row.clock_out_time %}
+                                <button onclick="handleClockOut({{ row.id }}, '퇴근')" class="btn-clockout">퇴근</button>
+                                <button onclick="handleClockOut({{ row.id }}, '조퇴')" class="btn-earlyleave">조퇴</button>
+                                {% elif not row.clock_out_time %}
+                                <span style="color: #adb5bd;">-</span>
+                                {% endif %}
+
+                                {% if user_level <= 2 %}
+                                <button onclick="deleteRecord({{ row.id }})" class="btn-delete-record" title="기록 삭제"><i class="fa-solid fa-trash-can"></i></button>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -141,19 +168,16 @@ function handleClockOut(recordId, type) {
     let reasonText = '';
 
     if (type === '조퇴') {
-        // 조퇴일 경우 사유 입력 팝업 띄우기
         reasonText = prompt('조퇴 사유를 간략하게 입력해주세요.\n(예: 병원 진료, 개인 사정 등)');
         if (reasonText === null) {
-            return; // 취소 버튼을 누르면 아무 작업도 하지 않음
+            return; 
         }
     } else {
-        // 일반 퇴근일 경우 확인 창만 띄우기
         if(!confirm(type + ' 처리 하시겠습니까? \n(한 번 기록되면 수정할 수 없습니다.)')) {
             return;
         }
     }
 
-    // 서버로 데이터 전송
     fetch('/attendance/clock_out', {
         method: 'POST',
         headers: {
@@ -169,7 +193,34 @@ function handleClockOut(recordId, type) {
     .then(data => {
         if(data.success) {
             alert(data.message);
-            location.reload(); // 성공 시 페이지 새로고침
+            location.reload(); 
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// [신규 추가] 관리자 삭제 로직
+function deleteRecord(recordId) {
+    if(!confirm('이 기록을 정말 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다.)')) {
+        return;
+    }
+
+    fetch('/attendance/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            record_id: recordId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            alert(data.message);
+            location.reload(); 
         } else {
             alert(data.message);
         }
