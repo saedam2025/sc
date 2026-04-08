@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    /* === 전체 레이아웃 및 폰트 === */
+    .dashboard-wrapper {
+        font-family: 'Pretendard', sans-serif;
+        color: #1e293b;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        margin-bottom: 40px;
+    }
+
+    /* === 상단 타이틀 영역 === */
+    .page-title-box {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 10px;
+    }
+    .page-title { margin: 0; font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+    .page-subtitle { font-size: 0.9rem; color: #64748b; font-weight: 500; }
+
+    /* === 대시보드 위젯 그리드 === */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+    .stat-card {
+        background: #ffffff; border-radius: 16px; padding: 24px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f1f5f9;
+        display: flex; align-items: center; justify-content: space-between;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-3px); }
+    
+    .stat-info { display: flex; flex-direction: column; gap: 8px; }
+    .stat-label { font-size: 0.95rem; color: #64748b; font-weight: 600; }
+    .stat-value { font-size: 1.8rem; color: #1e293b; font-weight: 800; line-height: 1; }
+    .stat-icon {
+        width: 50px; height: 50px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    }
+    
+    /* 카드별 포인트 컬러 */
+    .icon-blue { background: #e0f2fe; color: #0ea5e9; }
+    .icon-green { background: #dcfce7; color: #22c55e; }
+    .icon-purple { background: #f3e8ff; color: #a855f7; }
+
+    /* === 차트 카드 특수 레이아웃 === */
+    .chart-card {
+        background: #ffffff; border-radius: 16px; padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03); border: 1px solid #f1f5f9;
+        display: flex; gap: 20px; align-items: center;
+    }
+    .chart-container { width: 120px; height: 120px; position: relative; }
+
+    /* === 탐색기 (파일 리스트) 영역 === */
+    .explorer-container {
+        background: white; border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;
+        overflow: hidden;
+    }
+    .breadcrumb {
+        font-size: 1rem; color: #475569; background: #f8fafc;
+        padding: 15px 20px; border-bottom: 1px solid #e2e8f0;
+        display: flex; align-items: center; gap: 10px; font-weight: 500;
+    }
+    .file-list { width: 100%; border-collapse: collapse; }
+    .file-list th, .file-list td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+    .file-list th { background: #ffffff; font-weight: 700; color: #64748b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;}
+    .file-list tr { transition: background 0.15s; }
+    .file-list tr:hover { background: #f8fafc; }
+    
+    .file-link {
+        text-decoration: none; color: #334155; font-weight: 600;
+        display: flex; align-items: center; gap: 12px;
+    }
+    .file-link:hover { color: #3b82f6; }
+    .folder-icon { color: #fbbf24; font-size: 1.3rem; }
+    .file-icon { color: #94a3b8; font-size: 1.3rem; }
+    .up-dir { color: #64748b; font-weight: bold; }
+</style>
+
+<div class="dashboard-wrapper">
+    <div class="page-title-box">
+        <h2 class="page-title"><i class="fa-solid fa-server" style="color: #3b82f6; margin-right: 8px;"></i> 스토리지 센터</h2>
+        <span class="page-subtitle">시스템 관리자 전용 모니터링 대시보드</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="chart-card">
+            <div class="chart-container">
+                <canvas id="storageChart"></canvas>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">디스크 점유율</span>
+                <span class="stat-value">{{ stats.usage_percent }}%</span>
+                <span style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+                    여유: {{ stats.free_disk_gb }} GB
+                </span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <span class="stat-label">인트라넷 누적 데이터</span>
+                <span class="stat-value">{{ stats.app_used_str }}</span>
+            </div>
+            <div class="stat-icon icon-blue">
+                <i class="fa-solid fa-database"></i>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <span class="stat-label">보관 중인 파일</span>
+                <span class="stat-value">{{ stats.total_files }}<span style="font-size:1rem; font-weight:600; color:#64748b; margin-left:4px;">개</span></span>
+            </div>
+            <div class="stat-icon icon-purple">
+                <i class="fa-solid fa-file-shield"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="explorer-container">
+        <div class="breadcrumb">
+            <i class="fa-solid fa-hard-drive"></i> /mnt/data/<strong>{{ current_path }}</strong>
+        </div>
+
+        <table class="file-list">
+            <thead>
+                <tr>
+                    <th>이름</th>
+                    <th style="width: 150px;">크기</th>
+                    <th style="width: 200px;">수정일</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if parent_path != None %}
+                <tr>
+                    <td colspan="3">
+                        <a href="/explorer/{{ parent_path }}" class="file-link up-dir">
+                            <i class="fa-solid fa-level-up-alt"></i> .. 상위 폴더로 이동
+                        </a>
+                    </td>
+                </tr>
+                {% endif %}
+
+                {% for file in files %}
+                <tr>
+                    <td>
+                        <a href="/explorer/{{ file.rel_path }}" class="file-link">
+                            {% if file.is_dir %}
+                                <i class="fa-solid fa-folder folder-icon"></i>
+                            {% else %}
+                                <i class="fa-solid fa-file file-icon"></i>
+                            {% endif %}
+                            {{ file.name }}
+                        </a>
+                    </td>
+                    <td style="color: #64748b; font-weight: 500;">{{ file.size }}</td>
+                    <td style="color: #64748b; font-size: 0.95rem;">{{ file.mtime }}</td>
+                </tr>
+                {% endfor %}
+                
+                {% if not files %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: #94a3b8; padding: 60px;">
+                        <i class="fa-regular fa-folder-open" style="font-size: 3.5rem; margin-bottom: 15px; display: block; opacity: 0.5;"></i>
+                        이 폴더는 비어있습니다.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('storageChart').getContext('2d');
+    
+    // 백엔드에서 넘어온 통계 데이터 바인딩
+    const usedSpace = {{ stats.used_disk_gb }};
+    const freeSpace = {{ stats.free_disk_gb }};
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['사용 중', '사용 가능'],
+            datasets: [{
+                data: [usedSpace, freeSpace],
+                backgroundColor: [
+                    '#3b82f6', // 파란색 (사용중)
+                    '#f1f5f9'  // 연한 회색 (여유)
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%', // 도넛의 두께 얇게 조절
+            plugins: {
+                legend: { display: false }, // 기본 범례 숨김 (디자인 깔끔하게)
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.raw + ' GB';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
