@@ -16,6 +16,7 @@ from routes.board import board_bp
 from routes.payroll import payroll_bp  # 급여 명세서 발송 시스템
 from routes.memo import memo_bp        # [신규] 개인 화이트보드 메모장 시스템
 from routes.attendance import attendance_bp # [신규] 근태관리 시스템
+from routes.excel_generator import excel_bp # [신규] 입금용 엑셀 생성 시스템
 
 # 엑셀 대신 SQLite DB를 사용하도록 설정된 데이터베이스 모듈 임포트
 from routes.database import get_db
@@ -62,8 +63,6 @@ def check_login():
 @app.route('/login_page')
 def login_page():
     return render_template('login.html')
-
-# ... (상단 임포트 및 설정 생략 - 기존과 동일)
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -146,7 +145,8 @@ app.register_blueprint(approval_bp, url_prefix='/approval')
 app.register_blueprint(board_bp, url_prefix='/board')
 app.register_blueprint(payroll_bp, url_prefix='/payroll')
 app.register_blueprint(memo_bp, url_prefix='/memo')  
-app.register_blueprint(attendance_bp)  # [신규 추가] 근태관리 라우트 등록 (url_prefix 없이 등록하여 attendance.py 내부의 라우트를 그대로 사용)
+app.register_blueprint(attendance_bp)  # 근태관리 라우트
+app.register_blueprint(excel_bp)       # [신규 추가] 입금용 엑셀 생성 라우트 등록
 
 @app.errorhandler(404)
 def page_not_found(e):
