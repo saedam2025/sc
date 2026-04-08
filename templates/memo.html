@@ -170,9 +170,10 @@
         <div class="draggable-item media-card" id="memo_{{ memo.id }}" style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};">
             <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
             <div class="drag-handle" style="background: #f8fafc;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
-            <a href="/memo/file/{{ memo.filepath }}" download class="file-link">
+            <a href="/memo/file/{{ memo.filepath }}" download="{{ memo.content }}" class="file-link">
                 <i class="fa-solid fa-file-lines file-icon"></i>
-                <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.content }}</div> </a>
+                <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.content }}</div> 
+            </a>
         </div>
         {% endif %}
     {% endfor %}
@@ -185,6 +186,14 @@
 
 <script>
     let highestZ = 100;
+
+    // [핵심 수정] 페이지 로드 시 기존 메모들 중 가장 높은 z-index 값을 찾아 highestZ 초기화
+    document.querySelectorAll('.draggable-item').forEach(item => {
+        let z = parseInt(item.style.zIndex);
+        if (!isNaN(z) && z > highestZ) {
+            highestZ = z;
+        }
+    });
 
     // === 포스트잇 추가 ===
     async function addPostit(color) {
@@ -245,7 +254,7 @@
     whiteboard.addEventListener('mousedown', function(e) {
         if (e.target.closest('.drag-handle')) {
             draggedElement = e.target.closest('.draggable-item');
-            highestZ++;
+            highestZ++; // 드래그 시작 시 무조건 최상단으로 끌어올림
             draggedElement.style.zIndex = highestZ;
             
             const rect = draggedElement.getBoundingClientRect();
@@ -277,10 +286,11 @@
             const id = draggedElement.id.replace('memo_', '');
             const finalX = parseInt(draggedElement.style.left);
             const finalY = parseInt(draggedElement.style.top);
-            const z = draggedElement.style.zIndex;
+            const z = draggedElement.style.zIndex; // 최종 변경된 z-index 캡처
             
             draggedElement = null;
 
+            // 위치 이동 및 변경된 z-index 값을 DB에 함께 저장
             try {
                 await fetch('/memo/update', {
                     method: 'POST',
