@@ -1,8 +1,14 @@
 /* static/css/attendance.css */
 
+/* [수정됨] 근태관리 전용 애니메이션 독립 정의 (충돌 방지) */
+@keyframes attendanceFadeIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* 메인 컨테이너 및 애니메이션 (base.css의 content-container 내부에 위치) */
 .attendance-container {
-    animation: fadeIn 0.5s ease;
+    animation: attendanceFadeIn 0.5s ease-out forwards;
     padding: 20px 0;
 }
 
