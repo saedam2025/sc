@@ -8,12 +8,11 @@ from .database import get_db
 
 memo_bp = Blueprint('memo', __name__)
 
-# [수정됨] 이미지, 일반파일 구분 없이 'memoup' 단일 폴더에 모두 저장
+# 이미지, 일반파일 구분 없이 'memoup' 단일 폴더에 모두 저장
 UPLOAD_FOLDER = '/mnt/data/memoup'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # [보안] 1. 암호화 키 설정
-# Render 서버에서 Environment Variables에 FERNET_SECRET_KEY를 등록해서 사용하는 것이 가장 안전합니다.
 SECRET_KEY = os.environ.get('FERNET_SECRET_KEY', b'qQp_5wD1uO2-wWzL7vI2jN6_bH9T5_R-3gH8uO1mVpI=') 
 cipher_suite = Fernet(SECRET_KEY)
 
@@ -73,10 +72,17 @@ def memo_add_postit():
     
     conn = get_db()
     cursor = conn.cursor()
+    
+    # [핵심 수정] 현재 화이트보드에서 가장 높은 z-index 값 찾기
+    row = cursor.execute("SELECT MAX(z_index) as max_z FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchone()
+    # 데이터가 없으면 기본값 99에서 시작하여 +1 (즉, 100부터 시작)
+    new_z = (row['max_z'] if row and row['max_z'] is not None else 99) + 1
+    
     cursor.execute('''
         INSERT INTO whiteboard_memos (owner, type, content, color, pos_x, pos_y, z_index) 
-        VALUES (?, 'postit', '', ?, 100, 100, 1)
-    ''', (current_user, color))
+        VALUES (?, 'postit', '', ?, 100, 100, ?)
+    ''', (current_user, color, new_z))
+    
     memo_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -101,7 +107,7 @@ def memo_upload_file():
     ext = original_filename.split('.')[-1].lower()
     memo_type = 'image' if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'file'
     
-    # [수정됨] memoup 폴더로 단일화
+    # memoup 폴더로 단일화 저장 경로
     filepath = os.path.join(UPLOAD_FOLDER, saved_filename)
     
     # [보안] 3. 파일 내용 암호화 및 물리적 저장
@@ -114,12 +120,16 @@ def memo_upload_file():
     conn = get_db()
     cursor = conn.cursor()
     
-    # content: 화면 표시용 원본 파일명
-    # filepath: 서버에 실제 저장된 암호화 고유 파일명 (삭제 시 이 값이 기준이 됨)
+    # [핵심 수정] 첨부파일 추가 시에도 가장 높은 z-index 적용
+    row = cursor.execute("SELECT MAX(z_index) as max_z FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchone()
+    new_z = (row['max_z'] if row and row['max_z'] is not None else 99) + 1
+    
+    # content: 화면 표시 및 다운로드 복구용 원본 파일명
+    # filepath: 서버에 실제 저장된 암호화 고유 파일명
     cursor.execute('''
         INSERT INTO whiteboard_memos (owner, type, content, filepath, pos_x, pos_y, z_index) 
-        VALUES (?, ?, ?, ?, 150, 150, 1)
-    ''', (current_user, memo_type, original_filename, saved_filename))
+        VALUES (?, ?, ?, ?, 150, 150, ?)
+    ''', (current_user, memo_type, original_filename, saved_filename, new_z))
     
     memo_id = cursor.lastrowid
     conn.commit()
@@ -128,17 +138,28 @@ def memo_upload_file():
     return jsonify({"status": "success", "id": memo_id, "type": memo_type, "filename": original_filename})
 
 
-# [보안] 4. 프론트엔드 이미지/파일 제공용 복호화 라우트
+# [보안] 4. 프론트엔드 이미지/파일 제공용 복호화 라우트 (원본 파일명 복구 기능 포함)
 @memo_bp.route('/file/<filename>')
 def serve_secure_file(filename):
     current_user = session.get('user_name')
     if not current_user:
         return "로그인이 필요합니다.", 401
         
-    # [수정됨] memoup 단일 경로에서 파일 찾기
+    # memoup 단일 경로에서 파일 찾기
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(filepath):
         return "파일을 찾을 수 없습니다.", 404
+        
+    # DB에서 완벽한 원본 파일명(content) 찾아오기
+    conn = get_db()
+    memo = conn.execute("SELECT content FROM whiteboard_memos WHERE filepath = ?", (filename,)).fetchone()
+    conn.close()
+
+    # DB에 원본 파일명이 있으면 적용, 만약 옛날 자료라 없으면 파일명 잘라서 복구 시도
+    if memo and memo['content']:
+        original_filename = memo['content']
+    else:
+        original_filename = filename.split('_', 1)[-1].replace('.enc', '')
         
     # 파일 복호화
     try:
@@ -148,16 +169,14 @@ def serve_secure_file(filename):
     except Exception as e:
         return f"파일 복호화 실패 또는 손상된 파일입니다.", 500
 
-    # .enc를 떼어내고 원래 확장자 파악
-    display_name = filename.replace('.enc', '')
-    ext = display_name.split('.')[-1].lower()
-    
-    # 이미지는 브라우저 표시, 그 외는 다운로드 처리
+    # 원본 파일명의 확장자로 다운로드 처리 여부 파악
+    ext = original_filename.split('.')[-1].lower()
     as_attachment = ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']
 
+    # 다운로드 시 원본 파일명으로 강제 지정하여 브라우저에 전송
     return send_file(
         io.BytesIO(decrypted_data),
-        download_name=display_name,
+        download_name=original_filename,
         as_attachment=as_attachment
     )
 
@@ -214,7 +233,7 @@ def memo_delete(memo_id):
         
         # 3. filepath가 존재하면 서버 물리 파일(.enc)도 정확히 삭제
         if memo['type'] in ['file', 'image'] and memo['filepath']:
-            # [수정됨] memoup 단일 폴더에서 파일 삭제
+            # memoup 단일 폴더에서 파일 삭제
             file_path = os.path.join(UPLOAD_FOLDER, memo['filepath'])
             
             if os.path.exists(file_path):
