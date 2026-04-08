@@ -1,129 +1,180 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>새담 인트라넷 - 근태관리</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/attendance.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
+{% extends 'base.html' %}
 
-    <main class="main-content">
-        <div class="content-container">
-            <div class="attendance-container">
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/attendance.css') }}">
+<style>
+    /* 초기화 버튼 스타일 */
+    .btn-reset {
+        background-color: #f1f3f5;
+        color: #495057;
+        border: 1px solid #ced4da;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+        display: inline-block;
+    }
+    .btn-reset:hover {
+        background-color: #e9ecef;
+        color: #212529;
+    }
+    /* 직급별 타이틀 스타일 */
+    .position-title {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #2c7be5;
+        font-size: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="attendance-container">
+    
+    <div class="attendance-card" style="margin-bottom: 30px; padding: 20px 30px;">
+        <div class="attendance-header-area" style="margin-bottom: 0;">
+            <h2><i class="fa-regular fa-calendar-check"></i> 출퇴근 명단</h2>
+            
+            <form method="GET" action="/attendance" class="attendance-filters">
+                <input type="month" name="month" value="{{ current_month }}">
                 
-                <div class="attendance-card">
-                    <div class="attendance-header-area">
-                        <h2><i class="fa-regular fa-calendar-check"></i> 출퇴근 명단</h2>
+                {% if user_level <= 3 %}
+                <select name="search_emp_no">
+                    <option value="">전체 회원</option>
+                    {% for u in all_users %}
+                    <option value="{{ u.emp_no }}" {% if search_emp_no == u.emp_no|string %}selected{% endif %}>{{ u.name }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+                
+                <button type="submit" class="btn-search">조회</button>
+                <a href="/attendance" class="btn-reset"><i class="fa-solid fa-rotate-right"></i> 초기화</a>
+            </form>
+        </div>
+    </div>
+
+    {% if has_records %}
+        {% for position, items in grouped_records.items() %}
+        <div class="attendance-card" style="margin-bottom: 25px;">
+            <h3 class="position-title">
+                <i class="fa-solid fa-layer-group" style="color: #4a90e2;"></i> {{ position }}
+            </h3>
+            
+            <table class="attendance-table">
+                <thead>
+                    <tr>
+                        <th>날짜</th>
+                        <th>출근 순서</th>
+                        <th>이름</th>
+                        <th>출근 시간</th>
+                        <th>퇴근 시간</th>
+                        <th>상태</th>
+                        <th>사유</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in items %}
+                    <tr>
+                        <td>{{ row.date }}</td>
                         
-                        <form method="GET" action="/attendance" class="attendance-filters">
-                            <input type="month" name="month" value="{{ current_month }}">
-                            
-                            {% if user_level <= 3 %}
-                            <select name="search_emp_no">
-                                <option value="">전체 회원</option>
-                                {% for u in all_users %}
-                                <option value="{{ u.emp_no }}" {% if search_emp_no == u.emp_no|string %}selected{% endif %}>{{ u.name }}</option>
-                                {% endfor %}
-                            </select>
-                            {% endif %}
-                            
-                            <button type="submit" class="btn-search">조회</button>
-                        </form>
-                    </div>
+                        <td style="font-weight: 600; color: #2c3e50;">
+                            {% if row.daily_rank == 1 %}🥇 1등
+                            {% elif row.daily_rank == 2 %}🥈 2등
+                            {% elif row.daily_rank == 3 %}🥉 3등
+                            {% else %}{{ row.daily_rank }}등{% endif %}
+                        </td>
+                        
+                        <td style="font-weight: 600;">{{ row.user_name }}</td>
+                        <td>{{ row.clock_in_time if row.clock_in_time else '-' }}</td>
+                        <td>{{ row.clock_out_time if row.clock_out_time else '-' }}</td>
+                        
+                        <td>
+                            <span class="status-badge 
+                                {% if row.status == '근무중' %}status-working
+                                {% elif row.status == '조퇴' %}status-early
+                                {% else %}status-out{% endif %}">
+                                {{ row.status }}
+                            </span>
+                        </td>
 
-                    <hr style="border: 0; border-top: 1px solid #f0f2f5; margin-bottom: 20px;">
-
-                    <table class="attendance-table">
-                        <thead>
-                            <tr>
-                                <th>날짜</th>
-                                <th>출근 순서</th>
-                                <th>이름</th>
-                                <th>출근 시간</th>
-                                <th>퇴근 시간</th>
-                                <th>상태</th>
-                                <th>관리</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in records %}
-                            <tr>
-                                <td>{{ row.date }}</td>
-                                
-                                <td style="font-weight: 600; color: #2c3e50;">
-                                    {% if row.daily_rank == 1 %}🥇 1등
-                                    {% elif row.daily_rank == 2 %}🥈 2등
-                                    {% elif row.daily_rank == 3 %}🥉 3등
-                                    {% else %}{{ row.daily_rank }}등{% endif %}
-                                </td>
-                                
-                                <td style="font-weight: 600;">{{ row.user_name }}</td>
-                                <td>{{ row.clock_in_time if row.clock_in_time else '-' }}</td>
-                                <td>{{ row.clock_out_time if row.clock_out_time else '-' }}</td>
-                                
-                                <td>
-                                    <span class="status-badge 
-                                        {% if row.status == '근무중' %}status-working
-                                        {% elif row.status == '조퇴' %}status-early
-                                        {% else %}status-out{% endif %}">
-                                        {{ row.status }}
-                                    </span>
-                                </td>
-                                
-                                <td>
-                                    {% if row.emp_no|string == current_emp_no|string and not row.clock_out_time %}
-                                    <button onclick="handleClockOut({{ row.id }}, '퇴근')" class="btn-clockout">퇴근</button>
-                                    <button onclick="handleClockOut({{ row.id }}, '조퇴')" class="btn-earlyleave">조퇴</button>
-                                    {% else %}
-                                    <span style="color: #adb5bd;">-</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
+                        <td style="color: #636e72; font-size: 0.9rem; max-width: 150px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ row.reason if row.reason else '' }}">
+                            {{ row.reason if row.reason else '-' }}
+                        </td>
+                        
+                        <td>
+                            {% if row.emp_no|string == current_emp_no|string and not row.clock_out_time %}
+                            <button onclick="handleClockOut({{ row.id }}, '퇴근')" class="btn-clockout">퇴근</button>
+                            <button onclick="handleClockOut({{ row.id }}, '조퇴')" class="btn-earlyleave">조퇴</button>
                             {% else %}
-                            <tr>
-                                <td colspan="7" style="padding: 40px 0; color: #636e72;">
-                                    <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 10px; display: block; color: #cbd5e1;"></i>
-                                    해당 월의 근무 기록이 없습니다.
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
+                            <span style="color: #adb5bd;">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="attendance-card">
+            <div style="padding: 60px 0; text-align: center; color: #636e72;">
+                <i class="fa-regular fa-folder-open" style="font-size: 3rem; margin-bottom: 15px; display: block; color: #cbd5e1;"></i>
+                <p style="font-size: 1.1rem; margin: 0;">해당 조건의 근무 기록이 없습니다.</p>
             </div>
         </div>
-    </main>
+    {% endif %}
 
-    <script>
-    function handleClockOut(recordId, type) {
-        if(!confirm(type + ' 처리 하시겠습니까? \n(한 번 기록되면 수정할 수 없습니다.)')) return;
+</div>
+{% endblock %}
 
-        fetch('/attendance/clock_out', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                record_id: recordId,
-                type: type
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                alert(data.message);
-                location.reload(); 
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => console.error('Error:', error));
+{% block extra_js %}
+<script>
+function handleClockOut(recordId, type) {
+    let reasonText = '';
+
+    if (type === '조퇴') {
+        // 조퇴일 경우 사유 입력 팝업 띄우기
+        reasonText = prompt('조퇴 사유를 간략하게 입력해주세요.\n(예: 병원 진료, 개인 사정 등)');
+        if (reasonText === null) {
+            return; // 취소 버튼을 누르면 아무 작업도 하지 않음
+        }
+    } else {
+        // 일반 퇴근일 경우 확인 창만 띄우기
+        if(!confirm(type + ' 처리 하시겠습니까? \n(한 번 기록되면 수정할 수 없습니다.)')) {
+            return;
+        }
     }
-    </script>
-</body>
-</html>
+
+    // 서버로 데이터 전송
+    fetch('/attendance/clock_out', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            record_id: recordId,
+            type: type,
+            reason: reasonText
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            alert(data.message);
+            location.reload(); // 성공 시 페이지 새로고침
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+</script>
+{% endblock %}
