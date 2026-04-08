@@ -9,3 +9,4 @@ pdfkit
 yagmail
 hashids
 holidays>=0.45,<1.0
+cryptography
