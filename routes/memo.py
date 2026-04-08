@@ -1,5 +1,4 @@
 from flask import Blueprint, render_template, jsonify, session, request, send_file
-from werkzeug.utils import secure_filename
 import os
 import uuid
 import io
@@ -73,9 +72,8 @@ def memo_add_postit():
     conn = get_db()
     cursor = conn.cursor()
     
-    # [핵심 수정] 현재 화이트보드에서 가장 높은 z-index 값 찾기
+    # 현재 화이트보드에서 가장 높은 z-index 값 찾기
     row = cursor.execute("SELECT MAX(z_index) as max_z FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchone()
-    # 데이터가 없으면 기본값 99에서 시작하여 +1 (즉, 100부터 시작)
     new_z = (row['max_z'] if row and row['max_z'] is not None else 99) + 1
     
     cursor.execute('''
@@ -98,9 +96,11 @@ def memo_upload_file():
     if not file or not file.filename:
         return jsonify({"status": "error", "message": "첨부된 파일이 없습니다."}), 400
         
-    original_filename = secure_filename(file.filename)
+    # [원인 해결 핵심] 한글 파일명이 지워지는 secure_filename 대신, 
+    # 슬래시(/, \)만 안전하게 제거하여 한글 원본 이름을 100% 보존합니다.
+    original_filename = file.filename.replace('/', '').replace('\\', '')
     
-    # [보안] 2. 파일명 겹침 방지 (UUID 사용)
+    # 파일명 겹침 방지 (UUID 사용)
     unique_id = uuid.uuid4().hex
     saved_filename = f"{unique_id}_{original_filename}.enc" # 암호화 명시
     
@@ -110,7 +110,7 @@ def memo_upload_file():
     # memoup 폴더로 단일화 저장 경로
     filepath = os.path.join(UPLOAD_FOLDER, saved_filename)
     
-    # [보안] 3. 파일 내용 암호화 및 물리적 저장
+    # 파일 내용 암호화 및 물리적 저장
     file_data = file.read()
     encrypted_data = cipher_suite.encrypt(file_data)
     
@@ -120,11 +120,11 @@ def memo_upload_file():
     conn = get_db()
     cursor = conn.cursor()
     
-    # [핵심 수정] 첨부파일 추가 시에도 가장 높은 z-index 적용
+    # 첨부파일 추가 시에도 가장 높은 z-index 적용
     row = cursor.execute("SELECT MAX(z_index) as max_z FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchone()
     new_z = (row['max_z'] if row and row['max_z'] is not None else 99) + 1
     
-    # content: 화면 표시 및 다운로드 복구용 원본 파일명
+    # content: 화면 표시 및 다운로드 복구용 한글 원본 파일명
     # filepath: 서버에 실제 저장된 암호화 고유 파일명
     cursor.execute('''
         INSERT INTO whiteboard_memos (owner, type, content, filepath, pos_x, pos_y, z_index) 
@@ -138,7 +138,6 @@ def memo_upload_file():
     return jsonify({"status": "success", "id": memo_id, "type": memo_type, "filename": original_filename})
 
 
-# [보안] 4. 프론트엔드 이미지/파일 제공용 복호화 라우트 (원본 파일명 복구 기능 포함)
 @memo_bp.route('/file/<filename>')
 def serve_secure_file(filename):
     current_user = session.get('user_name')
