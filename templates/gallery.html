@@ -6,26 +6,24 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
 
 <style>
-    /* 상단 업로드 섹션 스타일 (Dropzone 적용) */
+    /* 상단 업로드 섹션 스타일 */
     .upload-section {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-radius: 15px;
-        padding: 30px;
+        padding: 25px 30px;
         margin-bottom: 30px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         border: 1px solid #dee2e6;
     }
     
+    /* 토글 아이콘 전환 애니메이션 */
+    .toggle-icon { transition: transform 0.3s ease; }
+    .toggle-icon.open { transform: rotate(180deg); color: #0d6efd; }
+
     .dropzone {
-        background: white;
-        border: 2px dashed #0d6efd;
-        border-radius: 10px;
-        min-height: 150px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: background 0.3s ease;
+        background: white; border: 2px dashed #0d6efd; border-radius: 10px;
+        min-height: 150px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: background 0.3s ease;
     }
     .dropzone:hover { background: #f1f7ff; }
 
@@ -38,82 +36,81 @@
 
     /* 갤러리 아이템 */
     .gallery-item {
-        position: relative;
-        aspect-ratio: 1 / 1;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        position: relative; aspect-ratio: 1 / 1; border-radius: 12px;
+        overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         background-color: #f1f1f1;
     }
 
     .gallery-item img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: transform 0.4s ease;
+        width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease;
     }
     .gallery-item:hover img { transform: scale(1.08); }
 
-    /* 커스텀 체크박스 */
+    /* [수정] 평소엔 투명하다가 호버 시, 혹은 체크되었을 때만 보이는 체크박스 */
     .photo-checkbox {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        width: 22px;
-        height: 22px;
-        cursor: pointer;
-        z-index: 10;
-        accent-color: #0d6efd;
-        box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        position: absolute; top: 12px; left: 12px;
+        width: 20px; height: 20px; cursor: pointer; z-index: 10;
+        accent-color: #0d6efd; transform: scale(1.2);
+        opacity: 0; transition: opacity 0.2s ease-in-out;
+    }
+    .gallery-item:hover .photo-checkbox,
+    .photo-checkbox:checked {
+        opacity: 1;
     }
 
-    /* 하단 오버레이 (제목 및 삭제 버튼) */
+    /* 하단 오버레이 */
     .item-overlay {
-        position: absolute;
-        bottom: 0; left: 0; right: 0;
+        position: absolute; bottom: 0; left: 0; right: 0;
         background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
-        padding: 20px 10px 10px 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        z-index: 2;
+        padding: 20px 10px 10px 10px; display: flex; justify-content: space-between; align-items: center;
+        opacity: 0; transition: opacity 0.3s ease; z-index: 2;
     }
     .gallery-item:hover .item-overlay { opacity: 1; }
     .item-title { color: white; font-size: 0.85rem; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .btn-delete { color: #ff4d4d; background: none; border: none; cursor: pointer; font-size: 1rem; }
     .btn-delete:hover { color: #ff1a1a; }
 
-    /* --- 슬라이드쇼 모달 스타일 --- */
+    /* --- [수정] 슬라이드쇼 모달창 (세련된 프레임 스타일) --- */
     #slideshowModal {
-        position: fixed;
-        top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.95);
-        z-index: 9999;
-        display: none;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.85); z-index: 9999;
+        display: none; justify-content: center; align-items: center;
     }
-    .slideshow-img {
-        max-width: 90vw;
-        max-height: 80vh;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-        transition: all 0.5s ease-in-out;
-        opacity: 0; /* 초기 투명도 */
+    
+    .slideshow-content-wrapper {
+        background: #ffffff; border-radius: 12px;
+        border-top: 6px solid #0d6efd; /* 예쁜 상단 테두리 */
+        box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        width: 90vw; max-width: 800px;
+        display: flex; flex-direction: column; overflow: hidden;
     }
-    .slideshow-title {
-        color: white; margin-top: 20px; font-size: 1.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+
+    .slideshow-header {
+        padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+        background: #f8f9fa; border-bottom: 1px solid #e9ecef;
     }
+    
+    .slideshow-header h4 { margin: 0; font-size: 1.1rem; color: #333; font-weight: bold; }
+    
     .btn-close-slideshow {
-        position: absolute; top: 20px; right: 30px;
-        background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; transition: color 0.2s;
+        background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; transition: color 0.2s;
     }
     .btn-close-slideshow:hover { color: #ff4d4d; }
 
-    /* 슬라이드쇼 애니메이션 효과 (JS 연동) */
+    .slideshow-body {
+        padding: 20px; text-align: center; background: #222; 
+        min-height: 450px; display: flex; align-items: center; justify-content: center;
+        position: relative;
+    }
+
+    /* 슬라이드쇼 애니메이션 효과 (잔상 버그 해결) */
+    .slideshow-img {
+        max-width: 100%; max-height: 60vh; border-radius: 6px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        transition: opacity 0.4s ease, transform 0.4s ease;
+        opacity: 0; /* 기본적으로 투명상태에서 시작 */
+        transform: scale(0.95);
+    }
     .effect-active { opacity: 1 !important; transform: scale(1) translateX(0) !important; }
     .effect-hide-fade { opacity: 0; }
     .effect-hide-zoom { opacity: 0; transform: scale(0.6); }
@@ -123,23 +120,32 @@
 <div class="container-fluid mt-4 px-4">
     
     <div class="upload-section">
-        <h3 class="mb-2"><i class="fas fa-images text-primary"></i> 개인 미디어 갤러리</h3>
-        <p class="text-muted small mb-3">여러 장의 사진을 드래그해서 한 번에 올리세요! (동영상 제외)</p>
-        
-        <form action="{{ url_for('gallery.upload') }}" class="dropzone" id="galleryDropzone">
-            <div class="dz-message" data-dz-message>
-                <i class="fas fa-cloud-upload-alt fa-3x mb-2 text-primary"></i><br>
-                <span>여기로 사진을 드래그하거나 클릭하여 업로드하세요.</span>
+        <div class="d-flex justify-content-between align-items-center" id="btnToggleUpload" style="cursor: pointer;">
+            <div>
+                <h3 class="mb-1"><i class="fas fa-camera-retro text-primary"></i> 개인 미디어 갤러리</h3>
+                <p class="text-muted small mb-0">사진을 올리시려면 여기를 클릭하여 창을 펼쳐주세요.</p>
             </div>
-        </form>
+            <div>
+                <i class="fas fa-chevron-down fa-2x text-muted toggle-icon" id="uploadToggleIcon"></i>
+            </div>
+        </div>
+        
+        <div id="uploadContent" style="display: none; margin-top: 25px; border-top: 1px solid #dee2e6; padding-top: 25px;">
+            <form action="{{ url_for('gallery.upload') }}" class="dropzone" id="galleryDropzone">
+                <div class="dz-message" data-dz-message>
+                    <i class="fas fa-cloud-upload-alt fa-3x mb-2 text-primary"></i><br>
+                    <span>여기로 사진을 드래그하거나 클릭하여 업로드하세요.</span>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <button id="btnSelectAll" class="btn btn-sm btn-outline-primary"><i class="fas fa-check-double"></i> 전체 선택</button>
-            <button id="btnPlaySlideshow" class="btn btn-sm btn-success ms-2"><i class="fas fa-play"></i> 선택된 사진 슬라이드쇼 (2초)</button>
+            <button id="btnPlaySlideshow" class="btn btn-sm btn-success ms-2"><i class="fas fa-play"></i> 선택된 사진 슬라이드쇼</button>
         </div>
-        <span class="text-muted small">사진을 클릭하면 확대해서 볼 수 있습니다.</span>
+        <span class="text-muted small">썸네일에 마우스를 올리면 선택 상자가 나타납니다.</span>
     </div>
 
     {% if files %}
@@ -176,16 +182,22 @@
 </div>
 
 <div id="slideshowModal">
-    <button id="btnCloseSlideshow" class="btn-close-slideshow"><i class="fas fa-times"></i></button>
-    <img id="slideshowImg" src="" class="slideshow-img">
-    <div id="slideshowTitle" class="slideshow-title"></div>
+    <div class="slideshow-content-wrapper">
+        <div class="slideshow-header">
+            <h4 id="slideshowTitle">슬라이드쇼</h4>
+            <button id="btnCloseSlideshow" class="btn-close-slideshow"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="slideshow-body">
+            <img id="slideshowImg" src="" class="slideshow-img">
+        </div>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/js/glightbox.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.js"></script>
 
 <script>
-    // 1. GLightbox 초기화 (기존 뷰어)
+    // 1. GLightbox 초기화
     const lightbox = GLightbox({
         selector: '.glightbox',
         touchNavigation: true,
@@ -193,33 +205,44 @@
         width: '90vw'
     });
 
-    // 2. Dropzone.js 설정 (다중 드래그앤드롭 업로드)
+    // 2. Dropzone.js 설정
     Dropzone.options.galleryDropzone = {
         paramName: "file",
-        maxFilesize: 20, // 최대 20MB
-        acceptedFiles: "image/*", // 이미지만 허용
+        maxFilesize: 20,
+        acceptedFiles: "image/*",
         init: function() {
             this.on("queuecomplete", function(file) {
-                // 업로드가 모두 끝나면 1초 뒤 페이지 새로고침
                 setTimeout(() => { window.location.reload(); }, 1000);
             });
         }
     };
 
-    // 3. 슬라이드쇼 로직 (체크박스 기반 랜덤 트랜지션)
+    // 3. 업로드 창 접기/펴기 토글 로직
+    document.getElementById('btnToggleUpload').addEventListener('click', function() {
+        const content = document.getElementById('uploadContent');
+        const icon = document.getElementById('uploadToggleIcon');
+        
+        if(content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.classList.add('open');
+        } else {
+            content.style.display = 'none';
+            icon.classList.remove('open');
+        }
+    });
+
+    // 4. 슬라이드쇼 로직 (글리치 현상 완벽 해결)
     let slideInterval;
     let slideImages = [];
     let currentIndex = 0;
     const hideEffects = ['effect-hide-fade', 'effect-hide-zoom', 'effect-hide-slide'];
 
-    // 전체 선택/해제 토글
     document.getElementById('btnSelectAll').addEventListener('click', function() {
         const checkboxes = document.querySelectorAll('.photo-checkbox');
         const allChecked = Array.from(checkboxes).every(cb => cb.checked);
         checkboxes.forEach(cb => cb.checked = !allChecked);
     });
 
-    // 슬라이드쇼 시작
     document.getElementById('btnPlaySlideshow').addEventListener('click', function() {
         const checkedBoxes = document.querySelectorAll('.photo-checkbox:checked');
         if(checkedBoxes.length === 0) {
@@ -227,7 +250,6 @@
             return;
         }
 
-        // 선택된 데이터 배열에 담기
         slideImages = Array.from(checkedBoxes).map(cb => ({
             src: cb.value,
             title: cb.getAttribute('data-title')
@@ -236,14 +258,15 @@
         currentIndex = 0;
         document.getElementById('slideshowModal').style.display = 'flex';
         
-        showSlide(); // 첫 장 보여주기
-        slideInterval = setInterval(nextSlide, 2000); // 2초 간격 재생
+        showSlide(); 
+        slideInterval = setInterval(nextSlide, 2500); // 완전한 전환을 위해 2.5초 간격 권장
     });
 
-    // 슬라이드쇼 닫기
     document.getElementById('btnCloseSlideshow').addEventListener('click', function() {
         document.getElementById('slideshowModal').style.display = 'none';
         clearInterval(slideInterval);
+        const img = document.getElementById('slideshowImg');
+        img.className = 'slideshow-img'; // 클래스 초기화
     });
 
     function nextSlide() {
@@ -255,21 +278,20 @@
         const img = document.getElementById('slideshowImg');
         const title = document.getElementById('slideshowTitle');
 
-        // 랜덤 퇴장 효과 부여
-        img.className = 'slideshow-img';
-        img.classList.add(hideEffects[Math.floor(Math.random() * hideEffects.length)]);
+        // [핵심] 1. 기존 사진을 투명하게 만듦 (퇴장)
+        img.className = 'slideshow-img ' + hideEffects[Math.floor(Math.random() * hideEffects.length)];
 
-        // 0.5초(퇴장 애니메이션 시간) 후 사진 교체 및 등장
+        // 2. 0.4초(투명해지는 시간) 대기 후, 눈에 보이지 않을 때 사진 소스 교체
         setTimeout(() => {
             img.src = slideImages[currentIndex].src;
             title.innerText = slideImages[currentIndex].title;
             
-            // DOM 강제 렌더링 트리거
-            void img.offsetWidth;
-            
-            // 활성화 클래스 추가하여 화면에 표시
-            img.className = 'slideshow-img effect-active';
-        }, 500); 
+            // 3. 새 사진이 완전히 로드된 후에 페이드인 (등장)
+            img.onload = function() {
+                void img.offsetWidth; // DOM 렌더링 강제 업데이트
+                img.className = 'slideshow-img effect-active';
+            };
+        }, 400); 
     }
 </script>
 
