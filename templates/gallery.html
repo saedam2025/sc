@@ -72,38 +72,6 @@
     .tab-title[contenteditable="true"]:focus { 
         border-bottom: 2px dashed #c9184a; background: #ffe5ec; padding: 2px 8px; border-radius: 6px; 
     }
-    
-    /* =========================================
-       ❌ [수정 완료] 탭 삭제 버튼 강제 고정
-       ========================================= */
-    .tab-delete-form {
-        position: absolute !important;
-        right: 8px !important;
-        top: 50% !important;
-        transform: translateY(-50%) !important;
-        z-index: 99 !important;
-    }
-    .btn-delete-tab { 
-        width: 22px !important;
-        height: 22px !important;
-        border-radius: 50% !important;
-        background-color: #ffffff !important;
-        color: #ff4d4d !important;
-        border: 1px solid #ffb3c6 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        font-size: 0.8rem !important;
-        cursor: pointer !important;
-        opacity: 1 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-        transition: all 0.2s ease !important;
-    }
-    .btn-delete-tab:hover { 
-        background-color: #ff4d4d !important;
-        color: #ffffff !important;
-        transform: scale(1.1) !important; 
-    }
 
     /* =========================================
        2. 🎀 메인 갤러리 본문 (모달창 귀여운 테마 적용)
@@ -179,6 +147,10 @@
     .btn-play-cute { background: linear-gradient(135deg, #ffafcc, #ffc8dd); color: #800f2f; }
     .btn-play-cute:hover { filter: brightness(1.05); }
 
+    /* 하단 탭 삭제 버튼 전용 스타일 */
+    .btn-delete-cute { background: #ffffff; color: #ff4d4d; border: 2px solid #ffb3c6; }
+    .btn-delete-cute:hover { background: #ff4d4d; color: #ffffff; border-color: #ff4d4d; }
+
     /* 드롭존 (귀여운 점선 박스) */
     .dropzone-wrapper { display: none; margin-top: 15px; }
     .dropzone {
@@ -189,30 +161,30 @@
     .dropzone:hover { background: #fff0f3; border-color: #ff758f; }
 
     /* =========================================
-       5. 🌸 슬라이드쇼 모달창 (원본 비율 자동조절 유지)
+       5. 🌸 모달창 공통 스타일 (슬라이드쇼 & 삭제 확인)
        ========================================= */
-    #slideshowModal {
+    .modal-overlay {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.8); z-index: 9999;
+        background: rgba(0,0,0,0.6); z-index: 9999;
         display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px);
     }
     
-    .slideshow-content-wrapper {
+    .modal-content-wrapper {
         background: #fff0f3; border-radius: 24px; border: 4px solid #ffc8dd;
         box-shadow: 0 20px 50px rgba(0,0,0,0.3); display: inline-flex; flex-direction: column; overflow: hidden;
-        max-width: 95vw; max-height: 95vh;
     }
 
+    /* 슬라이드쇼 특화 */
+    .slideshow-content { max-width: 95vw; max-height: 95vh; }
     .slideshow-header {
         padding: 15px 25px; display: flex; justify-content: space-between; align-items: center;
         background: #ffffff; border-bottom: 2px dashed #ffc8dd;
     }
     .slideshow-header h4 { margin: 0; font-size: 1.1rem; color: #ff8fab; font-weight: 800; }
-    .btn-close-slideshow { background: none; border: none; color: #ffb3c6; font-size: 1.8rem; cursor: pointer; transition: all 0.3s; }
-    .btn-close-slideshow:hover { color: #ff758f; transform: rotate(90deg); }
+    .btn-close-modal { background: none; border: none; color: #ffb3c6; font-size: 1.8rem; cursor: pointer; transition: all 0.3s; }
+    .btn-close-modal:hover { color: #ff758f; transform: rotate(90deg); }
 
     .slideshow-body { padding: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff0f3; }
-
     .slideshow-img {
         max-width: 95vw; max-height: calc(95vh - 85px); 
         width: auto; height: auto; object-fit: contain; border-radius: 12px;
@@ -224,6 +196,11 @@
     .effect-hide-fade { opacity: 0; }
     .effect-hide-zoom { opacity: 0; transform: scale(0.6); }
     .effect-hide-slide { opacity: 0; transform: translateX(100px); }
+
+    /* 탭 삭제 경고창 특화 */
+    .delete-confirm-content { padding: 40px 30px; text-align: center; max-width: 400px; background: #ffffff; }
+    .delete-confirm-icon { font-size: 3rem; color: #ff4d4d; margin-bottom: 15px; animation: bounce 2s infinite; }
+    @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px); } 60% { transform: translateY(-7px); } }
 </style>
 
 <div class="container-fluid mt-4 px-4">
@@ -233,9 +210,8 @@
             {% for tab in tabs %}
             <li class="nav-item position-relative">
                 <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
-                   href="{{ url_for('gallery.index', tab_id=tab.id) }}"
-                   style="padding-right: {% if tab.id != 1 %}40px{% else %}25px{% endif %};">
-                    
+                   href="{{ url_for('gallery.index', tab_id=tab.id) }}">
+                   
                     <span class="tab-title" data-id="{{ tab.id }}" 
                           {% if tab.id == active_tab_id %}
                           contenteditable="true" 
@@ -254,14 +230,6 @@
                            title="이름 수정"></i>
                     {% endif %}
                 </a>
-                
-                {% if tab.id != 1 %}
-                <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="tab-delete-form" onsubmit="return confirm('이 탭을 지우시겠어요? 🥺 (사진은 기본 갤러리로 안전하게 이동됩니다)');">
-                    <button type="submit" class="btn-delete-tab" title="탭 삭제">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </form>
-                {% endif %}
             </li>
             {% endfor %}
             
@@ -317,6 +285,12 @@
             </div>
             
             <div class="d-flex gap-2">
+                {% if active_tab_id != 1 %}
+                <button id="btnDeleteTabOpen" class="btn-cute btn-delete-cute">
+                    <i class="fas fa-trash-alt"></i> 현재 탭 지우기
+                </button>
+                {% endif %}
+
                 <button id="btnSelectAll" class="btn-cute btn-select-cute">
                     <i class="fas fa-check-square"></i> 전체 선택
                 </button>
@@ -338,15 +312,37 @@
     </div>
 </div>
 
-<div id="slideshowModal">
-    <div class="slideshow-content-wrapper">
+<div id="slideshowModal" class="modal-overlay">
+    <div class="modal-content-wrapper slideshow-content">
         <div class="slideshow-header">
             <h4 id="slideshowTitle"><i class="fas fa-star" style="color: #ffc8dd;"></i> 갤러리 감상</h4>
-            <button id="btnCloseSlideshow" class="btn-close-slideshow"><i class="fas fa-times"></i></button>
+            <button id="btnCloseSlideshow" class="btn-close-modal"><i class="fas fa-times"></i></button>
         </div>
         <div class="slideshow-body">
             <img id="slideshowImg" src="" class="slideshow-img">
         </div>
+    </div>
+</div>
+
+<div id="deleteTabModal" class="modal-overlay">
+    <div class="modal-content-wrapper delete-confirm-content">
+        <div class="delete-confirm-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h4 style="color:#c9184a; font-weight:900; margin-bottom:15px;">정말 탭을 지우시겠어요?</h4>
+        <p style="color:#ff758f; margin-bottom:30px; font-size:0.95rem;">
+            탭과 함께 <strong>안에 있는 모든 사진</strong>도<br>영구적으로 삭제됩니다! 🥺
+        </p>
+        
+        <form action="{{ url_for('gallery.delete_tab', tab_id=active_tab_id) }}" method="post">
+            <input type="hidden" name="delete_all_files" value="true">
+            <div class="d-flex justify-content-center gap-3">
+                <button type="button" id="btnCancelDelete" class="btn-cute btn-select-cute">앗, 취소할래요</button>
+                <button type="submit" class="btn-cute" style="background:#ff4d4d; color:white; border:none; box-shadow:0 4px 10px rgba(255, 77, 77, 0.3);">
+                    네, 다 지워주세요 🗑️
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -482,6 +478,23 @@
                 img.className = 'slideshow-img effect-active';
             };
         }, 400); 
+    }
+
+    // 6. 🚨 탭 삭제 모달 제어 로직
+    const btnDeleteTabOpen = document.getElementById('btnDeleteTabOpen');
+    const deleteTabModal = document.getElementById('deleteTabModal');
+    const btnCancelDelete = document.getElementById('btnCancelDelete');
+
+    if (btnDeleteTabOpen) {
+        btnDeleteTabOpen.addEventListener('click', function() {
+            deleteTabModal.style.display = 'flex';
+        });
+    }
+
+    if (btnCancelDelete) {
+        btnCancelDelete.addEventListener('click', function() {
+            deleteTabModal.style.display = 'none';
+        });
     }
 </script>
 {% endblock %}
