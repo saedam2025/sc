@@ -192,6 +192,77 @@
     .theme-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); border: 1px solid var(--card-border); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 1000; box-shadow: var(--card-shadow); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
     .theme-btn:hover { background: var(--widget-hover); transform: translateY(-2px); }
 
+    /* =========================================================
+       새로운 [나의 업무 알림] 카드형 위젯 전용 스타일 (전체 테마 연동)
+       ========================================================= */
+    .noti-widget-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: 100%;
+        box-sizing: border-box;
+    }
+    
+    .noti-card-item {
+        background: var(--widget-bg) !important;
+        border: 1px solid var(--widget-border) !important;
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--text-dark) !important;
+        transition: all 0.3s ease;
+    }
+    
+    .noti-card-item:hover {
+        background: var(--widget-hover) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    
+    .noti-card-long {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 15px 25px;
+    }
+    
+    .noti-card-title {
+        font-size: 0.85rem;
+        color: var(--text-gray);
+        font-weight: 700;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .noti-card-long .noti-card-title {
+        margin-bottom: 0;
+    }
+    
+    .noti-card-value {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--text-dark);
+    }
+    
+    .noti-count-red { color: #e74c3c; } /* 경고/대기 건수 컬러 */
+    .noti-count-blue { color: var(--primary-color); } /* 일반 건수 컬러 (테마 연동) */
+
+    .noti-grid-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        flex: 1;
+    }
+    
+    @media (max-width: 1300px) {
+        .noti-grid-container { grid-template-columns: repeat(2, 1fr); }
+    }
 </style>
 
 <div id="bg-effect-container"></div>
@@ -347,7 +418,7 @@
             </div>
         </div>
 
-        <div class="col-noti glass-box" style="flex: 5; height: 350px; display: flex; flex-direction: column; overflow-y: auto;">
+        <div class="col-noti glass-box" style="flex: 5; height: 350px; display: flex; flex-direction: column;">
             <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
                 <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
                     <i class="fa-solid fa-bell"></i> 나의 업무 알림
@@ -357,9 +428,60 @@
                 </button>
             </div>
             
-            <div id="notification-widget-area" style="flex: 1;">
-                <div style="text-align: center; padding: 30px 0; color: var(--text-gray); font-size: 0.9rem;">
-                    알림 데이터를 불러오는 중입니다...
+            <div id="notification-widget-area" class="noti-widget-wrapper">
+                
+                <a href="/approval" class="noti-card-item noti-card-long">
+                    <div class="noti-card-title">
+                        <i class="fa-solid fa-file-signature" style="color: var(--primary-color);"></i> 사내결재 대기현황
+                    </div>
+                    <div style="display: flex; gap: 20px;">
+                        <div class="noti-card-value">
+                            연차 신청서 <span class="noti-count-red">{{ noti_data.approval_vacation | default(2) }}</span>건
+                        </div>
+                        <div class="noti-card-value">
+                            기안서 <span class="noti-count-red">{{ noti_data.approval_draft | default(1) }}</span>건
+                        </div>
+                    </div>
+                </a>
+
+                <div class="noti-grid-container">
+                    
+                    <a href="/document" class="noti-card-item">
+                        <div class="noti-card-title">
+                            <i class="fa-solid fa-id-card" style="color: var(--primary-color);"></i> 증명서발급
+                        </div>
+                        <div class="noti-card-value">
+                            대기 <span class="noti-count-red">{{ noti_data.cert_wait | default(4) }}</span>건
+                        </div>
+                    </a>
+                    
+                    <a href="/contract" class="noti-card-item">
+                        <div class="noti-card-title">
+                            <i class="fa-solid fa-file-contract" style="color: var(--primary-color);"></i> 전자계약
+                        </div>
+                        <div class="noti-card-value">
+                            미계약 <span class="noti-count-red">{{ noti_data.contract_miss | default(3) }}</span>건
+                        </div>
+                    </a>
+                    
+                    <a href="/board" class="noti-card-item">
+                        <div class="noti-card-title">
+                            <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color);"></i> 사내 게시판
+                        </div>
+                        <div class="noti-card-value">
+                            신규 <span class="noti-count-blue">{{ noti_data.board_new | default(1) }}</span>건
+                        </div>
+                    </a>
+                    
+                    <a href="javascript:void(0)" onclick="document.getElementById('msgModal').style.display='block'" class="noti-card-item">
+                        <div class="noti-card-title">
+                            <i class="fa-solid fa-envelope" style="color: var(--primary-color);"></i> 시스템/쪽지
+                        </div>
+                        <div class="noti-card-value">
+                            신규 <span class="noti-count-blue">{{ noti_data.message_new | default(5) }}</span>건
+                        </div>
+                    </a>
+                    
                 </div>
             </div>
         </div>
@@ -598,6 +720,7 @@
     // === 알림 위젯 불러오기 (비동기 처리) ===
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
+        if (!widgetArea) return; // 안전 장치 추가
         
         fetch('/widget/notifications')
             .then(response => {
