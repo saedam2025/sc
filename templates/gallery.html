@@ -71,11 +71,11 @@
         border-bottom: 2px dashed #c9184a; background: #ffe5ec; padding: 2px 8px; border-radius: 6px; 
     }
     
-    /* [수정] 삭제 버튼 (모든 탭에서 항상 보이도록 설정, 클릭 오류 방지 z-index) */
+    /* 삭제 버튼 (항상 보이도록 투명도 1 고정) */
     .btn-delete-tab { 
-        position: absolute; right: 8px; top: 12px; font-size: 0.9rem; 
-        color: #ff8fab; background: none; border: none; opacity: 1; transition: all 0.2s;
-        z-index: 10; 
+        position: absolute; right: 10px; top: 14px; font-size: 0.9rem; 
+        color: #ff8fab; background: none; border: none; opacity: 1; transition: all 0.2s; 
+        z-index: 10;
     }
     .btn-delete-tab:hover { color: #ff4d4d; transform: scale(1.2); }
 
@@ -219,7 +219,7 @@
                         {{ tab.name }}
                     </span>
                     
-                    <span class="photo-count-badge" title="사진 개수">{{ tab.photo_count | default(0) }}</span>
+                    <span class="photo-count-badge" title="사진 개수">{{ tab.photo_count }}</span>
                     
                     {% if tab.id == active_tab_id %}
                         <i class="fas fa-pencil-alt ms-1 text-muted" 
