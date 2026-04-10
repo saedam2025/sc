@@ -73,14 +73,37 @@
         border-bottom: 2px dashed #c9184a; background: #ffe5ec; padding: 2px 8px; border-radius: 6px; 
     }
     
-    /* ❌ 삭제 버튼 (항상 보이도록 설정 및 아이콘 오류 완벽 수정) */
-    .btn-delete-tab { 
-        position: absolute; right: 10px; top: 14px; font-size: 1rem; 
-        color: #ff4d4d; /* 뚜렷한 빨간색으로 변경 */
-        background: none; border: none; opacity: 1; transition: all 0.2s; 
-        z-index: 10; cursor: pointer; padding: 0 5px;
+    /* =========================================
+       ❌ [수정 완료] 탭 삭제 버튼 강제 고정
+       ========================================= */
+    .tab-delete-form {
+        position: absolute !important;
+        right: 8px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        z-index: 99 !important;
     }
-    .btn-delete-tab:hover { color: #c9184a; transform: scale(1.3); }
+    .btn-delete-tab { 
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 50% !important;
+        background-color: #ffffff !important;
+        color: #ff4d4d !important;
+        border: 1px solid #ffb3c6 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0.8rem !important;
+        cursor: pointer !important;
+        opacity: 1 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+        transition: all 0.2s ease !important;
+    }
+    .btn-delete-tab:hover { 
+        background-color: #ff4d4d !important;
+        color: #ffffff !important;
+        transform: scale(1.1) !important; 
+    }
 
     /* =========================================
        2. 🎀 메인 갤러리 본문 (모달창 귀여운 테마 적용)
@@ -211,7 +234,7 @@
             <li class="nav-item position-relative">
                 <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
                    href="{{ url_for('gallery.index', tab_id=tab.id) }}"
-                   style="padding-right: {% if tab.id != 1 %}45px{% else %}25px{% endif %};">
+                   style="padding-right: {% if tab.id != 1 %}40px{% else %}25px{% endif %};">
                     
                     <span class="tab-title" data-id="{{ tab.id }}" 
                           {% if tab.id == active_tab_id %}
@@ -233,7 +256,7 @@
                 </a>
                 
                 {% if tab.id != 1 %}
-                <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="d-inline" onsubmit="return confirm('이 탭을 지우시겠어요? 🥺 (사진은 기본 갤러리로 안전하게 이동됩니다)');">
+                <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="tab-delete-form" onsubmit="return confirm('이 탭을 지우시겠어요? 🥺 (사진은 기본 갤러리로 안전하게 이동됩니다)');">
                     <button type="submit" class="btn-delete-tab" title="탭 삭제">
                         <i class="fas fa-times"></i>
                     </button>
