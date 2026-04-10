@@ -16,7 +16,7 @@ def get_db():
 def init_db():
     """테이블 초기화 및 필수 폴더 생성"""
     
-    # [추가] 갤러리 관련 필수 폴더 생성
+    # 갤러리 관련 필수 폴더 생성
     os.makedirs(GALLERY_UPLOADS, exist_ok=True)
     os.makedirs(GALLERY_THUMBS, exist_ok=True)
     
@@ -87,20 +87,31 @@ def init_db():
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
-    # 7. [수정 확인] 개인 갤러리 테이블
+    # 7. 개인 갤러리 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS gallery (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         filename TEXT NOT NULL,
         thumb_name TEXT NOT NULL,
         file_type TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        tab_id INTEGER DEFAULT 1
     )''')
+
+    # 8. [신규 추가] 갤러리 탭 (카테고리) 테이블
+    c.execute('''CREATE TABLE IF NOT EXISTS gallery_tabs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL
+    )''')
+    
+    # 기본 탭이 없으면 자동 생성
+    tabs_count = c.execute("SELECT count(*) FROM gallery_tabs").fetchone()[0]
+    if tabs_count == 0:
+        c.execute("INSERT INTO gallery_tabs (id, name) VALUES (1, '기본 갤러리')")
 
     # ---------------------------------------------------------
     # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가
     # ---------------------------------------------------------
-    
     try:
         c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         c.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
@@ -116,6 +127,11 @@ def init_db():
 
     try:
         c.execute("ALTER TABLE daily_attendance ADD COLUMN position TEXT")
+    except sqlite3.OperationalError: pass
+
+    # 기존 갤러리에 탭 속성(tab_id) 추가
+    try:
+        c.execute("ALTER TABLE gallery ADD COLUMN tab_id INTEGER DEFAULT 1")
     except sqlite3.OperationalError: pass
     
     conn.commit()
