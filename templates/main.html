@@ -347,35 +347,23 @@
             </div>
         </div>
 
-        <div class="col-memo glass-box" style="flex: 5; height: 350px; display: flex; flex-direction: column;">
+        <div class="col-noti glass-box" style="flex: 5; height: 350px; display: flex; flex-direction: column; overflow-y: auto;">
             <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: #27ae60 !important;">
-                    <i class="fa-solid fa-note-sticky"></i> 내 메모장
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
+                    <i class="fa-solid fa-bell"></i> 나의 업무 알림
                 </h3>
-                <button class="btn-primary" onclick="savePersonalMemo(this)" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;">
-                    <i class="fa-solid fa-save"></i> 저장
+                <button class="btn-primary" onclick="loadNotificationWidget()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;">
+                    <i class="fa-solid fa-rotate-right"></i> 새로고침
                 </button>
             </div>
             
-            <textarea id="personalMemoContent" style="flex: 1; resize: none; margin-bottom: 10px; padding: 15px; border-radius: 12px; background: var(--input-bg); border: 1px solid var(--card-border); color: var(--input-text); font-family: inherit; font-size: 0.95rem; line-height: 1.6; outline: none; transition: box-shadow 0.3s;" placeholder="오늘 해야 할 일이나 아이디어를 적어보세요! DB에 안전하게 저장됩니다.">{{ my_memo.content if my_memo else '' }}</textarea>
-            
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 5px 0;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <label for="memoFile" style="cursor:pointer; color:var(--primary-color); font-size:1.2rem;" title="파일/사진 첨부">
-                        <i class="fa-solid fa-paperclip"></i>
-                    </label>
-                    <input type="file" id="memoFile" style="display:none;" onchange="document.getElementById('memoFileName').innerText = this.files[0].name;">
-                    <span id="memoFileName" style="font-size: 0.8rem; color: var(--text-gray);">그림이나 파일을 첨부할 수 있습니다.</span>
+            <div id="notification-widget-area" style="flex: 1;">
+                <div style="text-align: center; padding: 30px 0; color: var(--text-gray); font-size: 0.9rem;">
+                    알림 데이터를 불러오는 중입니다...
                 </div>
-                
-                {% if my_memo and my_memo.filename %}
-                <div style="font-size: 0.85rem;">
-                    <i class="fa-solid fa-file-arrow-down" style="color: var(--primary-color);"></i> 
-                    <a href="/uploads/{{ my_memo.filename }}" target="_blank" style="color: var(--text-dark); text-decoration: none; font-weight: bold;">{{ my_memo.filename }}</a>
-                </div>
-                {% endif %}
             </div>
         </div>
+        
     </div>
 </div>
 
@@ -607,50 +595,31 @@
         }, 300); 
     }
 
-    // === 개인 전용 메모장 저장 통신 (DB & 파일) ===
-    async function savePersonalMemo(btn) {
-        const content = document.getElementById('personalMemoContent').value;
-        const fileInput = document.getElementById('memoFile');
+    // === 알림 위젯 불러오기 (비동기 처리) ===
+    function loadNotificationWidget() {
+        const widgetArea = document.getElementById('notification-widget-area');
         
-        let formData = new FormData();
-        formData.append('content', content);
-        if(fileInput.files.length > 0) {
-            formData.append('file', fileInput.files[0]);
-        }
-
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 저장중';
-
-        try {
-            // 백엔드의 /save_my_memo 라우트와 연결 (app.py에 해당 기능 추가 필요)
-            const res = await fetch('/save_my_memo', { method: 'POST', body: formData });
-            if(res.ok) { 
-                alert("메모가 안전하게 저장되었습니다.");
-                location.reload(); 
-            } else {
-                alert("저장 중 오류가 발생했습니다.");
-            }
-        } catch (e) { 
-            alert("서버 통신 오류가 발생했습니다."); 
-        } finally {
-            btn.innerHTML = originalHTML;
-        }
+        fetch('/widget/notifications')
+            .then(response => {
+                if (!response.ok) throw new Error('네트워크 응답이 정상이 아닙니다.');
+                return response.text();
+            })
+            .then(html => {
+                // 가져온 알림 위젯 HTML 조각을 화면에 삽입
+                widgetArea.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('위젯 로드 실패:', error);
+                widgetArea.innerHTML = '<div style="color: #e74c3c; text-align: center; padding: 20px; font-size: 0.9rem;">알림을 불러오지 못했습니다.</div>';
+            });
     }
 
-    // 초기 테마 설정 및 메모장 활성화
+    // 초기 테마 설정 및 알림 위젯 로드
     document.addEventListener('DOMContentLoaded', function() {
         initRandomTheme();
         
-        // 메모장 텍스트 창 포커스 효과 부여
-        const memoInput = document.getElementById('personalMemoContent');
-        memoInput.addEventListener('focus', function() {
-            this.style.boxShadow = '0 0 0 2px rgba(74, 144, 226, 0.3)';
-            this.style.borderColor = 'var(--primary-color)';
-        });
-        memoInput.addEventListener('blur', function() {
-            this.style.boxShadow = 'none';
-            this.style.borderColor = 'var(--card-border)';
-        });
+        // 메인 화면 렌더링 후 알림 위젯 데이터 불러오기
+        loadNotificationWidget();
     });
 
     // === 접속 중인 직원 실시간 업데이트 ===

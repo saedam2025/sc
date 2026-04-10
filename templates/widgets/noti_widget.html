@@ -1,0 +1,100 @@
+<style>
+    .widget-container {
+        padding: 10px;
+        background: #ffffff;
+        border-radius: 8px;
+    }
+    .noti-grid {
+        display: grid;
+        grid-template-columns: 110px 1fr; /* 좌측 타이틀 고정, 우측 뱃지 영역 */
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+    .noti-grid:last-child {
+        border-bottom: none;
+    }
+    .noti-category {
+        font-weight: 600;
+        color: #334155;
+        font-size: 15px;
+    }
+    .noti-badges {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .noti-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    /* 긴급/대기 알림 스타일 (빨강) */
+    .noti-badge.urgent {
+        background-color: #fee2e2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+    .noti-badge.urgent:hover {
+        background-color: #fca5a5;
+    }
+    /* 일반/정보 알림 스타일 (파랑) */
+    .noti-badge.info {
+        background-color: #e0f2fe;
+        color: #0284c7;
+        border: 1px solid #bae6fd;
+    }
+    .noti-badge.info:hover {
+        background-color: #7dd3fc;
+    }
+</style>
+
+<div class="widget-container">
+    <div class="noti-grid">
+        <div class="noti-category">[사내결재]</div>
+        <div class="noti-badges">
+            {% if data.approval_vacation > 0 %}
+            <a href="/approval" class="noti-badge urgent">🔴 연차 신청서 {{ data.approval_vacation }}건 대기</a>
+            {% endif %}
+            {% if data.approval_draft > 0 %}
+            <a href="/approval" class="noti-badge urgent">🔴 기안서 {{ data.approval_draft }}건 대기</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="noti-grid">
+        <div class="noti-category">[증명서발급]</div>
+        <div class="noti-badges">
+            {% if data.cert_wait > 0 %}
+            <a href="/document" class="noti-badge urgent">🔴 증명서 대기 {{ data.cert_wait }}건</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="noti-grid">
+        <div class="noti-category">[전자계약]</div>
+        <div class="noti-badges">
+            {% if data.contract_miss > 0 %}
+            <a href="/contract" class="noti-badge urgent">🔴 미계약 {{ data.contract_miss }}건</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="noti-grid">
+        <div class="noti-category">[게시판/시스템]</div>
+        <div class="noti-badges">
+            {% if data.board_new > 0 %}
+            <a href="/board" class="noti-badge info">🔵 신규 게시물 {{ data.board_new }}건</a>
+            {% endif %}
+            {% if data.message_new > 0 %}
+            <a href="/message" class="noti-badge info">🔵 신규 메시지 {{ data.message_new }}건</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
