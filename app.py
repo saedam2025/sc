@@ -19,6 +19,7 @@ from routes.attendance import attendance_bp # [신규] 근태관리 시스템
 from routes.excel_generator import excel_bp # [신규] 입금용 엑셀 생성 시스템
 from routes.excel_generator import excel_bp # [신규] 입금용 엑셀 생성 시스템
 from routes.explorer import explorer_bp     # [신규 추가] 서버 스토리지 관리자 (히든 메뉴)
+from routes.notifications import noti_bp    # [신규 추가] 나의 업무 알림 위젯 시스템
 
 # 엑셀 대신 SQLite DB를 사용하도록 설정된 데이터베이스 모듈 임포트
 from routes.database import get_db
@@ -150,6 +151,7 @@ app.register_blueprint(memo_bp, url_prefix='/memo')
 app.register_blueprint(attendance_bp)  # 근태관리 라우트
 app.register_blueprint(excel_bp)       # [신규 추가] 입금용 엑셀 생성 라우트 등록
 app.register_blueprint(explorer_bp, url_prefix='/explorer')  # [신규 추가] 스토리지 탐색기 라우트 등록
+app.register_blueprint(noti_bp)        # [신규 추가] 나의 업무 알림 위젯 라우트 등록
 
 @app.errorhandler(404)
 def page_not_found(e):
