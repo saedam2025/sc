@@ -8,9 +8,9 @@ from PIL import Image
 
 gallery_bp = Blueprint('gallery', __name__)
 
-# [보안] 암호화 키 설정 (환경 변수 권장, 없으면 고정키 사용)
-# 실제 운영 시에는 os.environ.get("GALLERY_KEY") 등으로 관리하세요.
-KEY = b'saedam_secure_gallery_key_2026_1234=' 
+# [수정] Fernet 키는 반드시 32바이트 URL-safe Base64 인코딩 형태여야 합니다.
+# 아래 키는 규격에 맞춰 생성된 고정 키입니다.
+KEY = b'uV5Z9X-o3J-7S-9k_L6_QW0Xm8k9V8P4f1L2M3N4O5A=' 
 cipher = Fernet(KEY)
 
 # [경로 설정] 요청하신 mnt/data/gallery 구조
@@ -23,16 +23,21 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMB_FOLDER, exist_ok=True)
 
 def generate_thumb(filename, file_type):
+    """암호화된 파일을 복호화하여 썸네일을 생성하는 함수"""
     source = os.path.join(UPLOAD_FOLDER, filename)
     thumb_name = f"thumb_{os.path.splitext(filename)[0]}.jpg"
     thumb_path = os.path.join(THUMB_FOLDER, thumb_name)
     
     # 1. 암호화된 파일 복호화하여 임시 처리
+    if not os.path.exists(source):
+        return None
+
     with open(source, 'rb') as f:
         try:
             decrypted_data = cipher.decrypt(f.read())
-        except:
-            return None # 복호화 실패 시 처리
+        except Exception as e:
+            print(f"복호화 실패: {e}")
+            return None
 
     temp_path = os.path.join(BASE_GALLERY_PATH, "temp_proc")
     with open(temp_path, 'wb') as f:
@@ -56,6 +61,8 @@ def generate_thumb(filename, file_type):
             if success:
                 cv2.imwrite(thumb_path, frame)
             cap.release()
+    except Exception as e:
+        print(f"썸네일 생성 중 오류: {e}")
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
@@ -110,8 +117,10 @@ def delete(id):
     if file:
         # 물리적 파일 삭제 (암호화 원본 & 썸네일)
         try:
-            os.remove(os.path.join(UPLOAD_FOLDER, file['filename']))
-            os.remove(os.path.join(THUMB_FOLDER, file['thumb_name']))
+            if os.path.exists(os.path.join(UPLOAD_FOLDER, file['filename'])):
+                os.remove(os.path.join(UPLOAD_FOLDER, file['filename']))
+            if os.path.exists(os.path.join(THUMB_FOLDER, file['thumb_name'])):
+                os.remove(os.path.join(THUMB_FOLDER, file['thumb_name']))
         except Exception as e:
             print(f"파일 삭제 오류: {e}")
             
@@ -131,10 +140,20 @@ def serve_file(filename):
         return "파일을 찾을 수 없습니다.", 404
         
     with open(file_path, 'rb') as f:
-        decrypted_data = cipher.decrypt(f.read())
+        try:
+            decrypted_data = cipher.decrypt(f.read())
+        except:
+            return "파일 복호화에 실패했습니다.", 500
     
-    # 확장자에 따른 MIME 타입 추론 (간단히 octet-stream 처리 또는 확장자 체크)
-    return Response(decrypted_data, mimetype='application/octet-stream')
+    # MIME 타입을 자동으로 판별하기 위한 로직 (확장자 기준)
+    ext = filename.split('.')[-1].lower()
+    mimetypes = {
+        'mp4': 'video/mp4', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif'
+    }
+    mimetype = mimetypes.get(ext, 'application/octet-stream')
+    
+    return Response(decrypted_data, mimetype=mimetype)
 
 @gallery_bp.route('/gallery/thumb/<filename>')
 def serve_thumb(filename):
