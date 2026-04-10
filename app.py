@@ -27,6 +27,21 @@ from routes.database import get_db, init_db # [수정] init_db 추가
 
 app = Flask(__name__)
 
+# =====================================================================
+# [핵심 수정] 배포 환경(gunicorn 등)에서도 DB 초기화가 무조건 실행되도록 
+# if __name__ == '__main__': 블록 밖으로 꺼냈습니다.
+# =====================================================================
+with app.app_context():
+    try:
+        init_db()
+        print("데이터베이스 초기화 및 폴더 생성 완료.")
+    except Exception as e:
+        print(f"데이터베이스 초기화 실패: {e}")
+
+    # 업로드 파일 저장을 위한 필수 폴더 생성 (Render 영구 저장소 외 기본 구조)
+    os.makedirs('static', exist_ok=True)
+# =====================================================================
+
 # 세션 보안을 위한 키 설정 (환경 변수 권장)
 app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
 
@@ -171,17 +186,6 @@ def internal_server_error(e):
     """, 500
 
 if __name__ == '__main__':
-    # 1. 서버 시작 시 DB 테이블 및 폴더가 없으면 자동 생성 (매우 중요)
-    with app.app_context():
-        try:
-            init_db()
-            print("데이터베이스 초기화 완료.")
-        except Exception as e:
-            print(f"데이터베이스 초기화 실패: {e}")
-
-    # 업로드 파일 저장을 위한 필수 폴더 생성 (Render 영구 저장소 외 기본 구조)
-    os.makedirs('static', exist_ok=True)
-    
     # Render 등 배포 환경의 포트 설정 대응
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
