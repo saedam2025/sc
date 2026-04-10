@@ -428,60 +428,9 @@
                 </button>
             </div>
             
-            <div id="notification-widget-area" class="noti-widget-wrapper">
-                
-                <a href="/approval" class="noti-card-item noti-card-long">
-                    <div class="noti-card-title">
-                        <i class="fa-solid fa-file-signature" style="color: var(--primary-color);"></i> 사내결재 대기현황
-                    </div>
-                    <div style="display: flex; gap: 20px;">
-                        <div class="noti-card-value">
-                            연차 신청서 <span class="noti-count-red">{{ noti_data.approval_vacation | default(2) }}</span>건
-                        </div>
-                        <div class="noti-card-value">
-                            기안서 <span class="noti-count-red">{{ noti_data.approval_draft | default(1) }}</span>건
-                        </div>
-                    </div>
-                </a>
-
-                <div class="noti-grid-container">
-                    
-                    <a href="/document" class="noti-card-item">
-                        <div class="noti-card-title">
-                            <i class="fa-solid fa-id-card" style="color: var(--primary-color);"></i> 증명서발급
-                        </div>
-                        <div class="noti-card-value">
-                            대기 <span class="noti-count-red">{{ noti_data.cert_wait | default(4) }}</span>건
-                        </div>
-                    </a>
-                    
-                    <a href="/contract" class="noti-card-item">
-                        <div class="noti-card-title">
-                            <i class="fa-solid fa-file-contract" style="color: var(--primary-color);"></i> 전자계약
-                        </div>
-                        <div class="noti-card-value">
-                            미계약 <span class="noti-count-red">{{ noti_data.contract_miss | default(3) }}</span>건
-                        </div>
-                    </a>
-                    
-                    <a href="/board" class="noti-card-item">
-                        <div class="noti-card-title">
-                            <i class="fa-solid fa-clipboard-list" style="color: var(--primary-color);"></i> 사내 게시판
-                        </div>
-                        <div class="noti-card-value">
-                            신규 <span class="noti-count-blue">{{ noti_data.board_new | default(1) }}</span>건
-                        </div>
-                    </a>
-                    
-                    <a href="javascript:void(0)" onclick="document.getElementById('msgModal').style.display='block'" class="noti-card-item">
-                        <div class="noti-card-title">
-                            <i class="fa-solid fa-envelope" style="color: var(--primary-color);"></i> 시스템/쪽지
-                        </div>
-                        <div class="noti-card-value">
-                            신규 <span class="noti-count-blue">{{ noti_data.message_new | default(5) }}</span>건
-                        </div>
-                    </a>
-                    
+            <div id="notification-widget-area" class="noti-widget-wrapper" style="justify-content: center; align-items: center;">
+                <div style="text-align: center; color: var(--text-gray); font-size: 0.9rem;">
+                    <i class="fa-solid fa-spinner fa-spin"></i> 알림 데이터를 불러오는 중입니다...
                 </div>
             </div>
         </div>
