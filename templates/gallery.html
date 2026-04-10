@@ -71,15 +71,16 @@
         border-bottom: 2px dashed #c9184a; background: #ffe5ec; padding: 2px 8px; border-radius: 6px; 
     }
     
-    /* 삭제 버튼 (항상 보이도록 투명도 1) */
+    /* [수정] 삭제 버튼 (모든 탭에서 항상 보이도록 설정, 클릭 오류 방지 z-index) */
     .btn-delete-tab { 
-        position: absolute; right: 10px; top: 14px; font-size: 0.9rem; 
-        color: #ff8fab; background: none; border: none; opacity: 1; transition: all 0.2s; 
+        position: absolute; right: 8px; top: 12px; font-size: 0.9rem; 
+        color: #ff8fab; background: none; border: none; opacity: 1; transition: all 0.2s;
+        z-index: 10; 
     }
     .btn-delete-tab:hover { color: #ff4d4d; transform: scale(1.2); }
 
     /* =========================================
-       2. 🎀 메인 갤러리 본문
+       2. 🎀 메인 갤러리 본문 (모달창 귀여운 테마 적용)
        ========================================= */
     .gallery-content-wrapper {
         background-color: #fff0f3; /* 사랑스러운 연핑크 배경 */
@@ -162,7 +163,7 @@
     .dropzone:hover { background: #fff0f3; border-color: #ff758f; }
 
     /* =========================================
-       5. 🌸 귀여운 핑크 슬라이드쇼 모달창 (복구 완료)
+       5. 🌸 슬라이드쇼 모달창 (원본 비율 자동조절 유지)
        ========================================= */
     #slideshowModal {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -207,21 +208,28 @@
             <li class="nav-item position-relative">
                 <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
                    href="{{ url_for('gallery.index', tab_id=tab.id) }}"
-                   style="padding-right: {% if tab.id == active_tab_id and tab.id != 1 %}45px{% else %}25px{% endif %};">
+                   style="padding-right: {% if tab.id != 1 %}45px{% else %}25px{% endif %};">
                     
                     <span class="tab-title" data-id="{{ tab.id }}" 
-                          {% if tab.id == active_tab_id %}contenteditable="true" title="클릭해서 이름 변경"{% endif %}>
+                          {% if tab.id == active_tab_id %}
+                          contenteditable="true" 
+                          onclick="event.preventDefault();"
+                          title="클릭해서 이름 변경"
+                          {% endif %}>
                         {{ tab.name }}
                     </span>
                     
                     <span class="photo-count-badge" title="사진 개수">{{ tab.photo_count | default(0) }}</span>
                     
                     {% if tab.id == active_tab_id %}
-                        <i class="fas fa-pencil-alt ms-1 text-muted" style="font-size: 0.75rem; pointer-events: none; opacity: 0.5;"></i>
+                        <i class="fas fa-pencil-alt ms-1 text-muted" 
+                           style="font-size: 0.75rem; cursor: pointer; opacity: 0.7;"
+                           onclick="event.preventDefault(); this.parentElement.querySelector('.tab-title').focus();"
+                           title="이름 수정"></i>
                     {% endif %}
                 </a>
                 
-                {% if tab.id == active_tab_id and tab.id != 1 %}
+                {% if tab.id != 1 %}
                 <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="d-inline" onsubmit="return confirm('이 탭을 지우시겠어요? 🥺 (사진은 기본 갤러리로 안전하게 이동됩니다)');">
                     <button type="submit" class="btn-delete-tab" title="탭 삭제"><i class="fas fa-times-circle"></i></button>
                 </form>
