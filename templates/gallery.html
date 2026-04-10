@@ -6,259 +6,306 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
 
 <style>
-    /* 1. 🌈 귀여운 인덱스 탭 네비게이션 스타일 */
-    .gallery-tabs { 
-        border-bottom: 3px solid #bde0fe; 
-        margin-bottom: 25px; 
-        gap: 5px; 
-        padding-left: 10px;
+    /* =========================================
+       1. 샤프한 인덱스 탭 (가로 일렬 배열, 폴더 디자인)
+       ========================================= */
+    .gallery-tabs-container {
+        margin-bottom: 0;
     }
+    
+    .gallery-tabs { 
+        display: flex;
+        flex-wrap: nowrap; /* 탭이 밑으로 포개지지 않게 고정 */
+        overflow-x: auto; /* 넘치면 가로 스크롤 */
+        border-bottom: 1px solid #dee2e6; 
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+    
+    /* 가로 스크롤바 세련되게 숨기기/축소 */
+    .gallery-tabs::-webkit-scrollbar { height: 4px; }
+    .gallery-tabs::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 4px; }
+
+    .gallery-tabs .nav-item {
+        flex-shrink: 0; /* 탭이 찌그러지지 않게 방지 */
+    }
+
     .gallery-tabs .nav-link { 
         color: #6c757d; 
         background-color: #f8f9fa; 
-        border: 1px solid #dee2e6; 
+        border: 1px solid transparent; 
         border-bottom: none; 
-        padding: 10px 25px; 
-        font-weight: 600; 
-        border-radius: 15px 15px 0 0; /* 인덱스 탭 모양 */
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        box-shadow: 0 -2px 5px rgba(0,0,0,0.02);
+        padding: 12px 24px; 
+        font-size: 0.95rem;
+        font-weight: 500; 
+        border-radius: 6px 6px 0 0; /* 살짝 각진 샤프한 모서리 */
+        transition: all 0.2s ease;
+        margin-right: 2px;
     }
+    
     .gallery-tabs .nav-link:hover { 
         background-color: #e9ecef; 
-        transform: translateY(-2px); 
+        color: #212529;
     }
+    
     .gallery-tabs .nav-link.active { 
-        color: #023e8a; 
+        color: #212529; 
         background-color: #ffffff; 
-        border: 3px solid #bde0fe; 
-        border-bottom: 3px solid #ffffff; /* 하단 선과 자연스럽게 이어짐 */
-        margin-bottom: -3px; /* 테두리 겹치기 */
-        z-index: 1; 
-        transform: scaleY(1.05); 
-        transform-origin: bottom;
+        border: 1px solid #dee2e6; 
+        border-bottom: 1px solid #ffffff; /* 하단 갤러리 영역과 매끄럽게 연결 */
+        font-weight: 600; 
+        margin-bottom: -1px; /* 테두리 겹침 처리 */
+        position: relative;
+        z-index: 2;
     }
     
-    .tab-title[contenteditable="true"] { outline: none; border-bottom: 1px dashed transparent; cursor: text; }
-    .tab-title[contenteditable="true"]:focus { border-bottom: 1px dashed #023e8a; background: #f1f8ff; padding: 0 5px; border-radius: 4px; }
+    .tab-title[contenteditable="true"] { outline: none; border-bottom: 1px dotted transparent; cursor: text; }
+    .tab-title[contenteditable="true"]:focus { border-bottom: 1px solid #212529; }
     
-    .btn-delete-tab { position: absolute; right: 5px; top: 12px; font-size: 0.75rem; color: #ff8fab; background: none; border: none; opacity: 0; transition: opacity 0.2s; }
+    .btn-delete-tab { 
+        position: absolute; right: 5px; top: 12px; font-size: 0.8rem; 
+        color: #adb5bd; background: none; border: none; opacity: 0; transition: color 0.2s, opacity 0.2s; 
+    }
     .nav-item:hover .btn-delete-tab { opacity: 1; }
-    .btn-delete-tab:hover { color: #ff4d4d; }
+    .btn-delete-tab:hover { color: #dc3545; }
 
-    /* 2. ✨ 컨트롤 패널 및 예쁜 버튼 스타일 */
-    .control-panel { 
-        background: #ffffff; 
-        border-radius: 20px; 
-        padding: 20px; 
-        box-shadow: 0 8px 20px rgba(0,0,0,0.04); 
-        border: 1px solid #f1f3f5; 
+    /* =========================================
+       2. 폴더 콘텐츠 래퍼 (탭 아래를 감싸는 본문)
+       ========================================= */
+    .gallery-content-wrapper {
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        border-top: none; /* 활성화된 탭과 연결되므로 상단 선 제거 */
+        border-radius: 0 4px 4px 4px;
+        padding: 30px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        margin-bottom: 40px;
+        min-height: 400px;
+    }
+
+    /* =========================================
+       3. 갤러리 그리드 & 체크박스
+       ========================================= */
+    .custom-gallery-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
+        gap: 15px; 
     }
     
-    .cute-btn {
-        border-radius: 30px;
-        padding: 8px 22px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-        border: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
-    .cute-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.12);
-    }
-    /* 업로드 버튼 (블루 파스텔) */
-    .btn-upload-cute { background: linear-gradient(135deg, #a2d2ff, #bde0fe); color: #023e8a; }
-    /* 전체선택 버튼 (소프트 그레이) */
-    .btn-select-cute { background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; box-shadow: none; }
-    .btn-select-cute:hover { background: #e9ecef; }
-    /* 슬라이드쇼 버튼 (핑크 파스텔) */
-    .btn-play-cute { background: linear-gradient(135deg, #ffafcc, #ffc8dd); color: #800f2f; }
-
-    .dropzone-wrapper { display: none; margin-top: 15px; border-top: 2px dashed #e9ecef; padding-top: 20px; }
-    .dropzone {
-        background: #fafbfc; border: 2px dashed #bde0fe; border-radius: 15px;
-        min-height: 120px; display: flex; align-items: center; justify-content: center;
-        cursor: pointer; transition: background 0.3s ease;
-    }
-    .dropzone:hover { background: #eff7ff; }
-
-    /* 3. 🖼️ 갤러리 그리드 및 체크박스 */
-    .custom-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
     .gallery-item {
-        position: relative; aspect-ratio: 1 / 1; border-radius: 15px;
-        overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.08); background-color: #f1f1f1;
+        position: relative; aspect-ratio: 1 / 1; border-radius: 4px; /* 각진 디자인 */
+        overflow: hidden; border: 1px solid #e9ecef; background-color: #f8f9fa;
+        transition: border-color 0.2s;
     }
-    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
-    .gallery-item:hover img { transform: scale(1.08); }
+    .gallery-item:hover { border-color: #adb5bd; }
+    
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+    .gallery-item:hover img { transform: scale(1.05); }
 
+    /* 샤프한 블루 체크박스 */
     .photo-checkbox {
-        position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; cursor: pointer; z-index: 10;
-        accent-color: #ffafcc; transform: scale(1.2); opacity: 0; transition: opacity 0.2s ease-in-out;
-        box-shadow: 0 0 5px rgba(0,0,0,0.2); border-radius: 5px;
+        position: absolute; top: 10px; left: 10px; width: 18px; height: 18px; cursor: pointer; z-index: 10;
+        accent-color: #0d6efd; opacity: 0; transition: opacity 0.2s ease-in-out;
+        box-shadow: 0 0 3px rgba(0,0,0,0.3); border-radius: 2px;
     }
     .gallery-item:hover .photo-checkbox, .photo-checkbox:checked { opacity: 1; }
 
     .item-overlay {
         position: absolute; bottom: 0; left: 0; right: 0;
-        background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); padding: 25px 10px 10px 10px;
-        display: flex; justify-content: space-between; align-items: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2;
+        background: linear-gradient(to top, rgba(0,0,0,0.85), transparent); padding: 30px 10px 10px 10px;
+        display: flex; justify-content: space-between; align-items: center; opacity: 0; transition: opacity 0.2s ease; z-index: 2;
     }
     .gallery-item:hover .item-overlay { opacity: 1; }
-    .item-title { color: white; font-size: 0.85rem; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500;}
-    .btn-delete { color: #ffb3c6; background: none; border: none; cursor: pointer; font-size: 1.1rem; transition: color 0.2s; }
-    .btn-delete:hover { color: #ff4d4d; }
+    .item-title { color: white; font-size: 0.8rem; letter-spacing: 0.5px; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+    .btn-delete { color: #adb5bd; background: none; border: none; cursor: pointer; font-size: 1rem; transition: color 0.2s; }
+    .btn-delete:hover { color: #dc3545; }
 
-    /* 4. 🌸 귀여운 자동조절 슬라이드쇼 모달창 */
+    /* =========================================
+       4. 하단 컨트롤 바 & 버튼 (샤프한 디자인)
+       ========================================= */
+    .action-bar {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .btn-sharp {
+        border-radius: 4px; /* 각진 버튼 */
+        padding: 8px 18px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-upload-sharp { background-color: #212529; color: #fff; }
+    .btn-upload-sharp:hover { background-color: #343a40; color: #fff; }
+    
+    .btn-select-sharp { background-color: #fff; color: #495057; border-color: #ced4da; }
+    .btn-select-sharp:hover { background-color: #f8f9fa; color: #212529; border-color: #adb5bd; }
+    
+    .btn-play-sharp { background-color: #0d6efd; color: #fff; }
+    .btn-play-sharp:hover { background-color: #0b5ed7; color: #fff; }
+
+    /* 드롭존 (업로드 영역) */
+    .dropzone-wrapper { display: none; margin-top: 15px; }
+    .dropzone {
+        background: #f8f9fa; border: 1px dashed #adb5bd; border-radius: 4px;
+        min-height: 120px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: background 0.2s ease;
+    }
+    .dropzone:hover { background: #e9ecef; }
+    .dz-message { color: #495057; }
+
+    /* =========================================
+       5. 슬라이드쇼 모달창 (모던 다크 테마)
+       ========================================= */
     #slideshowModal {
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        background: rgba(0,0,0,0.75); z-index: 9999; /* 약간 더 밝은 배경 */
+        background: rgba(0,0,0,0.9); z-index: 9999;
         display: none; justify-content: center; align-items: center;
-        backdrop-filter: blur(5px); /* 배경 흐림 효과 */
     }
     
     .slideshow-content-wrapper {
-        background: #fff0f3; /* 사랑스러운 연핑크 배경 */
-        border-radius: 24px; 
-        border: 4px solid #ffc8dd; /* 귀여운 핑크 테두리 */
-        box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        background: #111111; 
+        border-radius: 6px; 
+        border: 1px solid #333;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.8);
         display: inline-flex; flex-direction: column; overflow: hidden;
         max-width: 95vw; max-height: 95vh;
     }
 
     .slideshow-header {
         padding: 15px 25px; display: flex; justify-content: space-between; align-items: center;
-        background: #ffffff; border-bottom: 2px dashed #ffc8dd;
+        background: #000000; border-bottom: 1px solid #222;
     }
-    .slideshow-header h4 { 
-        margin: 0; font-size: 1.1rem; color: #ff8fab; font-weight: 800; 
-    }
-    .btn-close-slideshow { 
-        background: none; border: none; color: #ffb3c6; font-size: 1.8rem; 
-        cursor: pointer; transition: all 0.3s ease; 
-    }
-    .btn-close-slideshow:hover { color: #ff8fab; transform: rotate(90deg); } /* 닫기 버튼 회전 애니메이션 */
+    .slideshow-header h4 { margin: 0; font-size: 1rem; color: #f8f9fa; font-weight: 400; letter-spacing: 1px;}
+    
+    .btn-close-slideshow { background: none; border: none; color: #6c757d; font-size: 1.5rem; cursor: pointer; transition: color 0.2s; }
+    .btn-close-slideshow:hover { color: #f8f9fa; }
 
-    .slideshow-body {
-        padding: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff0f3;
-    }
+    .slideshow-body { padding: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
 
-    /* 이미지는 원본 비율을 유지하며 최대 해상도를 넘지 않음 */
     .slideshow-img {
-        max-width: 95vw; max-height: calc(95vh - 85px); 
+        max-width: 95vw; max-height: calc(95vh - 65px); 
         width: auto; height: auto; object-fit: contain;
-        border-radius: 12px;
-        box-shadow: 0 8px 25px rgba(255, 175, 204, 0.4); /* 은은한 핑크 그림자 */
         transition: opacity 0.4s ease, transform 0.4s ease;
-        opacity: 0; transform: scale(0.95);
+        opacity: 0; transform: scale(0.98);
     }
     
     .effect-active { opacity: 1 !important; transform: scale(1) translateX(0) !important; }
     .effect-hide-fade { opacity: 0; }
-    .effect-hide-zoom { opacity: 0; transform: scale(0.6); }
-    .effect-hide-slide { opacity: 0; transform: translateX(100px); }
+    .effect-hide-zoom { opacity: 0; transform: scale(0.95); }
+    .effect-hide-slide { opacity: 0; transform: translateX(30px); }
 </style>
 
 <div class="container-fluid mt-4 px-4">
     
-    <ul class="nav nav-tabs gallery-tabs border-0">
-        {% for tab in tabs %}
-        <li class="nav-item position-relative">
-            <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
-               href="{{ url_for('gallery.index', tab_id=tab.id) }}"
-               style="padding-right: {% if tab.id == active_tab_id and tab.id != 1 %}35px{% else %}25px{% endif %};">
+    <div class="gallery-tabs-container">
+        <ul class="nav nav-tabs gallery-tabs border-0">
+            {% for tab in tabs %}
+            <li class="nav-item position-relative">
+                <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
+                   href="{{ url_for('gallery.index', tab_id=tab.id) }}"
+                   style="padding-right: {% if tab.id == active_tab_id and tab.id != 1 %}35px{% else %}24px{% endif %};">
+                    
+                    <span class="tab-title" data-id="{{ tab.id }}" 
+                          {% if tab.id == active_tab_id %}contenteditable="true" title="클릭해서 이름 변경"{% endif %}>
+                        {{ tab.name }}
+                    </span>
+                </a>
                 
-                <span class="tab-title" data-id="{{ tab.id }}" 
-                      {% if tab.id == active_tab_id %}contenteditable="true" title="클릭해서 이름 변경"{% endif %}>
-                    {{ tab.name }}
-                </span>
-            </a>
+                {% if tab.id == active_tab_id and tab.id != 1 %}
+                <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="d-inline" onsubmit="return confirm('이 탭을 삭제하시겠습니까? (사진은 기본 갤러리로 이동됩니다)');">
+                    <button type="submit" class="btn-delete-tab" title="탭 삭제"><i class="fas fa-times"></i></button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
             
-            {% if tab.id == active_tab_id and tab.id != 1 %}
-            <form action="{{ url_for('gallery.delete_tab', tab_id=tab.id) }}" method="post" class="d-inline" onsubmit="return confirm('이 탭을 삭제하시겠습니까? (사진은 기본 갤러리로 이동됩니다)');">
-                <button type="submit" class="btn-delete-tab" title="탭 삭제"><i class="fas fa-times-circle"></i></button>
-            </form>
-            {% endif %}
-        </li>
-        {% endfor %}
-        
-        <li class="nav-item ms-2 align-self-end mb-1">
-            <form action="{{ url_for('gallery.add_tab') }}" method="post">
-                <button type="submit" class="btn btn-sm btn-light rounded-pill text-primary fw-bold border-0 shadow-sm"><i class="fas fa-plus"></i> 추가</button>
-            </form>
-        </li>
-    </ul>
+            <li class="nav-item align-self-end">
+                <form action="{{ url_for('gallery.add_tab') }}" method="post">
+                    <button type="submit" class="btn btn-sm btn-link text-secondary text-decoration-none" style="padding: 10px 15px;"><i class="fas fa-plus"></i></button>
+                </form>
+            </li>
+        </ul>
+    </div>
 
-    <div class="control-panel mb-4">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-            
+    <div class="gallery-content-wrapper">
+        
+        {% if files %}
+        <div class="custom-gallery-grid">
+            {% for file in files %}
+            <div class="gallery-item">
+                <input type="checkbox" class="photo-checkbox" value="{{ url_for('gallery.serve_file', filename=file.filename) }}" data-title="{{ file.title }}" onclick="event.stopPropagation();">
+                
+                <a href="{{ url_for('gallery.serve_file', filename=file.filename) }}" 
+                   class="glightbox w-100 h-100 d-block" 
+                   data-gallery="saedam_gallery" 
+                   data-title="{{ file.title }}">
+                    <img src="{{ url_for('gallery.serve_thumb', filename=file.thumb_name) }}" alt="{{ file.title }}" loading="lazy">
+                </a>
+                
+                <div class="item-overlay">
+                    <span class="item-title">{{ file.title }}</span>
+                    <a href="{{ url_for('gallery.delete', id=file.id, tab_id=active_tab_id) }}" 
+                       class="btn-delete" 
+                       onclick="return confirm('정말 삭제하시겠습니까?')"
+                       title="삭제">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-images fa-3x mb-3 text-light"></i>
+            <h6 class="text-secondary fw-normal">이 탭에는 아직 사진이 없습니다.</h6>
+        </div>
+        {% endif %}
+
+        <div class="action-bar">
             <div>
-                <button id="btnToggleUpload" class="cute-btn btn-upload-cute">
-                    <i class="fas fa-camera-retro"></i> 사진 추가하기
+                <button id="btnToggleUpload" class="btn-sharp btn-upload-sharp">
+                    <i class="fas fa-upload"></i> 업로드
                 </button>
             </div>
             
             <div class="d-flex gap-2">
-                <button id="btnSelectAll" class="cute-btn btn-select-cute">
-                    <i class="fas fa-check-double"></i> 전체 선택
+                <button id="btnSelectAll" class="btn-sharp btn-select-sharp">
+                    <i class="fas fa-check-square"></i> 전체 선택
                 </button>
-                <button id="btnPlaySlideshow" class="cute-btn btn-play-cute">
+                <button id="btnPlaySlideshow" class="btn-sharp btn-play-sharp">
                     <i class="fas fa-play"></i> 슬라이드쇼 재생
                 </button>
             </div>
-            
         </div>
         
         <div id="uploadContent" class="dropzone-wrapper">
             <form action="{{ url_for('gallery.upload', tab_id=active_tab_id) }}" class="dropzone" id="galleryDropzone">
                 <div class="dz-message" data-dz-message>
-                    <i class="fas fa-images fa-2x mb-2" style="color: #a2d2ff;"></i><br>
-                    <span class="fw-bold text-secondary">여기로 사진을 쏙! 끌어다 놓으세요.</span>
+                    <i class="fas fa-cloud-upload-alt fa-2x mb-2 text-secondary"></i><br>
+                    <span class="fw-normal text-secondary">여기로 사진을 드래그하거나 클릭하여 업로드하세요.</span>
                 </div>
             </form>
         </div>
-    </div>
-
-    {% if files %}
-    <div class="custom-gallery-grid">
-        {% for file in files %}
-        <div class="gallery-item">
-            <input type="checkbox" class="photo-checkbox" value="{{ url_for('gallery.serve_file', filename=file.filename) }}" data-title="{{ file.title }}" onclick="event.stopPropagation();">
-            
-            <a href="{{ url_for('gallery.serve_file', filename=file.filename) }}" 
-               class="glightbox w-100 h-100 d-block" 
-               data-gallery="saedam_gallery" 
-               data-title="{{ file.title }}">
-                <img src="{{ url_for('gallery.serve_thumb', filename=file.thumb_name) }}" alt="{{ file.title }}" loading="lazy">
-            </a>
-            
-            <div class="item-overlay">
-                <span class="item-title">{{ file.title }}</span>
-                <a href="{{ url_for('gallery.delete', id=file.id, tab_id=active_tab_id) }}" 
-                   class="btn-delete" 
-                   onclick="return confirm('정말 삭제하시겠습니까?')"
-                   title="삭제">
-                    <i class="fas fa-trash-alt"></i>
-                </a>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="text-center py-5">
-        <i class="fas fa-box-open fa-3x mb-3" style="color: #bde0fe;"></i>
-        <h5 class="text-secondary fw-bold">이 탭에는 아직 사진이 없어요!</h5>
-    </div>
-    {% endif %}
-</div>
+        
+    </div> </div>
 
 <div id="slideshowModal">
     <div class="slideshow-content-wrapper">
         <div class="slideshow-header">
-            <h4 id="slideshowTitle"><i class="fas fa-star" style="color: #ffc8dd;"></i> 갤러리 감상</h4>
+            <h4 id="slideshowTitle">SLIDESHOW</h4>
             <button id="btnCloseSlideshow" class="btn-close-slideshow"><i class="fas fa-times"></i></button>
         </div>
         <div class="slideshow-body">
@@ -300,19 +347,19 @@
         });
     });
 
-    // 3. 사진 올리기 폼 접기/펴기 (버튼 디자인 연동)
+    // 3. 사진 올리기 폼 접기/펴기
     document.getElementById('btnToggleUpload').addEventListener('click', function() {
         const content = document.getElementById('uploadContent');
         if(content.style.display === 'none' || content.style.display === '') {
             content.style.display = 'block';
             this.innerHTML = '<i class="fas fa-times"></i> 닫기';
-            this.style.background = '#e9ecef';
-            this.style.color = '#495057';
+            this.classList.replace('btn-upload-sharp', 'btn-select-sharp');
+            // 부드럽게 스크롤
+            content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
             content.style.display = 'none';
-            this.innerHTML = '<i class="fas fa-camera-retro"></i> 사진 추가하기';
-            this.style.background = 'linear-gradient(135deg, #a2d2ff, #bde0fe)';
-            this.style.color = '#023e8a';
+            this.innerHTML = '<i class="fas fa-upload"></i> 업로드';
+            this.classList.replace('btn-select-sharp', 'btn-upload-sharp');
         }
     });
 
@@ -339,20 +386,19 @@
         const allChecked = Array.from(checkboxes).every(cb => cb.checked);
         checkboxes.forEach(cb => cb.checked = !allChecked);
         
-        // 전체선택 버튼 토글 효과
         if(allChecked) {
-            this.innerHTML = '<i class="fas fa-check-double"></i> 전체 선택';
-            this.classList.replace('btn-select-cute-active', 'btn-select-cute');
+            this.innerHTML = '<i class="fas fa-check-square"></i> 전체 선택';
+            this.classList.replace('btn-upload-sharp', 'btn-select-sharp');
         } else {
             this.innerHTML = '<i class="fas fa-undo"></i> 선택 해제';
-            this.classList.add('btn-select-cute-active');
+            this.classList.replace('btn-select-sharp', 'btn-upload-sharp');
         }
     });
 
     document.getElementById('btnPlaySlideshow').addEventListener('click', function() {
         const checkedBoxes = document.querySelectorAll('.photo-checkbox:checked');
         if(checkedBoxes.length === 0) {
-            alert('슬라이드쇼로 볼 사진을 하나 이상 선택해주세요 📸');
+            alert('슬라이드쇼로 볼 사진을 체크해주세요.');
             return;
         }
 
@@ -388,7 +434,7 @@
 
         setTimeout(() => {
             img.src = slideImages[currentIndex].src;
-            title.innerHTML = `<i class="fas fa-heart" style="color: #ffb3c6;"></i> ${slideImages[currentIndex].title}`;
+            title.innerText = slideImages[currentIndex].title;
             
             img.onload = function() {
                 void img.offsetWidth; 
