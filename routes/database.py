@@ -1,14 +1,25 @@
 import sqlite3
 import os
 
-DB_FILE = '/mnt/data/saedam.db' # 렌더 영구저장소 경로
+# 1. 경로 설정
+DB_FILE = '/mnt/data/saedam.db' # 렌더 영구저장소 DB 경로
+GALLERY_ROOT = '/mnt/data/gallery'
+GALLERY_UPLOADS = os.path.join(GALLERY_ROOT, 'uploads')
+GALLERY_THUMBS = os.path.join(GALLERY_ROOT, 'thumbnails')
 
 def get_db():
+    """데이터베이스 연결 객체 생성"""
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
 
 def init_db():
+    """테이블 초기화 및 필수 폴더 생성"""
+    
+    # [추가] 갤러리 관련 필수 폴더 생성
+    os.makedirs(GALLERY_UPLOADS, exist_ok=True)
+    os.makedirs(GALLERY_THUMBS, exist_ok=True)
+    
     conn = get_db()
     c = conn.cursor()
     
@@ -24,13 +35,13 @@ def init_db():
         note TEXT
     )''')
     
-    # 2. 근태(Attendance) 테이블 - 기존 연차/휴가 관리용
+    # 2. 근태(Attendance) 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner TEXT, type TEXT, start_date TEXT, end_date TEXT, status TEXT
     )''')
 
-    # [수정] 2-1. 일일 출퇴근 테이블 (position 컬럼 추가)
+    # 2-1. 일일 출퇴근 테이블
     c.execute('''CREATE TABLE IF NOT EXISTS daily_attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         emp_no TEXT NOT NULL,
@@ -76,7 +87,20 @@ def init_db():
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
+    # 7. [수정 확인] 개인 갤러리 테이블
+    c.execute('''CREATE TABLE IF NOT EXISTS gallery (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        thumb_name TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    # ---------------------------------------------------------
     # [DB 자동 업데이트] 기존 테이블들에 신규 컬럼 자동 추가
+    # ---------------------------------------------------------
+    
     try:
         c.execute("ALTER TABLE messages ADD COLUMN filename TEXT")
         c.execute("ALTER TABLE messages ADD COLUMN filepath TEXT")
@@ -90,7 +114,6 @@ def init_db():
         c.execute("ALTER TABLE daily_attendance ADD COLUMN reason TEXT")
     except sqlite3.OperationalError: pass
 
-    # [신규 추가] 기존 출퇴근 테이블에 직급(position) 컬럼 추가
     try:
         c.execute("ALTER TABLE daily_attendance ADD COLUMN position TEXT")
     except sqlite3.OperationalError: pass
@@ -98,4 +121,5 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+if __name__ == "__main__":
+    init_db()
