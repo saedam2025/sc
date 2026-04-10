@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/css/glightbox.min.css">
+
+<style>
+    .gallery-header {
+        margin-bottom: 30px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+    }
+    .gallery-card {
+        transition: transform 0.2s;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .gallery-card:hover {
+        transform: translateY(-5px);
+    }
+    .thumb-wrapper {
+        position: relative;
+        height: 200px;
+        overflow: hidden;
+        background-color: #000;
+        border-top-left-radius: calc(0.25rem - 1px);
+        border-top-right-radius: calc(0.25rem - 1px);
+    }
+    .thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .video-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.6);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+    }
+    .delete-btn {
+        color: #dc3545;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+    .delete-btn:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="gallery-header shadow-sm">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h2>📂 개인 미디어 갤러리</h2>
+                <p class="text-muted mb-0">사진과 영상을 안전하게 암호화하여 보관합니다.</p>
+            </div>
+            <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                <form action="{{ url_for('gallery.upload') }}" method="post" enctype="multipart/form-data" class="d-flex gap-2 justify-content-md-end">
+                    <input type="text" name="title" class="form-control form-control-sm" placeholder="제목 입력" style="max-width: 200px;" required>
+                    <input type="file" name="file" class="form-control form-control-sm" style="max-width: 250px;" required>
+                    <button type="submit" class="btn btn-primary btn-sm">업로드</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        {% if files %}
+            {% for file in files %}
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card gallery-card h-100">
+                    <a href="{{ url_for('gallery.serve_file', filename=file.filename) }}" 
+                       class="glightbox" 
+                       data-gallery="saedam_gallery" 
+                       data-title="{{ file.title }}"
+                       data-description="업로드일: {{ file.created_at }}">
+                        
+                        <div class="thumb-wrapper">
+                            <img src="{{ url_for('gallery.serve_thumb', filename=file.thumb_name) }}" class="thumb-img" alt="{{ file.title }}">
+                            {% if file.file_type == 'video' %}
+                            <span class="video-badge">▶ Video</span>
+                            {% endif %}
+                        </div>
+                    </a>
+
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="card-title mb-0 text-truncate" style="max-width: 70%;">{{ file.title }}</h6>
+                            <a href="{{ url_for('gallery.delete', id=file.id) }}" 
+                               class="delete-btn" 
+                               onclick="return confirm('정말 삭제하시겠습니까? (암호화된 원본 파일도 함께 삭제됩니다)')">
+                               삭제
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12 text-center py-5">
+                <p class="text-muted">업로드된 파일이 없습니다. 첫 번째 사진이나 영상을 올려보세요!</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/js/glightbox.min.js"></script>
+<script>
+    // GLightbox 초기화
+    const lightbox = GLightbox({
+        selector: '.glightbox',
+        touchNavigation: true, // 모바일 스와이프 지원
+        loop: true,            // 마지막 파일에서 다시 처음으로
+        autoplayVideos: true,  // 동영상 자동 재생
+        width: '90vw',         // 뷰어 너비
+        height: 'auto'
+    });
+</script>
+
+{% endblock %}
