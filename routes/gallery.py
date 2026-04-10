@@ -1,9 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, Response
+from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, Response, jsonify
 from werkzeug.utils import secure_filename
 from .database import get_db
 from cryptography.fernet import Fernet
 import os
-import cv2
 from PIL import Image
 
 gallery_bp = Blueprint('gallery', __name__)
@@ -21,37 +20,19 @@ THUMB_FOLDER = os.path.join(BASE_GALLERY_PATH, 'thumbnails')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMB_FOLDER, exist_ok=True)
 
-def generate_thumb_from_raw(temp_path, filename, file_type):
-    """(최적화) 암호화되기 전의 원본 파일에서 바로 썸네일을 생성합니다."""
+def generate_thumb_from_raw(temp_path, filename):
+    """(최적화) 암호화되기 전의 원본 이미지에서 바로 썸네일을 생성합니다."""
     thumb_name = f"thumb_{os.path.splitext(filename)[0]}.jpg"
     thumb_path = os.path.join(THUMB_FOLDER, thumb_name)
     
     try:
-        if file_type == 'image':
-            with Image.open(temp_path) as img:
-                # 정사각형 크롭을 위해 썸네일 방식 개선
-                img.thumbnail((500, 500))
-                img.save(thumb_path, "JPEG", quality=85)
-                
-        elif file_type == 'video':
-            cap = cv2.VideoCapture(temp_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            target_frame = int(fps * 10) if fps > 0 else 0
-            
-            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
-            success, frame = cap.read()
-            if not success:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                success, frame = cap.read()
-                
-            if success:
-                # 썸네일 용량 최적화를 위해 리사이즈
-                height, width = frame.shape[:2]
-                if max(height, width) > 500:
-                    scale = 500 / max(height, width)
-                    frame = cv2.resize(frame, (int(width * scale), int(height * scale)))
-                cv2.imwrite(thumb_path, frame)
-            cap.release()
+        with Image.open(temp_path) as img:
+            # RGBA(PNG) 투명도 처리 및 RGB 변환 (에러 방지)
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            # 정사각형 크롭을 위해 썸네일 방식 개선
+            img.thumbnail((500, 500))
+            img.save(thumb_path, "JPEG", quality=85)
             
     except Exception as e:
         print(f"썸네일 생성 오류: {e}")
@@ -70,46 +51,60 @@ def index():
 
 @gallery_bp.route('/gallery/upload', methods=['POST'])
 def upload():
-    if 'file' not in request.files:
+    # 다중 파일 업로드 처리 (Dropzone.js 대응)
+    files = request.files.getlist('file')
+    
+    if not files or files[0].filename == '':
         return redirect(request.url)
     
-    file = request.files['file']
-    title = request.form.get('title', '제목 없음')
-    
-    if file and file.filename != '':
-        filename = secure_filename(file.filename)
-        ext = filename.split('.')[-1].lower()
-        file_type = 'video' if ext in ['mp4', 'mov', 'avi', 'mkv', 'wmv'] else 'image'
-        
-        # [메모리 최적화 로직] 
-        # 1. 원본 파일을 임시로 저장합니다. (RAM 부하 방지)
-        temp_path = os.path.join(BASE_GALLERY_PATH, f"temp_{filename}")
-        file.save(temp_path)
-        
-        # 2. 임시 원본 파일로 썸네일을 즉시 생성합니다.
-        thumb_name = generate_thumb_from_raw(temp_path, filename, file_type)
-        
-        # 3. 임시 파일을 읽어와 한 번만 암호화하고 최종 저장합니다.
-        try:
-            with open(temp_path, 'rb') as f:
-                encrypted_data = cipher.encrypt(f.read())
+    title_base = request.form.get('title', '')
+
+    for file in files:
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            ext = filename.split('.')[-1].lower()
+            
+            # 동영상 및 기타 파일 원천 차단 (이미지만 허용)
+            if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
+                continue
                 
-            save_path = os.path.join(UPLOAD_FOLDER, filename)
-            with open(save_path, 'wb') as f:
-                f.write(encrypted_data)
-        except Exception as e:
-            print(f"암호화 오류: {e}")
-        finally:
-            # 4. 임시 파일 삭제 (용량 확보)
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        
-        # DB 기록
-        conn = get_db()
-        conn.execute('INSERT INTO gallery (title, filename, thumb_name, file_type) VALUES (?, ?, ?, ?)',
-                     (title, filename, thumb_name, file_type))
-        conn.commit()
-        conn.close()
+            file_type = 'image'
+            
+            # 다중 드래그앤드롭 시 파일명을 기본 제목으로 활용
+            title = title_base if title_base else filename
+            
+            # [메모리 최적화 로직] 원본 파일을 임시로 저장
+            temp_path = os.path.join(BASE_GALLERY_PATH, f"temp_{filename}")
+            file.save(temp_path)
+            
+            # 임시 원본 파일로 썸네일을 즉시 생성
+            thumb_name = generate_thumb_from_raw(temp_path, filename)
+            
+            # 임시 파일을 읽어와 한 번만 암호화하고 최종 저장
+            try:
+                with open(temp_path, 'rb') as f:
+                    encrypted_data = cipher.encrypt(f.read())
+                    
+                save_path = os.path.join(UPLOAD_FOLDER, filename)
+                with open(save_path, 'wb') as f:
+                    f.write(encrypted_data)
+            except Exception as e:
+                print(f"암호화 오류: {e}")
+            finally:
+                # 임시 파일 삭제 (용량 확보)
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            
+            # DB 기록
+            conn = get_db()
+            conn.execute('INSERT INTO gallery (title, filename, thumb_name, file_type) VALUES (?, ?, ?, ?)',
+                         (title, filename, thumb_name, file_type))
+            conn.commit()
+            conn.close()
+            
+    # Dropzone(AJAX) 요청 시 JSON 성공 응답 반환
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'Dropzone' in request.headers.get('User-Agent', ''):
+        return jsonify({"status": "success"})
         
     return redirect(url_for('gallery.index'))
 
@@ -145,10 +140,10 @@ def serve_file(filename):
         except:
             return "파일 복호화에 실패했습니다.", 500
     
+    # 동영상 MIME 타입 삭제 (이미지만 남김)
     ext = filename.split('.')[-1].lower()
     mimetypes = {
-        'mp4': 'video/mp4', 'mov': 'video/quicktime', 'avi': 'video/x-msvideo',
-        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif'
+        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp'
     }
     mimetype = mimetypes.get(ext, 'application/octet-stream')
     
