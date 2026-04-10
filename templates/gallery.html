@@ -3,27 +3,40 @@
 {% block content %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/css/glightbox.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
 
 <style>
-    /* 상단 업로드 섹션 스타일 */
+    /* 상단 업로드 섹션 스타일 (Dropzone 적용) */
     .upload-section {
         background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-radius: 15px;
         padding: 30px;
-        margin-bottom: 40px;
+        margin-bottom: 30px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         border: 1px solid #dee2e6;
     }
     
+    .dropzone {
+        background: white;
+        border: 2px dashed #0d6efd;
+        border-radius: 10px;
+        min-height: 150px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.3s ease;
+    }
+    .dropzone:hover { background: #f1f7ff; }
+
     /* 8열 정사각 그리드 레이아웃 */
     .custom-gallery-grid {
         display: grid;
-        /* 기본 모바일 3열, 패드 5열, PC 8열 자동 반응형 */
         grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
         gap: 15px;
     }
 
-    /* 갤러리 아이템 (정사각형 유지) */
+    /* 갤러리 아이템 */
     .gallery-item {
         position: relative;
         aspect-ratio: 1 / 1;
@@ -31,48 +44,33 @@
         overflow: hidden;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         background-color: #f1f1f1;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .gallery-item:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
     }
 
     .gallery-item img {
         width: 100%;
         height: 100%;
-        object-fit: cover; /* 이미지를 정사각형에 맞게 꽉 채움 (찌그러짐 방지) */
+        object-fit: cover;
         transition: transform 0.4s ease;
     }
+    .gallery-item:hover img { transform: scale(1.08); }
 
-    .gallery-item:hover img {
-        transform: scale(1.08);
-    }
-
-    /* 비디오 뱃지 */
-    .video-icon {
+    /* 커스텀 체크박스 */
+    .photo-checkbox {
         position: absolute;
         top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.7);
-        color: #fff;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        z-index: 2;
+        left: 10px;
+        width: 22px;
+        height: 22px;
+        cursor: pointer;
+        z-index: 10;
+        accent-color: #0d6efd;
+        box-shadow: 0 0 5px rgba(0,0,0,0.5);
     }
 
     /* 하단 오버레이 (제목 및 삭제 버튼) */
     .item-overlay {
         position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        bottom: 0; left: 0; right: 0;
         background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
         padding: 20px 10px 10px 10px;
         display: flex;
@@ -82,81 +80,79 @@
         transition: opacity 0.3s ease;
         z-index: 2;
     }
+    .gallery-item:hover .item-overlay { opacity: 1; }
+    .item-title { color: white; font-size: 0.85rem; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-delete { color: #ff4d4d; background: none; border: none; cursor: pointer; font-size: 1rem; }
+    .btn-delete:hover { color: #ff1a1a; }
 
-    .gallery-item:hover .item-overlay {
-        opacity: 1;
+    /* --- 슬라이드쇼 모달 스타일 --- */
+    #slideshowModal {
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.95);
+        z-index: 9999;
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }
+    .slideshow-img {
+        max-width: 90vw;
+        max-height: 80vh;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        transition: all 0.5s ease-in-out;
+        opacity: 0; /* 초기 투명도 */
+    }
+    .slideshow-title {
+        color: white; margin-top: 20px; font-size: 1.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .btn-close-slideshow {
+        position: absolute; top: 20px; right: 30px;
+        background: none; border: none; color: white; font-size: 2.5rem; cursor: pointer; transition: color 0.2s;
+    }
+    .btn-close-slideshow:hover { color: #ff4d4d; }
 
-    .item-title {
-        color: white;
-        font-size: 0.85rem;
-        font-weight: 500;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 80%;
-    }
-
-    .btn-delete {
-        color: #ff4d4d;
-        background: none;
-        border: none;
-        cursor: pointer;
-        font-size: 1rem;
-        transition: color 0.2s;
-    }
-    .btn-delete:hover {
-        color: #ff1a1a;
-    }
-
-    /* 파일 업로드 인풋 스타일링 */
-    .styled-file-input::-webkit-file-upload-button {
-        background: #0d6efd;
-        color: white;
-        border: none;
-        padding: 8px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-    .styled-file-input::-webkit-file-upload-button:hover {
-        background: #0b5ed7;
-    }
+    /* 슬라이드쇼 애니메이션 효과 (JS 연동) */
+    .effect-active { opacity: 1 !important; transform: scale(1) translateX(0) !important; }
+    .effect-hide-fade { opacity: 0; }
+    .effect-hide-zoom { opacity: 0; transform: scale(0.6); }
+    .effect-hide-slide { opacity: 0; transform: translateX(100px); }
 </style>
 
 <div class="container-fluid mt-4 px-4">
     
     <div class="upload-section">
-        <div class="row align-items-center">
-            <div class="col-lg-5 mb-3 mb-lg-0">
-                <h3 class="mb-1"><i class="fas fa-camera-retro text-primary"></i> 미디어 갤러리</h3>
-                <p class="text-muted small mb-0">사내 전용 암호화 스토리지입니다.</p>
+        <h3 class="mb-2"><i class="fas fa-images text-primary"></i> 개인 미디어 갤러리</h3>
+        <p class="text-muted small mb-3">여러 장의 사진을 드래그해서 한 번에 올리세요! (동영상 제외)</p>
+        
+        <form action="{{ url_for('gallery.upload') }}" class="dropzone" id="galleryDropzone">
+            <div class="dz-message" data-dz-message>
+                <i class="fas fa-cloud-upload-alt fa-3x mb-2 text-primary"></i><br>
+                <span>여기로 사진을 드래그하거나 클릭하여 업로드하세요.</span>
             </div>
-            <div class="col-lg-7">
-                <form action="{{ url_for('gallery.upload') }}" method="post" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 justify-content-lg-end align-items-center">
-                    <input type="text" name="title" class="form-control" placeholder="사진/영상 제목" style="max-width: 200px;" required>
-                    <input type="file" name="file" class="form-control styled-file-input" style="max-width: 300px;" accept="image/*,video/*" required>
-                    <button type="submit" class="btn btn-primary px-4"><i class="fas fa-cloud-upload-alt"></i> 업로드</button>
-                </form>
-            </div>
+        </form>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <button id="btnSelectAll" class="btn btn-sm btn-outline-primary"><i class="fas fa-check-double"></i> 전체 선택</button>
+            <button id="btnPlaySlideshow" class="btn btn-sm btn-success ms-2"><i class="fas fa-play"></i> 선택된 사진 슬라이드쇼 (2초)</button>
         </div>
+        <span class="text-muted small">사진을 클릭하면 확대해서 볼 수 있습니다.</span>
     </div>
 
     {% if files %}
     <div class="custom-gallery-grid">
         {% for file in files %}
         <div class="gallery-item">
+            <input type="checkbox" class="photo-checkbox" value="{{ url_for('gallery.serve_file', filename=file.filename) }}" data-title="{{ file.title }}" onclick="event.stopPropagation();">
+            
             <a href="{{ url_for('gallery.serve_file', filename=file.filename) }}" 
                class="glightbox w-100 h-100 d-block" 
                data-gallery="saedam_gallery" 
-               data-title="{{ file.title }}"
-               data-description="업로드일: {{ file.created_at }}">
-                
+               data-title="{{ file.title }}">
                 <img src="{{ url_for('gallery.serve_thumb', filename=file.thumb_name) }}" alt="{{ file.title }}" loading="lazy">
-                
-                {% if file.file_type == 'video' %}
-                <div class="video-icon"><i class="fas fa-play"></i></div>
-                {% endif %}
             </a>
             
             <div class="item-overlay">
@@ -174,21 +170,107 @@
     {% else %}
     <div class="text-center py-5">
         <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-        <h5 class="text-muted">업로드된 미디어가 없습니다.</h5>
+        <h5 class="text-muted">업로드된 사진이 없습니다.</h5>
     </div>
     {% endif %}
+</div>
 
+<div id="slideshowModal">
+    <button id="btnCloseSlideshow" class="btn-close-slideshow"><i class="fas fa-times"></i></button>
+    <img id="slideshowImg" src="" class="slideshow-img">
+    <div id="slideshowTitle" class="slideshow-title"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/js/glightbox.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.js"></script>
+
 <script>
+    // 1. GLightbox 초기화 (기존 뷰어)
     const lightbox = GLightbox({
         selector: '.glightbox',
         touchNavigation: true,
         loop: true,
-        autoplayVideos: true,
         width: '90vw'
     });
+
+    // 2. Dropzone.js 설정 (다중 드래그앤드롭 업로드)
+    Dropzone.options.galleryDropzone = {
+        paramName: "file",
+        maxFilesize: 20, // 최대 20MB
+        acceptedFiles: "image/*", // 이미지만 허용
+        init: function() {
+            this.on("queuecomplete", function(file) {
+                // 업로드가 모두 끝나면 1초 뒤 페이지 새로고침
+                setTimeout(() => { window.location.reload(); }, 1000);
+            });
+        }
+    };
+
+    // 3. 슬라이드쇼 로직 (체크박스 기반 랜덤 트랜지션)
+    let slideInterval;
+    let slideImages = [];
+    let currentIndex = 0;
+    const hideEffects = ['effect-hide-fade', 'effect-hide-zoom', 'effect-hide-slide'];
+
+    // 전체 선택/해제 토글
+    document.getElementById('btnSelectAll').addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.photo-checkbox');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+    });
+
+    // 슬라이드쇼 시작
+    document.getElementById('btnPlaySlideshow').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.photo-checkbox:checked');
+        if(checkedBoxes.length === 0) {
+            alert('슬라이드쇼로 볼 사진을 하나 이상 선택해주세요.');
+            return;
+        }
+
+        // 선택된 데이터 배열에 담기
+        slideImages = Array.from(checkedBoxes).map(cb => ({
+            src: cb.value,
+            title: cb.getAttribute('data-title')
+        }));
+        
+        currentIndex = 0;
+        document.getElementById('slideshowModal').style.display = 'flex';
+        
+        showSlide(); // 첫 장 보여주기
+        slideInterval = setInterval(nextSlide, 2000); // 2초 간격 재생
+    });
+
+    // 슬라이드쇼 닫기
+    document.getElementById('btnCloseSlideshow').addEventListener('click', function() {
+        document.getElementById('slideshowModal').style.display = 'none';
+        clearInterval(slideInterval);
+    });
+
+    function nextSlide() {
+        currentIndex = (currentIndex + 1) % slideImages.length;
+        showSlide();
+    }
+
+    function showSlide() {
+        const img = document.getElementById('slideshowImg');
+        const title = document.getElementById('slideshowTitle');
+
+        // 랜덤 퇴장 효과 부여
+        img.className = 'slideshow-img';
+        img.classList.add(hideEffects[Math.floor(Math.random() * hideEffects.length)]);
+
+        // 0.5초(퇴장 애니메이션 시간) 후 사진 교체 및 등장
+        setTimeout(() => {
+            img.src = slideImages[currentIndex].src;
+            title.innerText = slideImages[currentIndex].title;
+            
+            // DOM 강제 렌더링 트리거
+            void img.offsetWidth;
+            
+            // 활성화 클래스 추가하여 화면에 표시
+            img.className = 'slideshow-img effect-active';
+        }, 500); 
+    }
 </script>
 
 {% endblock %}
