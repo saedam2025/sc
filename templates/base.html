@@ -144,6 +144,8 @@
 
         .btn-close-modal { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
         .btn-close-modal:hover { background: var(--widget-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .btn-random-theme { background: var(--widget-bg); color: var(--primary-color); border: 1px solid var(--primary-color); padding: 12px 30px; border-radius: 30px; cursor: pointer; font-weight: 700; font-size: 1rem; transition: all 0.3s; box-shadow: var(--card-shadow); display: inline-flex; align-items: center; gap: 8px; }
+        .btn-random-theme:hover { background: var(--primary-color); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
 
         .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--card-border); border-radius: 10px; box-sizing: border-box; background: var(--input-bg); color: var(--input-text); outline: none; transition: all 0.3s; }
         .glass-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
@@ -203,14 +205,6 @@
         .line-neg { animation: slideLineNeg infinite linear; }
         @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
         @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
-
-        /* 셀렉트 박스 테마 연동 룩앤필 */
-        .theme-select-box {
-            padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border);
-            background: var(--input-bg); color: var(--input-text); outline: none;
-            font-family: 'Pretendard', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s;
-        }
-        .theme-select-box:hover { border-color: var(--primary-color); box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -279,6 +273,10 @@
             </nav>
 
             <div class="user-section">
+                <a href="javascript:void(0);" onclick="applyRandomTheme()" class="btn-memo" title="다이나믹 테마 랜덤 변경">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </a>
+
                 {% if session.get('user_name') %}
                 <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
                     <i class="fa-solid fa-chalkboard"></i>
@@ -303,58 +301,10 @@
     </main>
 
     <footer class="main-footer">
-        <div class="theme-selector" style="margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <label style="font-weight: 800; color: var(--primary-color); margin-right: 5px;"><i class="fa-solid fa-palette"></i> 1250+ 다이나믹 테마:</label>
-            
-            <select id="theme-style-select" class="theme-select-box" onchange="generateThemeFromSelects()">
-                <option value="blobs">🌸 자연 (블랍)</option>
-                <option value="waves">🌊 오션 (물결)</option>
-                <option value="stars">🌌 우주 (별빛)</option>
-                <option value="orbs">🔮 오로라 (오브)</option>
-                <option value="rings">💎 크리스탈 (링)</option>
-                <option value="bubbles">💧 워터 (물방울)</option>
-                <option value="lines">⚡ 사이버 (라인)</option>
-                <option value="geometry">🧊 기하학 (도형)</option>
-                <option value="polygons">🔺 폴리곤 (다각형)</option>
-                <option value="cyber">🌐 매트릭스 (그리드)</option>
-            </select>
-
-            <select id="theme-color-select" class="theme-select-box" onchange="generateThemeFromSelects()">
-                <option value="200">스카이블루 (Sky Blue)</option>
-                <option value="180">시안 (Cyan)</option>
-                <option value="170">틸 (Teal)</option>
-                <option value="120">그린 (Green)</option>
-                <option value="150">에메랄드 (Emerald)</option>
-                <option value="80">라임 (Lime)</option>
-                <option value="50">옐로우 (Yellow)</option>
-                <option value="35">라이트 오렌지 (Light Orange)</option>
-                <option value="20">오렌지 (Orange)</option>
-                <option value="10">코랄 (Coral)</option>
-                <option value="340">로즈 (Rose)</option>
-                <option value="15">피치 (Peach)</option>
-                <option value="320">핑크 (Pink)</option>
-                <option value="300">마젠타 (Magenta)</option>
-                <option value="310">플럼 (Plum)</option>
-                <option value="280">퍼플 (Purple)</option>
-                <option value="270">바이올렛 (Violet)</option>
-                <option value="250">인디고 (Indigo)</option>
-                <option value="240">딥 인디고 (Deep Indigo)</option>
-                <option value="190">아쿠아 (Aqua)</option>
-                <option value="160">씨그린 (Sea Green)</option>
-                <option value="210">파스텔 블루 (Pastel Blue)</option>
-                <option value="220">그레이 블루 (Gray Blue)</option>
-                <option value="260">라벤더 (Lavender)</option>
-                <option value="30">살구 (Apricot)</option>
-            </select>
-
-            <select id="theme-mode-select" class="theme-select-box" onchange="generateThemeFromSelects()">
-                <option value="glass-light">유리 모드 (밝음)</option>
-                <option value="glass-dark">유리 모드 (어두움)</option>
-                <option value="neon-light">네온 글로우 (밝음) ✨</option>
-                <option value="neon-dark">네온 글로우 (어두움) ✨</option>
-                <option value="solid-light">솔리드 (밝음)</option>
-                <option value="solid-dark">솔리드 (어두움)</option>
-            </select>
+        <div style="margin-bottom: 20px; display: flex; justify-content: center; align-items: center;">
+            <button onclick="applyRandomTheme()" class="btn-random-theme">
+                <i class="fa-solid fa-shuffle"></i> 랜덤 테마 적용하기
+            </button>
         </div>
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
@@ -488,15 +438,19 @@
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
 
         // =====================================================================================
-        // 🚀 1250+ 다이나믹 테마 생성 엔진 (전역 적용)
+        // 🚀 랜덤 다이나믹 테마 생성 엔진 (전역 적용)
         // =====================================================================================
         
-        function generateThemeFromSelects() {
-            const style = document.getElementById('theme-style-select').value;
-            const hue = parseInt(document.getElementById('theme-color-select').value);
-            const mode = document.getElementById('theme-mode-select').value;
+        const THEME_STYLES = ['blobs', 'waves', 'stars', 'orbs', 'rings', 'bubbles', 'lines', 'geometry', 'polygons', 'cyber'];
+        const THEME_HUES = [200, 180, 170, 120, 150, 80, 50, 35, 20, 10, 340, 15, 320, 300, 310, 280, 270, 250, 240, 190, 160, 210, 220, 260, 30];
+        const THEME_MODES = ['glass-light', 'glass-dark', 'neon-light', 'neon-dark', 'solid-light', 'solid-dark'];
 
-            applyDynamicTheme(style, hue, mode);
+        function applyRandomTheme() {
+            const randomStyle = THEME_STYLES[Math.floor(Math.random() * THEME_STYLES.length)];
+            const randomHue = THEME_HUES[Math.floor(Math.random() * THEME_HUES.length)];
+            const randomMode = THEME_MODES[Math.floor(Math.random() * THEME_MODES.length)];
+
+            applyDynamicTheme(randomStyle, randomHue, randomMode);
         }
 
         function applyDynamicTheme(style, hue, mode) {
@@ -539,7 +493,7 @@
                 vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.4)';
                 vars['--card-backdrop'] = 'blur(24px)';
             }
-            else if (mode === 'neon-light') {  // 추가된 밝은 글로우 모드
+            else if (mode === 'neon-light') {  
                 vars['--body-bg'] = '#f8fafc';
                 vars['--text-dark'] = '#0f172a';
                 vars['--text-gray'] = '#475569';
@@ -675,20 +629,17 @@
             return `${Math.round(255 * f(0))}, ${Math.round(255 * f(8))}, ${Math.round(255 * f(4))}`;
         }
 
-        // 페이지 로드 시 기존 저장된 테마 UI 복원
+        // 페이지 로드 시 기존 저장된 테마 복원 또는 초기 테마 생성
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = localStorage.getItem('saedam_theme_config');
             if (savedTheme) {
                 try {
                     const config = JSON.parse(savedTheme);
-                    document.getElementById('theme-style-select').value = config.style;
-                    document.getElementById('theme-color-select').value = config.hue;
-                    document.getElementById('theme-mode-select').value = config.mode;
                     renderBackgroundEffects(config.style, config.mode.includes('dark'));
                 } catch(e) {}
             } else {
-                // 초기 기본 테마 설정 (블루, 유리, 밝음)
-                generateThemeFromSelects();
+                // 초기 접속 시 랜덤 테마로 시작
+                applyRandomTheme();
             }
         });
     </script>
