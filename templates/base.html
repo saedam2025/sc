@@ -304,7 +304,7 @@
 
     <footer class="main-footer">
         <div class="theme-selector" style="margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <label style="font-weight: 800; color: var(--primary-color); margin-right: 5px;"><i class="fa-solid fa-palette"></i> 1100+ 다이나믹 테마:</label>
+            <label style="font-weight: 800; color: var(--primary-color); margin-right: 5px;"><i class="fa-solid fa-palette"></i> 1250+ 다이나믹 테마:</label>
             
             <select id="theme-style-select" class="theme-select-box" onchange="generateThemeFromSelects()">
                 <option value="blobs">🌸 자연 (블랍)</option>
@@ -320,26 +320,38 @@
             </select>
 
             <select id="theme-color-select" class="theme-select-box" onchange="generateThemeFromSelects()">
-                <option value="210">블루 (Blue)</option>
+                <option value="200">스카이블루 (Sky Blue)</option>
                 <option value="180">시안 (Cyan)</option>
-                <option value="150">에메랄드 (Emerald)</option>
+                <option value="170">틸 (Teal)</option>
                 <option value="120">그린 (Green)</option>
+                <option value="150">에메랄드 (Emerald)</option>
                 <option value="80">라임 (Lime)</option>
                 <option value="50">옐로우 (Yellow)</option>
-                <option value="35">골드 (Gold)</option>
+                <option value="35">라이트 오렌지 (Light Orange)</option>
                 <option value="20">오렌지 (Orange)</option>
-                <option value="0">레드 (Red)</option>
+                <option value="10">코랄 (Coral)</option>
                 <option value="340">로즈 (Rose)</option>
+                <option value="15">피치 (Peach)</option>
                 <option value="320">핑크 (Pink)</option>
+                <option value="300">마젠타 (Magenta)</option>
+                <option value="310">플럼 (Plum)</option>
                 <option value="280">퍼플 (Purple)</option>
-                <option value="260">바이올렛 (Violet)</option>
-                <option value="240">인디고 (Indigo)</option>
+                <option value="270">바이올렛 (Violet)</option>
+                <option value="250">인디고 (Indigo)</option>
+                <option value="240">딥 인디고 (Deep Indigo)</option>
+                <option value="190">아쿠아 (Aqua)</option>
+                <option value="160">씨그린 (Sea Green)</option>
+                <option value="210">파스텔 블루 (Pastel Blue)</option>
+                <option value="220">그레이 블루 (Gray Blue)</option>
+                <option value="260">라벤더 (Lavender)</option>
+                <option value="30">살구 (Apricot)</option>
             </select>
 
             <select id="theme-mode-select" class="theme-select-box" onchange="generateThemeFromSelects()">
                 <option value="glass-light">유리 모드 (밝음)</option>
                 <option value="glass-dark">유리 모드 (어두움)</option>
-                <option value="neon-dark">네온 글로우 (어두움)</option>
+                <option value="neon-light">네온 글로우 (밝음) ✨</option>
+                <option value="neon-dark">네온 글로우 (어두움) ✨</option>
                 <option value="solid-light">솔리드 (밝음)</option>
                 <option value="solid-dark">솔리드 (어두움)</option>
             </select>
@@ -476,7 +488,7 @@
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
 
         // =====================================================================================
-        // 🚀 1100+ 다이나믹 테마 생성 엔진 (전역 적용)
+        // 🚀 1250+ 다이나믹 테마 생성 엔진 (전역 적용)
         // =====================================================================================
         
         function generateThemeFromSelects() {
@@ -491,7 +503,6 @@
             let vars = {};
             const isDark = mode.includes('dark');
             const isSolid = mode.includes('solid');
-            const isNeon = mode === 'neon-dark';
 
             // 1. 기본 색상 생성 (HSL 기반)
             const primary = `hsl(${hue}, 80%, ${isDark ? '60%' : '50%'})`;
@@ -527,6 +538,21 @@
                 vars['--widget-border'] = 'rgba(255, 255, 255, 0.1)';
                 vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.4)';
                 vars['--card-backdrop'] = 'blur(24px)';
+            }
+            else if (mode === 'neon-light') {  // 추가된 밝은 글로우 모드
+                vars['--body-bg'] = '#f8fafc';
+                vars['--text-dark'] = '#0f172a';
+                vars['--text-gray'] = '#475569';
+                vars['--card-bg'] = 'rgba(255, 255, 255, 0.85)';
+                vars['--card-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.5)`;
+                vars['--navbar-bg'] = 'rgba(255, 255, 255, 0.95)';
+                vars['--input-bg'] = '#ffffff';
+                vars['--input-text'] = '#0f172a';
+                vars['--widget-bg'] = 'rgba(255, 255, 255, 0.9)';
+                vars['--widget-hover'] = '#ffffff';
+                vars['--widget-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.6)`;
+                vars['--card-shadow'] = `0 0 25px rgba(${hslToRgb(hue, 80, 50)}, 0.3)`;
+                vars['--card-backdrop'] = 'blur(10px)';
             }
             else if (mode === 'neon-dark') {
                 vars['--body-bg'] = '#0a0a0a';
