@@ -144,8 +144,6 @@
 
         .btn-close-modal { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
         .btn-close-modal:hover { background: var(--widget-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .btn-random-theme { background: var(--widget-bg); color: var(--primary-color); border: 1px solid var(--primary-color); padding: 12px 30px; border-radius: 30px; cursor: pointer; font-weight: 700; font-size: 1rem; transition: all 0.3s; box-shadow: var(--card-shadow); display: inline-flex; align-items: center; gap: 8px; }
-        .btn-random-theme:hover { background: var(--primary-color); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
 
         .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--card-border); border-radius: 10px; box-sizing: border-box; background: var(--input-bg); color: var(--input-text); outline: none; transition: all 0.3s; }
         .glass-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
@@ -153,10 +151,42 @@
         .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
         .btn-primary-glass:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
 
-        .main-footer { position: relative; z-index: 10; text-align: center; padding: 40px 0; color: var(--text-gray); font-size: 0.85rem; border-top: 1px solid var(--card-border); margin-top: 50px; background: transparent; }
+        .main-footer { position: relative; z-index: 10; text-align: center; padding: 40px 0 80px 0; color: var(--text-gray); font-size: 0.85rem; border-top: 1px solid var(--card-border); margin-top: 50px; background: transparent; }
 
         /* ===============================================================
-           🚀 배경 애니메이션 효과 모음 (1100 테마 다이나믹 글로우 연동)
+           ✨ 우측 하단 테마 랜덤 컨트롤러 (텍스트 클릭형)
+           =============================================================== */
+        .theme-control-wrapper {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 3000;
+        }
+
+        .theme-name-display {
+            color: var(--text-dark);
+            font-size: 0.75rem;
+            font-weight: 400;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* 가독성을 위한 은은한 그림자 */
+            cursor: pointer; /* 마우스를 올렸을 때 손가락 모양으로 변경 */
+            user-select: none; /* 텍스트 더블클릭 드래그 방지 */
+        }
+
+        .theme-name-display:hover {
+            transform: translateY(-2px);
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 600px) {
+            .theme-control-wrapper { flex-direction: column; align-items: flex-end; right: 15px; bottom: 15px; }
+        }
+
+        /* ===============================================================
+           🚀 배경 애니메이션 효과 모음
            =============================================================== */
         #bg-effect-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
         
@@ -301,13 +331,12 @@
     </main>
 
     <footer class="main-footer">
-        <div style="margin-bottom: 20px; display: flex; justify-content: center; align-items: center;">
-            <button onclick="applyRandomTheme()" class="btn-random-theme">
-                <i class="fa-solid fa-shuffle"></i> 랜덤 테마 적용하기
-            </button>
-        </div>
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
+
+    <div class="theme-control-wrapper">
+        <div id="currentThemeName" class="theme-name-display" onclick="applyRandomTheme()" title="클릭하여 테마 랜덤 변경">테마를 불러오는 중...</div>
+    </div>
 
     <div id="myInfoModal" class="modal">
         <div class="modal-content">
@@ -438,163 +467,162 @@
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
 
         // =====================================================================================
-        // 🚀 랜덤 다이나믹 테마 생성 엔진 (전역 적용)
+        // 🚀 1100 테마 다이나믹 생성 엔진 복구 및 LocalStorage 연동
         // =====================================================================================
         
-        const THEME_STYLES = ['blobs', 'waves', 'stars', 'orbs', 'rings', 'bubbles', 'lines', 'geometry', 'polygons', 'cyber'];
-        const THEME_HUES = [200, 180, 170, 120, 150, 80, 50, 35, 20, 10, 340, 15, 320, 300, 310, 280, 270, 250, 240, 190, 160, 210, 220, 260, 30];
-        const THEME_MODES = ['glass-light', 'glass-dark', 'neon-light', 'neon-dark', 'solid-light', 'solid-dark'];
+        const uiStyles = ['glass', 'solid', 'glow'];
+        const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
+        
+        const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
+        const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
 
-        function applyRandomTheme() {
-            const randomStyle = THEME_STYLES[Math.floor(Math.random() * THEME_STYLES.length)];
-            const randomHue = THEME_HUES[Math.floor(Math.random() * THEME_HUES.length)];
-            const randomMode = THEME_MODES[Math.floor(Math.random() * THEME_MODES.length)];
+        const generatedThemes = [];
 
-            applyDynamicTheme(randomStyle, randomHue, randomMode);
+        // 1100가지 테마 생성 루프
+        for (let i = 0; i < 1100; i++) {
+            const hue = Math.floor((i / 1100) * 360);
+            const useComplementary = (i % 5 === 0);
+            const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+            
+            let effectType;
+            if(i >= 1000) {
+                const geoEffects = ['geometry', 'rings', 'polygons', 'lines'];
+                effectType = geoEffects[i % geoEffects.length];
+            } else {
+                effectType = effectsList[i % effectsList.length];
+            }
+            
+            const isDark = i % 2 === 0;
+            const uiStyle = uiStyles[i % uiStyles.length]; 
+            
+            const styleNameKOR = uiStyle === 'glass' ? "유리" : (uiStyle === 'solid' ? "솔리드" : "네온");
+            const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+            
+            let vars = {};
+            
+            if (isDark) {
+                const primary = `hsl(${pointHue}, 80%, 60%)`;
+                const primaryDark = `hsl(${pointHue}, 80%, 40%)`;
+                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 10%), hsl(${(hue + 45) % 360}, 50%, 5%), hsl(${(hue - 45 + 360) % 360}, 40%, 10%))`;
+                
+                vars = {
+                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                    "--text-dark": "#ffffff", "--text-gray": "#cbd5e1",
+                    "--input-text": "#ffffff", 
+                    "--effect-color1": `hsl(${hue}, 80%, 50%)`, 
+                    "--effect-color2": `hsl(${(hue + 40) % 360}, 80%, 50%)`, 
+                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 80%, 50%)`
+                };
+
+                if (uiStyle === 'glass') {
+                    vars["--card-bg"] = "rgba(20, 20, 30, 0.4)"; vars["--card-border"] = "rgba(255, 255, 255, 0.15)";
+                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.15)";
+                    vars["--input-bg"] = "rgba(0, 0, 0, 0.4)"; vars["--widget-bg"] = "rgba(30, 30, 45, 0.5)"; 
+                    vars["--widget-hover"] = "rgba(45, 45, 60, 0.8)"; vars["--widget-border"] = "rgba(255, 255, 255, 0.15)";
+                    vars["--navbar-bg"] = "rgba(20, 20, 30, 0.6)";
+                } else if (uiStyle === 'solid') {
+                    vars["--card-bg"] = "#1e293b"; vars["--card-border"] = "transparent";
+                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 50px rgba(0, 0, 0, 0.5)";
+                    vars["--input-bg"] = "#0f172a"; vars["--widget-bg"] = "#0f172a"; 
+                    vars["--widget-hover"] = "#334155"; vars["--widget-border"] = "transparent";
+                    vars["--navbar-bg"] = "#1e293b";
+                } else if (uiStyle === 'glow') {
+                    vars["--card-bg"] = "rgba(0, 0, 0, 0.6)"; vars["--card-border"] = primary;
+                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 30px ${primaryDark}`;
+                    vars["--input-bg"] = "rgba(0,0,0,0.5)"; vars["--widget-bg"] = "rgba(0,0,0,0.5)"; 
+                    vars["--widget-hover"] = "rgba(0,0,0,0.8)"; vars["--widget-border"] = primaryDark;
+                    vars["--navbar-bg"] = "rgba(0, 0, 0, 0.8)";
+                }
+            } else {
+                const primary = `hsl(${pointHue}, 70%, 50%)`;
+                const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
+                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
+                
+                vars = {
+                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                    "--text-dark": "#0f172a", "--text-gray": "#64748b",
+                    "--input-text": "#1e293b",
+                    "--effect-color1": `hsl(${hue}, 70%, 75%)`, 
+                    "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, 
+                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`
+                };
+
+                if (uiStyle === 'glass') {
+                    vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
+                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
+                    vars["--input-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; 
+                    vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
+                    vars["--navbar-bg"] = "rgba(255, 255, 255, 0.7)";
+                } else if (uiStyle === 'solid') {
+                    vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
+                    vars["--input-bg"] = "#f1f5f9"; vars["--widget-bg"] = "#f1f5f9"; 
+                    vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+                    vars["--navbar-bg"] = "#ffffff";
+                } else if (uiStyle === 'glow') {
+                    vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
+                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
+                    vars["--input-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-bg"] = "rgba(255,255,255,0.5)"; 
+                    vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
+                    vars["--navbar-bg"] = "rgba(255, 255, 255, 0.9)";
+                }
+            }
+            
+            generatedThemes.push({ name: name, type: effectType, vars: vars, isDark: isDark });
         }
 
-        function applyDynamicTheme(style, hue, mode) {
-            let vars = {};
-            const isDark = mode.includes('dark');
-            const isSolid = mode.includes('solid');
+        let currentThemeIndex = -1;
 
-            // 1. 기본 색상 생성 (HSL 기반)
-            const primary = `hsl(${hue}, 80%, ${isDark ? '60%' : '50%'})`;
-            const primaryDark = `hsl(${hue}, 80%, ${isDark ? '50%' : '40%'})`;
+        function applyRandomTheme() {
+            let newIndex = Math.floor(Math.random() * generatedThemes.length);
+            while (newIndex === currentThemeIndex) {
+                newIndex = Math.floor(Math.random() * generatedThemes.length);
+            }
+            currentThemeIndex = newIndex;
             
-            // 2. 모드별 배경 및 요소 컬러 설정
-            if (mode === 'glass-light') {
-                vars['--body-bg'] = `linear-gradient(-45deg, hsl(${hue}, 30%, 96%), hsl(${(hue + 40)%360}, 40%, 92%), hsl(${(hue - 40 + 360)%360}, 30%, 96%))`;
-                vars['--text-dark'] = '#1e293b';
-                vars['--text-gray'] = '#64748b';
-                vars['--card-bg'] = 'rgba(255, 255, 255, 0.6)';
-                vars['--card-border'] = 'rgba(255, 255, 255, 0.9)';
-                vars['--navbar-bg'] = 'rgba(255, 255, 255, 0.7)';
-                vars['--input-bg'] = 'rgba(255, 255, 255, 0.8)';
-                vars['--input-text'] = '#1e293b';
-                vars['--widget-bg'] = 'rgba(255, 255, 255, 0.7)';
-                vars['--widget-hover'] = 'rgba(255, 255, 255, 1)';
-                vars['--widget-border'] = 'rgba(255, 255, 255, 1)';
-                vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.1)';
-                vars['--card-backdrop'] = 'blur(24px)';
-            } 
-            else if (mode === 'glass-dark') {
-                vars['--body-bg'] = `linear-gradient(-45deg, hsl(${hue}, 30%, 10%), hsl(${(hue + 40)%360}, 40%, 15%), hsl(${(hue - 40 + 360)%360}, 30%, 10%))`;
-                vars['--text-dark'] = '#f8fafc';
-                vars['--text-gray'] = '#cbd5e1';
-                vars['--card-bg'] = 'rgba(15, 23, 42, 0.6)';
-                vars['--card-border'] = 'rgba(255, 255, 255, 0.15)';
-                vars['--navbar-bg'] = 'rgba(15, 23, 42, 0.7)';
-                vars['--input-bg'] = 'rgba(30, 41, 59, 0.8)';
-                vars['--input-text'] = '#f8fafc';
-                vars['--widget-bg'] = 'rgba(30, 41, 59, 0.6)';
-                vars['--widget-hover'] = 'rgba(51, 65, 85, 0.8)';
-                vars['--widget-border'] = 'rgba(255, 255, 255, 0.1)';
-                vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.4)';
-                vars['--card-backdrop'] = 'blur(24px)';
-            }
-            else if (mode === 'neon-light') {  
-                vars['--body-bg'] = '#f8fafc';
-                vars['--text-dark'] = '#0f172a';
-                vars['--text-gray'] = '#475569';
-                vars['--card-bg'] = 'rgba(255, 255, 255, 0.85)';
-                vars['--card-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.5)`;
-                vars['--navbar-bg'] = 'rgba(255, 255, 255, 0.95)';
-                vars['--input-bg'] = '#ffffff';
-                vars['--input-text'] = '#0f172a';
-                vars['--widget-bg'] = 'rgba(255, 255, 255, 0.9)';
-                vars['--widget-hover'] = '#ffffff';
-                vars['--widget-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.6)`;
-                vars['--card-shadow'] = `0 0 25px rgba(${hslToRgb(hue, 80, 50)}, 0.3)`;
-                vars['--card-backdrop'] = 'blur(10px)';
-            }
-            else if (mode === 'neon-dark') {
-                vars['--body-bg'] = '#0a0a0a';
-                vars['--text-dark'] = '#ffffff';
-                vars['--text-gray'] = '#a1a1aa';
-                vars['--card-bg'] = 'rgba(10, 10, 10, 0.8)';
-                vars['--card-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.5)`;
-                vars['--navbar-bg'] = 'rgba(10, 10, 10, 0.9)';
-                vars['--input-bg'] = '#171717';
-                vars['--input-text'] = '#ffffff';
-                vars['--widget-bg'] = '#121212';
-                vars['--widget-hover'] = '#262626';
-                vars['--widget-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.4)`;
-                vars['--card-shadow'] = `0 0 20px rgba(${hslToRgb(hue, 80, 50)}, 0.2)`;
-                vars['--card-backdrop'] = 'blur(10px)';
-            }
-            else if (mode === 'solid-light') {
-                vars['--body-bg'] = `hsl(${hue}, 20%, 96%)`;
-                vars['--text-dark'] = '#1e293b';
-                vars['--text-gray'] = '#64748b';
-                vars['--card-bg'] = '#ffffff';
-                vars['--card-border'] = '#e2e8f0';
-                vars['--navbar-bg'] = '#ffffff';
-                vars['--input-bg'] = '#f1f5f9';
-                vars['--input-text'] = '#1e293b';
-                vars['--widget-bg'] = '#ffffff';
-                vars['--widget-hover'] = '#f8fafc';
-                vars['--widget-border'] = '#e2e8f0';
-                vars['--card-shadow'] = '0 10px 25px rgba(0, 0, 0, 0.05)';
-                vars['--card-backdrop'] = 'none';
-            }
-            else if (mode === 'solid-dark') {
-                vars['--body-bg'] = '#0f172a';
-                vars['--text-dark'] = '#f1f5f9';
-                vars['--text-gray'] = '#94a3b8';
-                vars['--card-bg'] = '#1e293b';
-                vars['--card-border'] = '#334155';
-                vars['--navbar-bg'] = '#1e293b';
-                vars['--input-bg'] = '#0f172a';
-                vars['--input-text'] = '#f1f5f9';
-                vars['--widget-bg'] = '#1e293b';
-                vars['--widget-hover'] = '#334155';
-                vars['--widget-border'] = '#475569';
-                vars['--card-shadow'] = '0 10px 25px rgba(0, 0, 0, 0.5)';
-                vars['--card-backdrop'] = 'none';
-            }
-
-            vars['--primary-color'] = primary;
-            vars['--primary-dark'] = primaryDark;
+            const t = generatedThemes[currentThemeIndex];
             
-            // 이펙트 컬러 설정
-            const lightness = isDark ? '40%' : '75%';
-            vars['--effect-color1'] = `hsl(${hue}, 80%, ${lightness})`;
-            vars['--effect-color2'] = `hsl(${(hue + 40)%360}, 80%, ${lightness})`;
-            vars['--effect-color3'] = `hsl(${(hue - 40 + 360)%360}, 80%, ${lightness})`;
-
-            // 3. CSS 변수 적용
-            for (const [key, value] of Object.entries(vars)) {
+            // 변수 적용
+            for (const [key, value] of Object.entries(t.vars)) {
                 document.documentElement.style.setProperty(key, value);
             }
 
-            // 4. 로컬 스토리지에 현재 설정 저장
-            localStorage.setItem('saedam_theme_config', JSON.stringify({ style, hue, mode, vars }));
+            // 우측 하단 테마명 출력 업데이트 (텍스트만)
+            const fullThemeName = `[Theme ${currentThemeIndex + 1}/1100] ${t.name}`;
+            document.getElementById('currentThemeName').innerText = fullThemeName;
 
-            // 5. 배경 애니메이션 DOM 재구성
-            renderBackgroundEffects(style, isDark);
+            // 로컬 스토리지에 저장하여 다른 페이지에서도 유지
+            localStorage.setItem('saedam_theme_config', JSON.stringify({
+                name: fullThemeName,
+                type: t.type,
+                vars: t.vars,
+                isDark: t.isDark
+            }));
+
+            // 배경 효과 렌더링
+            renderBackgroundEffects(t.type, t.isDark);
         }
 
         function renderBackgroundEffects(style, isDark) {
             const container = document.getElementById('bg-effect-container');
             container.style.opacity = '0';
             
-            // 다크 모드일 때 블랍(Blob) 혼합 모드 변경을 위한 클래스 토글
             if(isDark) document.body.classList.add('dark-mode-blob');
             else document.body.classList.remove('dark-mode-blob');
 
             setTimeout(() => {
                 container.innerHTML = ''; 
+                
                 if (style === 'stars') {
                     container.innerHTML = `<div class="stars-small"></div><div class="stars-medium"></div><div class="stars-large"></div><div class="shooting-star" style="top:20%; right:-10%;"></div>`;
                 } else if (style === 'bubbles') {
-                    for(let i=0; i<25; i++) {
+                    for(let i=0; i<30; i++) {
                         let b = document.createElement('div'); b.className = 'bubble'; b.style.left = Math.random() * 100 + '%'; b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px'; b.style.animationDuration = (Math.random() * 8 + 4) + 's'; b.style.animationDelay = (Math.random() * 5) + 's'; container.appendChild(b);
                     }
                 } else if (style === 'blobs') {
                     container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div><div class="blob blob-3" style="background: var(--effect-color3)"></div>`;
                 } else if (style === 'orbs') {
-                    container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div>`;
+                    container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div><div class="cyber-grid"></div>`;
                 } else if (style === 'waves') {
                     container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div><div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div><div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>`;
                 } else if (style === 'geometry') {
@@ -610,7 +638,7 @@
                         let el = document.createElement('div'); el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon'); el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 80 + 30; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.background = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
                     }
                 } else if (style === 'lines') {
-                    for(let i=0; i<10; i++) {
+                    for(let i=0; i<12; i++) {
                         let el = document.createElement('div'); el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg'); el.style.top = (Math.random() * 150 - 25) + '%'; el.style.animationDuration = (Math.random() * 8 + 5) + 's'; el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`; container.appendChild(el);
                     }
                 } else if (style === 'cyber') {
@@ -620,25 +648,17 @@
             }, 300);
         }
 
-        // HSL to RGB 헬퍼 함수 (네온 글로우 그림자 처리용)
-        function hslToRgb(h, s, l){
-            s /= 100; l /= 100;
-            const k = n => (n + h / 30) % 12;
-            const a = s * Math.min(l, 1 - l);
-            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-            return `${Math.round(255 * f(0))}, ${Math.round(255 * f(8))}, ${Math.round(255 * f(4))}`;
-        }
-
         // 페이지 로드 시 기존 저장된 테마 복원 또는 초기 테마 생성
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = localStorage.getItem('saedam_theme_config');
             if (savedTheme) {
                 try {
                     const config = JSON.parse(savedTheme);
-                    renderBackgroundEffects(config.style, config.mode.includes('dark'));
+                    document.getElementById('currentThemeName').innerText = config.name;
+                    renderBackgroundEffects(config.type, config.isDark);
                 } catch(e) {}
             } else {
-                // 초기 접속 시 랜덤 테마로 시작
+                // 저장된 테마가 없으면 랜덤 테마로 시작
                 applyRandomTheme();
             }
         });
