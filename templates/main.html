@@ -421,7 +421,8 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadNotificationWidget();
-        setInterval(loadNotificationWidget, 60000); // 1분마다 자동 갱신
+        // 1분(60,000ms)마다 업무 알림 위젯 자동 갱신
+        setInterval(loadNotificationWidget, 60000); 
     });
 
     async function fetchActiveUsers() {
@@ -604,8 +605,9 @@
         calendar.render();
         checkUnreadMessages();
         fetchActiveUsers(); 
-        setInterval(fetchActiveUsers, 10000);
-        setInterval(checkUnreadMessages, 10000);
+        // 1분(60,000ms)마다 접속자 목록 및 읽지 않은 쪽지 확인
+        setInterval(fetchActiveUsers, 60000);
+        setInterval(checkUnreadMessages, 60000);
     });
 
     function editTask(taskId, dateStr) {

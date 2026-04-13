@@ -1,166 +1,211 @@
 <style>
     /* =========================================================
-       새담 인트라넷 [나의 업무 알림] 레이아웃 최적화 (삐침 방지)
+       새담 인트라넷 [나의 업무 알림] 프리미엄 카드형 디자인
        ========================================================= */
     .noti-widget-wrapper {
         background: transparent !important;
         display: flex;
         flex-direction: column;
-        gap: 15px;
+        gap: 20px;
         height: 100%;
-        width: 100%;
-        box-sizing: border-box; /* 패딩이 너비에 영향을 주지 않도록 설정 */
-    }
-    
-    .noti-card-item {
-        background: var(--widget-bg) !important;
-        border: 1px solid var(--card-border) !important;
-        border-radius: 15px;
-        padding: 15px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        text-decoration: none;
-        color: var(--text-dark) !important;
-        box-shadow: var(--card-shadow);
-        transition: all 0.3s ease;
-        box-sizing: border-box; /* 🧨 핵심: 내부 패딩과 테두리를 너비에 포함 */
-    }
-    
-    .noti-card-item:hover {
-        transform: translateY(-5px);
-        background: var(--widget-hover) !important;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-        border-color: var(--primary-color) !important;
-    }
-    
-    /* 상단 긴 카드 (너비 삐침 수정) */
-    .noti-card-long {
-        flex-direction: row;
-        justify-content: space-between;
-        padding: 20px 30px;
-        width: 100% !important; /* 부모 너비를 넘지 않도록 고정 */
-        margin: 0; /* 불필요한 여백 제거 */
-    }
-    
-    .noti-card-title {
-        font-size: 0.9rem;
-        color: var(--text-gray);
-        font-weight: 700;
-        margin-bottom: 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        white-space: nowrap; /* 글자 줄바꿈 방지 */
-    }
-
-    .noti-card-title i {
-        font-size: 1.2rem;
-        color: var(--primary-color);
-    }
-    
-    .noti-card-value {
-        font-size: 1.15rem;
-        font-weight: 800;
-        color: var(--text-dark);
-        white-space: nowrap;
-    }
-    
-    /* 강조 색상 */
-    .noti-count-red { color: #ef4444; margin-left: 2px; } 
-    .noti-count-blue { color: var(--primary-color); margin-left: 2px; }
-
-    /* 그리드 컨테이너: 꽉 차게 배치 */
-    .noti-grid-container {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        flex: 1;
         width: 100%;
         box-sizing: border-box;
     }
     
-    /* 아이콘 강조형 스타일 (그리드 내부) */
-    .noti-grid-container .noti-card-item {
-        padding: 20px 10px;
-    }
-    
-    .noti-grid-container .noti-card-title {
-        flex-direction: column;
-        margin-bottom: 10px;
-        font-size: 0.85rem;
-    }
-
-    .noti-grid-container .noti-card-title i {
-        font-size: 1.6rem;
+    /* 섹션 타이틀 스타일 보강 */
+    .noti-section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
         margin-bottom: 5px;
     }
-    
+
+    .noti-title-icon {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        font-size: 1.1rem;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        animation: floatIcon 3s ease-in-out infinite;
+    }
+
+    @keyframes floatIcon {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-4px); }
+    }
+
+    /* 상단 통합 결재 카드 */
+    .noti-main-card {
+        background: var(--widget-bg) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 20px;
+        padding: 20px 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        box-shadow: var(--card-shadow);
+        box-sizing: border-box;
+        width: 100%;
+    }
+
+    .noti-main-card:hover {
+        transform: translateY(-3px);
+        background: var(--widget-hover) !important;
+        border-color: var(--primary-color) !important;
+        box-shadow: 0 12px 25px rgba(0,0,0,0.08);
+    }
+
+    /* 하단 4열 그리드 레이아웃 */
+    .noti-grid-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .design-card {
+        background: var(--widget-bg) !important;
+        border: 1px solid var(--card-border) !important;
+        border-radius: 18px;
+        padding: 22px 10px;
+        text-align: center;
+        text-decoration: none;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: var(--card-shadow);
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        box-sizing: border-box;
+    }
+
+    .design-card:hover {
+        transform: translateY(-8px);
+        background: var(--widget-hover) !important;
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        border-color: var(--primary-color) !important;
+    }
+
+    /* 아이콘 그라데이션 적용 */
+    .card-icon {
+        font-size: 2rem;
+        margin-bottom: 12px;
+        display: inline-block;
+        background: linear-gradient(135deg, var(--primary-color), #34d399);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .card-label {
+        display: block;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 4px;
+    }
+
+    .card-sub {
+        font-size: 0.75rem;
+        color: var(--text-gray);
+        font-weight: 500;
+    }
+
+    /* 강조 텍스트 */
+    .count-highlight {
+        font-weight: 800;
+        color: #ef4444;
+        margin: 0 2px;
+    }
+
+    .count-normal {
+        font-weight: 800;
+        color: var(--primary-color);
+        margin: 0 2px;
+    }
+
+    /* 알림 배지 */
+    .noti-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: #ef4444;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
+    }
+
     @media (max-width: 1300px) {
         .noti-grid-container { grid-template-columns: repeat(2, 1fr); }
-        .noti-card-long { 
-            flex-direction: column; 
-            align-items: flex-start; 
-            gap: 10px; 
-            padding: 15px 20px;
-        }
+        .noti-main-card { flex-direction: column; align-items: flex-start; gap: 12px; }
     }
 </style>
 
 <div class="noti-widget-wrapper">
     
-    <a href="/approval" class="noti-card-item noti-card-long">
-        <div class="noti-card-title">
-            <i class="fa-solid fa-file-signature"></i> 사내결재 대기현황
-        </div>
-        <div style="display: flex; gap: 25px;">
-            <div class="noti-card-value">
-                연차 신청 <span class="noti-count-red">{{ data.approval_vacation | default(0) }}</span><span style="font-size: 0.8rem; font-weight: 500;">건</span>
+    <a href="/approval" class="noti-main-card">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="noti-title-icon">
+                <i class="fa-solid fa-file-signature"></i>
             </div>
-            <div class="noti-card-value">
-                기안문서 <span class="noti-count-red">{{ data.approval_draft | default(0) }}</span><span style="font-size: 0.8rem; font-weight: 500;">건</span>
+            <div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-dark);">전자결재 대기현황</div>
+                <div style="font-size: 0.75rem; color: var(--text-gray);">승인이 필요한 문서가 있습니다.</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 20px;">
+            <div class="noti-card-value" style="font-size: 1.05rem; font-weight: 700;">
+                연차신청 <span class="count-highlight">{{ data.approval_vacation | default(0) }}</span>건
+            </div>
+            <div class="noti-card-value" style="font-size: 1.05rem; font-weight: 700;">
+                일반기안 <span class="count-highlight">{{ data.approval_draft | default(0) }}</span>건
             </div>
         </div>
     </a>
 
     <div class="noti-grid-container">
         
-        <a href="/document" class="noti-card-item">
-            <div class="noti-card-title">
-                <i class="fa-solid fa-id-card"></i> 증명서발급
-            </div>
-            <div class="noti-card-value">
-                대기 <span class="noti-count-red">{{ data.cert_wait | default(0) }}</span>건
-            </div>
+        <a href="/document" class="design-card">
+            {% if (data.cert_wait | default(0)) > 0 %}<div class="noti-badge">WAIT</div>{% endif %}
+            <div class="card-icon"><i class="fa-solid fa-id-card"></i></div>
+            <span class="card-label">증명서발급</span>
+            <span class="card-sub">대기 <span class="count-highlight">{{ data.cert_wait | default(0) }}</span>건</span>
         </a>
         
-        <a href="/contract" class="noti-card-item">
-            <div class="noti-card-title">
-                <i class="fa-solid fa-file-contract"></i> 전자계약
+        <a href="/contract" class="design-card">
+            <div class="card-icon" style="background: linear-gradient(135deg, #3b82f6, #60a5fa); -webkit-background-clip: text;">
+                <i class="fa-solid fa-file-contract"></i>
             </div>
-            <div class="noti-card-value">
-                미계약 <span class="noti-count-red">{{ data.contract_miss | default(0) }}</span>건
-            </div>
+            <span class="card-label">전자계약</span>
+            <span class="card-sub">미계약 <span class="count-highlight">{{ data.contract_miss | default(0) }}</span>건</span>
         </a>
         
-        <a href="/board" class="noti-card-item">
-            <div class="noti-card-title">
-                <i class="fa-solid fa-clipboard-list"></i> 게시판
+        <a href="/board" class="design-card">
+            <div class="card-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24); -webkit-background-clip: text;">
+                <i class="fa-solid fa-bullhorn"></i>
             </div>
-            <div class="noti-card-value">
-                신규 <span class="noti-count-blue">{{ data.board_new | default(0) }}</span>건
-            </div>
+            <span class="card-label">사내게시판</span>
+            <span class="card-sub">신규 <span class="count-normal">{{ data.board_new | default(0) }}</span>건</span>
         </a>
         
-        <a href="javascript:void(0)" onclick="if(document.getElementById('msgModal')) document.getElementById('msgModal').style.display='block'" class="noti-card-item">
-            <div class="noti-card-title">
-                <i class="fa-solid fa-envelope"></i> 쪽지함
+        <a href="javascript:void(0)" onclick="if(document.getElementById('msgModal')) document.getElementById('msgModal').style.display='block'" class="design-card">
+            {% if (data.message_new | default(0)) > 0 %}<div class="noti-badge">NEW</div>{% endif %}
+            <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); -webkit-background-clip: text;">
+                <i class="fa-solid fa-envelope-open-text"></i>
             </div>
-            <div class="noti-card-value">
-                미확인 <span class="noti-count-blue">{{ data.message_new | default(0) }}</span>건
-            </div>
+            <span class="card-label">쪽지함</span>
+            <span class="card-sub">미확인 <span class="count-normal">{{ data.message_new | default(0) }}</span>건</span>
         </a>
         
     </div>
