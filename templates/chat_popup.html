@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ partner }}님과의 대화 - 새담 인트라넷</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        
+        :root {
+            --primary-color: #3b82f6; /* 필요시 base.html의 메인 색상으로 변경하세요 */
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --input-bg: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--bg-color);
+            margin: 0; 
+            padding: 20px;
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            box-sizing: border-box;
+            color: var(--text-dark);
+        }
+
+        /* 채팅 말풍선 스타일 */
+        .chat-sent-bubble { 
+            background: var(--primary-color); 
+            color: #fff; 
+            padding: 10px 14px; 
+            border-radius: 15px 15px 0 15px; 
+            font-size: 0.9rem; 
+            word-break: break-all; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+        }
+        .chat-recv-bubble { 
+            background: var(--card-bg); 
+            color: var(--text-dark); 
+            border: 1px solid var(--card-border); 
+            padding: 10px 14px; 
+            border-radius: 0 15px 15px 15px; 
+            font-size: 0.9rem; 
+            word-break: break-all; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+        }
+
+        /* 입력 폼 및 버튼 스타일 */
+        .modal-input { 
+            width: 100%; 
+            padding: 12px 15px; 
+            border: 1px solid var(--card-border); 
+            border-radius: 10px; 
+            box-sizing: border-box; 
+            transition: all 0.3s;
+            background: var(--card-bg);
+            font-family: inherit;
+        }
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .btn-primary { 
+            background: var(--primary-color); 
+            color: white; 
+            border: none; 
+            padding: 0 20px; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .btn-primary:hover { filter: brightness(0.9); }
+
+        /* 이모지 및 아이콘 */
+        .emoji-item { 
+            font-size: 1.4rem; 
+            cursor: pointer; 
+            padding: 5px; 
+            text-align: center; 
+            border-radius: 5px; 
+            transition: background 0.2s;
+        }
+        .emoji-item:hover { background: var(--input-bg); }
+        
+        .action-icon {
+            cursor: pointer; 
+            font-size: 1.3rem; 
+            padding: 8px;
+            transition: transform 0.2s;
+        }
+        .action-icon:hover { transform: scale(1.1); }
+
+        /* 스크롤바 커스텀 */
+        #chatBox::-webkit-scrollbar { width: 6px; }
+        #chatBox::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="color: var(--text-dark); margin: 0; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span id="chatPartnerIcon" style="font-size:1.5rem;">👤</span> 
+            <span>{{ partner }}</span>님과의 대화
+        </h3>
+        <button onclick="window.close()" style="background:none; border:none; color:var(--text-gray); cursor:pointer; font-size:1.2rem;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    
+    <div id="chatBox" style="flex:1; overflow-y:auto; background: var(--input-bg); border: 1px solid var(--card-border); padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
+        </div>
+    
+    <div style="display:flex; gap:10px; align-items:stretch; position:relative; background: var(--card-bg); padding: 10px; border-radius: 12px; border: 1px solid var(--card-border); box-shadow: 0 2px 10px rgba(0,0,0,0.02);">
+        
+        <label for="chatFile" class="action-icon" style="color:var(--primary-color); display:flex; align-items:center;">
+            <i class="fa-solid fa-paperclip"></i>
+        </label>
+        <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
+        
+        <div class="action-icon" style="color:#f59e0b; display:flex; align-items:center;" onclick="toggleEmojiPicker()">
+            <i class="fa-regular fa-face-smile"></i>
+        </div>
+        
+        <div id="chatEmojiPicker" style="display:none; position:absolute; bottom:60px; left:10px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:10px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+            <span class="emoji-item" onclick="addEmoji('😀')">😀</span><span class="emoji-item" onclick="addEmoji('😂')">😂</span><span class="emoji-item" onclick="addEmoji('🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('😎')">😎</span><span class="emoji-item" onclick="addEmoji('😭')">😭</span><span class="emoji-item" onclick="addEmoji('😡')">😡</span><span class="emoji-item" onclick="addEmoji('👍')">👍</span>
+            <span class="emoji-item" onclick="addEmoji('🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('💖')">💖</span><span class="emoji-item" onclick="addEmoji('🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('✨')">✨</span><span class="emoji-item" onclick="addEmoji('🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('👏')">👏</span>
+            <span class="emoji-item" onclick="addEmoji('🙌')">🙌</span><span class="emoji-item" onclick="addEmoji('😅')">😅</span><span class="emoji-item" onclick="addEmoji('😋')">😋</span><span class="emoji-item" onclick="addEmoji('🤩')">🤩</span><span class="emoji-item" onclick="addEmoji('😴')">😴</span><span class="emoji-item" onclick="addEmoji('🥳')">🥳</span><span class="emoji-item" onclick="addEmoji('🤫')">🤫</span>
+            <span class="emoji-item" onclick="addEmoji('🤝')">🤝</span><span class="emoji-item" onclick="addEmoji('💪')">💪</span><span class="emoji-item" onclick="addEmoji('📝')">📝</span><span class="emoji-item" onclick="addEmoji('💡')">💡</span><span class="emoji-item" onclick="addEmoji('💯')">💯</span><span class="emoji-item" onclick="addEmoji('📌')">📌</span><span class="emoji-item" onclick="addEmoji('🚀')">🚀</span>
+        </div>
+
+        <div style="flex:1; display:flex; flex-direction:column; position:relative; justify-content:center;">
+            <div id="chatFileName" style="font-size:0.75rem; color:var(--primary-color); position:absolute; top:-25px; left:0; display:none; background:var(--bg-color); padding:4px 8px; border-radius:6px; border: 1px solid var(--card-border); font-weight:bold;"></div>
+            <input type="text" id="chatInput" class="modal-input" style="border:none; background:transparent; padding:0;" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()" autocomplete="off">
+        </div>
+        
+        <button class="btn-primary" onclick="sendChatReply()"><i class="fa-solid fa-paper-plane"></i></button>
+    </div>
+
+    <script>
+        const partnerName = "{{ partner }}";
+        // 서버에서 렌더링 시 현재 접속자 아이디를 넘겨주어야 합니다.
+        const currentUser = "{{ current_user }}"; 
+
+        // 이모지 패널 토글
+        function toggleEmojiPicker() {
+            const picker = document.getElementById('chatEmojiPicker');
+            if(picker.style.display === 'none' || picker.style.display === '') {
+                picker.style.display = 'grid';
+            } else {
+                picker.style.display = 'none';
+            }
+        }
+
+        // 입력창에 이모지 추가
+        function addEmoji(emoji) {
+            const input = document.getElementById('chatInput');
+            input.value += emoji;
+            input.focus();
+            document.getElementById('chatEmojiPicker').style.display = 'none';
+        }
+
+        // 첨부파일 이름 표시
+        function showChatFileName(input) {
+            const nameDiv = document.getElementById('chatFileName');
+            if(input.files && input.files.length > 0) {
+                nameDiv.innerText = "📎 첨부됨: " + input.files[0].name;
+                nameDiv.style.display = 'block';
+            } else { 
+                nameDiv.style.display = 'none'; 
+            }
+        }
+
+        // 대화 기록 불러오기 (서버 API 통신)
+        async function refreshChatBox() {
+            try {
+                // 엔드포인트는 기존 app.py에 구현된 /get_chat_history 라우트를 호출합니다.
+                const res = await fetch(`/get_chat_history/${encodeURIComponent(partnerName)}`);
+                const chats = await res.json();
+                const box = document.getElementById('chatBox');
+                
+                // 기존 내용을 지우고 새로 그립니다.
+                box.innerHTML = '';
+                
+                chats.forEach(c => {
+                    const timeStr = c.sent_at.substring(5, 16);
+                    let fileHtml = '';
+                    
+                    // 파일 첨부가 있는 경우 처리
+                    if(c.filename) {
+                        const ext = c.filename.split('.').pop().toLowerCase();
+                        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                        if(isImage) {
+                            fileHtml = `<div style="margin-top:8px;"><img src="/uploads/${c.filename}" style="max-width:100%; border-radius:8px; cursor:pointer;" onclick="window.open(this.src)"></div>`;
+                        } else {
+                            fileHtml = `<div style="margin-top:8px; font-size:0.8rem; background:rgba(0,0,0,0.1); padding:6px; border-radius:5px;"><i class="fa-solid fa-paperclip"></i> <a href="/uploads/${c.filename}" target="_blank" style="color:inherit; text-decoration:none; font-weight:bold;">다운로드</a></div>`;
+                        }
+                    }
+
+                    // 내가 보낸 메시지 (오른쪽 정렬)
+                    if(c.sender === currentUser) {
+                        box.innerHTML += `
+                        <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
+                            <div class="chat-sent-bubble">${c.content}${fileHtml}</div>
+                            <div style="font-size:0.7rem; color:var(--text-gray); margin-top:4px;">
+                                <span style="cursor:pointer; color:#e74c3c; font-weight:bold;" onclick="deleteChatMsg(${c.id})">삭제</span> · ${timeStr} 
+                                <span style="color:${c.is_read ? 'var(--text-gray)' : 'var(--primary-color)'}; font-weight:bold;">${c.is_read ? '' : '안읽음'}</span>
+                            </div>
+                        </div>`;
+                    } 
+                    // 상대방이 보낸 메시지 (왼쪽 정렬)
+                    else {
+                        box.innerHTML += `
+                        <div style="align-self: flex-start; max-width: 80%; display:flex; gap:10px;">
+                            <div style="font-size: 2.2rem; margin-top: 5px;">👤</div>
+                            <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                                <div style="font-size:0.8rem; color:var(--text-gray); margin-bottom:3px; font-weight:bold;">${c.sender}</div>
+                                <div class="chat-recv-bubble">${c.content}${fileHtml}</div>
+                                <div style="font-size:0.7rem; color:var(--text-gray); margin-top:4px;">${timeStr}</div>
+                            </div>
+                        </div>`;
+                    }
+                });
+                // 스크롤을 항상 가장 아래로 이동시킵니다.
+                box.scrollTop = box.scrollHeight;
+            } catch(e) {
+                console.error("채팅 로드 실패:", e);
+            }
+        }
+
+        // 메시지 전송
+        async function sendChatReply() {
+            const input = document.getElementById('chatInput');
+            const fileInput = document.getElementById('chatFile');
+            const content = input.value.trim();
+            
+            // 내용과 파일이 모두 없으면 전송 방지
+            if(!content && fileInput.files.length === 0) return;
+            
+            let formData = new FormData();
+            formData.append('receiver', partnerName);
+            formData.append('content', content);
+            if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/send_message', { method: 'POST', body: formData });
+                if(res.ok) { 
+                    // 전송 성공 시 입력창 초기화 및 새로고침
+                    input.value = ''; 
+                    fileInput.value = '';
+                    document.getElementById('chatFileName').style.display = 'none';
+                    document.getElementById('chatEmojiPicker').style.display = 'none';
+                    await refreshChatBox();
+                }
+            } catch (e) { 
+                alert("메시지 전송 중 오류가 발생했습니다."); 
+            }
+        }
+
+        // 메시지 삭제
+        async function deleteChatMsg(msgId) {
+            if(!confirm("이 메시지를 삭제하시겠습니까?")) return;
+            try {
+                const res = await fetch(`/delete_message/${msgId}`, { method: 'DELETE' });
+                if(res.ok) { await refreshChatBox(); }
+            } catch(e) {
+                console.error("삭제 실패:", e);
+            }
+        }
+
+        // 화면 로드 시 최초 1회 채팅 내역 불러오기
+        window.onload = function() {
+            refreshChatBox();
+            document.getElementById('chatInput').focus();
+        };
+
+        // 5초마다 주기적으로 새 메시지를 확인하여 대화창 갱신
+        setInterval(refreshChatBox, 5000);
+    </script>
+</body>
+</html>
