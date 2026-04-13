@@ -21,13 +21,14 @@
     </script>
     
     <style>
-        /* 기본 설정 */
+        /* 기본 설정 (테마 연동 완료) */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: #f4f7f9; 
+            background-color: var(--secondary-color, #f4f7f9) !important; /* 배경 테마 연동 */
             min-height: 100vh;
             margin: 0;
-            color: #333;
+            color: var(--text-color, #333);
+            transition: background-color 0.4s ease; /* 부드러운 테마 전환 */
         }
 
         .content-container {
@@ -94,16 +95,17 @@
             transition: all 0.2s ease-in-out;
         }
 
+        /* 테마 색상 연동 부분 */
         .menu-item:hover {
-            background: #f0f4f8;
-            color: #2c7be5; 
+            background: var(--secondary-color, #f0f4f8);
+            color: var(--primary-color, #2c7be5); 
         }
-        .menu-item:hover i { color: #2c7be5; }
+        .menu-item:hover i { color: var(--primary-color, #2c7be5); }
 
         .menu-item.active {
-            color: #2c7be5 !important;
+            color: var(--primary-color, #2c7be5) !important;
             font-weight: 700;
-            border-bottom: 2px solid #2c7be5;
+            border-bottom: 2px solid var(--primary-color, #2c7be5);
             border-radius: 0; 
             background-color: transparent; 
             box-shadow: none; 
@@ -158,8 +160,8 @@
         }
 
         .dropdown-content a:hover {
-            background: #f8f9fa;
-            color: #2c7be5;
+            background: var(--secondary-color, #f8f9fa);
+            color: var(--primary-color, #2c7be5);
             padding-left: 25px; 
         }
 
@@ -183,8 +185,8 @@
             justify-content: center;
         }
         .btn-memo:hover, .btn-memo.active {
-            color: #2c7be5;
-            background: #f0f4f8;
+            color: var(--primary-color, #2c7be5);
+            background: var(--secondary-color, #f0f4f8);
         }
 
         .user-profile {
@@ -200,7 +202,8 @@
         }
         
         .user-profile:hover {
-            background: #f0f4f8;
+            background: var(--secondary-color, #f0f4f8);
+            color: var(--primary-color, #333);
         }
 
         .btn-logout { 
@@ -226,7 +229,7 @@
             margin: 8% auto; padding: 0; border-radius: 15px; width: 450px; overflow: hidden; 
         }
         .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.6); display: flex; justify-content: space-between; align-items: center; background: transparent; }
-        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: #2c7be5; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--primary-color, #2c7be5); }
         .info-table { width: 100%; border-collapse: collapse; }
         .info-table th { padding: 15px 25px; background: rgba(255,255,255,0.4); text-align: left; color: #444; border-bottom: 1px solid rgba(255,255,255,0.6); width: 35%; font-size: 0.9rem; font-weight: 700; }
         .info-table td { padding: 15px 25px; color: #1e293b; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.1); font-size: 0.95rem; }
@@ -252,13 +255,13 @@
             color: #1e293b; 
             outline: none; transition: all 0.3s;
         }
-        .glass-input:focus { border-color: #4a90e2; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+        .glass-input:focus { border-color: var(--primary-color, #4a90e2); box-shadow: 0 0 0 2px var(--secondary-color, rgba(74, 144, 226, 0.2)); }
 
         .btn-primary-glass {
-            background: #4a90e2; color: white; border: none; padding: 12px; border-radius: 10px;
+            background: var(--primary-color, #4a90e2); color: white; border: none; padding: 12px; border-radius: 10px;
             font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%;
         }
-        .btn-primary-glass:hover { background: #357abd; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+        .btn-primary-glass:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
 
         .main-footer { text-align: center; padding: 40px 0; color: #a0aec0; font-size: 0.85rem; border-top: 1px solid #edf2f7; margin-top: 50px; background: transparent; }
     </style>
@@ -314,7 +317,7 @@
                     {% endif %}
 
                     <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item" style="color: #2c7be5; font-weight: 700;">
+                        <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color, #2c7be5); font-weight: 700;">
                             <i class="fa-solid fa-briefcase"></i> 업무지원
                         </a>
                         <div class="dropdown-content">
@@ -398,7 +401,7 @@
                 <table class="info-table" id="myInfoTable"></table>
                 
                 <div id="passwordChangeSection" style="display: none; padding: 20px; background: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.6);">
-                    <h4 style="margin-top: 0; margin-bottom: 15px; color: #2c7be5;"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color, #2c7be5);"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
                     <input type="password" id="currPwd" class="glass-input" placeholder="현재 비밀번호">
                     <input type="password" id="newPwd" class="glass-input" placeholder="새 비밀번호">
                     <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
@@ -548,7 +551,7 @@
         }
 
         // ==========================================
-        // 🎨 테마 관리 자바스크립트 추가 부분
+        // 🎨 테마 관리 자바스크립트
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
             const savedTheme = localStorage.getItem('saedam_theme') || 'default';
