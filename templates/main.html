@@ -114,6 +114,15 @@
         height: 100%;
         box-sizing: border-box;
     }
+
+    /* 🔥 서버에서 불러오는 알림 위젯(연녹색 영역)의 배경을 테마 글래스 재질로 강제 덮어쓰기 */
+    #notification-widget-area > div {
+        background: var(--input-bg) !important;  /* 기존 연녹색 대신 다이나믹 테마의 반투명 배경 적용 */
+        border: 1px solid var(--card-border) !important;
+        border-radius: 15px !important;
+        box-shadow: inset 0 2px 5px rgba(0,0,0,0.02) !important;
+        transition: background 0.5s ease, border 0.5s ease;
+    }
     
     .noti-card-item {
         background: var(--widget-bg) !important;
