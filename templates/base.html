@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-theme="default">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,266 +9,215 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     
     <script>
         (function() {
-            const savedTheme = localStorage.getItem('saedam_theme');
+            const savedTheme = localStorage.getItem('saedam_theme_config');
             if (savedTheme) {
-                document.documentElement.setAttribute('data-theme', savedTheme);
+                try {
+                    const config = JSON.parse(savedTheme);
+                    for (const [key, value] of Object.entries(config.vars)) {
+                        document.documentElement.style.setProperty(key, value);
+                    }
+                } catch(e) {}
             }
         })();
     </script>
     
     <style>
-        /* 기본 설정 (테마 연동 완료) */
+        /* === 다이나믹 테마 변수 기본값 (전역 적용) === */
+        :root {
+            --body-bg: #f8fafc;
+            --primary-color: #4a90e2;
+            --primary-dark: #357abd;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            
+            --card-bg: rgba(255, 255, 255, 0.6);
+            --card-border: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+            --card-backdrop: blur(24px);
+            
+            --input-bg: rgba(255, 255, 255, 0.8);
+            --input-text: #1e293b;
+            --widget-bg: rgba(255, 255, 255, 0.7);
+            --widget-hover: rgba(255, 255, 255, 1);
+            --widget-border: rgba(255, 255, 255, 1);
+            
+            --effect-color1: transparent;
+            --effect-color2: transparent;
+            --effect-color3: transparent;
+            --navbar-bg: rgba(255, 255, 255, 0.6);
+        }
+
+        /* 기본 설정 (테마 변수 강제 연동) */
         body {
             font-family: 'Pretendard', sans-serif;
-            background-color: var(--secondary-color, #f4f7f9) !important; /* 배경 테마 연동 */
+            background: var(--body-bg) !important;
+            background-size: 400% 400% !important;
+            animation: gradientBG 20s ease infinite !important;
             min-height: 100vh;
             margin: 0;
-            color: var(--text-color, #333);
-            transition: background-color 0.4s ease; /* 부드러운 테마 전환 */
+            color: var(--text-dark) !important;
+            transition: background 1.5s ease, color 0.5s ease;
         }
+
+        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 
         .content-container {
             max-width: 1550px !important;
             width: 95% !important;
             margin: 0 auto;
             padding-top: 30px;
+            position: relative;
+            z-index: 10;
         }
 
-        /* 네비게이션바 */
+        /* 네비게이션바 (글래스모피즘 연동) */
         .navbar {
-            background: #ffffff;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); 
+            background: var(--navbar-bg) !important;
+            backdrop-filter: var(--card-backdrop) !important;
+            -webkit-backdrop-filter: var(--card-backdrop) !important;
+            border-bottom: 1px solid var(--card-border) !important;
+            box-shadow: var(--card-shadow) !important;
             position: sticky;
             top: 0;
             z-index: 1000;
+            transition: all 0.5s ease;
         }
 
-        .nav-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            height: 75px; 
-            max-width: 1550px;
-            margin: 0 auto;
-        }
-
-        /* 로고 설정 */
-        .logo-img { 
-            height: 55px; 
-            width: auto; 
-            display: block; 
-        }
+        .nav-container { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 75px; max-width: 1550px; margin: 0 auto; }
+        .logo-img { height: 55px; width: auto; display: block; }
 
         /* 메인 메뉴 목록 */
-        .menu-list { 
-            display: flex; 
-            list-style: none; 
-            margin: 0; 
-            padding: 0; 
-            height: 100%;
-            align-items: center; 
-            gap: 10px; 
-        }
+        .menu-list { display: flex; list-style: none; margin: 0; padding: 0; height: 100%; align-items: center; gap: 10px; }
+        .menu-item-wrapper { position: relative; height: 100%; display: flex; align-items: center; }
         
-        .menu-item-wrapper {
-            position: relative;
-            height: 100%;
-            display: flex;
-            align-items: center;
-        }
-
         .menu-item {
-            color: #444;
-            text-decoration: none; 
-            font-weight: 600; 
-            padding: 10px 18px; 
-            border-radius: 8px; 
-            display: flex; 
-            align-items: center; 
-            gap: 8px;
-            font-size: 1rem;
-            transition: all 0.2s ease-in-out;
+            color: var(--text-dark) !important;
+            text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 1rem; transition: all 0.2s ease-in-out;
         }
-
-        /* 테마 색상 연동 부분 */
-        .menu-item:hover {
-            background: var(--secondary-color, #f0f4f8);
-            color: var(--primary-color, #2c7be5); 
-        }
-        .menu-item:hover i { color: var(--primary-color, #2c7be5); }
-
+        .menu-item:hover { background: var(--widget-bg) !important; color: var(--primary-color) !important; }
+        .menu-item:hover i { color: var(--primary-color) !important; }
+        
         .menu-item.active {
-            color: var(--primary-color, #2c7be5) !important;
+            color: var(--primary-color) !important;
             font-weight: 700;
-            border-bottom: 2px solid var(--primary-color, #2c7be5);
-            border-radius: 0; 
-            background-color: transparent; 
-            box-shadow: none; 
+            border-bottom: 2px solid var(--primary-color);
+            border-radius: 0; background-color: transparent; box-shadow: none; 
         }
 
         .dropdown { height: 100%; }
+        .dropdown-content { display: none; position: absolute; top: 85%; left: 50%; transform: translateX(-50%); background: var(--card-bg) !important; backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); min-width: 200px; box-shadow: var(--card-shadow) !important; border-radius: 10px; border: 1px solid var(--card-border); z-index: 1100; padding: 10px 0; }
+        .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 20px; }
+        .menu-item-wrapper:hover .dropdown-content { display: block; animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
         
-        .dropdown-content {
-            display: none; 
-            position: absolute;
-            top: 85%; 
-            left: 50%;
-            transform: translateX(-50%); 
-            background: #ffffff; 
-            min-width: 200px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08); 
-            border-radius: 10px; 
-            border: 1px solid #eef0f3;
-            z-index: 1100;
-            padding: 10px 0; 
-        }
-
-        .menu-item-wrapper::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            height: 20px;
-        }
-
-        .menu-item-wrapper:hover .dropdown-content {
-            display: block;
-            animation: fadeIn 0.2s ease; 
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translate(-50%, 10px); }
-            to { opacity: 1; transform: translate(-50%, 0); }
-        }
-
-        .dropdown-content a {
-            color: #555;
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .dropdown-content a:hover {
-            background: var(--secondary-color, #f8f9fa);
-            color: var(--primary-color, #2c7be5);
-            padding-left: 25px; 
-        }
+        .dropdown-content a { color: var(--text-dark); padding: 12px 20px; text-decoration: none; display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 500; transition: all 0.2s; }
+        .dropdown-content a:hover { background: var(--widget-hover); color: var(--primary-color); padding-left: 25px; }
 
         /* 우측 유저 섹션 */
-        .user-section {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+        .user-section { display: flex; align-items: center; gap: 15px; }
+        .btn-memo { color: var(--text-gray); font-size: 1.3rem; text-decoration: none; padding: 8px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: var(--widget-hover); }
+        .user-profile { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; padding: 8px 12px; border-radius: 20px; color: var(--text-dark); transition: background 0.2s; }
+        .user-profile:hover { background: var(--widget-hover); }
+        .btn-logout { font-size: 1.1rem; color: var(--text-gray); text-decoration: none; padding: 5px; transition: color 0.2s; }
+        .btn-logout:hover { color: #e53e3e; }
 
-        /* 화이트보드 메모장 아이콘 버튼 */
-        .btn-memo {
-            color: #a0aec0;
-            font-size: 1.3rem;
-            text-decoration: none;
-            padding: 8px;
-            border-radius: 50%;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .btn-memo:hover, .btn-memo.active {
-            color: var(--primary-color, #2c7be5);
-            background: var(--secondary-color, #f0f4f8);
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 600;
-            padding: 8px 12px;
-            border-radius: 20px;
-            transition: background 0.2s;
-        }
-        
-        .user-profile:hover {
-            background: var(--secondary-color, #f0f4f8);
-            color: var(--primary-color, #333);
-        }
-
-        .btn-logout { 
-            font-size: 1.1rem;
-            color: #a0aec0;
-            text-decoration: none;
-            padding: 5px;
-            transition: color 0.2s;
-        }
-        
-        .btn-logout:hover {
-            color: #e53e3e;
-        }
-
-        /* 내 정보 모달 스타일 */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
+        /* 모달 및 폼 전역 스타일 */
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
         .modal-content { 
-            background: rgba(255, 255, 255, 0.7) !important; 
-            backdrop-filter: blur(24px) !important; 
-            -webkit-backdrop-filter: blur(24px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.9) !important; 
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15) !important;
-            margin: 8% auto; padding: 0; border-radius: 15px; width: 450px; overflow: hidden; 
+            background: var(--card-bg) !important; 
+            backdrop-filter: var(--card-backdrop) !important; 
+            -webkit-backdrop-filter: var(--card-backdrop) !important;
+            border: 1px solid var(--card-border) !important; 
+            box-shadow: var(--card-shadow) !important;
+            margin: 8% auto; padding: 0; border-radius: 15px; width: 450px; overflow: hidden; color: var(--text-dark) !important;
         }
-        .modal-header { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.6); display: flex; justify-content: space-between; align-items: center; background: transparent; }
-        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--primary-color, #2c7be5); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: transparent; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--primary-color); }
+        
         .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 15px 25px; background: rgba(255,255,255,0.4); text-align: left; color: #444; border-bottom: 1px solid rgba(255,255,255,0.6); width: 35%; font-size: 0.9rem; font-weight: 700; }
-        .info-table td { padding: 15px 25px; color: #1e293b; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.6); background: rgba(255,255,255,0.1); font-size: 0.95rem; }
+        .info-table th { padding: 15px 25px; background: rgba(100,100,100,0.1); text-align: left; color: var(--text-gray); border-bottom: 1px solid var(--card-border); width: 35%; font-size: 0.9rem; font-weight: 700; }
+        .info-table td { padding: 15px 25px; color: var(--text-dark); font-weight: 600; border-bottom: 1px solid var(--card-border); background: rgba(100,100,100,0.05); font-size: 0.95rem; }
 
-        .btn-close-modal {
-            background: rgba(255,255,255,0.8); 
-            color: #444; 
-            border: 1px solid rgba(255,255,255,0.9); 
-            padding: 10px 30px; 
-            border-radius: 8px;
-            cursor: pointer; 
-            font-weight: 700;
-            font-size: 0.95rem;
-            transition: all 0.2s;
-        }
-        .btn-close-modal:hover { background: #ffffff; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .btn-close-modal { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
+        .btn-close-modal:hover { background: var(--widget-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
-        .glass-input {
-            width: 100%; padding: 12px; margin-bottom: 10px; 
-            border: 1px solid rgba(255,255,255,0.9); 
-            border-radius: 10px; box-sizing: border-box; 
-            background: rgba(255,255,255,0.8); 
-            color: #1e293b; 
-            outline: none; transition: all 0.3s;
-        }
-        .glass-input:focus { border-color: var(--primary-color, #4a90e2); box-shadow: 0 0 0 2px var(--secondary-color, rgba(74, 144, 226, 0.2)); }
+        .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--card-border); border-radius: 10px; box-sizing: border-box; background: var(--input-bg); color: var(--input-text); outline: none; transition: all 0.3s; }
+        .glass-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
 
-        .btn-primary-glass {
-            background: var(--primary-color, #4a90e2); color: white; border: none; padding: 12px; border-radius: 10px;
-            font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%;
-        }
+        .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
         .btn-primary-glass:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
 
-        .main-footer { text-align: center; padding: 40px 0; color: #a0aec0; font-size: 0.85rem; border-top: 1px solid #edf2f7; margin-top: 50px; background: transparent; }
+        .main-footer { position: relative; z-index: 10; text-align: center; padding: 40px 0; color: var(--text-gray); font-size: 0.85rem; border-top: 1px solid var(--card-border); margin-top: 50px; background: transparent; }
+
+        /* ===============================================================
+           🚀 배경 애니메이션 효과 모음 (1100 테마 다이나믹 글로우 연동)
+           =============================================================== */
+        #bg-effect-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
+        
+        .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
+        .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
+        .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
+        .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
+        @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
+        @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
+
+        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
+
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; mix-blend-mode: multiply; }
+        .dark-mode-blob .blob { mix-blend-mode: screen; opacity: 0.4; }
+        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
+        .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
+        .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.6; animation: orbOrbit 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
+        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
+        .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
+        .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
+        @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
+
+        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+        .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
+        .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
+        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+
+        .glass-ring { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
+        @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
+
+        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+        .line-pos { animation: slideLinePos infinite linear; }
+        .line-neg { animation: slideLineNeg infinite linear; }
+        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+        @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+
+        /* 셀렉트 박스 테마 연동 룩앤필 */
+        .theme-select-box {
+            padding: 8px 12px; border-radius: 8px; border: 1px solid var(--card-border);
+            background: var(--input-bg); color: var(--input-text); outline: none;
+            font-family: 'Pretendard', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.3s;
+        }
+        .theme-select-box:hover { border-color: var(--primary-color); box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     </style>
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    
+    <div id="bg-effect-container"></div>
 
     <header class="navbar">
         <div class="nav-container">
@@ -317,7 +266,7 @@
                     {% endif %}
 
                     <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color, #2c7be5); font-weight: 700;">
+                        <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color); font-weight: 700;">
                             <i class="fa-solid fa-briefcase"></i> 업무지원
                         </a>
                         <div class="dropdown-content">
@@ -354,35 +303,45 @@
     </main>
 
     <footer class="main-footer">
-        <div class="theme-selector" style="margin-bottom: 20px;">
-            <label for="theme-select" style="font-weight: bold; margin-right: 10px;">🎨 인트라넷 테마 변경:</label>
-            <select id="theme-select" onchange="changeTheme(this.value)" style="padding: 6px; border-radius: 5px; border: 1px solid #cbd5e1; outline: none; background: #fff; color: #333; font-family: 'Pretendard', sans-serif;">
-                <option value="default">기본 (블루)</option>
-                <option value="theme_1">스카이블루</option>
-                <option value="theme_2">시안</option>
-                <option value="theme_3">틸 (Teal)</option>
-                <option value="theme_4">그린</option>
-                <option value="theme_5">에메랄드</option>
-                <option value="theme_6">라임</option>
-                <option value="theme_7">옐로우</option>
-                <option value="theme_8">라이트 오렌지</option>
-                <option value="theme_9">오렌지</option>
-                <option value="theme_10">코랄</option>
-                <option value="theme_11">로즈</option>
-                <option value="theme_12">피치</option>
-                <option value="theme_13">핑크</option>
-                <option value="theme_14">마젠타</option>
-                <option value="theme_15">플럼</option>
-                <option value="theme_16">퍼플</option>
-                <option value="theme_17">바이올렛</option>
-                <option value="theme_18">인디고</option>
-                <option value="theme_19">딥 인디고</option>
-                <option value="theme_20">아쿠아</option>
-                <option value="theme_21">씨그린</option>
-                <option value="theme_22">파스텔 블루</option>
-                <option value="theme_23">그레이 블루</option>
-                <option value="theme_24">라벤더</option>
-                <option value="theme_25">살구</option>
+        <div class="theme-selector" style="margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <label style="font-weight: 800; color: var(--primary-color); margin-right: 5px;"><i class="fa-solid fa-palette"></i> 1100+ 다이나믹 테마:</label>
+            
+            <select id="theme-style-select" class="theme-select-box" onchange="generateThemeFromSelects()">
+                <option value="blobs">🌸 자연 (블랍)</option>
+                <option value="waves">🌊 오션 (물결)</option>
+                <option value="stars">🌌 우주 (별빛)</option>
+                <option value="orbs">🔮 오로라 (오브)</option>
+                <option value="rings">💎 크리스탈 (링)</option>
+                <option value="bubbles">💧 워터 (물방울)</option>
+                <option value="lines">⚡ 사이버 (라인)</option>
+                <option value="geometry">🧊 기하학 (도형)</option>
+                <option value="polygons">🔺 폴리곤 (다각형)</option>
+                <option value="cyber">🌐 매트릭스 (그리드)</option>
+            </select>
+
+            <select id="theme-color-select" class="theme-select-box" onchange="generateThemeFromSelects()">
+                <option value="210">블루 (Blue)</option>
+                <option value="180">시안 (Cyan)</option>
+                <option value="150">에메랄드 (Emerald)</option>
+                <option value="120">그린 (Green)</option>
+                <option value="80">라임 (Lime)</option>
+                <option value="50">옐로우 (Yellow)</option>
+                <option value="35">골드 (Gold)</option>
+                <option value="20">오렌지 (Orange)</option>
+                <option value="0">레드 (Red)</option>
+                <option value="340">로즈 (Rose)</option>
+                <option value="320">핑크 (Pink)</option>
+                <option value="280">퍼플 (Purple)</option>
+                <option value="260">바이올렛 (Violet)</option>
+                <option value="240">인디고 (Indigo)</option>
+            </select>
+
+            <select id="theme-mode-select" class="theme-select-box" onchange="generateThemeFromSelects()">
+                <option value="glass-light">유리 모드 (밝음)</option>
+                <option value="glass-dark">유리 모드 (어두움)</option>
+                <option value="neon-dark">네온 글로우 (어두움)</option>
+                <option value="solid-light">솔리드 (밝음)</option>
+                <option value="solid-dark">솔리드 (어두움)</option>
             </select>
         </div>
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
@@ -392,26 +351,26 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-id-card"></i> 내 프로필 정보</h3>
-                <span style="cursor:pointer; font-size:1.6rem; color: #a0aec0; transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='#a0aec0'">&times;</span>
+                <span style="cursor:pointer; font-size:1.6rem; color: var(--text-gray); transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='var(--text-gray)'">&times;</span>
             </div>
-            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: #64748b; font-weight: 600;">데이터를 불러오는 중입니다...</div>
+            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: var(--text-gray); font-weight: 600;">데이터를 불러오는 중입니다...</div>
             <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #e53e3e; font-weight: 600;"></div>
             
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
                 
-                <div id="passwordChangeSection" style="display: none; padding: 20px; background: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.6);">
-                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color, #2c7be5);"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
+                <div id="passwordChangeSection" style="display: none; padding: 20px; background: rgba(100,100,100,0.1); border-top: 1px solid var(--card-border);">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color);"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
                     <input type="password" id="currPwd" class="glass-input" placeholder="현재 비밀번호">
                     <input type="password" id="newPwd" class="glass-input" placeholder="새 비밀번호">
                     <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button type="button" class="btn-primary-glass" onclick="changeMyPassword()">변경 완료</button>
-                        <button type="button" class="btn-close-modal" style="width: 100%;" onclick="togglePasswordForm()">취소</button>
+                        <button type="button" class="btn-close-modal" style="width: 100%; background: var(--widget-bg); border: 1px solid var(--card-border);" onclick="togglePasswordForm()">취소</button>
                     </div>
                 </div>
 
-                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: rgba(255,255,255,0.3); border-top: 1px solid rgba(255,255,255,0.6);">
+                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: rgba(100,100,100,0.1); border-top: 1px solid var(--card-border);">
                     <button type="button" class="btn-close-modal" id="btnTogglePwd" onclick="togglePasswordForm()"><i class="fa-solid fa-key"></i> 비밀번호 변경</button>
                     <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
                 </div>
@@ -469,16 +428,12 @@
                         html += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
                     }
 
-                    if (html === '') {
-                        html = '<tr><td colspan="2" style="text-align:center;">표시할 데이터가 없습니다.</td></tr>';
-                    }
+                    if (html === '') { html = '<tr><td colspan="2" style="text-align:center;">표시할 데이터가 없습니다.</td></tr>'; }
 
                     table.innerHTML = html;
                     loading.style.display = "none";
                     display.style.display = "block";
-                } else {
-                    throw new Error(result.message || '데이터를 불러오지 못했습니다.');
-                }
+                } else { throw new Error(result.message || '데이터를 불러오지 못했습니다.'); }
             } catch (e) {
                 loading.style.display = "none";
                 errorDiv.style.display = "block";
@@ -489,14 +444,8 @@
         function togglePasswordForm() {
             const pwdSection = document.getElementById('passwordChangeSection');
             const toggleBtn = document.getElementById('btnTogglePwd');
-            
-            if (pwdSection.style.display === 'none') {
-                pwdSection.style.display = 'block';
-                toggleBtn.style.display = 'none'; 
-            } else {
-                pwdSection.style.display = 'none';
-                toggleBtn.style.display = 'block';
-            }
+            if (pwdSection.style.display === 'none') { pwdSection.style.display = 'block'; toggleBtn.style.display = 'none'; } 
+            else { pwdSection.style.display = 'none'; toggleBtn.style.display = 'block'; }
         }
 
         async function changeMyPassword() {
@@ -504,67 +453,218 @@
             const newPwd = document.getElementById('newPwd').value;
             const confirmPwd = document.getElementById('confirmPwd').value;
 
-            if (!currPwd || !newPwd || !confirmPwd) {
-                alert('모든 필드를 입력해주세요.');
-                return;
-            }
-
-            if (newPwd !== confirmPwd) {
-                alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.');
-                return;
-            }
-
-            if (newPwd.length < 4) {
-                alert('새 비밀번호는 4자리 이상이어야 합니다.');
-                return;
-            }
+            if (!currPwd || !newPwd || !confirmPwd) { alert('모든 필드를 입력해주세요.'); return; }
+            if (newPwd !== confirmPwd) { alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.'); return; }
+            if (newPwd.length < 4) { alert('새 비밀번호는 4자리 이상이어야 합니다.'); return; }
 
             try {
                 const res = await fetch('/user/change_password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ current_password: currPwd, new_password: newPwd })
                 });
-
                 const result = await res.json();
 
                 if (res.ok && result.status === 'success') {
                     alert('비밀번호가 성공적으로 변경되었습니다.');
                     togglePasswordForm();
-                    document.getElementById('currPwd').value = '';
-                    document.getElementById('newPwd').value = '';
-                    document.getElementById('confirmPwd').value = '';
-                } else {
-                    alert(result.message || '비밀번호 변경에 실패했습니다. 현재 비밀번호를 확인해주세요.');
-                }
-            } catch (e) {
-                alert('서버와 통신 중 오류가 발생했습니다.');
+                    document.getElementById('currPwd').value = ''; document.getElementById('newPwd').value = ''; document.getElementById('confirmPwd').value = '';
+                } else { alert(result.message || '비밀번호 변경에 실패했습니다. 현재 비밀번호를 확인해주세요.'); }
+            } catch (e) { alert('서버와 통신 중 오류가 발생했습니다.'); }
+        }
+
+        function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+        window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
+
+        // =====================================================================================
+        // 🚀 1100+ 다이나믹 테마 생성 엔진 (전역 적용)
+        // =====================================================================================
+        
+        function generateThemeFromSelects() {
+            const style = document.getElementById('theme-style-select').value;
+            const hue = parseInt(document.getElementById('theme-color-select').value);
+            const mode = document.getElementById('theme-mode-select').value;
+
+            applyDynamicTheme(style, hue, mode);
+        }
+
+        function applyDynamicTheme(style, hue, mode) {
+            let vars = {};
+            const isDark = mode.includes('dark');
+            const isSolid = mode.includes('solid');
+            const isNeon = mode === 'neon-dark';
+
+            // 1. 기본 색상 생성 (HSL 기반)
+            const primary = `hsl(${hue}, 80%, ${isDark ? '60%' : '50%'})`;
+            const primaryDark = `hsl(${hue}, 80%, ${isDark ? '50%' : '40%'})`;
+            
+            // 2. 모드별 배경 및 요소 컬러 설정
+            if (mode === 'glass-light') {
+                vars['--body-bg'] = `linear-gradient(-45deg, hsl(${hue}, 30%, 96%), hsl(${(hue + 40)%360}, 40%, 92%), hsl(${(hue - 40 + 360)%360}, 30%, 96%))`;
+                vars['--text-dark'] = '#1e293b';
+                vars['--text-gray'] = '#64748b';
+                vars['--card-bg'] = 'rgba(255, 255, 255, 0.6)';
+                vars['--card-border'] = 'rgba(255, 255, 255, 0.9)';
+                vars['--navbar-bg'] = 'rgba(255, 255, 255, 0.7)';
+                vars['--input-bg'] = 'rgba(255, 255, 255, 0.8)';
+                vars['--input-text'] = '#1e293b';
+                vars['--widget-bg'] = 'rgba(255, 255, 255, 0.7)';
+                vars['--widget-hover'] = 'rgba(255, 255, 255, 1)';
+                vars['--widget-border'] = 'rgba(255, 255, 255, 1)';
+                vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.1)';
+                vars['--card-backdrop'] = 'blur(24px)';
+            } 
+            else if (mode === 'glass-dark') {
+                vars['--body-bg'] = `linear-gradient(-45deg, hsl(${hue}, 30%, 10%), hsl(${(hue + 40)%360}, 40%, 15%), hsl(${(hue - 40 + 360)%360}, 30%, 10%))`;
+                vars['--text-dark'] = '#f8fafc';
+                vars['--text-gray'] = '#cbd5e1';
+                vars['--card-bg'] = 'rgba(15, 23, 42, 0.6)';
+                vars['--card-border'] = 'rgba(255, 255, 255, 0.15)';
+                vars['--navbar-bg'] = 'rgba(15, 23, 42, 0.7)';
+                vars['--input-bg'] = 'rgba(30, 41, 59, 0.8)';
+                vars['--input-text'] = '#f8fafc';
+                vars['--widget-bg'] = 'rgba(30, 41, 59, 0.6)';
+                vars['--widget-hover'] = 'rgba(51, 65, 85, 0.8)';
+                vars['--widget-border'] = 'rgba(255, 255, 255, 0.1)';
+                vars['--card-shadow'] = '0 15px 40px rgba(0, 0, 0, 0.4)';
+                vars['--card-backdrop'] = 'blur(24px)';
             }
+            else if (mode === 'neon-dark') {
+                vars['--body-bg'] = '#0a0a0a';
+                vars['--text-dark'] = '#ffffff';
+                vars['--text-gray'] = '#a1a1aa';
+                vars['--card-bg'] = 'rgba(10, 10, 10, 0.8)';
+                vars['--card-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.5)`;
+                vars['--navbar-bg'] = 'rgba(10, 10, 10, 0.9)';
+                vars['--input-bg'] = '#171717';
+                vars['--input-text'] = '#ffffff';
+                vars['--widget-bg'] = '#121212';
+                vars['--widget-hover'] = '#262626';
+                vars['--widget-border'] = `rgba(${hslToRgb(hue, 80, 50)}, 0.4)`;
+                vars['--card-shadow'] = `0 0 20px rgba(${hslToRgb(hue, 80, 50)}, 0.2)`;
+                vars['--card-backdrop'] = 'blur(10px)';
+            }
+            else if (mode === 'solid-light') {
+                vars['--body-bg'] = `hsl(${hue}, 20%, 96%)`;
+                vars['--text-dark'] = '#1e293b';
+                vars['--text-gray'] = '#64748b';
+                vars['--card-bg'] = '#ffffff';
+                vars['--card-border'] = '#e2e8f0';
+                vars['--navbar-bg'] = '#ffffff';
+                vars['--input-bg'] = '#f1f5f9';
+                vars['--input-text'] = '#1e293b';
+                vars['--widget-bg'] = '#ffffff';
+                vars['--widget-hover'] = '#f8fafc';
+                vars['--widget-border'] = '#e2e8f0';
+                vars['--card-shadow'] = '0 10px 25px rgba(0, 0, 0, 0.05)';
+                vars['--card-backdrop'] = 'none';
+            }
+            else if (mode === 'solid-dark') {
+                vars['--body-bg'] = '#0f172a';
+                vars['--text-dark'] = '#f1f5f9';
+                vars['--text-gray'] = '#94a3b8';
+                vars['--card-bg'] = '#1e293b';
+                vars['--card-border'] = '#334155';
+                vars['--navbar-bg'] = '#1e293b';
+                vars['--input-bg'] = '#0f172a';
+                vars['--input-text'] = '#f1f5f9';
+                vars['--widget-bg'] = '#1e293b';
+                vars['--widget-hover'] = '#334155';
+                vars['--widget-border'] = '#475569';
+                vars['--card-shadow'] = '0 10px 25px rgba(0, 0, 0, 0.5)';
+                vars['--card-backdrop'] = 'none';
+            }
+
+            vars['--primary-color'] = primary;
+            vars['--primary-dark'] = primaryDark;
+            
+            // 이펙트 컬러 설정
+            const lightness = isDark ? '40%' : '75%';
+            vars['--effect-color1'] = `hsl(${hue}, 80%, ${lightness})`;
+            vars['--effect-color2'] = `hsl(${(hue + 40)%360}, 80%, ${lightness})`;
+            vars['--effect-color3'] = `hsl(${(hue - 40 + 360)%360}, 80%, ${lightness})`;
+
+            // 3. CSS 변수 적용
+            for (const [key, value] of Object.entries(vars)) {
+                document.documentElement.style.setProperty(key, value);
+            }
+
+            // 4. 로컬 스토리지에 현재 설정 저장
+            localStorage.setItem('saedam_theme_config', JSON.stringify({ style, hue, mode, vars }));
+
+            // 5. 배경 애니메이션 DOM 재구성
+            renderBackgroundEffects(style, isDark);
         }
 
-        function closeMyInfoModal() { 
-            document.getElementById('myInfoModal').style.display = "none"; 
+        function renderBackgroundEffects(style, isDark) {
+            const container = document.getElementById('bg-effect-container');
+            container.style.opacity = '0';
+            
+            // 다크 모드일 때 블랍(Blob) 혼합 모드 변경을 위한 클래스 토글
+            if(isDark) document.body.classList.add('dark-mode-blob');
+            else document.body.classList.remove('dark-mode-blob');
+
+            setTimeout(() => {
+                container.innerHTML = ''; 
+                if (style === 'stars') {
+                    container.innerHTML = `<div class="stars-small"></div><div class="stars-medium"></div><div class="stars-large"></div><div class="shooting-star" style="top:20%; right:-10%;"></div>`;
+                } else if (style === 'bubbles') {
+                    for(let i=0; i<25; i++) {
+                        let b = document.createElement('div'); b.className = 'bubble'; b.style.left = Math.random() * 100 + '%'; b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px'; b.style.animationDuration = (Math.random() * 8 + 4) + 's'; b.style.animationDelay = (Math.random() * 5) + 's'; container.appendChild(b);
+                    }
+                } else if (style === 'blobs') {
+                    container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div><div class="blob blob-3" style="background: var(--effect-color3)"></div>`;
+                } else if (style === 'orbs') {
+                    container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div>`;
+                } else if (style === 'waves') {
+                    container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div><div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div><div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>`;
+                } else if (style === 'geometry') {
+                    for(let i=0; i<15; i++) {
+                        let el = document.createElement('div'); el.className = 'shape-box'; if(i%3===0) el.style.borderRadius = '50%'; el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 60 + 20; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                    }
+                } else if (style === 'rings') {
+                    for(let i=0; i<6; i++) {
+                        let el = document.createElement('div'); el.className = 'glass-ring'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.top = (Math.random() * 80 + 10) + '%'; let size = Math.random() * 300 + 150; el.style.width = el.style.height = size + 'px'; el.style.marginLeft = el.style.marginTop = -(size/2) + 'px'; el.style.animationDuration = (Math.random() * 4 + 4) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                    }
+                } else if (style === 'polygons') {
+                    for(let i=0; i<12; i++) {
+                        let el = document.createElement('div'); el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon'); el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 80 + 30; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.background = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                    }
+                } else if (style === 'lines') {
+                    for(let i=0; i<10; i++) {
+                        let el = document.createElement('div'); el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg'); el.style.top = (Math.random() * 150 - 25) + '%'; el.style.animationDuration = (Math.random() * 8 + 5) + 's'; el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`; container.appendChild(el);
+                    }
+                } else if (style === 'cyber') {
+                    container.innerHTML = `<div class="cyber-grid"></div><div class="glow-orb orb-1" style="background: var(--effect-color1); opacity: 0.3;"></div>`;
+                }
+                container.style.opacity = '1';
+            }, 300);
         }
 
-        window.onclick = function(event) {
-            if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal();
+        // HSL to RGB 헬퍼 함수 (네온 글로우 그림자 처리용)
+        function hslToRgb(h, s, l){
+            s /= 100; l /= 100;
+            const k = n => (n + h / 30) % 12;
+            const a = s * Math.min(l, 1 - l);
+            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+            return `${Math.round(255 * f(0))}, ${Math.round(255 * f(8))}, ${Math.round(255 * f(4))}`;
         }
 
-        // ==========================================
-        // 🎨 테마 관리 자바스크립트
-        // ==========================================
+        // 페이지 로드 시 기존 저장된 테마 UI 복원
         document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('saedam_theme') || 'default';
-            const selectBox = document.getElementById('theme-select');
-            if(selectBox) selectBox.value = savedTheme;
+            const savedTheme = localStorage.getItem('saedam_theme_config');
+            if (savedTheme) {
+                try {
+                    const config = JSON.parse(savedTheme);
+                    document.getElementById('theme-style-select').value = config.style;
+                    document.getElementById('theme-color-select').value = config.hue;
+                    document.getElementById('theme-mode-select').value = config.mode;
+                    renderBackgroundEffects(config.style, config.mode.includes('dark'));
+                } catch(e) {}
+            } else {
+                // 초기 기본 테마 설정 (블루, 유리, 밝음)
+                generateThemeFromSelects();
+            }
         });
-
-        function changeTheme(themeName) {
-            document.documentElement.setAttribute('data-theme', themeName);
-            localStorage.setItem('saedam_theme', themeName);
-        }
     </script>
-
-    {% block extra_js %}{% endblock %}
 </body>
 </html>
