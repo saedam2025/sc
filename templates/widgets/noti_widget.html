@@ -1,15 +1,15 @@
 <style>
     /* =========================================================
-       새담 인트라넷 [나의 업무 알림] 개선된 글래스모피즘 카드 스타일
+       새담 인트라넷 [나의 업무 알림] 레이아웃 최적화 (삐침 방지)
        ========================================================= */
     .noti-widget-wrapper {
-        background: transparent !important; /* 외부 컨테이너 배경 제거로 여백 최소화 */
+        background: transparent !important;
         display: flex;
         flex-direction: column;
         gap: 15px;
         height: 100%;
         width: 100%;
-        box-sizing: border-box;
+        box-sizing: border-box; /* 패딩이 너비에 영향을 주지 않도록 설정 */
     }
     
     .noti-card-item {
@@ -26,6 +26,7 @@
         color: var(--text-dark) !important;
         box-shadow: var(--card-shadow);
         transition: all 0.3s ease;
+        box-sizing: border-box; /* 🧨 핵심: 내부 패딩과 테두리를 너비에 포함 */
     }
     
     .noti-card-item:hover {
@@ -35,12 +36,13 @@
         border-color: var(--primary-color) !important;
     }
     
-    /* 상단 긴 카드 (결재 현황) */
+    /* 상단 긴 카드 (너비 삐침 수정) */
     .noti-card-long {
         flex-direction: row;
         justify-content: space-between;
         padding: 20px 30px;
-        width: 100%;
+        width: 100% !important; /* 부모 너비를 넘지 않도록 고정 */
+        margin: 0; /* 불필요한 여백 제거 */
     }
     
     .noti-card-title {
@@ -51,6 +53,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        white-space: nowrap; /* 글자 줄바꿈 방지 */
     }
 
     .noti-card-title i {
@@ -62,6 +65,7 @@
         font-size: 1.15rem;
         font-weight: 800;
         color: var(--text-dark);
+        white-space: nowrap;
     }
     
     /* 강조 색상 */
@@ -75,6 +79,7 @@
         gap: 15px;
         flex: 1;
         width: 100%;
+        box-sizing: border-box;
     }
     
     /* 아이콘 강조형 스타일 (그리드 내부) */
@@ -95,7 +100,12 @@
     
     @media (max-width: 1300px) {
         .noti-grid-container { grid-template-columns: repeat(2, 1fr); }
-        .noti-card-long { flex-direction: column; align-items: flex-start; gap: 10px; }
+        .noti-card-long { 
+            flex-direction: column; 
+            align-items: flex-start; 
+            gap: 10px; 
+            padding: 15px 20px;
+        }
     }
 </style>
 
