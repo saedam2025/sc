@@ -144,6 +144,14 @@ def get_my_info():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# --- [신규 추가] 새 창 팝업 쪽지함 라우트 ---
+@app.route('/chat_popup/<partner>')
+def chat_popup(partner):
+    # 로그인 시 세션에 저장된 user_name을 현재 사용자로 넘겨줍니다.
+    current_user = session.get('user_name', '알수없음')
+    return render_template('chat_popup.html', partner=partner, current_user=current_user)
+
+
 @app.route('/logout')
 def logout():
     session.clear() # 모든 세션 파기
