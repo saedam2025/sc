@@ -106,54 +106,30 @@
     .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
     .emoji-item:hover { background: var(--widget-hover); }
 
-    /* 나의 업무 알림 위젯 전용 스타일 */
+    /* 나의 업무 알림 위젯 전용 스타일 (수정됨) */
     .noti-widget-wrapper {
         display: flex;
         flex-direction: column;
         gap: 12px;
         height: 100%;
+        width: 100%; /* 여백 없이 꽉 채움 */
         box-sizing: border-box;
     }
 
-    /* 🔥 배경색 제거 및 초기화: 서버에서 넘어오는 인라인 스타일 및 기본 배경색을 무효화 */
+    /* 🔥 서버 위젯의 배경색 무효화 및 레이아웃 강제 지정 */
+    #notification-widget-area {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+    }
+
     #notification-widget-area > div, 
-    #notification-widget-area .noti-container {
+    #notification-widget-area .noti-container,
+    #notification-widget-area .noti-widget-wrapper {
         background: transparent !important; 
         border: none !important;
         box-shadow: none !important;
-    }
-    
-    .noti-card-item {
-        background: var(--widget-bg) !important;
-        border: 1px solid var(--widget-border) !important;
-        border-radius: 12px;
-        padding: 15px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        text-decoration: none;
-        color: var(--text-dark) !important;
-        transition: all 0.3s ease;
-    }
-    
-    .noti-card-item:hover {
-        background: var(--widget-hover) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-    
-    .noti-card-long { flex-direction: row; justify-content: space-between; padding: 15px 25px; }
-    .noti-card-title { font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-    .noti-card-long .noti-card-title { margin-bottom: 0; }
-    .noti-card-value { font-size: 1.1rem; font-weight: 800; color: var(--text-dark); }
-    .noti-count-red { color: #e74c3c; } 
-    .noti-count-blue { color: var(--primary-color); } 
-    .noti-grid-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex: 1; width: 100%; }
-    
-    @media (max-width: 1300px) {
-        .noti-grid-container { grid-template-columns: repeat(2, 1fr); }
+        padding: 0 !important;
     }
 </style>
 
@@ -318,7 +294,7 @@
                 </button>
             </div>
             
-            <div id="notification-widget-area" class="noti-widget-wrapper" style="justify-content: center; align-items: center;">
+            <div id="notification-widget-area" class="noti-widget-wrapper">
                 <div style="text-align: center; color: var(--text-gray); font-size: 0.9rem;">
                     <i class="fa-solid fa-spinner fa-spin"></i> 알림 데이터를 불러오는 중입니다...
                 </div>
@@ -433,9 +409,9 @@
             })
             .then(html => { 
                 widgetArea.innerHTML = html; 
-                // 🔥 로드된 HTML 내부의 인라인 배경색 스타일 강제 제거 (있는 경우)
-                const container = widgetArea.querySelector('.noti-container');
-                if(container) container.style.background = 'transparent';
+                // 위젯 내부 레이아웃 보정
+                widgetArea.style.justifyContent = "flex-start";
+                widgetArea.style.alignItems = "stretch";
             })
             .catch(error => {
                 console.error('위젯 로드 실패:', error);
@@ -445,6 +421,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadNotificationWidget();
+        setInterval(loadNotificationWidget, 60000); // 1분마다 자동 갱신
     });
 
     async function fetchActiveUsers() {
@@ -625,10 +602,10 @@
             }
         });
         calendar.render();
-        setInterval(checkUnreadMessages, 10000);
         checkUnreadMessages();
-        setInterval(fetchActiveUsers, 10000);
         fetchActiveUsers(); 
+        setInterval(fetchActiveUsers, 10000);
+        setInterval(checkUnreadMessages, 10000);
     });
 
     function editTask(taskId, dateStr) {
