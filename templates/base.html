@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="default">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +9,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('saedam_theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+        })();
+    </script>
     
     <style>
         /* 기본 설정 */
@@ -341,6 +351,37 @@
     </main>
 
     <footer class="main-footer">
+        <div class="theme-selector" style="margin-bottom: 20px;">
+            <label for="theme-select" style="font-weight: bold; margin-right: 10px;">🎨 인트라넷 테마 변경:</label>
+            <select id="theme-select" onchange="changeTheme(this.value)" style="padding: 6px; border-radius: 5px; border: 1px solid #cbd5e1; outline: none; background: #fff; color: #333; font-family: 'Pretendard', sans-serif;">
+                <option value="default">기본 (블루)</option>
+                <option value="theme_1">스카이블루</option>
+                <option value="theme_2">시안</option>
+                <option value="theme_3">틸 (Teal)</option>
+                <option value="theme_4">그린</option>
+                <option value="theme_5">에메랄드</option>
+                <option value="theme_6">라임</option>
+                <option value="theme_7">옐로우</option>
+                <option value="theme_8">라이트 오렌지</option>
+                <option value="theme_9">오렌지</option>
+                <option value="theme_10">코랄</option>
+                <option value="theme_11">로즈</option>
+                <option value="theme_12">피치</option>
+                <option value="theme_13">핑크</option>
+                <option value="theme_14">마젠타</option>
+                <option value="theme_15">플럼</option>
+                <option value="theme_16">퍼플</option>
+                <option value="theme_17">바이올렛</option>
+                <option value="theme_18">인디고</option>
+                <option value="theme_19">딥 인디고</option>
+                <option value="theme_20">아쿠아</option>
+                <option value="theme_21">씨그린</option>
+                <option value="theme_22">파스텔 블루</option>
+                <option value="theme_23">그레이 블루</option>
+                <option value="theme_24">라벤더</option>
+                <option value="theme_25">살구</option>
+            </select>
+        </div>
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
 
@@ -504,6 +545,20 @@
 
         window.onclick = function(event) {
             if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal();
+        }
+
+        // ==========================================
+        // 🎨 테마 관리 자바스크립트 추가 부분
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('saedam_theme') || 'default';
+            const selectBox = document.getElementById('theme-select');
+            if(selectBox) selectBox.value = savedTheme;
+        });
+
+        function changeTheme(themeName) {
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('saedam_theme', themeName);
         }
     </script>
 

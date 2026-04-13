@@ -2,102 +2,24 @@
 
 {% block content %}
 <style>
-    /* === 다이나믹 테마 변수 (유리 속성 고정) === */
+    /* === 글래스모피즘(유리) 속성 및 공통 변수 (테마 색상은 base.html을 따름) === */
     :root {
-        --body-bg: #f8fafc;
-        --primary-color: #4a90e2;
-        --primary-dark: #357abd;
         --text-dark: #1e293b;
         --text-gray: #64748b;
         
-        --card-bg: rgba(255, 255, 255, 0.6);
+        --card-bg: rgba(255, 255, 255, 0.7);
         --card-border: rgba(255, 255, 255, 0.9);
-        --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-        --card-backdrop: blur(24px);
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        --card-backdrop: blur(15px);
         
         --input-bg: rgba(255, 255, 255, 0.8);
         --input-text: #1e293b;
-        --widget-bg: rgba(255, 255, 255, 0.7);
+        --widget-bg: rgba(255, 255, 255, 0.8);
         --widget-hover: rgba(255, 255, 255, 1);
         --widget-border: rgba(255, 255, 255, 1);
-        
-        --effect-color1: transparent;
-        --effect-color2: transparent;
-        --effect-color3: transparent;
     }
 
-    /* 상위 base.html의 body 및 navbar 강제 오버라이드 */
-    body {
-        background: var(--body-bg) !important;
-        background-size: 400% 400% !important;
-        animation: gradientBG 20s ease infinite !important;
-        transition: background 1.5s ease;
-        color: var(--text-dark) !important;
-    }
-    
-    .navbar {
-        background: var(--card-bg) !important;
-        backdrop-filter: var(--card-backdrop) !important;
-        -webkit-backdrop-filter: var(--card-backdrop) !important;
-        border-bottom: 1px solid var(--card-border) !important;
-        transition: all 0.5s ease;
-    }
-
-    .navbar .menu-item, .navbar .logo, .navbar .user-profile {
-        color: var(--text-dark) !important;
-    }
-
-    @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-
-    /* === 배경 애니메이션 효과 (별, 물방울, 블롭 등) === */
-    .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
-    .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
-    .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
-    .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
-    @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
-    @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
-
-    .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
-    @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
-
-    .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
-    .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
-    .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
-    .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
-    @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-    .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
-    .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
-    .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
-    .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
-    .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
-    @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
-
-    .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
-    .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
-    .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
-    @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-    .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-    @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
-
-    .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
-    @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
-
-    .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
-    .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
-    .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
-
-    .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
-    .line-pos { animation: slideLinePos infinite linear; }
-    .line-neg { animation: slideLineNeg infinite linear; }
-    @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
-    @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
-
-    #bg-effect-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
-
-    /* === 인트라넷 전용 스타일 업데이트 (테마 변수 적용) === */
+    /* === 인트라넷 전용 스타일 업데이트 === */
     .glass-box {
         background: var(--card-bg) !important; 
         backdrop-filter: var(--card-backdrop) !important; 
@@ -107,7 +29,7 @@
         border-radius: 20px; 
         padding: 20px;
         color: var(--text-dark) !important;
-        transition: background 0.5s ease, border 0.5s ease, box-shadow 0.5s ease, color 0.5s ease;
+        transition: all 0.3s ease;
     }
 
     .glass-event-card, .list-item, .widget-box {
@@ -141,7 +63,7 @@
     /* 글꼴 및 타이포그래피 */
     .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
     .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
-    h3, h4 { color: var(--text-dark) !important; transition: color 0.5s ease; }
+    h3, h4 { color: var(--text-dark) !important; transition: color 0.3s ease; }
     
     /* 모달 및 폼 스타일 */
     .modal-content { 
@@ -161,7 +83,7 @@
         color: var(--input-text) !important; 
         transition: all 0.3s;
     }
-    .modal-input:focus { border-color: var(--primary-color) !important; outline: none; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+    .modal-input:focus { border-color: var(--primary-color) !important; outline: none; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05); }
     
     .task-input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .task-input-group label { width: 45px; font-weight: bold; font-size: 0.85rem; color: var(--text-gray); text-align: right; }
@@ -174,7 +96,7 @@
     .btn-edit { color: var(--primary-color) !important; }
     .btn-delete { color: #e74c3c !important; }
     .btn-primary { background: var(--primary-color) !important; color: white !important; transition: all 0.3s; }
-    .btn-primary:hover { background: var(--primary-dark) !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+    .btn-primary:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
     /* 채팅 및 쪽지 스타일 */
     .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
@@ -188,12 +110,8 @@
     .chat-sent-bubble { background: var(--primary-color); color: #fff; padding: 10px 14px; border-radius: 15px 15px 0 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .chat-recv-bubble { background: var(--input-bg); color: var(--input-text); border: 1px solid var(--card-border); padding: 10px 14px; border-radius: 0 15px 15px 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
 
-    /* 랜덤 테마 버튼 */
-    .theme-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); border: 1px solid var(--card-border); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 1000; box-shadow: var(--card-shadow); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
-    .theme-btn:hover { background: var(--widget-hover); transform: translateY(-2px); }
-
     /* =========================================================
-       새로운 [나의 업무 알림] 카드형 위젯 전용 스타일 (전체 테마 연동)
+       [나의 업무 알림] 카드형 위젯 전용 스타일 (전체 테마 연동)
        ========================================================= */
     .noti-widget-wrapper {
         display: flex;
@@ -250,8 +168,8 @@
         color: var(--text-dark);
     }
     
-    .noti-count-red { color: #e74c3c; } /* 경고/대기 건수 컬러 */
-    .noti-count-blue { color: var(--primary-color); } /* 일반 건수 컬러 (테마 연동) */
+    .noti-count-red { color: #e74c3c; } 
+    .noti-count-blue { color: var(--primary-color); } 
 
     .noti-grid-container {
         display: grid;
@@ -264,8 +182,6 @@
         .noti-grid-container { grid-template-columns: repeat(2, 1fr); }
     }
 </style>
-
-<div id="bg-effect-container"></div>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
     <div class="row" style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
@@ -438,10 +354,6 @@
     </div>
 </div>
 
-<button class="theme-btn" onclick="initRandomTheme()">
-    <span id="themeNameBadge" style="font-weight: bold; margin-right: 5px;"></span> <i class="fa-solid fa-dice"></i> 테마 변경
-</button>
-
 <div id="chatModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
     <div class="modal-content" style="margin:5% auto; padding:25px; width:450px; height:600px; border-radius:20px; position:relative; display:flex; flex-direction:column;">
         <span onclick="closeChat()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
@@ -568,104 +480,6 @@
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
-    // === 다이나믹 테마 엔진 생성 (유리 테마 고정 및 다크/검정 모드 완전히 제거) ===
-    const themeConfigs = [
-        { name: "[유리]크리스탈 포레스터", hue: 140, isDark: false, type: "rings" },
-        { name: "[유리]로얄 웨이브", hue: 280, isDark: false, type: "waves" },
-        { name: "[유리]시크릿 선셋", hue: 20, isDark: false, type: "orbs" },
-        { name: "[유리]네온 포레스터", hue: 110, isDark: false, type: "lines" },
-        { name: "[유리]시크릿 선셋2", hue: 35, isDark: false, type: "stars" }, 
-        { name: "[유리]루비 오디세이", hue: 345, isDark: false, type: "blobs" },
-        { name: "[유리]에테르 갤럭시", hue: 260, isDark: false, type: "stars" },
-        { name: "[유리]드림 플레어", hue: 320, isDark: false, type: "bubbles" },
-        { name: "[유리]다아내믹 오디세이", hue: 200, isDark: false, type: "polygons" },
-        { name: "[유리]미스틱 호라이즌", hue: 230, isDark: false, type: "geometry" },
-        { name: "[유리]샤파이어 네블라", hue: 220, isDark: false, type: "orbs" },
-        { name: "[유리]프리즘 네블라", hue: 180, isDark: false, type: "rings" },
-        { name: "[유리]일루전 오션", hue: 195, isDark: false, type: "waves" },
-        { name: "[유리]인피니티 호라이즌", hue: 275, isDark: false, type: "lines" }
-    ];
-
-    const generatedThemes = [];
-
-    themeConfigs.forEach(config => {
-        const pointHue = config.hue;
-        
-        // 다크 모드 제거, 모두 밝은 톤으로 처리
-        const primary = `hsl(${pointHue}, 70%, 50%)`;
-        const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
-        const bg = `linear-gradient(-45deg, hsl(${config.hue}, 40%, 95%), hsl(${(config.hue + 30) % 360}, 50%, 90%), hsl(${(config.hue - 30 + 360) % 360}, 40%, 95%))`;
-        
-        const vars = {
-            "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
-            "--text-dark": "#0f172a", "--text-gray": "#64748b",
-            "--input-text": "#1e293b", 
-            "--effect-color1": `hsl(${config.hue}, 70%, 75%)`, "--effect-color2": `hsl(${(config.hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(config.hue - 40 + 360) % 360}, 70%, 75%)`,
-            
-            // 밝은 테마 유리(Glass) 고정 속성
-            "--card-bg": "rgba(255, 255, 255, 0.6)", "--card-border": "rgba(255, 255, 255, 0.9)",
-            "--card-backdrop": "blur(24px)", "--card-shadow": "0 15px 40px rgba(0, 0, 0, 0.1)",
-            "--input-bg": "rgba(255, 255, 255, 0.8)", "--widget-bg": "rgba(255, 255, 255, 0.7)", 
-            "--widget-hover": "rgba(255, 255, 255, 1)", "--widget-border": "rgba(255, 255, 255, 1)"
-        };
-        
-        generatedThemes.push({ name: config.name, type: config.type, vars: vars });
-    });
-
-    generatedThemes.sort(() => Math.random() - 0.5);
-    let currentThemeIndex = -1;
-
-    function initRandomTheme() {
-        let newIndex = Math.floor(Math.random() * generatedThemes.length);
-        while (newIndex === currentThemeIndex) { newIndex = Math.floor(Math.random() * generatedThemes.length); }
-        currentThemeIndex = newIndex;
-        
-        const t = generatedThemes[currentThemeIndex];
-        
-        for (const [key, value] of Object.entries(t.vars)) {
-            document.documentElement.style.setProperty(key, value);
-        }
-
-        document.getElementById('themeNameBadge').innerText = t.name;
-
-        const container = document.getElementById('bg-effect-container');
-        container.style.opacity = '0';
-        
-        setTimeout(() => {
-            container.innerHTML = ''; 
-            if (t.type === 'stars') {
-                container.innerHTML = `<div class="stars-small"></div><div class="stars-medium"></div><div class="stars-large"></div><div class="shooting-star" style="top:20%; right:-10%;"></div>`;
-            } else if (t.type === 'bubbles') {
-                for(let i=0; i<20; i++) {
-                    let b = document.createElement('div'); b.className = 'bubble'; b.style.left = Math.random() * 100 + '%'; b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px'; b.style.animationDuration = (Math.random() * 8 + 4) + 's'; b.style.animationDelay = (Math.random() * 5) + 's'; container.appendChild(b);
-                }
-            } else if (t.type === 'blobs') {
-                container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div><div class="blob blob-3" style="background: var(--effect-color3)"></div>`;
-            } else if (t.type === 'orbs') {
-                container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div><div class="cyber-grid"></div>`;
-            } else if (t.type === 'waves') {
-                container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div><div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div><div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>`;
-            } else if (t.type === 'geometry') {
-                for(let i=0; i<12; i++) {
-                    let el = document.createElement('div'); el.className = 'shape-box'; if(i%3===0) el.style.borderRadius = '50%'; el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 60 + 20; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                }
-            } else if (t.type === 'rings') {
-                for(let i=0; i<5; i++) {
-                    let el = document.createElement('div'); el.className = 'glass-ring'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.top = (Math.random() * 80 + 10) + '%'; let size = Math.random() * 300 + 150; el.style.width = el.style.height = size + 'px'; el.style.marginLeft = el.style.marginTop = -(size/2) + 'px'; el.style.animationDuration = (Math.random() * 4 + 4) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                }
-            } else if (t.type === 'polygons') {
-                for(let i=0; i<10; i++) {
-                    let el = document.createElement('div'); el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon'); el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 80 + 30; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.background = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                }
-            } else if (t.type === 'lines') {
-                for(let i=0; i<8; i++) {
-                    let el = document.createElement('div'); el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg'); el.style.top = (Math.random() * 150 - 25) + '%'; el.style.animationDuration = (Math.random() * 8 + 5) + 's'; el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`; container.appendChild(el);
-                }
-            }
-            container.style.opacity = '1';
-        }, 300); 
-    }
-
     // === 알림 위젯 불러오기 (비동기 처리) ===
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
@@ -686,10 +500,8 @@
             });
     }
 
-    // 초기 테마 설정 및 알림 위젯 로드
+    // 초기 알림 위젯 로드 및 기초 설정
     document.addEventListener('DOMContentLoaded', function() {
-        initRandomTheme();
-        
         // 메인 화면 렌더링 후 알림 위젯 데이터 불러오기
         loadNotificationWidget();
     });
