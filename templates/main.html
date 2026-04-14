@@ -106,34 +106,36 @@
     .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
     .emoji-item:hover { background: var(--widget-hover); }
 
-    /* 나의 업무 알림 위젯 전용 스타일 (수정됨) */
+    /* 나의 업무 알림 위젯 전용 스타일 */
     .noti-widget-wrapper {
         display: flex;
         flex-direction: column;
         gap: 12px;
         height: 100%;
-        width: 100%; /* 여백 없이 꽉 채움 */
+        width: 100%;
         box-sizing: border-box;
     }
 
-    /* 🔥 서버 위젯의 배경색 무효화 및 레이아웃 강제 지정 */
-    #notification-widget-area {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-    }
-
+    #notification-widget-area { display: flex; flex-direction: column; width: 100%; }
     #notification-widget-area > div, 
     #notification-widget-area .noti-container,
     #notification-widget-area .noti-widget-wrapper {
-        background: transparent !important; 
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
+        background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;
     }
 
-    /* WebLink 드래그 시 고스트 효과 */
+    /* WebLink 전용 스타일 (삭제 버튼 및 고스트 효과) */
+    .weblink-item { position: relative; }
     .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
+    
+    .weblink-delete-btn {
+        position: absolute; top: -5px; right: -5px;
+        background: #e74c3c; color: white; border-radius: 50%;
+        width: 18px; height: 18px; font-size: 10px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; opacity: 0; transition: opacity 0.2s;
+        z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .weblink-item:hover .weblink-delete-btn { opacity: 1; }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: stretch;">
@@ -315,14 +317,28 @@
                 <i class="fa-solid fa-link"></i> WebLink
             </h3>
             <button onclick="document.getElementById('weblinkModal').style.display='block'" style="background: var(--widget-bg); border: 1px dashed var(--primary-color); color: var(--primary-color); width: 100%; border-radius: 8px; padding: 5px; cursor: pointer; font-size: 0.75rem; font-weight: bold; transition: all 0.2s;">
-                + 사이트 등록
+                + 등록
             </button>
         </div>
         
         <div id="weblink-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 12px 5px; border-radius: 12px; margin-bottom: 0;" onclick="window.open('{{ link.url }}', '_blank')">
+                
+                {% if link.created_by == current_user or current_user_level >= 1 %}
+                <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+                {% endif %}
+
+                {% if link.type == 'file' or link.favicon_url == 'FILE' %}
+                <div style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: var(--primary-color); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                </div>
+                {% else %}
                 <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
+                {% endif %}
+                
                 <span style="font-size: 0.75rem; color: var(--text-dark); font-weight: 700; text-align: center; word-break: keep-all; line-height: 1.2; pointer-events: none;">{{ link.title }}</span>
             </div>
             {% else %}
@@ -429,10 +445,18 @@
 <div id="weblinkModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
     <div class="modal-content" style="margin:10% auto; padding:25px; width:350px; border-radius:15px; position:relative;">
         <span onclick="document.getElementById('weblinkModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
-        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-link"></i> 새 업무사이트 등록</h3>
+        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-link"></i> 사이트/파일 등록</h3>
         <form id="weblinkForm">
-            <input type="text" id="weblinkTitle" class="modal-input" placeholder="사이트명 (예: 새담 홈피)" required>
-            <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소 (예: www.saedam.com)" required>
+            <input type="text" id="weblinkTitle" class="modal-input" placeholder="표시될 이름 (예: 새담 홈피)" required>
+            
+            <div style="margin-bottom: 15px; padding: 0 5px; display: flex; gap: 20px; font-size: 0.9rem; color: var(--text-dark); font-weight: 600;">
+                <label style="cursor: pointer;"><input type="radio" name="weblinkType" value="url" checked onchange="toggleWeblinkType()"> URL 링크</label>
+                <label style="cursor: pointer;"><input type="radio" name="weblinkType" value="file" onchange="toggleWeblinkType()"> 파일 업로드</label>
+            </div>
+            
+            <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소 (예: www.saedam.com)">
+            <input type="file" id="weblinkFile" class="modal-input" style="display: none; background: #fff !important;">
+            
             <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; margin-top: 10px;">등록하기</button>
         </form>
     </div>
@@ -453,7 +477,6 @@
             })
             .then(html => { 
                 widgetArea.innerHTML = html; 
-                // 위젯 내부 레이아웃 보정
                 widgetArea.style.justifyContent = "flex-start";
                 widgetArea.style.alignItems = "stretch";
             })
@@ -465,15 +488,14 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadNotificationWidget();
-        // 1분(60,000ms)마다 업무 알림 위젯 자동 갱신
         setInterval(loadNotificationWidget, 60000); 
 
-        // WebLink SortableJS (드래그 앤 드롭 초기화)
+        // WebLink SortableJS
         var weblinkEl = document.getElementById('weblink-container');
         if(weblinkEl) {
             Sortable.create(weblinkEl, {
                 animation: 150,
-                ghostClass: 'weblink-ghost', // 드래그 중인 아이템 스타일
+                ghostClass: 'weblink-ghost',
                 onEnd: function (evt) {
                     var itemEls = weblinkEl.querySelectorAll('.weblink-item');
                     var newOrder = [];
@@ -481,7 +503,6 @@
                         newOrder.push(item.getAttribute('data-id'));
                     });
                     
-                    // 변경된 순서를 서버에 비동기로 전송 및 저장
                     fetch('/update_weblink_order', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -672,7 +693,6 @@
         calendar.render();
         checkUnreadMessages();
         fetchActiveUsers(); 
-        // 1분(60,000ms)마다 접속자 목록 및 읽지 않은 쪽지 확인
         setInterval(fetchActiveUsers, 60000);
         setInterval(checkUnreadMessages, 60000);
     });
@@ -773,19 +793,54 @@
         } catch (e) {}
     }
 
-    // WebLink 저장 기능 스크립트
+    // WebLink 타입 라디오 버튼 토글
+    function toggleWeblinkType() {
+        const type = document.querySelector('input[name="weblinkType"]:checked').value;
+        if(type === 'url') {
+            document.getElementById('weblinkUrl').style.display = 'block';
+            document.getElementById('weblinkFile').style.display = 'none';
+        } else {
+            document.getElementById('weblinkUrl').style.display = 'none';
+            document.getElementById('weblinkFile').style.display = 'block';
+        }
+    }
+
+    // WebLink 저장 및 파일 업로드
     async function saveWebLink() {
         const title = document.getElementById('weblinkTitle').value;
-        const url = document.getElementById('weblinkUrl').value;
-        if(!title || !url) { alert("모든 항목을 입력해주세요."); return; }
+        const type = document.querySelector('input[name="weblinkType"]:checked').value;
         
         let formData = new FormData();
         formData.append('title', title);
-        formData.append('url', url);
+        formData.append('type', type);
+        
+        if (type === 'url') {
+            const url = document.getElementById('weblinkUrl').value;
+            if(!title || !url) { alert("모든 항목을 입력해주세요."); return; }
+            formData.append('url', url);
+        } else {
+            const fileInput = document.getElementById('weblinkFile');
+            if(!title || fileInput.files.length === 0) { alert("파일과 이름을 입력해주세요."); return; }
+            formData.append('file', fileInput.files[0]);
+        }
         
         try {
             const res = await fetch('/save_weblink', { method: 'POST', body: formData });
             if(res.ok) { location.reload(); }
+        } catch (e) { alert("오류가 발생했습니다."); }
+    }
+
+    // WebLink 삭제 기능
+    async function deleteWebLink(linkId) {
+        if(!confirm("이 링크를 삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_weblink/${linkId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if(res.ok && data.status === 'success') {
+                location.reload();
+            } else {
+                alert(data.message || "삭제에 실패했습니다.");
+            }
         } catch (e) { alert("오류가 발생했습니다."); }
     }
 </script>
