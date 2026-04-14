@@ -131,176 +131,206 @@
         box-shadow: none !important;
         padding: 0 !important;
     }
+
+    /* WebLink 드래그 시 고스트 효과 */
+    .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
 </style>
 
-<div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
-    <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 20px;">
-        
-        <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden;">
-            <div id='calendar'></div>
-        </div>
-
-        <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
-            </div>
+<div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: stretch;">
+    
+    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+        <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 0;">
             
-            <div class="today-list">
-                {% set today_empty = true %}
-                {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
-                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
-                        {% for event in today_grouped[cat] %}
-                        <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
-                            <div class="card-header">
-                                <span class="card-title">{{ event.display_title_detailed }}</span>
-                                <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: var(--text-gray); transition: transform 0.2s;"></i>
-                            </div>
-                            {% if event.extendedProps.note or event.extendedProps.task_time %}
-                            <div class="card-details">
-                                {% if event.extendedProps.task_time %}<div><strong>시간:</strong> {{ event.extendedProps.task_time }}</div>{% endif %}
-                                {% if event.extendedProps.note %}<div style="margin-top:5px;"><strong>비고:</strong> {{ event.extendedProps.note }}</div>{% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                {% endif %}{% endfor %}
-                {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 30px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
+            <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden;">
+                <div id='calendar'></div>
             </div>
 
-            <hr style="border: 0; border-top: 1px dashed var(--card-border); margin: 20px 0;">
-            
-            <h3 style="margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-calendar-week"></i> UPCOMING</h3>
-            <div class="weekly-list">
-                {% set weekly_empty = true %}
-                {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
-                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
-                        {% for event in weekly_grouped[cat] %}
-                        <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
-                            <div style="font-size: 0.7rem; color: var(--primary-color); margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
-                            <div class="card-header"><span class="card-title">{{ event.display_title_detailed }}</span></div>
-                        </div>
-                        {% endfor %}
-                {% endif %}{% endfor %}
-            </div>
-        </div>
-
-        <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px; box-sizing: border-box;">
-            
-            <div class="glass-box" style="flex: 0 0 140px; overflow-y: auto; padding: 15px;">
-                <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
-                    <i class="fa-solid fa-users"></i> 접속 중인 직원
-                </h3>
-                <div id="activeUserContainer" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    <span style="font-size: 0.8rem; color: var(--text-gray);">실시간 접속자 정보를 불러오는 중...</span>
-                </div>
-            </div>
-
-            <div class="glass-box col-msg" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.05rem;">
-                        <i class="fa-solid fa-envelope"></i> 쪽지함
-                    </h3>
-                    <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight: 600;"><i class="fa-solid fa-pen"></i> 쓰기</button>
+            <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
                 </div>
                 
-                <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
-                    <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.85rem;" onclick="switchMsgTab('partners')">상대</span>
-                    <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('recv')">받음 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
-                    <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('sent')">보냄</span>
+                <div class="today-list">
+                    {% set today_empty = true %}
+                    {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
+                            <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
+                            {% for event in today_grouped[cat] %}
+                            <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
+                                <div class="card-header">
+                                    <span class="card-title">{{ event.display_title_detailed }}</span>
+                                    <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: var(--text-gray); transition: transform 0.2s;"></i>
+                                </div>
+                                {% if event.extendedProps.note or event.extendedProps.task_time %}
+                                <div class="card-details">
+                                    {% if event.extendedProps.task_time %}<div><strong>시간:</strong> {{ event.extendedProps.task_time }}</div>{% endif %}
+                                    {% if event.extendedProps.note %}<div style="margin-top:5px;"><strong>비고:</strong> {{ event.extendedProps.note }}</div>{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                    {% endif %}{% endfor %}
+                    {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 30px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
                 </div>
 
-                <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
-                    {% for partner in chat_partners %}
-                    <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
-                        <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
-                        <div style="flex: 1;">
-                            <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
-                            {% if partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
-                        </div>
-                        <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
+                <hr style="border: 0; border-top: 1px dashed var(--card-border); margin: 20px 0;">
+                
+                <h3 style="margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-calendar-week"></i> UPCOMING</h3>
+                <div class="weekly-list">
+                    {% set weekly_empty = true %}
+                    {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
+                            <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
+                            {% for event in weekly_grouped[cat] %}
+                            <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
+                                <div style="font-size: 0.7rem; color: var(--primary-color); margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
+                                <div class="card-header"><span class="card-title">{{ event.display_title_detailed }}</span></div>
+                            </div>
+                            {% endfor %}
+                    {% endif %}{% endfor %}
+                </div>
+            </div>
+
+            <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px; box-sizing: border-box;">
+                
+                <div class="glass-box" style="flex: 0 0 140px; overflow-y: auto; padding: 15px;">
+                    <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
+                        <i class="fa-solid fa-users"></i> 접속 중인 직원
+                    </h3>
+                    <div id="activeUserContainer" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <span style="font-size: 0.8rem; color: var(--text-gray);">실시간 접속자 정보를 불러오는 중...</span>
                     </div>
-                    {% else %}
-                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">대화 기록이 없습니다.</p>
-                    {% endfor %}
                 </div>
 
-                <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
-                    {% for msg in received_messages %}
-                    <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
-                        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                            <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
-                            <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
-                        </div>
-                        <div style="color: var(--text-gray); font-size:0.8rem;">
-                            {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
-                        </div>
+                <div class="glass-box col-msg" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.05rem;">
+                            <i class="fa-solid fa-envelope"></i> 쪽지함
+                        </h3>
+                        <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight: 600;"><i class="fa-solid fa-pen"></i> 쓰기</button>
                     </div>
-                    {% else %}
-                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
-                    {% endfor %}
-                </div>
+                    
+                    <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
+                        <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.85rem;" onclick="switchMsgTab('partners')">상대</span>
+                        <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('recv')">받음 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
+                        <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('sent')">보냄</span>
+                    </div>
 
-                <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
-                    {% for msg in sent_messages %}
-                    <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
-                        <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                            <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
-                            <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                    <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                        {% for partner in chat_partners %}
+                        <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
+                            <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
+                            <div style="flex: 1;">
+                                <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
+                                {% if partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
+                            </div>
+                            <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
                         </div>
-                        <div style="color: var(--text-gray); font-size:0.8rem;">
-                            {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
+                        {% else %}
+                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">대화 기록이 없습니다.</p>
+                        {% endfor %}
+                    </div>
+
+                    <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                        {% for msg in received_messages %}
+                        <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                                <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
+                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                            </div>
+                            <div style="color: var(--text-gray); font-size:0.8rem;">
+                                {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
+                            </div>
                         </div>
+                        {% else %}
+                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
+                        {% endfor %}
+                    </div>
+
+                    <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                        {% for msg in sent_messages %}
+                        <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
+                            <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                                <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
+                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                            </div>
+                            <div style="color: var(--text-gray); font-size:0.8rem;">
+                                {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" style="display: flex; gap: 20px;">
+            
+            <div class="col-board glass-box" style="flex: 0 0 calc(50% - 20px); height: 350px; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
+                    <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
+                </div>
+                <div style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                    {% for post in board_posts %}
+                    <div class="list-item" style="cursor: pointer; padding: 12px;"
+                         data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
+                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}"
+                         onclick="openBoardDetail(this)">
+                        <div style="flex: 1; color: var(--text-dark);">
+                            <strong>{{ post.title }}</strong> 
+                            {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
                     </div>
                     {% else %}
-                    <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
+                    <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">등록된 게시글이 없습니다.</p>
                     {% endfor %}
                 </div>
             </div>
+
+            <div class="col-noti glass-box" style="flex: 1; height: 350px; display: flex; flex-direction: column;">
+                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
+                        <i class="fa-solid fa-bell"></i> 나의 업무 알림
+                    </h3>
+                    <button class="btn-primary" onclick="loadNotificationWidget()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;">
+                        <i class="fa-solid fa-rotate-right"></i> 새로고침
+                    </button>
+                </div>
+                
+                <div id="notification-widget-area" class="noti-widget-wrapper">
+                    <div style="text-align: center; color: var(--text-gray); font-size: 0.9rem;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> 알림 데이터를 불러오는 중입니다...
+                    </div>
+                </div>
+            </div>
+            
         </div>
     </div>
 
-    <div class="row" style="display: flex; gap: 20px;">
-        
-        <div class="col-board glass-box" style="flex: 0 0 calc(50% - 20px); height: 350px; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
-                <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
-            </div>
-            <div style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
-                {% for post in board_posts %}
-                <div class="list-item" style="cursor: pointer; padding: 12px;"
-                     data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
-                     data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}"
-                     onclick="openBoardDetail(this)">
-                    <div style="flex: 1; color: var(--text-dark);">
-                        <strong>{{ post.title }}</strong> 
-                        {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
-                </div>
-                {% else %}
-                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">등록된 게시글이 없습니다.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="col-noti glass-box" style="flex: 1; height: 350px; display: flex; flex-direction: column;">
-            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
-                    <i class="fa-solid fa-bell"></i> 나의 업무 알림
-                </h3>
-                <button class="btn-primary" onclick="loadNotificationWidget()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;">
-                    <i class="fa-solid fa-rotate-right"></i> 새로고침
-                </button>
-            </div>
-            
-            <div id="notification-widget-area" class="noti-widget-wrapper">
-                <div style="text-align: center; color: var(--text-gray); font-size: 0.9rem;">
-                    <i class="fa-solid fa-spinner fa-spin"></i> 알림 데이터를 불러오는 중입니다...
-                </div>
-            </div>
+    <div class="col-weblink glass-box" style="width: 120px; flex-shrink: 0; display: flex; flex-direction: column; padding: 15px;">
+        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; position: relative;">
+            <h3 style="margin: 0 0 5px 0; font-weight: 800; font-size: 1rem; color: var(--primary-color) !important;">
+                <i class="fa-solid fa-link"></i> WebLink
+            </h3>
+            <button onclick="document.getElementById('weblinkModal').style.display='block'" style="background: var(--widget-bg); border: 1px dashed var(--primary-color); color: var(--primary-color); width: 100%; border-radius: 8px; padding: 5px; cursor: pointer; font-size: 0.75rem; font-weight: bold; transition: all 0.2s;">
+                + 사이트 등록
+            </button>
         </div>
         
+        <div id="weblink-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+            {% for link in weblinks %}
+            <div class="weblink-item list-item" data-id="{{ link.id }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 12px 5px; border-radius: 12px; margin-bottom: 0;" onclick="window.open('{{ link.url }}', '_blank')">
+                <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
+                <span style="font-size: 0.75rem; color: var(--text-dark); font-weight: 700; text-align: center; word-break: keep-all; line-height: 1.2; pointer-events: none;">{{ link.title }}</span>
+            </div>
+            {% else %}
+            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5;">
+                등록된 링크가<br>없습니다.
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
@@ -396,7 +426,21 @@
     </div>
 </div>
 
+<div id="weblinkModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:10% auto; padding:25px; width:350px; border-radius:15px; position:relative;">
+        <span onclick="document.getElementById('weblinkModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
+        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-link"></i> 새 업무사이트 등록</h3>
+        <form id="weblinkForm">
+            <input type="text" id="weblinkTitle" class="modal-input" placeholder="사이트명 (예: 새담 홈피)" required>
+            <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소 (예: www.saedam.com)" required>
+            <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; margin-top: 10px;">등록하기</button>
+        </form>
+    </div>
+</div>
+
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
 <script>
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
@@ -423,6 +467,29 @@
         loadNotificationWidget();
         // 1분(60,000ms)마다 업무 알림 위젯 자동 갱신
         setInterval(loadNotificationWidget, 60000); 
+
+        // WebLink SortableJS (드래그 앤 드롭 초기화)
+        var weblinkEl = document.getElementById('weblink-container');
+        if(weblinkEl) {
+            Sortable.create(weblinkEl, {
+                animation: 150,
+                ghostClass: 'weblink-ghost', // 드래그 중인 아이템 스타일
+                onEnd: function (evt) {
+                    var itemEls = weblinkEl.querySelectorAll('.weblink-item');
+                    var newOrder = [];
+                    itemEls.forEach(function(item) {
+                        newOrder.push(item.getAttribute('data-id'));
+                    });
+                    
+                    // 변경된 순서를 서버에 비동기로 전송 및 저장
+                    fetch('/update_weblink_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: newOrder })
+                    }).catch(err => console.error("순서 저장 실패:", err));
+                }
+            });
+        }
     });
 
     async function fetchActiveUsers() {
@@ -704,6 +771,22 @@
             const res = await fetch(url, { method: 'POST', body: formData });
             if(res.ok) { alert(id ? "수정되었습니다." : "등록되었습니다."); location.reload(); }
         } catch (e) {}
+    }
+
+    // WebLink 저장 기능 스크립트
+    async function saveWebLink() {
+        const title = document.getElementById('weblinkTitle').value;
+        const url = document.getElementById('weblinkUrl').value;
+        if(!title || !url) { alert("모든 항목을 입력해주세요."); return; }
+        
+        let formData = new FormData();
+        formData.append('title', title);
+        formData.append('url', url);
+        
+        try {
+            const res = await fetch('/save_weblink', { method: 'POST', body: formData });
+            if(res.ok) { location.reload(); }
+        } catch (e) { alert("오류가 발생했습니다."); }
     }
 </script>
 {% endblock %}
