@@ -123,46 +123,46 @@
         background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;
     }
 
-    /* WebLink 전용 스타일 */
-    .weblink-item { position: relative; width: 85px; flex: 0 0 auto; }
+    /* WebLink 전용 스타일 및 Grid (가로 자동 확장) */
+    .weblink-item { position: relative; }
     .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
     
-    /* 삭제 버튼 위치 안쪽으로 조정 (잘림 현상 방지) */
+    /* 삭제 버튼 위치 안쪽으로 조정 (잘림 현상 완벽 방지) */
     .weblink-delete-btn {
-        position: absolute; top: 2px; right: 2px;
+        position: absolute; top: 5px; right: 5px;
         background: #e74c3c; color: white; border-radius: 50%;
-        width: 18px; height: 18px; font-size: 10px;
+        width: 20px; height: 20px; font-size: 11px;
         display: flex; align-items: center; justify-content: center;
         cursor: pointer; opacity: 0; transition: opacity 0.2s;
         z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     .weblink-item:hover .weblink-delete-btn { opacity: 1; }
 
-    /* 자동 가로 확장을 위한 Grid 설정 */
     #weblink-container {
         flex: 1;
         display: grid;
         grid-template-rows: repeat(auto-fill, 85px);
         grid-auto-flow: column;
         grid-auto-columns: 85px;
-        gap: 8px;
+        gap: 10px;
         overflow-x: auto;
         overflow-y: hidden;
         padding-right: 5px;
         padding-bottom: 5px;
+        align-content: start;
     }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: stretch;">
     
-    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0;">
-        <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 0;">
+    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; margin: 0;">
+        <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin: 0 !important; padding: 0;">
             
-            <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden;">
+            <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden; margin: 0;">
                 <div id='calendar'></div>
             </div>
 
-            <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto;">
+            <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
                 </div>
@@ -206,7 +206,7 @@
                 </div>
             </div>
 
-            <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px; box-sizing: border-box;">
+            <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px; box-sizing: border-box; margin: 0;">
                 
                 <div class="glass-box" style="flex: 0 0 140px; overflow-y: auto; padding: 15px;">
                     <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
@@ -281,9 +281,9 @@
             </div>
         </div>
 
-        <div class="row" style="display: flex; gap: 20px;">
+        <div class="row" style="display: flex; gap: 20px; margin: 0 !important; padding: 0;">
             
-            <div class="col-board glass-box" style="flex: 0 0 calc(50% - 20px); height: 350px; overflow-y: auto;">
+            <div class="col-board glass-box" style="flex: 0 0 calc(50% - 20px); height: 350px; overflow-y: auto; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
                     <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
@@ -306,7 +306,7 @@
                 </div>
             </div>
 
-            <div class="col-noti glass-box" style="flex: 1; height: 350px; display: flex; flex-direction: column;">
+            <div class="col-noti glass-box" style="flex: 1; height: 350px; display: flex; flex-direction: column; margin: 0;">
                 <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
                         <i class="fa-solid fa-bell"></i> 나의 업무 알림
@@ -326,7 +326,7 @@
         </div>
     </div>
 
-    <div class="col-weblink glass-box" style="width: auto; min-width: 120px; max-width: 400px; flex-shrink: 0; display: flex; flex-direction: column; padding: 15px;">
+    <div class="col-weblink glass-box" style="width: max-content; min-width: 130px; max-width: 500px; flex-shrink: 0; display: flex; flex-direction: column; padding: 20px; margin: 0;">
         <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; position: relative;">
             <h3 style="margin: 0 0 5px 0; font-weight: 800; font-size: 1rem; color: var(--primary-color) !important;">
                 <i class="fa-solid fa-link"></i> WebLink
@@ -338,7 +338,7 @@
         
         <div id="weblink-container">
             {% for link in weblinks %}
-            <div class="weblink-item list-item" data-id="{{ link.id }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 12px 5px; border-radius: 12px; margin-bottom: 0;" onclick="window.open('{{ link.url }}', '_blank')">
+            <div class="weblink-item list-item" data-id="{{ link.id }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 10px 5px; border-radius: 12px; margin: 0; width: 85px; height: 85px; box-sizing: border-box;" onclick="window.open('{{ link.url }}', '_blank')">
                 
                 {% if link.created_by == current_user or current_user_level >= 1 %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
@@ -347,15 +347,15 @@
                 {% endif %}
 
                 {% if link.type == 'file' or link.favicon_url == 'FILE' %}
-                <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%2390CAF9' d='M40 43H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h18l16 16v20a2 2 0 0 1-2 2z'/%3E%3Cpath fill='%23E3F2FD' d='M26 5l16 16H26V5z'/%3E%3Cpath fill='%231E88E5' d='M14 23h20v3H14zm0 8h20v3H14z'/%3E%3C/svg%3E" alt="file" style="width: 36px; height: 36px; border-radius: 8px; margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); pointer-events: none;">
+                <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z'/%3E%3C/svg%3E" alt="file" style="width: 36px; height: 36px; border-radius: 8px; margin-bottom: 6px; background: #f8fafc; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; pointer-events: none;">
                 {% else %}
                 <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
                 {% endif %}
                 
-                <span style="font-size: 0.75rem; color: var(--text-dark); font-weight: 700; text-align: center; word-break: keep-all; line-height: 1.2; pointer-events: none;">{{ link.title }}</span>
+                <span style="font-size: 0.75rem; color: var(--text-dark); font-weight: 700; text-align: center; word-break: keep-all; line-height: 1.2; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%;">{{ link.title }}</span>
             </div>
             {% else %}
-            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5;">
+            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5; width: 100%;">
                 등록된 링크가<br>없습니다.
             </div>
             {% endfor %}
