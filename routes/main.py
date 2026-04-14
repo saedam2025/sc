@@ -3,6 +3,8 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import holidays
 import os
+import json
+import urllib.parse
 from .database import get_db
 
 main_bp = Blueprint('main', __name__)
@@ -49,7 +51,7 @@ def index():
         '외근': '#e67e22', '기타': '#7b8a9e', '근태/휴가': '#e74c3c'
     }
 
-    current_user = session.get('user_name', '배서현') 
+    current_user = session.get('user_name', '배호영') 
     events = []
     
     conn = get_db()
@@ -78,6 +80,28 @@ def index():
                 filename TEXT,
                 filepath TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+    except:
+        pass
+
+    # [WebLink DB 테이블 자동 생성]
+    try:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS weblinks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                url TEXT,
+                favicon_url TEXT,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS user_weblink_order (
+                user_name TEXT PRIMARY KEY,
+                order_json TEXT
             )
         ''')
         conn.commit()
@@ -217,11 +241,26 @@ def index():
     # 8. 개인 메모 로드 (현재 사용자용)
     my_memo = conn.execute("SELECT * FROM memos WHERE owner = ?", (current_user,)).fetchone()
 
+    # 9. WebLink 및 사용자별 정렬 로드
+    weblinks_db = conn.execute("SELECT * FROM weblinks").fetchall()
+    weblinks = [dict(row) for row in weblinks_db]
+    
+    order_row = conn.execute("SELECT order_json FROM user_weblink_order WHERE user_name=?", (current_user,)).fetchone()
+    if order_row and order_row['order_json']:
+        try:
+            order_list = json.loads(order_row['order_json'])
+            order_dict = {int(id_val): index for index, id_val in enumerate(order_list)}
+            # 저장된 순서가 있으면 우선 정렬, 새로운 링크는 뒤로
+            weblinks.sort(key=lambda x: order_dict.get(x['id'], 999999))
+        except:
+            pass
+
     conn.close()
 
     return render_template('main.html', 
+                           weblinks=weblinks,
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
-                           cats=cats, today_str=today.strftime('%Y년 %m월 %d일'), holidays_dict=holidays_dict,
+                           cats=cats, today_str=today.strftime('%d'), holidays_dict=holidays_dict,
                            current_user=current_user, board_posts=board_posts, 
                            chat_partners=chat_partners,
                            received_messages=received_messages, sent_messages=sent_messages,
@@ -459,4 +498,50 @@ def save_my_memo():
     conn.commit()
     conn.close()
 
+    return jsonify({"status": "success"})
+
+
+# --- 업무사이트링크(WebLink) 관련 API ---
+
+@main_bp.route('/save_weblink', methods=['POST'])
+def save_weblink():
+    title = request.form.get('title')
+    url = request.form.get('url')
+    current_user = session.get('user_name', '익명')
+    
+    # URL에서 도메인 추출 후 구글 Favicon API 연결
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = 'http://' + url
+    
+    parsed_uri = urllib.parse.urlparse(url)
+    domain = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+    favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+    
+    conn = get_db()
+    conn.execute("INSERT INTO weblinks (title, url, favicon_url, created_by) VALUES (?, ?, ?, ?)", 
+                 (title, url, favicon_url, current_user))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+@main_bp.route('/update_weblink_order', methods=['POST'])
+def update_weblink_order():
+    data = request.get_json()
+    order_list = data.get('order', [])
+    current_user = session.get('user_name')
+    
+    if not current_user:
+        return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+        
+    order_json = json.dumps(order_list)
+    
+    conn = get_db()
+    # SQLite UPSERT 구문 적용
+    conn.execute('''
+        INSERT INTO user_weblink_order (user_name, order_json)
+        VALUES (?, ?)
+        ON CONFLICT(user_name) DO UPDATE SET order_json=excluded.order_json
+    ''', (current_user, order_json))
+    conn.commit()
+    conn.close()
     return jsonify({"status": "success"})
