@@ -16,17 +16,17 @@
         <tr>
             <td style="border: 1px solid #ccc; padding: 7px; text-align: center; font-weight: bold;">기본급</td>
             <td style="border: 1px solid #ccc; padding: 7px; text-align: right;">{{ data.수수료 }}</td>
-            <td style="border: 1px solid #ccc; padding: 7px;"></td>
+            <td style="border: 1px solid #ccc; padding: 7px; text-align: center;">{{ data.비고1 }}</td>
         </tr>
 <tr style="{{ style.경력수당 }}">
         <td style="border: 1px solid #ccc; padding: 7px; text-align: center; font-weight: bold;">경력수당</td>
         <td style="border: 1px solid #ccc; padding: 7px; text-align: right;">{{ data.경력수당 }}</td>
-        <td style="border: 1px solid #ccc; padding: 7px;"></td>
+        <td style="border: 1px solid #ccc; padding: 7px; text-align: center;">{{ data.비고3 }}</td>
     </tr>
     <tr style="{{ style.직책수당 }}">
         <td style="border: 1px solid #ccc; padding: 7px; text-align: center; font-weight: bold;">직책수당</td>
         <td style="border: 1px solid #ccc; padding: 7px; text-align: right;">{{ data.직책수당 }}</td>
-        <td style="border: 1px solid #ccc; padding: 7px;"></td>
+        <td style="border: 1px solid #ccc; padding: 7px; text-align: center;">{{ data.비고4 }}</td>
     </tr>
         <tr>
             <td style="border: 1px solid #ccc; padding: 8px; text-align: center; font-weight: bold;">기타</td>
