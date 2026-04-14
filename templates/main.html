@@ -123,12 +123,13 @@
         background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;
     }
 
-    /* WebLink 전용 스타일 (삭제 버튼 및 고스트 효과) */
-    .weblink-item { position: relative; }
+    /* WebLink 전용 스타일 */
+    .weblink-item { position: relative; width: 85px; flex: 0 0 auto; }
     .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
     
+    /* 삭제 버튼 위치 안쪽으로 조정 (잘림 현상 방지) */
     .weblink-delete-btn {
-        position: absolute; top: -5px; right: -5px;
+        position: absolute; top: 2px; right: 2px;
         background: #e74c3c; color: white; border-radius: 50%;
         width: 18px; height: 18px; font-size: 10px;
         display: flex; align-items: center; justify-content: center;
@@ -136,6 +137,20 @@
         z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
     .weblink-item:hover .weblink-delete-btn { opacity: 1; }
+
+    /* 자동 가로 확장을 위한 Grid 설정 */
+    #weblink-container {
+        flex: 1;
+        display: grid;
+        grid-template-rows: repeat(auto-fill, 85px);
+        grid-auto-flow: column;
+        grid-auto-columns: 85px;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-right: 5px;
+        padding-bottom: 5px;
+    }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: stretch;">
@@ -311,7 +326,7 @@
         </div>
     </div>
 
-    <div class="col-weblink glass-box" style="width: 120px; flex-shrink: 0; display: flex; flex-direction: column; padding: 15px;">
+    <div class="col-weblink glass-box" style="width: auto; min-width: 120px; max-width: 400px; flex-shrink: 0; display: flex; flex-direction: column; padding: 15px;">
         <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; position: relative;">
             <h3 style="margin: 0 0 5px 0; font-weight: 800; font-size: 1rem; color: var(--primary-color) !important;">
                 <i class="fa-solid fa-link"></i> WebLink
@@ -321,7 +336,7 @@
             </button>
         </div>
         
-        <div id="weblink-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+        <div id="weblink-container">
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; padding: 12px 5px; border-radius: 12px; margin-bottom: 0;" onclick="window.open('{{ link.url }}', '_blank')">
                 
@@ -332,9 +347,7 @@
                 {% endif %}
 
                 {% if link.type == 'file' or link.favicon_url == 'FILE' %}
-                <div style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: var(--primary-color); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
-                    <i class="fa-solid fa-file-arrow-down"></i>
-                </div>
+                <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%2390CAF9' d='M40 43H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h18l16 16v20a2 2 0 0 1-2 2z'/%3E%3Cpath fill='%23E3F2FD' d='M26 5l16 16H26V5z'/%3E%3Cpath fill='%231E88E5' d='M14 23h20v3H14zm0 8h20v3H14z'/%3E%3C/svg%3E" alt="file" style="width: 36px; height: 36px; border-radius: 8px; margin-bottom: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); pointer-events: none;">
                 {% else %}
                 <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 6px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
                 {% endif %}
