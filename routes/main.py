@@ -30,15 +30,12 @@ def get_active_users():
     active_user_list = []
     
     # 딕셔너리를 순회하며 5분 이내 활동한 사람만 추출
-    # list()로 감싸서 순회 도중 딕셔너리 크기가 변경되어 발생하는 오류 방지
     for user, last_active in list(active_users.items()):
         if now - last_active <= timedelta(minutes=ACTIVE_TIMEOUT):
             active_user_list.append(user)
         else:
-            # 5분이 지나 오프라인 상태가 된 사용자는 딕셔너리에서 제거
             del active_users[user]
             
-    # 가나다순으로 정렬하여 보기 좋게 표시
     active_user_list.sort()
     return jsonify({"active_users": active_user_list})
 
@@ -69,6 +66,12 @@ def index():
         conn.commit()
     except:
         pass
+        
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN level INTEGER DEFAULT 0")
+        conn.commit()
+    except:
+        pass
 
     # 내 메모장 DB 테이블 자동 생성 (없을 경우)
     try:
@@ -86,7 +89,7 @@ def index():
     except:
         pass
 
-    # [WebLink DB 테이블 자동 생성]
+    # [WebLink DB 테이블 자동 생성 및 업데이트]
     try:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS weblinks (
@@ -107,6 +110,19 @@ def index():
         conn.commit()
     except:
         pass
+
+    # WebLink에 파일 업로드를 위한 컬럼 추가 (이미 있으면 pass)
+    try:
+        conn.execute("ALTER TABLE weblinks ADD COLUMN type TEXT DEFAULT 'url'")
+        conn.execute("ALTER TABLE weblinks ADD COLUMN filename TEXT")
+        conn.execute("ALTER TABLE weblinks ADD COLUMN filepath TEXT")
+        conn.commit()
+    except:
+        pass
+
+    # 현재 사용자의 레벨 조회
+    user_row = conn.execute("SELECT level FROM users WHERE name=?", (current_user,)).fetchone()
+    current_user_level = user_row['level'] if user_row and 'level' in user_row.keys() else 0
 
     # 1. 일정(Tasks) 로드
     tasks = conn.execute('SELECT * FROM tasks').fetchall()
@@ -250,7 +266,6 @@ def index():
         try:
             order_list = json.loads(order_row['order_json'])
             order_dict = {int(id_val): index for index, id_val in enumerate(order_list)}
-            # 저장된 순서가 있으면 우선 정렬, 새로운 링크는 뒤로
             weblinks.sort(key=lambda x: order_dict.get(x['id'], 999999))
         except:
             pass
@@ -258,7 +273,7 @@ def index():
     conn.close()
 
     return render_template('main.html', 
-                           weblinks=weblinks,
+                           weblinks=weblinks, current_user_level=current_user_level,
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
                            cats=cats, today_str=today.strftime('%d'), holidays_dict=holidays_dict,
                            current_user=current_user, board_posts=board_posts, 
@@ -439,7 +454,6 @@ def get_chat_history(other_user):
 def delete_message(msg_id):
     current_user = session.get('user_name')
     conn = get_db()
-    # 보안: 본인이 전송한 글(sender)만 삭제할 수 있도록 제한
     conn.execute("DELETE FROM messages WHERE id=? AND sender=?", (msg_id, current_user))
     conn.commit()
     conn.close()
@@ -475,11 +489,9 @@ def save_my_memo():
 
     conn = get_db()
     
-    # 기존 메모가 있는지 확인
     existing_memo = conn.execute("SELECT * FROM memos WHERE owner = ?", (owner,)).fetchone()
     
     if existing_memo:
-        # 새로운 파일 업로드가 없다면, 기존 파일 정보 유지
         if not filename:
             filename = existing_memo['filename'] if existing_memo['filename'] else ''
             filepath = existing_memo['filepath'] if existing_memo['filepath'] else ''
@@ -506,20 +518,34 @@ def save_my_memo():
 @main_bp.route('/save_weblink', methods=['POST'])
 def save_weblink():
     title = request.form.get('title')
-    url = request.form.get('url')
+    link_type = request.form.get('type', 'url')  # 'url' 또는 'file'
     current_user = session.get('user_name', '익명')
     
-    # URL에서 도메인 추출 후 구글 Favicon API 연결
-    if not url.startswith('http://') and not url.startswith('https://'):
-        url = 'http://' + url
-    
-    parsed_uri = urllib.parse.urlparse(url)
-    domain = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
-    favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
-    
     conn = get_db()
-    conn.execute("INSERT INTO weblinks (title, url, favicon_url, created_by) VALUES (?, ?, ?, ?)", 
-                 (title, url, favicon_url, current_user))
+    
+    if link_type == 'file':
+        file = request.files.get('file')
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(filepath)
+            
+            url = f'/uploads/{filename}'
+            # 파일을 위한 특수 플래그로 favicon_url 설정
+            conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                         (title, 'file', url, 'FILE', current_user, filename, filepath))
+    else:
+        url = request.form.get('url')
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = 'http://' + url
+        
+        parsed_uri = urllib.parse.urlparse(url)
+        domain = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
+        favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+        
+        conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by) VALUES (?, ?, ?, ?, ?)", 
+                     (title, 'url', url, favicon_url, current_user))
+        
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
@@ -536,7 +562,6 @@ def update_weblink_order():
     order_json = json.dumps(order_list)
     
     conn = get_db()
-    # SQLite UPSERT 구문 적용
     conn.execute('''
         INSERT INTO user_weblink_order (user_name, order_json)
         VALUES (?, ?)
@@ -544,4 +569,34 @@ def update_weblink_order():
     ''', (current_user, order_json))
     conn.commit()
     conn.close()
+    return jsonify({"status": "success"})
+
+@main_bp.route('/delete_weblink/<int:link_id>', methods=['DELETE'])
+def delete_weblink(link_id):
+    current_user = session.get('user_name')
+    conn = get_db()
+
+    # 권한 체크: 생성자이거나 레벨 1 이상
+    user_row = conn.execute("SELECT level FROM users WHERE name=?", (current_user,)).fetchone()
+    user_level = user_row['level'] if user_row and 'level' in user_row.keys() else 0
+
+    link = conn.execute("SELECT * FROM weblinks WHERE id=?", (link_id,)).fetchone()
+    if not link:
+        return jsonify({"status": "error", "message": "존재하지 않는 링크입니다."}), 404
+
+    if link['created_by'] != current_user and user_level < 1:
+        return jsonify({"status": "error", "message": "삭제 권한이 없습니다."}), 403
+
+    # 등록된 파일이 있다면 서버에서 물리 파일도 삭제
+    if 'type' in link.keys() and link['type'] == 'file' and link['filepath']:
+        if os.path.exists(link['filepath']):
+            try:
+                os.remove(link['filepath'])
+            except:
+                pass
+
+    conn.execute("DELETE FROM weblinks WHERE id=?", (link_id,))
+    conn.commit()
+    conn.close()
+    
     return jsonify({"status": "success"})
