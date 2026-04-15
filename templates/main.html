@@ -22,7 +22,7 @@
     /* === 레이아웃 정렬 강제 === */
     .dashboard-container {
         display: flex !important;
-        align-items: stretch !important; /* flex-start에서 stretch로 변경하여 양측 상단 높이를 완벽하게 맞춤 */
+        align-items: stretch !important;
         gap: 20px !important;
         padding-top: 30px !important; 
         margin: 0;
@@ -52,14 +52,14 @@
         box-sizing: border-box; 
     }
 
-    .glass-event-card, .list-item, .widget-box {
+    /* 일반 리스트 아이템 및 위젯 박스 */
+    .list-item, .widget-box {
         background: var(--widget-bg) !important; 
         border: 1px solid var(--widget-border) !important;
         color: var(--text-dark) !important;
         transition: all 0.3s ease;
     }
-    
-    .glass-event-card:hover, .list-item:hover {
+    .list-item:hover {
         background: var(--widget-hover) !important;
         transform: translateY(-2px);
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
@@ -68,17 +68,83 @@
     .list-item { border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--card-border); }
     .list-item:last-child { margin-bottom: 0; }
 
-    /* 풀캘린더 테마 오버라이드 */
+    /* 1) 일정 카드 (배경색 및 기본 테두리 제거, 좌측 컬러바 인라인 적용) */
+    .glass-event-card {
+        background: transparent !important;
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        color: var(--text-dark) !important;
+        transition: all 0.3s ease;
+        padding: 8px 10px;
+        margin-bottom: 5px;
+        cursor: pointer;
+    }
+    .glass-event-card:hover {
+        background: rgba(0, 0, 0, 0.03) !important; 
+        transform: translateX(3px); /* 우측으로 살짝 밀려 입체감 효과 */
+    }
+
+    /* 2) 풀캘린더 테마 오버라이드 (3D 입체 효과 적용) */
     .fc { font-size: 0.8em; color: var(--text-dark); }
-    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: 800; color: var(--text-dark) !important; transition: color 0.5s; }
-    .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
+    
+    /* 캘린더 제목 3D 효과 */
+    .fc .fc-toolbar-title { 
+        font-size: 1.4em !important; 
+        font-weight: 900 !important; 
+        color: var(--primary-color) !important; 
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.15), -1px -1px 2px rgba(255,255,255,0.8) !important;
+        letter-spacing: 1px;
+        transition: color 0.5s; 
+    }
+    
+    /* 캘린더 버튼 3D 입체 효과 (이전, 다음, 오늘) */
+    .fc .fc-button-primary {
+        background: linear-gradient(145deg, rgba(255,255,255,0.9), rgba(230,230,230,0.7)) !important;
+        border: 1px solid rgba(255,255,255,0.5) !important;
+        color: var(--primary-color) !important;
+        box-shadow: 3px 3px 6px rgba(0,0,0,0.1), -3px -3px 6px rgba(255,255,255,0.8) !important;
+        border-radius: 10px !important;
+        font-weight: 800 !important;
+        text-transform: capitalize;
+        transition: all 0.2s ease !important;
+    }
+    .fc .fc-button-primary:hover {
+        transform: translateY(1px);
+        box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), inset -2px -2px 5px rgba(255,255,255,0.8) !important;
+        background: linear-gradient(145deg, rgba(230,230,230,0.7), rgba(255,255,255,0.9)) !important;
+    }
+    .fc .fc-button-primary:not(:disabled):active {
+        box-shadow: inset 3px 3px 6px rgba(0,0,0,0.15), inset -3px -3px 6px rgba(255,255,255,0.9) !important;
+    }
+    /* 버튼 아이콘에 가벼운 그림자 */
+    .fc .fc-icon {
+        filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.2));
+    }
+
+    /* 캘린더 날짜 숫자 3D 엠보싱 효과 */
+    .fc .fc-daygrid-day-number {
+        font-weight: 800 !important;
+        font-size: 0.9em !important;
+        color: var(--text-dark);
+        text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+        background: linear-gradient(145deg, rgba(255,255,255,0.8), rgba(240,240,240,0.5));
+        border-radius: 8px;
+        margin: 3px 5px;
+        padding: 4px 8px !important;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.08), -2px -2px 5px rgba(255,255,255,0.8);
+        display: inline-block;
+        text-decoration: none;
+    }
+    
+    .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 2px; }
     .fc-theme-standard td, .fc-theme-standard th { border-color: var(--card-border) !important; }
-    .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
-    .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
+    .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; }
+    .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; }
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
-    .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
+    .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; text-shadow: 1px 1px 0px rgba(255,255,255,0.8); }
     .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
-    .fc-event-main { padding: 1px 3px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; }
+    .fc-event-main { padding: 2px 4px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
     /* 글꼴 및 타이포그래피 */
     .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
