@@ -24,8 +24,7 @@
         display: flex !important;
         align-items: stretch !important; /* 위아래 끝선을 완벽하게 일치시킴 */
         gap: 20px !important;
-        margin-top: 0 !important;
-        padding-top: 0 !important;
+        padding-top: 20px !important; /* 이전처럼 전체 메뉴를 살짝 아래로 내려줌 */
     }
 
     .main-content {
@@ -33,8 +32,6 @@
         display: flex;
         flex-direction: column;
         gap: 20px;
-        margin-top: 0 !important;
-        padding-top: 0 !important;
         min-height: 0 !important; /* 내부 요소가 부모를 뚫고 늘어나는 것 방지 */
     }
 
@@ -150,7 +147,7 @@
         display: flex; 
         flex-direction: column; 
         padding: 20px; 
-        margin-top: 0 !important; /* 상단 튀어나옴 완벽 차단 */
+        margin-top: 0 !important; 
         box-sizing: border-box; 
         min-height: 0 !important; /* 스크롤바 활성화를 위한 필수 속성 */
     }
@@ -392,9 +389,9 @@
         
         <div id="weblink-container">
             {% for link in weblinks %}
-            <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')">
+            <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
                 
-                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int >= 1) %}
+                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int >= 2) %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
