@@ -19,6 +19,25 @@
         --widget-border: rgba(255, 255, 255, 1);
     }
 
+    /* === 레이아웃 정렬 강제 (상단/하단 끝선 완벽 일치 및 무한 늘어남 방지) === */
+    .dashboard-container {
+        display: flex !important;
+        align-items: stretch !important; /* 위아래 끝선을 완벽하게 일치시킴 */
+        gap: 20px !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+
+    .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        min-height: 0 !important; /* 내부 요소가 부모를 뚫고 늘어나는 것 방지 */
+    }
+
     /* === 인트라넷 전용 스타일 업데이트 === */
     .glass-box {
         background: var(--card-bg) !important; 
@@ -30,7 +49,7 @@
         padding: 20px;
         color: var(--text-dark) !important;
         transition: all 0.3s ease;
-        box-sizing: border-box; /* 높이 오차 보정 */
+        box-sizing: border-box; 
     }
 
     .glass-event-card, .list-item, .widget-box {
@@ -123,17 +142,17 @@
         background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;
     }
 
-    /* === WebLink 전용 스타일 === */
+    /* === WebLink 전용 스타일 (상하단 일치 및 세로 스크롤 적용) === */
     .col-weblink {
-        width: 130px !important; /* 고정 너비 */
-        height: 920px !important; /* 옆 패널의 총합 (550+20+350)과 정확히 일치시킴 */
-        max-height: 920px !important; 
+        width: 130px !important; 
+        height: auto !important; /* 부모 컨테이너(stretch)에 의해 높이 자동 동기화 */
         flex-shrink: 0; 
         display: flex; 
         flex-direction: column; 
         padding: 20px; 
-        margin: 0 !important;
+        margin-top: 0 !important; /* 상단 튀어나옴 완벽 차단 */
         box-sizing: border-box; 
+        min-height: 0 !important; /* 스크롤바 활성화를 위한 필수 속성 */
     }
 
     .weblink-item { 
@@ -164,16 +183,17 @@
 
     #weblink-container {
         flex: 1;
-        min-height: 0; 
+        min-height: 0; /* 컨텐츠가 길어져도 부모 박스를 밀어내지 않고 스크롤 생성 */
         display: flex; 
         flex-direction: column;
         gap: 10px;
-        overflow-y: auto; /* 마우스 휠 세로 스크롤 허용 */
+        overflow-y: auto; /* 마우스 휠 스크롤 활성화 */
         overflow-x: hidden;
         padding-right: 5px;
         align-items: center;
     }
 
+    /* WebLink 세로 스크롤바 깔끔하게 디자인 */
     #weblink-container::-webkit-scrollbar { width: 6px; }
     #weblink-container::-webkit-scrollbar-track { background: transparent; }
     #weblink-container::-webkit-scrollbar-thumb {
@@ -185,9 +205,9 @@
     }
 </style>
 
-<div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: flex-start;">
+<div class="dashboard-container">
     
-    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; min-height: 0; margin: 0;">
+    <div class="main-content">
         <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin: 0 !important; padding: 0;">
             
             <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden; margin: 0;">
@@ -374,7 +394,7 @@
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')">
                 
-                {% if link.created_by == current_user or current_user_level >= 1 %}
+                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int >= 1) %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
@@ -386,7 +406,7 @@
                 <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 4px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
                 {% endif %}
                 
-                <span style="display: block; max-width: 56px; font-size: 0.75rem; color: var(--text-dark); font-weight: normal; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; pointer-events: none;">{{ link.title }}</span>
+                <span style="display: block; max-width: 58px; font-size: 0.75rem; color: var(--text-dark); font-weight: normal; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; pointer-events: none;">{{ link.title }}</span>
             </div>
             {% else %}
             <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5; width: 100%;">
