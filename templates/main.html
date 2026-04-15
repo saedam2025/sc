@@ -19,12 +19,12 @@
         --widget-border: rgba(255, 255, 255, 1);
     }
 
-    /* === 레이아웃 정렬 강제 (상단/하단 끝선 완벽 일치 및 무한 늘어남 방지) === */
+    /* === 레이아웃 정렬 강제 === */
     .dashboard-container {
         display: flex !important;
-        align-items: stretch !important; /* 위아래 끝선을 완벽하게 일치시킴 */
+        align-items: flex-start !important; /* 상단 정렬 */
         gap: 20px !important;
-        padding-top: 20px !important; /* 이전처럼 전체 메뉴를 살짝 아래로 내려줌 */
+        padding-top: 20px !important; /* 자연스럽게 여백 유지 */
     }
 
     .main-content {
@@ -32,7 +32,7 @@
         display: flex;
         flex-direction: column;
         gap: 20px;
-        min-height: 0 !important; /* 내부 요소가 부모를 뚫고 늘어나는 것 방지 */
+        min-height: 0 !important;
     }
 
     /* === 인트라넷 전용 스타일 업데이트 === */
@@ -139,17 +139,18 @@
         background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important;
     }
 
-    /* === WebLink 전용 스타일 (상하단 일치 및 세로 스크롤 적용) === */
+    /* === WebLink 전용 스타일 (높이 920px 명시적 강제 고정) === */
     .col-weblink {
         width: 130px !important; 
-        height: auto !important; /* 부모 컨테이너(stretch)에 의해 높이 자동 동기화 */
+        height: 920px !important; /* 상단(550)+여백(20)+하단(350)과 정확하게 1픽셀까지 일치하도록 강제 고정 */
+        max-height: 920px !important; 
         flex-shrink: 0; 
         display: flex; 
         flex-direction: column; 
         padding: 20px; 
         margin-top: 0 !important; 
         box-sizing: border-box; 
-        min-height: 0 !important; /* 스크롤바 활성화를 위한 필수 속성 */
+        min-height: 0 !important; 
     }
 
     .weblink-item { 
@@ -391,7 +392,7 @@
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
                 
-                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int >= 2) %}
+                {% if (link.created_by and link.created_by == current_user) or (current_user_level|default(0)|int >= 2) %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
