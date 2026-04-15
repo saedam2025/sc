@@ -395,7 +395,7 @@
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
                 
-                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int >= 2) %}
+                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
