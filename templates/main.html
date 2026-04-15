@@ -52,11 +52,27 @@
         box-sizing: border-box; 
     }
 
-    .glass-event-card, .list-item, .widget-box {
+    .list-item, .widget-box {
         background: var(--widget-bg) !important; 
         border: 1px solid var(--widget-border) !important;
         color: var(--text-dark) !important;
         transition: all 0.3s ease;
+    }
+    
+    /* 1) 일정(TODAY/UPCOMING) 카드: 배경 투명, 테두리 없음 (좌측 컬러바 유지) */
+    .glass-event-card {
+        background: transparent !important;
+        border-top: none !important;
+        border-right: none !important;
+        border-bottom: none !important;
+        color: var(--text-dark) !important;
+        transition: all 0.3s ease;
+    }
+
+    /* 2, 3) 쪽지함, 사내게시판 리스트 아이템 배경 및 테두리 투명화 */
+    .col-msg .list-item, .col-board .list-item {
+        background: transparent !important;
+        border: none !important;
     }
     
     .glass-event-card:hover, .list-item:hover {
@@ -284,9 +300,9 @@
                         <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('sent')">보냄</span>
                     </div>
 
-                    <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                    <div id="list-partners" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px;">
                         {% for partner in chat_partners %}
-                        <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
+                        <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-radius: 0;">
                             <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
                             <div style="flex: 1;">
                                 <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
@@ -299,7 +315,7 @@
                         {% endfor %}
                     </div>
 
-                    <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                    <div id="list-recv" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
                         {% for msg in received_messages %}
                         <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
                             <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
@@ -315,7 +331,7 @@
                         {% endfor %}
                     </div>
 
-                    <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                    <div id="list-sent" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
                         {% for msg in sent_messages %}
                         <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
                             <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
@@ -341,7 +357,7 @@
                     <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
                     <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
                 </div>
-                <div style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                <div style="background: transparent; border: none; border-radius: 12px; padding: 10px;">
                     {% for post in board_posts %}
                     <div class="list-item" style="cursor: pointer; padding: 12px;"
                          data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
