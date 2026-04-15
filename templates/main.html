@@ -124,6 +124,24 @@
     }
 
     /* WebLink 전용 스타일 및 Grid (가로 자동 확장) */
+    .col-weblink {
+        width: max-content; 
+        min-width: 130px; 
+        max-width: 130px; /* 기본상태: 세로 1줄 너비 고정 */
+        flex-shrink: 0; 
+        display: flex; 
+        flex-direction: column; 
+        padding: 20px; 
+        margin: 0;
+        min-height: 0; /* 내부 컨텐츠 증가로 인해 세로로 솟아나오는 현상 방지 */
+        transition: max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        overflow: hidden;
+    }
+
+    .col-weblink:hover {
+        max-width: 800px; /* 마우스 오버 시 가로로 자연스럽게 늘어남 */
+    }
+
     .weblink-item { position: relative; }
     .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
     
@@ -140,6 +158,7 @@
 
     #weblink-container {
         flex: 1;
+        min-height: 0; /* 세로 늘어남 한계 설정 */
         display: grid;
         grid-template-rows: repeat(auto-fill, 85px);
         grid-auto-flow: column;
@@ -151,11 +170,15 @@
         padding-bottom: 5px;
         align-content: start;
     }
+
+    /* 스크롤바 숨기기 (더 깔끔한 UI 유지) */
+    #weblink-container::-webkit-scrollbar { display: none; }
+    #weblink-container { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 
 <div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent; display: flex; gap: 20px; align-items: stretch;">
     
-    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; margin: 0;">
+    <div class="main-content" style="flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; min-height: 0; margin: 0;">
         <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin: 0 !important; padding: 0;">
             
             <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden; margin: 0;">
@@ -326,12 +349,14 @@
         </div>
     </div>
 
-    <div class="col-weblink glass-box" style="width: max-content; min-width: 130px; max-width: 500px; flex-shrink: 0; display: flex; flex-direction: column; padding: 20px; margin: 0;">
-        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; position: relative;">
-            <h3 style="margin: 0 0 5px 0; font-weight: 800; font-size: 1rem; color: var(--primary-color) !important;">
-                <i class="fa-solid fa-link"></i> WebLink
-            </h3>
-            <button onclick="document.getElementById('weblinkModal').style.display='block'" style="background: var(--widget-bg); border: 1px dashed var(--primary-color); color: var(--primary-color); width: 100%; border-radius: 8px; padding: 5px; cursor: pointer; font-size: 0.75rem; font-weight: bold; transition: all 0.2s;">
+    <div class="col-weblink glass-box">
+        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; min-width: 85px; width: 100%;">
+            <div style="height: 28px; display: flex; align-items: center; justify-content: center; width: 100%;">
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important; text-align: center; white-space: nowrap;">
+                    <i class="fa-solid fa-link"></i> WebLink
+                </h3>
+            </div>
+            <button onclick="document.getElementById('weblinkModal').style.display='block'" style="background: var(--widget-bg); border: 1px dashed var(--primary-color); color: var(--primary-color); width: 85px; border-radius: 8px; padding: 5px; cursor: pointer; font-size: 0.75rem; font-weight: bold; transition: all 0.2s; margin-top: 10px; flex-shrink: 0;">
                 + 등록
             </button>
         </div>
