@@ -22,7 +22,7 @@
     /* === 레이아웃 정렬 강제 === */
     .dashboard-container {
         display: flex !important;
-        align-items: stretch !important; /* flex-start에서 stretch로 변경하여 양측 상단 높이를 완벽하게 맞춤 */
+        align-items: stretch !important;
         gap: 20px !important;
         padding-top: 30px !important; 
         margin: 0;
@@ -59,7 +59,6 @@
         transition: all 0.3s ease;
     }
     
-    /* 1) 일정(TODAY/UPCOMING) 카드: 배경 투명, 테두리 없음 (좌측 컬러바 유지) */
     .glass-event-card {
         background: transparent !important;
         border-top: none !important;
@@ -69,7 +68,6 @@
         transition: all 0.3s ease;
     }
 
-    /* 2, 3) 쪽지함, 사내게시판 리스트 아이템 배경 및 테두리 투명화 */
     .col-msg .list-item, .col-board .list-item {
         background: transparent !important;
         border: none !important;
@@ -95,7 +93,6 @@
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
     .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
-    .fc-event-main { padding: 1px 3px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; }
 
     /* 커스텀 달력 날짜 숫자 호버/클릭 효과용 */
     .saedam-date-num {
@@ -110,6 +107,67 @@
         background: var(--primary-color);
         color: white !important;
         transform: scale(1.1);
+    }
+
+    /* === 달력 셀 2x2 고정 배열 및 늘어남 방지 CSS === */
+    .fc-daygrid-day-frame {
+        overflow: hidden !important; /* 셀 늘어남 절대 방지 */
+    }
+    
+    .fc-daygrid-day-events {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-content: flex-start !important;
+        padding: 2px !important;
+        gap: 2px !important;
+        margin: 0 !important;
+        min-height: 0 !important; 
+    }
+    
+    .fc-daygrid-event-harness {
+        position: static !important; /* 절대 좌표 무시하고 Flex 적용 */
+        width: calc(50% - 1.5px) !important; /* 한 줄에 2개 (50% 너비) */
+        margin: 0 !important;
+        visibility: visible !important;
+    }
+    
+    .fc-daygrid-day-bottom {
+        position: static !important;
+        width: calc(50% - 1.5px) !important; /* +more 버튼도 동일하게 50% 차지 */
+        margin: 0 !important;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+    }
+    
+    /* 이벤트 아이콘 배지 스타일 */
+    .fc-event-main-custom {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 3px 0;
+        text-align: center;
+        border-radius: 4px;
+        color: white;
+        width: 100%;
+        box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    /* +more 버튼 디자인 (2x2의 4번째 칸) */
+    .fc-daygrid-more-link {
+        font-size: 0.65rem !important;
+        background: var(--widget-hover) !important;
+        color: var(--primary-color) !important;
+        padding: 2px 0 !important;
+        border-radius: 4px !important;
+        width: 100% !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+        font-weight: 800 !important;
+        display: block !important;
+        border: 1px solid var(--primary-color) !important;
     }
 
     /* 글꼴 및 타이포그래피 */
@@ -226,7 +284,6 @@
         align-items: center;
     }
 
-    /* WebLink 세로 스크롤바 깔끔하게 디자인 */
     #weblink-container::-webkit-scrollbar { width: 6px; }
     #weblink-container::-webkit-scrollbar-track { background: transparent; }
     #weblink-container::-webkit-scrollbar-thumb {
@@ -590,7 +647,6 @@
         loadNotificationWidget();
         setInterval(loadNotificationWidget, 60000); 
 
-        // WebLink SortableJS
         var weblinkEl = document.getElementById('weblink-container');
         if(weblinkEl) {
             Sortable.create(weblinkEl, {
@@ -712,18 +768,44 @@
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         const holidays = {{ holidays_dict | tojson | safe }};
+        
+        // 🚀 다일(Multi-day) 일정을 쪼개어 단일 셀에만 위치하도록 변환하는 로직 추가
+        let rawEvents = {{ events | tojson | safe }};
+        let processedEvents = [];
+        
+        rawEvents.forEach(e => {
+            if (e.end && e.end !== e.start) {
+                let startDate = new Date(e.start);
+                let endDate = new Date(e.end);
+                
+                while(startDate < endDate) {
+                    let singleEvent = { ...e };
+                    let y = startDate.getFullYear();
+                    let m = String(startDate.getMonth() + 1).padStart(2, '0');
+                    let d = String(startDate.getDate()).padStart(2, '0');
+                    singleEvent.start = `${y}-${m}-${d}`;
+                    delete singleEvent.end; // end 속성 제거하여 하루짜리 이벤트로 강제
+                    processedEvents.push(singleEvent);
+                    startDate.setDate(startDate.getDate() + 1);
+                }
+            } else {
+                processedEvents.push(e);
+            }
+        });
+
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
-            events: {{ events | tojson | safe }},
-            height: 510, fixedWeekCount: false, dayMaxEvents: 5, /* 5개 일정부터 +more 표시 */
+            events: processedEvents, /* 변환된 이벤트 사용 */
+            height: 510, fixedWeekCount: false, 
+            dayMaxEvents: 4, /* 4개까지만 2x2로 렌더링하고, 초과시 +more 링크 표시 */
             dayCellContent: function(arg) { 
-                /* 빈칸 방지용: 숫자 텍스트를 span으로 감싸 호버/클릭 타겟으로 만듦 */
+                /* 빈칸 클릭 방지용: 숫자 텍스트를 span으로 감싸 호버/클릭 타겟으로 만듦 */
                 return { html: `<span class="saedam-date-num">${arg.date.getDate()}</span>` }; 
             },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
-                return { html: `<div class="fc-event-main" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
+                return { html: `<div class="fc-event-main-custom" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
             },
             eventDidMount: function(info) {
                 let props = info.event.extendedProps;
@@ -746,7 +828,7 @@
                     }
                 }
             },
-            // 달력 헤더 그래픽 아이콘 커스텀 세팅
+            // 달력 상단 UI(제목, 버튼) 그래픽 커스텀 설정
             datesSet: function(info) {
                 const titleEl = document.querySelector('.fc-toolbar-title');
                 if (titleEl) {
@@ -791,9 +873,9 @@
                 }
             },
             dateClick: function(info) {
-                // 커스텀 날짜 숫자 영역(span.saedam-date-num)을 정확히 클릭했는지 확인
+                // 정확히 숫자(.saedam-date-num)를 클릭했을 때만 모달 열기
                 if (!info.jsEvent.target.classList.contains('saedam-date-num')) {
-                    return; // 빈 공간 클릭 시 이벤트 무시
+                    return; 
                 }
                 document.getElementById('taskForm').reset();
                 document.getElementById('taskId').value = ''; 
@@ -810,24 +892,29 @@
                 const tzoffset = (new Date()).getTimezoneOffset() * 60000;
                 const todayDate = (new Date(Date.now() - tzoffset)).toISOString().split('T')[0];
                 
-                // 삭제 권한 체크 변수
+                // 삭제 권한 체크 
                 const isAdmin = {{ 'true' if session.get('user_name') == 'admin' else 'false' }};
                 const isPast = clickDate < todayDate;
 
+                // 클릭한 날짜에 해당하는 모든 이벤트 필터링
                 const dayEvents = calendar.getEvents().filter(e => {
                     const s = e.startStr.split('T')[0];
                     let eDate = e.endStr ? e.endStr.split('T')[0] : s;
                     if (e.allDay && e.endStr) { let d = new Date(e.endStr); d.setDate(d.getDate() - 1); eDate = d.toISOString().split('T')[0]; }
                     return clickDate >= s && clickDate <= eDate;
                 });
+                
                 document.getElementById('dayEventsTitle').innerText = clickDate + " 상세 일정";
                 let html = '';
                 let renderedTaskIds = new Set(); 
+                
                 dayEvents.forEach(ev => {
                     let p = ev.extendedProps; 
                     let bgColor = ev.backgroundColor || 'var(--primary-color)';
                     if(p.task_id) window.taskDataMap[p.task_id] = p; 
+                    
                     html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
+                    
                     if (p.category === "근태/휴가" || !p.owner) {
                         html += `<div style="font-weight: bold; color: var(--text-dark);">${ev.title}</div>`;
                     } else {
@@ -837,6 +924,7 @@
                         html += `</div>`;
                     }
                     if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
+                    
                     if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
                         html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
                                       <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>`;
@@ -851,6 +939,7 @@
                     }
                     html += `</div>`;
                 });
+                
                 document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
                 document.getElementById('dayEventsModal').style.display = 'block';
             }
@@ -958,7 +1047,6 @@
         } catch (e) {}
     }
 
-    // WebLink 타입 라디오 버튼 토글
     function toggleWeblinkType() {
         const type = document.querySelector('input[name="weblinkType"]:checked').value;
         if(type === 'url') {
@@ -970,7 +1058,6 @@
         }
     }
 
-    // WebLink 저장 및 파일 업로드
     async function saveWebLink() {
         const title = document.getElementById('weblinkTitle').value;
         const type = document.querySelector('input[name="weblinkType"]:checked').value;
@@ -995,7 +1082,6 @@
         } catch (e) { alert("오류가 발생했습니다."); }
     }
 
-    // WebLink 삭제 기능
     async function deleteWebLink(linkId) {
         if(!confirm("이 링크를 삭제하시겠습니까?")) return;
         try {
