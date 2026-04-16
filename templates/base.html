@@ -305,6 +305,18 @@
                         </div>
                     </li>
 
+                    <li class="menu-item-wrapper dropdown">
+                        <a href="javascript:void(0);" class="menu-item {% if 'workspace' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-layer-group"></i> 업무공간
+                        </a>
+                        <div class="dropdown-content">
+                            <a href="/workspace/board"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</a>
+                            <a href="/workspace/archive"><i class="fa-solid fa-folder-open"></i> 사내 자료실</a>
+                            <a href="/workspace/manual"><i class="fa-solid fa-book"></i> 업무메뉴얼</a>
+                            <a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i> 개인화이트보드</a>
+                        </div>
+                    </li>
+
                     {% if session.get('user_level') in [1, 2] or session.get('user_name') == 'admin' %}
                     <li class="menu-item-wrapper">
                         <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
