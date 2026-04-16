@@ -92,7 +92,9 @@
     .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
-    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
+    
+    /* 캘린더 기본 이벤트 박스 투명화 (글씨만 보이게) */
+    .fc-event { background-color: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; }
 
     /* 커스텀 달력 날짜 숫자 호버/클릭 효과용 */
     .saedam-date-num {
@@ -111,63 +113,59 @@
 
     /* === 달력 셀 2x2 고정 배열 및 늘어남 방지 CSS === */
     .fc-daygrid-day-frame {
-        overflow: hidden !important; /* 셀 늘어남 절대 방지 */
+        overflow: hidden !important; 
+        max-height: 100% !important;
+        cursor: pointer; /* 빈 여백 클릭 유도를 위한 포인터 */
     }
     
     .fc-daygrid-day-events {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-content: flex-start !important;
-        padding: 2px !important;
-        gap: 2px !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: 22px; /* 줄 높이 고정 */
+        gap: 0px 2px;
+        padding: 0 4px !important;
         margin: 0 !important;
         min-height: 0 !important; 
     }
     
     .fc-daygrid-event-harness {
-        position: static !important; /* 절대 좌표 무시하고 Flex 적용 */
-        width: calc(50% - 1.5px) !important; /* 한 줄에 2개 (50% 너비) */
+        position: static !important; /* FullCalendar의 절대 좌표 무시하고 Grid 활용 */
+        width: 100% !important;
         margin: 0 !important;
-        visibility: visible !important;
     }
     
     .fc-daygrid-day-bottom {
-        position: static !important;
-        width: calc(50% - 1.5px) !important; /* +more 버튼도 동일하게 50% 차지 */
-        margin: 0 !important;
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
+        margin-top: 2px !important;
+        padding: 0 4px !important;
     }
     
-    /* 이벤트 아이콘 배지 스타일 */
+    /* 이벤트 텍스트 커스텀 (배경투명, 테두리 없음, 아이콘 색상 동기화) */
     .fc-event-main-custom {
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 3px 0;
-        text-align: center;
-        border-radius: 4px;
-        color: white;
+        font-size: 0.75rem;
+        font-weight: 800;
+        text-align: left;
+        background: transparent !important;
         width: 100%;
         box-sizing: border-box;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
     }
     
-    /* +more 버튼 디자인 (2x2의 4번째 칸) */
+    /* +more 버튼 텍스트 디자인 */
     .fc-daygrid-more-link {
-        font-size: 0.65rem !important;
-        background: var(--widget-hover) !important;
+        font-size: 0.7rem !important;
         color: var(--primary-color) !important;
-        padding: 2px 0 !important;
-        border-radius: 4px !important;
-        width: 100% !important;
-        text-align: center !important;
-        box-sizing: border-box !important;
         font-weight: 800 !important;
+        text-decoration: none !important;
+        text-align: right !important;
         display: block !important;
-        border: 1px solid var(--primary-color) !important;
+        padding-right: 4px;
+    }
+    .fc-daygrid-more-link:hover {
+        text-decoration: underline !important;
     }
 
     /* 글꼴 및 타이포그래피 */
@@ -592,7 +590,7 @@
 </div>
 
 <div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:8% auto; padding:25px; width:380px; border-radius:20px; position:relative;">
+    <div class="modal-content" style="margin:8% auto; padding:25px; width:400px; border-radius:20px; position:relative;">
         <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
         <h3 id="dayEventsTitle" style="margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 800;"></h3>
         <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto;"></div>
@@ -765,11 +763,85 @@
         }
     }
 
+    // (공통) 해당 일자의 상세일정 뷰 모달 여는 함수
+    function openDayEventsModal(clickDate) {
+        const tzoffset = (new Date()).getTimezoneOffset() * 60000;
+        const todayDate = (new Date(Date.now() - tzoffset)).toISOString().split('T')[0];
+        
+        const isAdmin = {{ 'true' if session.get('user_name') == 'admin' else 'false' }};
+        const isPast = clickDate < todayDate;
+
+        const dayEvents = calendarInstance.getEvents().filter(e => {
+            const s = e.startStr.split('T')[0];
+            let eDate = e.endStr ? e.endStr.split('T')[0] : s;
+            if (e.allDay && e.endStr) { let d = new Date(e.endStr); d.setDate(d.getDate() - 1); eDate = d.toISOString().split('T')[0]; }
+            return clickDate >= s && clickDate <= eDate;
+        });
+        
+        // 제목 옆에 '일정 추가' 버튼 탑재
+        document.getElementById('dayEventsTitle').innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span>${clickDate} 상세 일정</span>
+                <button class="btn-primary" onclick="openTaskModalFromDate('${clickDate}')" style="font-size:0.8rem; padding:4px 10px; border:none; border-radius:6px; cursor:pointer;"><i class="fa-solid fa-plus"></i> 일정 추가</button>
+            </div>
+        `;
+        
+        let html = '';
+        let renderedTaskIds = new Set(); 
+        
+        dayEvents.forEach(ev => {
+            let p = ev.extendedProps; 
+            let bgColor = ev.backgroundColor || 'var(--primary-color)';
+            if(p.task_id) window.taskDataMap[p.task_id] = p; 
+            
+            html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
+            
+            if (p.category === "근태/휴가" || !p.owner) {
+                html += `<div style="font-weight: bold; color: var(--text-dark);">${ev.title}</div>`;
+            } else {
+                html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
+                html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
+                if(p.task_time) html += ` <strong>시간:</strong> ${p.task_time}`;
+                html += `</div>`;
+            }
+            if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
+            
+            if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
+                html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
+                              <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>`;
+                
+                // 이미 지난 날짜의 일정이면 admin 계정만 삭제 버튼 표시
+                if (!isPast || isAdmin) {
+                    html += `<button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>`;
+                }
+                
+                html += `</div>`;
+                renderedTaskIds.add(p.task_id);
+            }
+            html += `</div>`;
+        });
+        
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
+        document.getElementById('dayEventsModal').style.display = 'block';
+    }
+
+    function openTaskModalFromDate(clickDate) {
+        document.getElementById('dayEventsModal').style.display = 'none';
+        document.getElementById('taskForm').reset();
+        document.getElementById('taskId').value = ''; 
+        document.getElementById('taskOwner').value = currentUser;
+        document.getElementById('taskDate').value = clickDate;
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
+        document.getElementById('taskModal').style.display = 'block';
+    }
+
+    let calendarInstance = null;
+
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         const holidays = {{ holidays_dict | tojson | safe }};
         
-        // 🚀 다일(Multi-day) 일정을 쪼개어 단일 셀에만 위치하도록 변환하는 로직 추가
+        // 다일(Multi-day) 일정을 쪼개어 단일 셀에만 위치하도록 변환하여 달력 크기 확장 방지
         let rawEvents = {{ events | tojson | safe }};
         let processedEvents = [];
         
@@ -784,7 +856,7 @@
                     let m = String(startDate.getMonth() + 1).padStart(2, '0');
                     let d = String(startDate.getDate()).padStart(2, '0');
                     singleEvent.start = `${y}-${m}-${d}`;
-                    delete singleEvent.end; // end 속성 제거하여 하루짜리 이벤트로 강제
+                    delete singleEvent.end; 
                     processedEvents.push(singleEvent);
                     startDate.setDate(startDate.getDate() + 1);
                 }
@@ -793,19 +865,19 @@
             }
         });
 
-        var calendar = new FullCalendar.Calendar(calendarEl, {
+        calendarInstance = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
-            events: processedEvents, /* 변환된 이벤트 사용 */
+            events: processedEvents,
             height: 510, fixedWeekCount: false, 
-            dayMaxEvents: 4, /* 4개까지만 2x2로 렌더링하고, 초과시 +more 링크 표시 */
+            dayMaxEvents: 5, /* 최대 4개 이벤트 렌더링 후, 5개째부터 +more 표시 */
             dayCellContent: function(arg) { 
-                /* 빈칸 클릭 방지용: 숫자 텍스트를 span으로 감싸 호버/클릭 타겟으로 만듦 */
                 return { html: `<span class="saedam-date-num">${arg.date.getDate()}</span>` }; 
             },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
-                return { html: `<div class="fc-event-main-custom" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
+                /* 배경투명, 테두리 없음, 이벤트 색상을 텍스트와 아이콘 폰트 컬러로 치환 */
+                return { html: `<div class="fc-event-main-custom" style="color:${arg.event.backgroundColor} !important;"><i class="fa-solid fa-circle" style="font-size:0.4rem; margin-right:4px;"></i>${label}</div>` };
             },
             eventDidMount: function(info) {
                 let props = info.event.extendedProps;
@@ -828,7 +900,6 @@
                     }
                 }
             },
-            // 달력 상단 UI(제목, 버튼) 그래픽 커스텀 설정
             datesSet: function(info) {
                 const titleEl = document.querySelector('.fc-toolbar-title');
                 if (titleEl) {
@@ -873,78 +944,22 @@
                 }
             },
             dateClick: function(info) {
-                // 정확히 숫자(.saedam-date-num)를 클릭했을 때만 모달 열기
-                if (!info.jsEvent.target.classList.contains('saedam-date-num')) {
+                // 날짜(숫자)를 클릭하면 새 일정 등록 모달 오픈
+                if (info.jsEvent.target.classList.contains('saedam-date-num')) {
+                    openTaskModalFromDate(info.dateStr);
                     return; 
                 }
-                document.getElementById('taskForm').reset();
-                document.getElementById('taskId').value = ''; 
-                document.getElementById('taskOwner').value = currentUser;
-                document.getElementById('taskDate').value = info.dateStr;
-                document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
-                document.getElementById('taskModal').style.display = 'block';
+                // 빈 여백(셀)을 클릭하면 상세 일정 조회 모달 오픈
+                openDayEventsModal(info.dateStr);
             },
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
                 const clickDate = info.event.startStr.split('T')[0];
-                
-                // 오늘 날짜 계산 (타임존 보정)
-                const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-                const todayDate = (new Date(Date.now() - tzoffset)).toISOString().split('T')[0];
-                
-                // 삭제 권한 체크 
-                const isAdmin = {{ 'true' if session.get('user_name') == 'admin' else 'false' }};
-                const isPast = clickDate < todayDate;
-
-                // 클릭한 날짜에 해당하는 모든 이벤트 필터링
-                const dayEvents = calendar.getEvents().filter(e => {
-                    const s = e.startStr.split('T')[0];
-                    let eDate = e.endStr ? e.endStr.split('T')[0] : s;
-                    if (e.allDay && e.endStr) { let d = new Date(e.endStr); d.setDate(d.getDate() - 1); eDate = d.toISOString().split('T')[0]; }
-                    return clickDate >= s && clickDate <= eDate;
-                });
-                
-                document.getElementById('dayEventsTitle').innerText = clickDate + " 상세 일정";
-                let html = '';
-                let renderedTaskIds = new Set(); 
-                
-                dayEvents.forEach(ev => {
-                    let p = ev.extendedProps; 
-                    let bgColor = ev.backgroundColor || 'var(--primary-color)';
-                    if(p.task_id) window.taskDataMap[p.task_id] = p; 
-                    
-                    html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
-                    
-                    if (p.category === "근태/휴가" || !p.owner) {
-                        html += `<div style="font-weight: bold; color: var(--text-dark);">${ev.title}</div>`;
-                    } else {
-                        html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
-                        html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
-                        if(p.task_time) html += ` <strong>시간:</strong> ${p.task_time}`;
-                        html += `</div>`;
-                    }
-                    if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
-                    
-                    if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
-                        html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
-                                      <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>`;
-                        
-                        // 이미 지난 날짜의 일정이면 admin 계정만 삭제 버튼 표시
-                        if (!isPast || isAdmin) {
-                            html += `<button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>`;
-                        }
-                        
-                        html += `</div>`;
-                        renderedTaskIds.add(p.task_id);
-                    }
-                    html += `</div>`;
-                });
-                
-                document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
-                document.getElementById('dayEventsModal').style.display = 'block';
+                // 일정 이벤트를 눌러도 상세 일정 조회 모달 오픈
+                openDayEventsModal(clickDate);
             }
         });
-        calendar.render();
+        calendarInstance.render();
         checkUnreadMessages();
         fetchActiveUsers(); 
         setInterval(fetchActiveUsers, 60000);
