@@ -164,14 +164,14 @@
 
     /* 이벤트 배경 있는 커스텀 디자인 복구 */
     .fc-event-main-custom {
-        font-size: 0.65rem !important; /* 좁은 공간을 위해 축소 */
+        font-size: 0.65rem !important; 
         font-weight: 700;
         text-align: center;
         padding: 1px 2px !important;
         border-radius: 4px;
-        color: white !important; /* 배경색에 맞춘 하얀 글씨 */
+        color: white !important; 
         width: 100%;
-        height: 18px !important; /* 높이 절대 고정 */
+        height: 18px !important; 
         line-height: 16px !important;
         box-sizing: border-box;
         white-space: nowrap;
@@ -180,14 +180,14 @@
         display: block;
     }
     
-    /* +more 버튼 디자인 (배경 있는 디자인과 밸런스 맞춤) */
+    /* +more 버튼 디자인 */
     .fc-daygrid-more-link {
         font-size: 0.65rem !important;
         background: var(--widget-hover) !important;
         color: var(--primary-color) !important;
         border-radius: 4px !important;
         width: 100% !important;
-        height: 18px !important; /* 다른 이벤트와 높이 통일 */
+        height: 18px !important;
         line-height: 16px !important;
         text-align: center !important;
         box-sizing: border-box !important;
@@ -336,12 +336,14 @@
 
             <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto; margin: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; height: 26px;">
-                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
+                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str|default('') }}</span></h3>
                 </div>
                 
                 <div class="today-list">
                     {% set today_empty = true %}
-                    {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
+                    {% for cat in cats|default([]) %}
+                        {% if today_grouped and cat in today_grouped and today_grouped[cat] %}
+                            {% set today_empty = false %}
                             <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
                             {% for event in today_grouped[cat] %}
                             <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
@@ -349,7 +351,7 @@
                                     <span class="card-title">{{ event.display_title_detailed }}</span>
                                     <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: var(--text-gray); transition: transform 0.2s;"></i>
                                 </div>
-                                {% if event.extendedProps.note or event.extendedProps.task_time %}
+                                {% if event.extendedProps and (event.extendedProps.note or event.extendedProps.task_time) %}
                                 <div class="card-details">
                                     {% if event.extendedProps.task_time %}<div><strong>시간:</strong> {{ event.extendedProps.task_time }}</div>{% endif %}
                                     {% if event.extendedProps.note %}<div style="margin-top:5px;"><strong>비고:</strong> {{ event.extendedProps.note }}</div>{% endif %}
@@ -357,7 +359,8 @@
                                 {% endif %}
                             </div>
                             {% endfor %}
-                    {% endif %}{% endfor %}
+                        {% endif %}
+                    {% endfor %}
                     {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 30px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
                 </div>
 
@@ -366,15 +369,18 @@
                 <h3 style="margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-calendar-week"></i> UPCOMING</h3>
                 <div class="weekly-list">
                     {% set weekly_empty = true %}
-                    {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
+                    {% for cat in cats|default([]) %}
+                        {% if weekly_grouped and cat in weekly_grouped and weekly_grouped[cat] %}
+                            {% set weekly_empty = false %}
                             <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
                             {% for event in weekly_grouped[cat] %}
                             <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
-                                <div style="font-size: 0.7rem; color: var(--primary-color); margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
+                                <div style="font-size: 0.7rem; color: var(--primary-color); margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] if event.start else '' }}</div>
                                 <div class="card-header"><span class="card-title">{{ event.display_title_detailed }}</span></div>
                             </div>
                             {% endfor %}
-                    {% endif %}{% endfor %}
+                        {% endif %}
+                    {% endfor %}
                 </div>
             </div>
 
@@ -404,12 +410,12 @@
                     </div>
 
                     <div id="list-partners" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px;">
-                        {% for partner in chat_partners %}
+                        {% for partner in chat_partners|default([]) %}
                         <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-radius: 0;">
-                            <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
+                            <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') if user_icons else '👤' }}</div>
                             <div style="flex: 1;">
                                 <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
-                                {% if partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
+                                {% if partner.unread and partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
                             </div>
                             <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
                         </div>
@@ -419,11 +425,11 @@
                     </div>
 
                     <div id="list-recv" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
-                        {% for msg in received_messages %}
+                        {% for msg in received_messages|default([]) %}
                         <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
                             <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                                <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
-                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                                <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') if user_icons else '👤' }} <strong>{{ msg.sender }}</strong></span>
+                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] if msg.sent_at else '' }}</span>
                             </div>
                             <div style="color: var(--text-gray); font-size:0.8rem;">
                                 {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
@@ -435,11 +441,11 @@
                     </div>
 
                     <div id="list-sent" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
-                        {% for msg in sent_messages %}
+                        {% for msg in sent_messages|default([]) %}
                         <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
                             <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                                <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
-                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                                <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') if user_icons else '👤' }} <strong>{{ msg.receiver }}</strong></span>
+                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] if msg.sent_at else '' }}</span>
                             </div>
                             <div style="color: var(--text-gray); font-size:0.8rem;">
                                 {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
@@ -461,16 +467,16 @@
                     <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
                 </div>
                 <div style="background: transparent; border: none; border-radius: 12px; padding: 10px;">
-                    {% for post in board_posts %}
+                    {% for post in board_posts|default([]) %}
                     <div class="list-item" style="cursor: pointer; padding: 12px;"
                          data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
-                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}"
+                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] if post.created_at else '' }}" data-filename="{{ post.filename }}"
                          onclick="openBoardDetail(this)">
                         <div style="flex: 1; color: var(--text-dark);">
                             <strong>{{ post.title }}</strong> 
                             {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
                         </div>
-                        <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') if user_icons else '👤' }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] if post.created_at else '' }}</div>
                     </div>
                     {% else %}
                     <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">등록된 게시글이 없습니다.</p>
@@ -511,7 +517,7 @@
         </div>
         
         <div id="weblink-container">
-            {% for link in weblinks %}
+            {% for link in weblinks|default([]) %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
                 
                 {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
@@ -544,7 +550,7 @@
         <form id="msgForm">
             <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
                 <option value="" style="color: #666;">수신자를 선택하세요</option>
-                {% for u in user_list %}
+                {% for u in user_list|default([]) %}
                     {% if u != current_user %}
                     <option value="{{ u }}" style="color: #000;">{{ u }}</option>
                     {% endif %}
@@ -605,7 +611,7 @@
         <form id="taskForm">
             <input type="hidden" id="taskId">
             <input type="date" id="taskDate" class="modal-input" required readonly style="opacity: 0.8;">
-            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="opacity: 0.8;">
+            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user|default('') }}" readonly style="opacity: 0.8;">
             <div style="background: var(--widget-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--card-border); margin-bottom: 15px;">
                 {% for c in ['회의','면접','미팅','외근','기타'] %}
                 <div class="task-input-group">
@@ -723,8 +729,7 @@
     }
 
     window.taskDataMap = window.taskDataMap || {};
-    const currentUser = '{{ current_user }}';
-    const userIcons = {{ user_icons | tojson | safe }};
+    const currentUser = '{{ current_user|default("") }}';
 
     function switchMsgTab(tab) {
         ['partners', 'recv', 'sent'].forEach(t => {
@@ -842,7 +847,6 @@
                 html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
                               <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>`;
                 
-                // 이미 지난 날짜의 일정이면 admin 계정만 삭제 버튼 표시
                 if (!isPast || isAdmin) {
                     html += `<button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>`;
                 }
@@ -871,18 +875,29 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
-        const holidays = {{ holidays_dict | tojson | safe }};
+        const holidays = {{ holidays_dict | default({}) | tojson | safe }} || {};
         
-        // 다일(Multi-day) 일정을 쪼개어 단일 셀에만 위치하도록 변환하여 달력 크기 확장 방지
-        let rawEvents = {{ events | tojson | safe }};
+        // JS 충돌(null 예외) 방지를 위해 기본값 처리
+        let rawEvents = {{ events | default([]) | tojson | safe }};
+        if (!Array.isArray(rawEvents)) { rawEvents = []; }
+        
         let processedEvents = [];
         
         rawEvents.forEach(e => {
-            if (e.end && e.end !== e.start) {
-                let startDate = new Date(e.start);
-                let endDate = new Date(e.end);
+            if (e && e.end && e.end !== e.start) {
+                // 날짜 파싱 오류 및 무한 루프 방지 로직
+                let startStr = e.start.includes('T') ? e.start.split('T')[0] : e.start;
+                let endStr = e.end.includes('T') ? e.end.split('T')[0] : e.end;
+                let startDate = new Date(startStr + 'T00:00:00');
+                let endDate = new Date(endStr + 'T00:00:00');
                 
-                while(startDate < endDate) {
+                if (isNaN(startDate) || isNaN(endDate)) {
+                    processedEvents.push(e);
+                    return;
+                }
+
+                let safeCounter = 0;
+                while(startDate < endDate && safeCounter < 100) {
                     let singleEvent = { ...e };
                     let y = startDate.getFullYear();
                     let m = String(startDate.getMonth() + 1).padStart(2, '0');
@@ -891,9 +906,10 @@
                     delete singleEvent.end; 
                     processedEvents.push(singleEvent);
                     startDate.setDate(startDate.getDate() + 1);
+                    safeCounter++;
                 }
             } else {
-                processedEvents.push(e);
+                if(e) processedEvents.push(e);
             }
         });
 
@@ -901,14 +917,13 @@
             initialView: 'dayGridMonth', locale: 'ko',
             events: processedEvents,
             height: 510, fixedWeekCount: false, 
-            dayMaxEvents: 4, /* 4번째 칸부터는 +more 표시 적용 (3개 초과시 발동) */
+            dayMaxEvents: 4, 
             dayCellContent: function(arg) { 
                 return { html: `<span class="saedam-date-num">${arg.date.getDate()}</span>` }; 
             },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
-                /* 원래 배경 있는 디자인으로 렌더링 */
                 return { html: `<div class="fc-event-main-custom" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
             },
             eventDidMount: function(info) {
@@ -976,18 +991,15 @@
                 }
             },
             dateClick: function(info) {
-                // 날짜(숫자)를 클릭하면 새 일정 등록 모달 오픈
                 if (info.jsEvent.target.classList.contains('saedam-date-num')) {
                     openTaskModalFromDate(info.dateStr);
                     return; 
                 }
-                // 빈 여백(셀)을 클릭하면 상세 일정 조회 모달 오픈
                 openDayEventsModal(info.dateStr);
             },
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
                 const clickDate = info.event.startStr.split('T')[0];
-                // 일정 이벤트를 눌러도 상세 일정 조회 모달 오픈
                 openDayEventsModal(clickDate);
             }
         });
