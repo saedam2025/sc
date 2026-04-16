@@ -116,8 +116,21 @@
         .dropdown-content a { color: var(--text-dark); padding: 12px 20px; text-decoration: none; display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 500; transition: all 0.2s; }
         .dropdown-content a:hover { background: var(--widget-hover); color: var(--primary-color); padding-left: 25px; }
 
-        /* 우측 유저 섹션 */
-        .user-section { display: flex; align-items: center; gap: 15px; }
+        /* 우측 유저 섹션 (가독성을 위해 배경 디자인 추가) */
+        .user-section { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px;
+            background: var(--card-bg) !important;
+            backdrop-filter: var(--card-backdrop);
+            -webkit-backdrop-filter: var(--card-backdrop);
+            border: 1px solid var(--card-border);
+            padding: 6px 15px 6px 10px;
+            border-radius: 30px; /* 캡슐 형태 */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
         .btn-memo { color: var(--text-gray); font-size: 1.3rem; text-decoration: none; padding: 8px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: var(--widget-hover); }
         .user-profile { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; padding: 8px 12px; border-radius: 20px; color: var(--text-dark); transition: background 0.2s; }
@@ -257,14 +270,6 @@
                         </a>
                     </li>
                     
-                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li class="menu-item-wrapper">
-                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-user-gear"></i> 인사관리
-                        </a>
-                    </li>
-                    {% endif %}
-                    
                     <li class="menu-item-wrapper">
                         <a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}">
                             <i class="fa-solid fa-file-signature"></i> 사내결재
@@ -299,6 +304,14 @@
                             <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i> 근태 관리</a>
                         </div>
                     </li>
+
+                    {% if session.get('user_level') in [1, 2] or session.get('user_name') == 'admin' %}
+                    <li class="menu-item-wrapper">
+                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
+                            <i class="fa-solid fa-user-gear"></i> 인사관리
+                        </a>
+                    </li>
+                    {% endif %}
                 </ul>
             </nav>
 
