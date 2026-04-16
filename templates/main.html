@@ -82,7 +82,7 @@
     .list-item { border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--card-border); }
     .list-item:last-child { margin-bottom: 0; }
 
-    /* === 풀캘린더 수정사항 (아이콘 밀착 및 창 크기 고정) === */
+    /* === 풀캘린더 수정사항 (아이콘 밀착, 스크롤 제거 및 창 크기 고정) === */
     .fc { font-size: 0.8em; color: var(--text-dark); }
     .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: 800; color: var(--text-dark) !important; transition: color 0.5s; }
     .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
@@ -92,37 +92,44 @@
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
     
-    /* 일일 창 높이 고정 및 넘치는 부분 숨김 */
-    .fc-daygrid-day-frame { height: 95px !important; overflow: hidden !important; }
+    /* 달력 내부 스크롤바 강제 제거 */
+    .fc-scroller { overflow: hidden !important; }
     
-    /* 일정 아이콘 2열 배열 및 바싹 밀착 */
+    /* 일일 창 높이 고정 */
+    .fc-daygrid-day-frame { height: 85px !important; overflow: hidden !important; }
+    
+    /* 일정 아이콘 2열 배열 및 바싹 밀착 (gap, margin 0처리) */
     .fc-daygrid-day-events { 
         display: flex !important; 
         flex-wrap: wrap !important; 
-        gap: 1px !important; 
+        gap: 0 !important; 
         justify-content: flex-start !important; 
         margin: 0 !important; 
-        padding: 0 2px !important; 
+        padding: 0 !important; 
     }
     .fc-daygrid-event-harness { 
-        flex: 0 0 calc(50% - 1px) !important; 
-        max-width: calc(50% - 1px) !important; 
-        margin-top: 0 !important; 
+        flex: 0 0 50% !important; 
+        max-width: 50% !important; 
+        margin: 0 !important; 
+        padding: 1px !important; /* 아이콘 간 충돌 방지용 최소 여백 */
+        box-sizing: border-box;
     }
     
-    /* +more 링크 여백 완전 제거 및 폰트 축소 */
+    /* +more 링크 여백 완전 제거 */
     .fc-daygrid-more-link { 
+        display: block !important;
         width: 100% !important; 
         text-align: center !important; 
         font-size: 0.65rem !important; 
         font-weight: bold !important; 
         color: #e74c3c !important; 
-        margin-top: -2px !important; 
-        padding-bottom: 0 !important; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+        line-height: 1.1 !important;
     }
 
-    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
-    .fc-event-main { padding: 1px 2px; font-weight: 700; font-size: 0.7rem; border-radius: 4px; display: block; color: white; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 1px; }
+    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; margin: 0 !important; }
+    .fc-event-main { padding: 1px 0 !important; font-weight: 700; font-size: 0.7rem; border-radius: 3px; display: block; color: white; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; }
 
     /* 날짜 숫자 클릭 영역 강조 */
     .fc-daygrid-day-number { cursor: pointer; padding: 2px 5px; border-radius: 4px; transition: background 0.2s; position: relative; z-index: 10; }
@@ -133,8 +140,37 @@
     .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
     h3, h4 { color: var(--text-dark) !important; transition: color 0.3s ease; margin-top: 0; }
     
-    /* === Today & Upcoming 인터렉티브 카드 디자인 === */
-    .timeline-label { font-size: 0.85rem; font-weight: 800; color: var(--primary-color); display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; }
+    /* === Today & Upcoming 인터렉티브 자동 슬라이드 디자인 === */
+    .schedule-carousel-wrapper {
+        position: relative;
+        flex: 1;
+        width: 100%;
+        height: calc(100% - 30px);
+        overflow: hidden; /* 영역 밖 숨김 */
+    }
+    .schedule-slide {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.5s ease-in-out;
+        overflow-y: auto; /* 내용이 많을 경우 내부 스크롤 허용 */
+        padding-right: 5px;
+    }
+    .schedule-slide.active {
+        opacity: 1;
+        visibility: visible;
+        z-index: 2;
+    }
+    
+    /* 스크롤바 커스텀 */
+    .schedule-slide::-webkit-scrollbar { width: 4px; }
+    .schedule-slide::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+
+    .timeline-label { font-size: 0.85rem; font-weight: 800; color: var(--primary-color); display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
     .timeline-label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(to right, var(--card-border), transparent); }
     
     .interactive-card { 
@@ -293,54 +329,66 @@
                 <div id='calendar'></div>
             </div>
 
-            <div class="col-today glass-box" style="flex: 2; height: 550px; overflow-y: auto; margin: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; height: 26px;">
-                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-check"></i> SCHEDULE</h3>
+            <div class="col-today glass-box" style="flex: 2; height: 550px; margin: 0; display: flex; flex-direction: column; overflow: hidden;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; height: 26px; flex-shrink: 0;">
+                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important;">
+                        <i class="fa-solid fa-calendar-check"></i> SCHEDULE
+                    </h3>
+                    <div style="display: flex; gap: 6px;">
+                        <span id="dot-today" style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color); transition: 0.3s;"></span>
+                        <span id="dot-upcoming" style="width: 8px; height: 8px; border-radius: 50%; background: var(--card-border); transition: 0.3s;"></span>
+                    </div>
                 </div>
                 
-                <div class="timeline-label">TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></div>
-                <div class="today-list">
-                    {% set today_empty = true %}
-                    {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
-                            {% for event in today_grouped[cat] %}
-                            <div class="interactive-card" style="border-left-color: {{ event.color }};" onclick="toggleInteractiveNote(this)">
-                                <div class="card-header-flex">
-                                    <span class="card-category" style="background: {{ event.color }};">{{ cat }}</span>
-                                    <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #cbd5e1; transition: transform 0.2s;"></i>
-                                </div>
-                                <span class="card-title-text">{{ event.display_title_detailed }}</span>
-                                <div class="card-info-row">
-                                    <i class="fa-regular fa-clock"></i> 
-                                    {% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일 일정{% endif %}
-                                </div>
-                                {% if event.extendedProps.note %}
-                                <div class="card-note-box"><i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}</div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                    {% endif %}{% endfor %}
-                    {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 20px; font-size: 0.85rem;">오늘 일정이 없습니다.</p>{% endif %}
-                </div>
+                <div class="schedule-carousel-wrapper">
+                    <div id="slide-today" class="schedule-slide active">
+                        <div class="timeline-label">TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></div>
+                        <div class="today-list">
+                            {% set today_empty = true %}
+                            {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
+                                    {% for event in today_grouped[cat] %}
+                                    <div class="interactive-card" style="border-left-color: {{ event.color }};" onclick="toggleInteractiveNote(this)">
+                                        <div class="card-header-flex">
+                                            <span class="card-category" style="background: {{ event.color }};">{{ cat }}</span>
+                                            <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #cbd5e1; transition: transform 0.2s;"></i>
+                                        </div>
+                                        <span class="card-title-text">{{ event.display_title_detailed }}</span>
+                                        <div class="card-info-row">
+                                            <i class="fa-regular fa-clock"></i> 
+                                            {% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일 일정{% endif %}
+                                        </div>
+                                        {% if event.extendedProps.note %}
+                                        <div class="card-note-box"><i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                            {% endif %}{% endfor %}
+                            {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 20px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
+                        </div>
+                    </div>
 
-                <div class="timeline-label" style="margin-top: 25px;">UPCOMING</div>
-                <div class="weekly-list">
-                    {% set weekly_empty = true %}
-                    {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
-                            {% for event in weekly_grouped[cat] %}
-                            <div class="interactive-card" style="border-left-color: {{ event.color }};" onclick="toggleInteractiveNote(this)">
-                                <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 800; margin-bottom: 6px;">{{ event.start[:10] | replace('-', '/') }}</div>
-                                <div class="card-header-flex">
-                                    <span class="card-category" style="background: {{ event.color }};">{{ cat }}</span>
-                                    <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #cbd5e1; transition: transform 0.2s;"></i>
-                                </div>
-                                <span class="card-title-text">{{ event.display_title_detailed }}</span>
-                                {% if event.extendedProps.note %}
-                                <div class="card-note-box"><i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}</div>
-                                {% endif %}
-                            </div>
-                            {% endfor %}
-                    {% endif %}{% endfor %}
-                    {% if weekly_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 20px; font-size: 0.85rem;">예정된 주간 일정이 없습니다.</p>{% endif %}
+                    <div id="slide-upcoming" class="schedule-slide">
+                        <div class="timeline-label">UPCOMING</div>
+                        <div class="weekly-list">
+                            {% set weekly_empty = true %}
+                            {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
+                                    {% for event in weekly_grouped[cat] %}
+                                    <div class="interactive-card" style="border-left-color: {{ event.color }};" onclick="toggleInteractiveNote(this)">
+                                        <div style="font-size: 0.7rem; color: var(--primary-color); font-weight: 800; margin-bottom: 6px;">{{ event.start[:10] | replace('-', '/') }}</div>
+                                        <div class="card-header-flex">
+                                            <span class="card-category" style="background: {{ event.color }};">{{ cat }}</span>
+                                            <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: #cbd5e1; transition: transform 0.2s;"></i>
+                                        </div>
+                                        <span class="card-title-text">{{ event.display_title_detailed }}</span>
+                                        {% if event.extendedProps.note %}
+                                        <div class="card-note-box"><i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                            {% endif %}{% endfor %}
+                            {% if weekly_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 20px; font-size: 0.85rem;">예정된 주간 일정이 없습니다.</p>{% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -616,7 +664,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
-    // 인터렉티브 카드 비고란 토글 함수
+    // 인터렉티브 카드 비고란 토글 함수 (애니메이션 토글)
     function toggleInteractiveNote(card) {
         const note = card.querySelector('.card-note-box');
         const icon = card.querySelector('.toggle-icon');
@@ -631,7 +679,32 @@
         }
     }
 
-    // 위젯 및 기초 기능 (건드리지 않음)
+    // 자동 페이드 인/아웃 슬라이드 로직
+    let currentScheduleSlide = 'today';
+    setInterval(() => {
+        const slideToday = document.getElementById('slide-today');
+        const slideUpcoming = document.getElementById('slide-upcoming');
+        const dotToday = document.getElementById('dot-today');
+        const dotUpcoming = document.getElementById('dot-upcoming');
+
+        if (!slideToday || !slideUpcoming) return;
+
+        if (currentScheduleSlide === 'today') {
+            slideToday.classList.remove('active');
+            slideUpcoming.classList.add('active');
+            dotToday.style.background = 'var(--card-border)';
+            dotUpcoming.style.background = 'var(--primary-color)';
+            currentScheduleSlide = 'upcoming';
+        } else {
+            slideUpcoming.classList.remove('active');
+            slideToday.classList.add('active');
+            dotUpcoming.style.background = 'var(--card-border)';
+            dotToday.style.background = 'var(--primary-color)';
+            currentScheduleSlide = 'today';
+        }
+    }, 6000); // 6초마다 자동 전환
+
+    // 위젯 및 기초 기능
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
         if (!widgetArea) return; 
@@ -660,7 +733,7 @@
     window.taskDataMap = window.taskDataMap || {};
     const currentUser = '{{ current_user }}';
 
-    // 달력 로직 수정
+    // 풀캘린더 로직
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         const holidays = {{ holidays_dict | tojson | safe }};
@@ -668,11 +741,12 @@
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
             events: {{ events | tojson | safe }},
-            height: 510, fixedWeekCount: false,
-            dayMaxEvents: 2, // 3개째부터 +more 표시 (수정사항 4번)
+            height: 'auto', // 내부 스크롤바 방지
+            contentHeight: 'auto', // 내용물에 맞춰 높이 최적화
+            fixedWeekCount: false,
+            dayMaxEvents: 2, 
             
             dayCellContent: function(arg) {
-                // 수정사항 2번: 날짜 숫자에만 클래스 부여하여 클릭 타겟 분리
                 return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` };
             },
             
@@ -684,7 +758,6 @@
 
             dateClick: function(info) {
                 const target = info.jsEvent.target;
-                // 수정사항 2번: 날짜 숫자 클릭 시에만 입력 모달 오픈
                 if (target.classList.contains('fc-daygrid-day-number')) {
                     document.getElementById('taskForm').reset();
                     document.getElementById('taskId').value = ''; 
@@ -693,14 +766,12 @@
                     document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
                     document.getElementById('taskModal').style.display = 'block';
                 } else {
-                    // 수정사항 5번: 빈칸 클릭 시 상세 일정창 오픈
                     openDayDetails(info.dateStr, calendar);
                 }
             },
 
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
-                // 수정사항 5번: 일정 아이콘 클릭 시 상세 일정창 오픈
                 openDayDetails(info.event.startStr.split('T')[0], calendar);
             },
 
@@ -719,14 +790,35 @@
         });
         calendar.render();
 
-        // 공통 기능 실행
+        // 웹링크 SortableJS 적용
+        var weblinkEl = document.getElementById('weblink-container');
+        if(weblinkEl) {
+            Sortable.create(weblinkEl, {
+                animation: 150,
+                ghostClass: 'weblink-ghost',
+                onEnd: function (evt) {
+                    var itemEls = weblinkEl.querySelectorAll('.weblink-item');
+                    var newOrder = [];
+                    itemEls.forEach(function(item) {
+                        newOrder.push(item.getAttribute('data-id'));
+                    });
+                    fetch('/update_weblink_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: newOrder })
+                    }).catch(err => console.error("순서 저장 실패:", err));
+                }
+            });
+        }
+
+        // 공통 기능 실행 주기
         loadNotificationWidget();
         fetchActiveUsers();
         setInterval(fetchActiveUsers, 60000);
         setInterval(loadNotificationWidget, 60000);
     });
 
-    // 상세 일정창 함수 (수정사항 5번 대응)
+    // 상세 일정창 함수
     function openDayDetails(dateStr, calendarInstance) {
         const dayEvents = calendarInstance.getEvents().filter(e => {
             const s = e.startStr.split('T')[0];
@@ -767,7 +859,7 @@
         document.getElementById('dayEventsModal').style.display = 'block';
     }
 
-    // 나머지 게시판, 쪽지, 웹링크 함수 (건드리지 않음)
+    // 쪽지 탭 변환 함수
     function switchMsgTab(tab) {
         ['partners', 'recv', 'sent'].forEach(t => {
             document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
@@ -776,11 +868,11 @@
         });
     }
 
+    // 이모지 선택 토글 및 입력
     function toggleEmojiPicker(pickerId) {
         const picker = document.getElementById(pickerId);
         picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
     }
-
     function addEmoji(inputId, emoji) {
         const input = document.getElementById(inputId);
         input.value += emoji;
@@ -788,6 +880,7 @@
         document.getElementById('newMsgEmojiPicker').style.display = 'none';
     }
 
+    // 팝업 채팅 열기
     function openChat(partnerName) {
         const popupWidth = 450; const popupHeight = 650;
         const left = (window.screen.width / 2) - (popupWidth / 2);
@@ -795,6 +888,7 @@
         window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
     }
 
+    // 새 쪽지 보내기 기능
     async function sendNewMessage() {
         const receiver = document.getElementById('msgReceiver').value;
         const content = document.getElementById('msgContent').value;
@@ -808,14 +902,7 @@
         if(res.ok) { document.getElementById('msgModal').style.display='none'; openChat(receiver); }
     }
 
-    function toggleDetails(card) {
-        const details = card.querySelector('.card-details');
-        const icon = card.querySelector('.toggle-icon');
-        if(!details) return;
-        details.style.display = (details.style.display === 'block') ? 'none' : 'block';
-        if(icon) icon.style.transform = (details.style.display === 'block') ? 'rotate(180deg)' : 'rotate(0deg)';
-    }
-
+    // 일정 수정 모달 열기
     function editTask(taskId, dateStr) {
         document.getElementById('dayEventsModal').style.display = 'none'; 
         const props = window.taskDataMap[taskId];
@@ -830,12 +917,14 @@
         document.getElementById('taskModal').style.display = 'block';
     }
 
+    // 일정 삭제
     async function deleteTask(taskId) {
         if(!confirm("삭제하시겠습니까?")) return;
         const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
         if(res.ok) location.reload();
     }
 
+    // 일정 저장
     async function saveTask() {
         const taskId = document.getElementById('taskId').value;
         const data = { date: document.getElementById('taskDate').value, owner: currentUser, note: document.getElementById('taskNote').value };
@@ -850,12 +939,14 @@
 
     function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
 
+    // 게시판 글쓰기 모달 열기
     function openBoardForm() {
         document.getElementById('boardForm').reset();
         document.getElementById('boardId').value = '';
         document.getElementById('boardModal').style.display = 'block';
     }
 
+    // 게시판 상세 내용 모달 열기
     function openBoardDetail(el) {
         currentBoardId = el.getAttribute('data-id');
         document.getElementById('detailTitle').innerText = el.getAttribute('data-title');
@@ -873,6 +964,7 @@
         document.getElementById('boardDetailModal').style.display = 'block';
     }
 
+    // 게시글 저장
     async function saveBoard() {
         const id = document.getElementById('boardId').value;
         let fd = new FormData();
@@ -884,12 +976,31 @@
         if(res.ok) location.reload();
     }
 
+    // 게시판 글 수정 연동 (상세 모달에서 진입 시)
+    function editBoardFromDetail() {
+        document.getElementById('boardDetailModal').style.display = 'none';
+        document.getElementById('boardId').value = currentBoardId;
+        document.getElementById('boardTitle').value = document.getElementById('detailTitle').innerText;
+        document.getElementById('boardContent').value = document.getElementById('detailContent').innerText;
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 게시글 수정';
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    // 게시판 글 삭제 연동
+    async function deleteBoardFromDetail() {
+        if(!confirm("삭제하시겠습니까?")) return;
+        const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' });
+        if(res.ok) location.reload();
+    }
+
+    // 웹링크 타입 변경에 따른 파일/URL 창 토글
     function toggleWeblinkType() {
         const t = document.querySelector('input[name="weblinkType"]:checked').value;
         document.getElementById('weblinkUrl').style.display = (t === 'url') ? 'block' : 'none';
         document.getElementById('weblinkFile').style.display = (t === 'file') ? 'block' : 'none';
     }
 
+    // 웹링크 저장
     async function saveWebLink() {
         const title = document.getElementById('weblinkTitle').value;
         const type = document.querySelector('input[name="weblinkType"]:checked').value;
@@ -901,6 +1012,7 @@
         if(res.ok) location.reload();
     }
 
+    // 웹링크 삭제
     async function deleteWebLink(id) {
         if(!confirm("삭제하시겠습니까?")) return;
         const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' });
