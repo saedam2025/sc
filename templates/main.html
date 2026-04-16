@@ -92,13 +92,9 @@
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
     
-    /* 달력 내부 스크롤바 강제 제거 */
     .fc-scroller { overflow: hidden !important; }
-    
-    /* 일일 창 높이 고정 */
     .fc-daygrid-day-frame { height: 85px !important; overflow: hidden !important; }
     
-    /* 일정 아이콘 2열 배열 및 바싹 밀착 (gap, margin 0처리) */
     .fc-daygrid-day-events { 
         display: flex !important; 
         flex-wrap: wrap !important; 
@@ -111,11 +107,10 @@
         flex: 0 0 50% !important; 
         max-width: 50% !important; 
         margin: 0 !important; 
-        padding: 1px !important; /* 아이콘 간 충돌 방지용 최소 여백 */
+        padding: 1px !important; 
         box-sizing: border-box;
     }
     
-    /* +more 링크 여백 완전 제거 */
     .fc-daygrid-more-link { 
         display: block !important;
         width: 100% !important; 
@@ -131,16 +126,10 @@
     .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; margin: 0 !important; }
     .fc-event-main { padding: 1px 0 !important; font-weight: 700; font-size: 0.7rem; border-radius: 3px; display: block; color: white; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; }
 
-    /* 날짜 숫자 클릭 영역 강조 */
     .fc-daygrid-day-number { cursor: pointer; padding: 2px 5px; border-radius: 4px; transition: background 0.2s; position: relative; z-index: 10; }
     .fc-daygrid-day-number:hover { background: var(--primary-color); color: white !important; }
 
-    /* 글꼴 및 타이포그래피 */
-    .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
-    .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
-    h3, h4 { color: var(--text-dark) !important; transition: color 0.3s ease; margin-top: 0; }
-    
-    /* === 🚀 리뉴얼된 스케줄 리스트(Today & Upcoming) 디자인 === */
+    /* === 🚀 리뉴얼된 스케줄 리스트 디자인 === */
     .schedule-carousel-wrapper {
         position: relative;
         flex: 1;
@@ -163,7 +152,6 @@
     .schedule-slide::-webkit-scrollbar { width: 4px; }
     .schedule-slide::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
 
-    /* === (====) 느낌을 주는 상하단 데쉬보더 박스 === */
     .sched-report-box {
         border-top: 2px dashed var(--card-border);
         border-bottom: 2px dashed var(--card-border);
@@ -178,7 +166,6 @@
         text-align: center;
     }
 
-    /* === 카테고리별 정렬 리스트 CSS === */
     .sched-cat-group {
         display: flex;
         align-items: flex-start;
@@ -218,7 +205,6 @@
     .sched-dash { color: var(--text-gray); opacity: 0.5; }
     .sched-title-text { font-weight: 600; }
     .sched-time-text { font-size: 0.75rem; color: var(--text-gray); }
-    .sched-owner-text { font-size: 0.65rem; color: var(--text-gray); font-weight: bold; background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; }
     .sched-date-text { font-size: 0.75rem; color: var(--primary-color); font-weight: bold; }
     
     .sched-note-box {
@@ -271,14 +257,12 @@
     .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
     .emoji-item:hover { background: var(--widget-hover); }
 
-    /* 나의 업무 알림 위젯 전용 스타일 */
     .noti-widget-wrapper { display: flex; flex-direction: column; gap: 12px; height: 100%; width: 100%; box-sizing: border-box; }
     #notification-widget-area { display: flex; flex-direction: column; width: 100%; }
     #notification-widget-area > div, 
     #notification-widget-area .noti-container,
     #notification-widget-area .noti-widget-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
 
-    /* === WebLink 전용 스타일 (높이 920px 명시적 강제 고정) === */
     .col-weblink { width: 130px !important; height: 920px !important; max-height: 920px !important; flex-shrink: 0; display: flex; flex-direction: column; padding: 20px; margin: 0 !important; box-sizing: border-box; min-height: 0 !important; }
     .weblink-item { position: relative; width: 100%; height: auto; min-height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 5px; border-radius: 12px; box-sizing: border-box; }
     .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
@@ -316,8 +300,8 @@
                         <div class="sched-report-box">
                             <div class="sched-report-title">Today {{ today_str }} 일정입니다.</div>
                             
-                            {% set today_empty = true %}
-                            {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
+                            {% set ns_today = namespace(empty=true) %}
+                            {% for cat in cats %}{% if today_grouped[cat] %}{% set ns_today.empty = false %}
                                 <div class="sched-cat-group">
                                     <div class="sched-cat-name" style="color: {{ today_grouped[cat][0].color }};">{{ cat }}</div>
                                     <div class="sched-events-wrapper">
@@ -328,7 +312,6 @@
                                                 <span class="sched-title-text">{{ event.display_title_detailed }}</span>
                                                 <span class="sched-dash">-</span>
                                                 <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
-                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
                                             </div>
                                             {% if event.extendedProps.note %}
                                             <div class="sched-note-box">
@@ -340,7 +323,7 @@
                                     </div>
                                 </div>
                             {% endif %}{% endfor %}
-                            {% if today_empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">오늘 일정이 없습니다.</div>{% endif %}
+                            {% if ns_today.empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">오늘 일정이 없습니다.</div>{% endif %}
                         </div>
                     </div>
 
@@ -348,8 +331,8 @@
                         <div class="sched-report-box">
                             <div class="sched-report-title">Upcoming 주간 일정입니다.</div>
                             
-                            {% set weekly_empty = true %}
-                            {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
+                            {% set ns_weekly = namespace(empty=true) %}
+                            {% for cat in cats %}{% if weekly_grouped[cat] %}{% set ns_weekly.empty = false %}
                                 <div class="sched-cat-group">
                                     <div class="sched-cat-name" style="color: {{ weekly_grouped[cat][0].color }};">{{ cat }}</div>
                                     <div class="sched-events-wrapper">
@@ -361,7 +344,6 @@
                                                 <span class="sched-title-text">{{ event.display_title_detailed }}</span>
                                                 <span class="sched-dash">-</span>
                                                 <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
-                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
                                             </div>
                                             {% if event.extendedProps.note %}
                                             <div class="sched-note-box">
@@ -373,7 +355,7 @@
                                     </div>
                                 </div>
                             {% endif %}{% endfor %}
-                            {% if weekly_empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">예정된 주간 일정이 없습니다.</div>{% endif %}
+                            {% if ns_weekly.empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">예정된 주간 일정이 없습니다.</div>{% endif %}
                         </div>
                     </div>
                 </div>
@@ -462,10 +444,9 @@
                 </div>
                 <div style="background: transparent; border: none; border-radius: 12px; padding: 10px;">
                     {% for post in board_posts %}
-                    <div class="list-item" style="cursor: pointer; padding: 12px;"
+                    <div class="list-item" style="cursor: pointer; padding: 12px;" onclick="openBoardDetail(this)"
                          data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
-                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}"
-                         onclick="openBoardDetail(this)">
+                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}">
                         <div style="flex: 1; color: var(--text-dark);">
                             <strong>{{ post.title }}</strong> 
                             {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
@@ -507,29 +488,19 @@
                 + 등록
             </button>
         </div>
-        
         <div id="weblink-container">
             {% for link in weblinks %}
             <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
-                
                 {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
                 <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
                     <i class="fa-solid fa-xmark"></i>
                 </div>
                 {% endif %}
-
-                {% if link.type == 'file' or link.favicon_url == 'FILE' %}
-                <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z'/%3E%3C/svg%3E" alt="file" style="width: 36px; height: 36px; border-radius: 8px; margin-bottom: 4px; background: #f8fafc; padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; pointer-events: none;">
-                {% else %}
                 <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 4px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
-                {% endif %}
-                
                 <span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: 90px; font-size: 0.75rem; color: var(--text-dark); font-weight: normal; text-align: center; white-space: normal; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; line-height: 1.2; pointer-events: none;">{{ link.title }}</span>
             </div>
             {% else %}
-            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5; width: 100%;">
-                등록된 링크가<br>없습니다.
-            </div>
+            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5; width: 100%;">등록된 링크가<br>없습니다.</div>
             {% endfor %}
         </div>
     </div>
@@ -542,13 +513,8 @@
         <form id="msgForm">
             <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
                 <option value="" style="color: #666;">수신자를 선택하세요</option>
-                {% for u in user_list %}
-                    {% if u != current_user %}
-                    <option value="{{ u }}" style="color: #000;">{{ u }}</option>
-                    {% endif %}
-                {% endfor %}
+                {% for u in user_list %}{% if u != current_user %}<option value="{{ u }}" style="color: #000;">{{ u }}</option>{% endif %}{% endfor %}
             </select>
-            
             <div style="position:relative;">
                 <i class="fa-regular fa-face-smile" style="position:absolute; right:10px; top:-25px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
                 <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-120px; right:35px; background:var(--card-bg); backdrop-filter:var(--card-backdrop); border:1px solid var(--card-border); border-radius:10px; padding:12px; box-shadow:var(--card-shadow); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
@@ -556,7 +522,6 @@
                 </div>
                 <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
             </div>
-            
             <input type="file" id="msgFile" class="modal-input">
             <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">전송하기</button>
         </form>
@@ -648,7 +613,6 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
-    // 인터렉티브 스케줄 리스트 비고란 토글 함수
     function toggleSchedNote(row) {
         const note = row.parentElement.querySelector('.sched-note-box') || row.nextElementSibling;
         if(note && note.classList.contains('sched-note-box')) {
@@ -656,38 +620,28 @@
         }
     }
 
-    // 자동 페이드 인/아웃 슬라이드 로직
     let currentScheduleSlide = 'today';
     setInterval(() => {
         const slideToday = document.getElementById('slide-today');
         const slideUpcoming = document.getElementById('slide-upcoming');
         const dotToday = document.getElementById('dot-today');
         const dotUpcoming = document.getElementById('dot-upcoming');
-
         if (!slideToday || !slideUpcoming) return;
-
         if (currentScheduleSlide === 'today') {
-            slideToday.classList.remove('active');
-            slideUpcoming.classList.add('active');
-            dotToday.style.background = 'var(--card-border)';
-            dotUpcoming.style.background = 'var(--primary-color)';
+            slideToday.classList.remove('active'); slideUpcoming.classList.add('active');
+            dotToday.style.background = 'var(--card-border)'; dotUpcoming.style.background = 'var(--primary-color)';
             currentScheduleSlide = 'upcoming';
         } else {
-            slideUpcoming.classList.remove('active');
-            slideToday.classList.add('active');
-            dotUpcoming.style.background = 'var(--card-border)';
-            dotToday.style.background = 'var(--primary-color)';
+            slideUpcoming.classList.remove('active'); slideToday.classList.add('active');
+            dotUpcoming.style.background = 'var(--card-border)'; dotToday.style.background = 'var(--primary-color)';
             currentScheduleSlide = 'today';
         }
-    }, 6000); // 6초마다 자동 전환
+    }, 6000);
 
-    // 위젯 및 기초 기능
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
         if (!widgetArea) return; 
-        fetch('/widget/notifications').then(res => res.text()).then(html => {
-            widgetArea.innerHTML = html;
-        }).catch(err => console.error(err));
+        fetch('/widget/notifications').then(res => res.text()).then(html => { widgetArea.innerHTML = html; });
     }
 
     async function fetchActiveUsers() {
@@ -706,52 +660,31 @@
         } catch (e) {}
     }
 
-    // 전역 변수 설정
     window.taskDataMap = window.taskDataMap || {};
     const currentUser = '{{ current_user }}';
 
-    // 풀캘린더 로직
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         const holidays = {{ holidays_dict | tojson | safe }};
-        
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth', locale: 'ko',
             events: {{ events | tojson | safe }},
-            height: 'auto', // 내부 스크롤바 방지
-            contentHeight: 'auto', // 내용물에 맞춰 높이 최적화
-            fixedWeekCount: false,
-            dayMaxEvents: 2, 
-            
-            dayCellContent: function(arg) {
-                return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` };
-            },
-            
+            height: 'auto', contentHeight: 'auto', fixedWeekCount: false, dayMaxEvents: 2, 
+            dayCellContent: function(arg) { return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` }; },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
                 return { html: `<div class="fc-event-main" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
             },
-
             dateClick: function(info) {
-                const target = info.jsEvent.target;
-                if (target.classList.contains('fc-daygrid-day-number')) {
+                if (info.jsEvent.target.classList.contains('fc-daygrid-day-number')) {
                     document.getElementById('taskForm').reset();
                     document.getElementById('taskId').value = ''; 
-                    document.getElementById('taskOwner').value = currentUser;
                     document.getElementById('taskDate').value = info.dateStr;
-                    document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
                     document.getElementById('taskModal').style.display = 'block';
-                } else {
-                    openDayDetails(info.dateStr, calendar);
-                }
+                } else { openDayDetails(info.dateStr, calendar); }
             },
-
-            eventClick: function(info) {
-                info.jsEvent.preventDefault();
-                openDayDetails(info.event.startStr.split('T')[0], calendar);
-            },
-
+            eventClick: function(info) { info.jsEvent.preventDefault(); openDayDetails(info.event.startStr.split('T')[0], calendar); },
             dayCellDidMount: function(arg) {
                 const d = arg.date;
                 const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
@@ -767,76 +700,44 @@
         });
         calendar.render();
 
-        // 웹링크 SortableJS 적용
         var weblinkEl = document.getElementById('weblink-container');
         if(weblinkEl) {
             Sortable.create(weblinkEl, {
-                animation: 150,
-                ghostClass: 'weblink-ghost',
+                animation: 150, ghostClass: 'weblink-ghost',
                 onEnd: function (evt) {
                     var itemEls = weblinkEl.querySelectorAll('.weblink-item');
                     var newOrder = [];
-                    itemEls.forEach(function(item) {
-                        newOrder.push(item.getAttribute('data-id'));
-                    });
-                    fetch('/update_weblink_order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ order: newOrder })
-                    }).catch(err => console.error("순서 저장 실패:", err));
+                    itemEls.forEach(function(item) { newOrder.push(item.getAttribute('data-id')); });
+                    fetch('/update_weblink_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: newOrder }) });
                 }
             });
         }
-
-        // 공통 기능 실행 주기
-        loadNotificationWidget();
-        fetchActiveUsers();
-        setInterval(fetchActiveUsers, 60000);
-        setInterval(loadNotificationWidget, 60000);
+        loadNotificationWidget(); fetchActiveUsers();
+        setInterval(fetchActiveUsers, 60000); setInterval(loadNotificationWidget, 60000);
     });
 
-    // 상세 일정창 함수
     function openDayDetails(dateStr, calendarInstance) {
-        const dayEvents = calendarInstance.getEvents().filter(e => {
-            const s = e.startStr.split('T')[0];
-            return dateStr === s;
-        });
-        
+        const dayEvents = calendarInstance.getEvents().filter(e => e.startStr.split('T')[0] === dateStr);
         document.getElementById('dayEventsTitle').innerText = dateStr + " 상세 일정";
         let html = '';
-        let renderedTaskIds = new Set(); 
-        
         dayEvents.forEach(ev => {
-            let p = ev.extendedProps; 
-            let bgColor = ev.backgroundColor || 'var(--primary-color)';
+            let p = ev.extendedProps; let bgColor = ev.backgroundColor || 'var(--primary-color)';
             if(p.task_id) window.taskDataMap[p.task_id] = p; 
-            
             html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
-            if (p.category === "근태/휴가" || !p.owner) {
-                html += `<div style="font-weight: bold; color: var(--text-dark);">${ev.title}</div>`;
-            } else {
-                html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
-                html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
-                if(p.task_time) html += ` <strong>시간:</strong> ${p.task_time}`;
-                html += `</div>`;
-            }
-            if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
-            
-            if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
-                html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
-                            <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${dateStr}')" style="margin-right:5px;">수정</button>
-                            <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>
-                         </div>`;
-                renderedTaskIds.add(p.task_id);
+            html += `<div style="font-weight: bold;">${p.owner ? '['+p.owner+'] ' + p.task_title : ev.title}</div>`;
+            if(p.task_time) html += `<div style="font-size: 0.8rem; color: var(--text-gray);">시간: ${p.task_time}</div>`;
+            if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); border-top: 1px dashed #eee; margin-top: 5px; padding-top: 5px;">${p.note}</div>`;
+            if (p.owner === currentUser && p.task_id) {
+                html += `<div style="text-align:right; margin-top:10px;">
+                    <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${dateStr}')">수정</button>
+                    <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button></div>`;
             }
             html += `</div>`;
         });
-        
-        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="text-align:center;">일정이 없습니다.</p>';
         document.getElementById('dayEventsModal').style.display = 'block';
     }
 
-    // 쪽지 탭 변환 함수
     function switchMsgTab(tab) {
         ['partners', 'recv', 'sent'].forEach(t => {
             document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
@@ -845,155 +746,79 @@
         });
     }
 
-    // 이모지 선택 토글 및 입력
-    function toggleEmojiPicker(pickerId) {
-        const picker = document.getElementById(pickerId);
-        picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
-    }
-    function addEmoji(inputId, emoji) {
-        const input = document.getElementById(inputId);
-        input.value += emoji;
-        input.focus();
-        document.getElementById('newMsgEmojiPicker').style.display = 'none';
-    }
+    function toggleEmojiPicker(id) { const p = document.getElementById(id); p.style.display = (p.style.display === 'none') ? 'grid' : 'none'; }
+    function addEmoji(id, e) { const i = document.getElementById(id); i.value += e; document.getElementById('newMsgEmojiPicker').style.display = 'none'; }
+    function openChat(n) { window.open(`/chat_popup/${encodeURIComponent(n)}`, `chat_${n}`, 'width=450,height=650'); }
 
-    // 팝업 채팅 열기
-    function openChat(partnerName) {
-        const popupWidth = 450; const popupHeight = 650;
-        const left = (window.screen.width / 2) - (popupWidth / 2);
-        const top = (window.screen.height / 2) - (popupHeight / 2);
-        window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
-    }
-
-    // 새 쪽지 보내기 기능
     async function sendNewMessage() {
-        const receiver = document.getElementById('msgReceiver').value;
-        const content = document.getElementById('msgContent').value;
-        const fileInput = document.getElementById('msgFile');
-        if(!receiver) return;
-        let formData = new FormData();
-        formData.append('receiver', receiver);
-        formData.append('content', content);
-        if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
-        const res = await fetch('/send_message', { method: 'POST', body: formData });
-        if(res.ok) { document.getElementById('msgModal').style.display='none'; openChat(receiver); }
+        const r = document.getElementById('msgReceiver').value; const c = document.getElementById('msgContent').value;
+        if(!r) return;
+        let fd = new FormData(); fd.append('receiver', r); fd.append('content', c);
+        const res = await fetch('/send_message', { method: 'POST', body: fd });
+        if(res.ok) { document.getElementById('msgModal').style.display='none'; openChat(r); }
     }
 
-    // 일정 수정 모달 열기
-    function editTask(taskId, dateStr) {
-        document.getElementById('dayEventsModal').style.display = 'none'; 
-        const props = window.taskDataMap[taskId];
-        document.getElementById('taskForm').reset();
-        document.getElementById('taskId').value = taskId; 
-        document.getElementById('taskDate').value = dateStr;
+    function editTask(tid, d) {
+        document.getElementById('dayEventsModal').style.display = 'none';
+        const p = window.taskDataMap[tid]; document.getElementById('taskForm').reset();
+        document.getElementById('taskId').value = tid; document.getElementById('taskDate').value = d;
         ['회의','면접','미팅','외근','기타'].forEach(c => {
-            document.getElementById(`cat_${c}_제목`).value = props[`cat_${c}_제목`] || '';
-            document.getElementById(`cat_${c}_시간`).value = props[`cat_${c}_시간`] || '';
+            document.getElementById(`cat_${c}_제목`).value = p[`cat_${c}_제목`] || '';
+            document.getElementById(`cat_${c}_시간`).value = p[`cat_${c}_시간`] || '';
         });
-        document.getElementById('taskNote').value = props.note || '';
-        document.getElementById('taskModal').style.display = 'block';
+        document.getElementById('taskNote').value = p.note || ''; document.getElementById('taskModal').style.display = 'block';
     }
 
-    // 일정 삭제
-    async function deleteTask(taskId) {
-        if(!confirm("삭제하시겠습니까?")) return;
-        const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
-        if(res.ok) location.reload();
-    }
-
-    // 일정 저장
+    async function deleteTask(tid) { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_task/${tid}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
     async function saveTask() {
-        const taskId = document.getElementById('taskId').value;
+        const tid = document.getElementById('taskId').value;
         const data = { date: document.getElementById('taskDate').value, owner: currentUser, note: document.getElementById('taskNote').value };
-        ['회의','면접','미팅','외근','기타'].forEach(c => {
-            data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value;
-            data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value;
-        });
-        const url = taskId ? `/update_task/${taskId}` : '/save_task';
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        ['회의','면접','미팅','외근','기타'].forEach(c => { data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value; data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value; });
+        const res = await fetch(tid ? `/update_task/${tid}` : '/save_task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if(res.ok) location.reload();
     }
-
     function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
 
-    // 게시판 글쓰기 모달 열기
-    function openBoardForm() {
-        document.getElementById('boardForm').reset();
-        document.getElementById('boardId').value = '';
-        document.getElementById('boardModal').style.display = 'block';
-    }
-
-    // 게시판 상세 내용 모달 열기
+    function openBoardForm() { document.getElementById('boardForm').reset(); document.getElementById('boardId').value = ''; document.getElementById('boardModal').style.display = 'block'; }
     function openBoardDetail(el) {
         currentBoardId = el.getAttribute('data-id');
         document.getElementById('detailTitle').innerText = el.getAttribute('data-title');
         document.getElementById('detailAuthor').innerText = el.getAttribute('data-author');
         document.getElementById('detailDate').innerText = el.getAttribute('data-date');
         document.getElementById('detailContent').innerText = el.getAttribute('data-content');
-        const fname = el.getAttribute('data-filename');
-        const fwrap = document.getElementById('detailFileWrap');
-        if(fname && fname !== 'None') {
-            document.getElementById('detailFile').innerText = fname;
-            document.getElementById('detailFile').href = '/uploads/' + fname;
-            fwrap.style.display = 'block';
-        } else fwrap.style.display = 'none';
+        const fn = el.getAttribute('data-filename'); const fw = document.getElementById('detailFileWrap');
+        if(fn && fn !== 'None') { document.getElementById('detailFile').innerText = fn; document.getElementById('detailFile').href = '/uploads/' + fn; fw.style.display = 'block'; } else fw.style.display = 'none';
         document.getElementById('detailActions').style.display = (el.getAttribute('data-author') === currentUser) ? 'block' : 'none';
         document.getElementById('boardDetailModal').style.display = 'block';
     }
 
-    // 게시글 저장
     async function saveBoard() {
-        const id = document.getElementById('boardId').value;
-        let fd = new FormData();
-        fd.append('title', document.getElementById('boardTitle').value);
-        fd.append('content', document.getElementById('boardContent').value);
-        const fi = document.getElementById('boardFile');
-        if(fi.files.length > 0) fd.append('file', fi.files[0]);
+        const id = document.getElementById('boardId').value; let fd = new FormData();
+        fd.append('title', document.getElementById('boardTitle').value); fd.append('content', document.getElementById('boardContent').value);
+        const fi = document.getElementById('boardFile'); if(fi.files.length > 0) fd.append('file', fi.files[0]);
         const res = await fetch(id ? `/update_board/${id}` : '/save_board', { method: 'POST', body: fd });
         if(res.ok) location.reload();
     }
-
-    // 게시판 글 수정 연동 (상세 모달에서 진입 시)
     function editBoardFromDetail() {
         document.getElementById('boardDetailModal').style.display = 'none';
         document.getElementById('boardId').value = currentBoardId;
         document.getElementById('boardTitle').value = document.getElementById('detailTitle').innerText;
         document.getElementById('boardContent').value = document.getElementById('detailContent').innerText;
-        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 게시글 수정';
         document.getElementById('boardModal').style.display = 'block';
     }
+    async function deleteBoardFromDetail() { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
 
-    // 게시판 글 삭제 연동
-    async function deleteBoardFromDetail() {
-        if(!confirm("삭제하시겠습니까?")) return;
-        const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' });
-        if(res.ok) location.reload();
-    }
-
-    // 웹링크 타입 변경에 따른 파일/URL 창 토글
     function toggleWeblinkType() {
         const t = document.querySelector('input[name="weblinkType"]:checked').value;
         document.getElementById('weblinkUrl').style.display = (t === 'url') ? 'block' : 'none';
         document.getElementById('weblinkFile').style.display = (t === 'file') ? 'block' : 'none';
     }
-
-    // 웹링크 저장
     async function saveWebLink() {
-        const title = document.getElementById('weblinkTitle').value;
-        const type = document.querySelector('input[name="weblinkType"]:checked').value;
-        let fd = new FormData();
-        fd.append('title', title); fd.append('type', type);
-        if(type === 'url') fd.append('url', document.getElementById('weblinkUrl').value);
-        else fd.append('file', document.getElementById('weblinkFile').files[0]);
-        const res = await fetch('/save_weblink', { method: 'POST', body: fd });
-        if(res.ok) location.reload();
+        const ti = document.getElementById('weblinkTitle').value; const ty = document.querySelector('input[name="weblinkType"]:checked').value;
+        let fd = new FormData(); fd.append('title', ti); fd.append('type', ty);
+        if(ty === 'url') fd.append('url', document.getElementById('weblinkUrl').value); else fd.append('file', document.getElementById('weblinkFile').files[0]);
+        const res = await fetch('/save_weblink', { method: 'POST', body: fd }); if(res.ok) location.reload();
     }
-
-    // 웹링크 삭제
-    async function deleteWebLink(id) {
-        if(!confirm("삭제하시겠습니까?")) return;
-        const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' });
-        if(res.ok) location.reload();
-    }
+    async function deleteWebLink(id) { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
 </script>
 {% endblock %}
