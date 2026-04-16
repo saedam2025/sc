@@ -129,6 +129,11 @@
     .fc-daygrid-day-number { cursor: pointer; padding: 2px 5px; border-radius: 4px; transition: background 0.2s; position: relative; z-index: 10; }
     .fc-daygrid-day-number:hover { background: var(--primary-color); color: white !important; }
 
+    /* 글꼴 및 타이포그래피 */
+    .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
+    .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
+    h3, h4 { color: var(--text-dark) !important; transition: color 0.3s ease; margin-top: 0; }
+    
     /* === 🚀 리뉴얼된 스케줄 리스트 디자인 === */
     .schedule-carousel-wrapper {
         position: relative;
@@ -205,6 +210,7 @@
     .sched-dash { color: var(--text-gray); opacity: 0.5; }
     .sched-title-text { font-weight: 600; }
     .sched-time-text { font-size: 0.75rem; color: var(--text-gray); }
+    .sched-owner-text { font-size: 0.65rem; color: var(--text-gray); font-weight: bold; background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; }
     .sched-date-text { font-size: 0.75rem; color: var(--primary-color); font-weight: bold; }
     
     .sched-note-box {
@@ -309,9 +315,10 @@
                                         <div class="sched-event-row" onclick="toggleSchedNote(this)">
                                             <div class="sched-event-content">
                                                 <span class="sched-dash">-</span>
-                                                <span class="sched-title-text">{{ event.display_title_detailed }}</span>
+                                                <span class="sched-title-text">{{ event.extendedProps.task_title }}</span>
                                                 <span class="sched-dash">-</span>
                                                 <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
+                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
                                             </div>
                                             {% if event.extendedProps.note %}
                                             <div class="sched-note-box">
@@ -341,9 +348,10 @@
                                             <div class="sched-event-content">
                                                 <span class="sched-dash">-</span>
                                                 <span class="sched-date-text">[{{ event.start[5:10] | replace('-', '/') }}]</span>
-                                                <span class="sched-title-text">{{ event.display_title_detailed }}</span>
+                                                <span class="sched-title-text">{{ event.extendedProps.task_title }}</span>
                                                 <span class="sched-dash">-</span>
                                                 <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
+                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
                                             </div>
                                             {% if event.extendedProps.note %}
                                             <div class="sched-note-box">
@@ -615,7 +623,7 @@
 <script>
     function toggleSchedNote(row) {
         const note = row.parentElement.querySelector('.sched-note-box') || row.nextElementSibling;
-        if(note && note.classList.contains('sched-note-box')) {
+        if (note && note.classList.contains('sched-note-box')) {
             note.style.display = (note.style.display === 'block') ? 'none' : 'block';
         }
     }
@@ -626,14 +634,20 @@
         const slideUpcoming = document.getElementById('slide-upcoming');
         const dotToday = document.getElementById('dot-today');
         const dotUpcoming = document.getElementById('dot-upcoming');
+
         if (!slideToday || !slideUpcoming) return;
+
         if (currentScheduleSlide === 'today') {
-            slideToday.classList.remove('active'); slideUpcoming.classList.add('active');
-            dotToday.style.background = 'var(--card-border)'; dotUpcoming.style.background = 'var(--primary-color)';
+            slideToday.classList.remove('active');
+            slideUpcoming.classList.add('active');
+            dotToday.style.background = 'var(--card-border)';
+            dotUpcoming.style.background = 'var(--primary-color)';
             currentScheduleSlide = 'upcoming';
         } else {
-            slideUpcoming.classList.remove('active'); slideToday.classList.add('active');
-            dotUpcoming.style.background = 'var(--card-border)'; dotToday.style.background = 'var(--primary-color)';
+            slideUpcoming.classList.remove('active');
+            slideToday.classList.add('active');
+            dotUpcoming.style.background = 'var(--card-border)';
+            dotToday.style.background = 'var(--primary-color)';
             currentScheduleSlide = 'today';
         }
     }, 6000);
@@ -641,7 +655,12 @@
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
         if (!widgetArea) return; 
-        fetch('/widget/notifications').then(res => res.text()).then(html => { widgetArea.innerHTML = html; });
+        fetch('/widget/notifications')
+            .then(res => res.text())
+            .then(html => {
+                widgetArea.innerHTML = html;
+            })
+            .catch(err => console.error(err));
     }
 
     async function fetchActiveUsers() {
@@ -652,39 +671,78 @@
                 const users = Array.isArray(data) ? data : (data.active_users || []);
                 const container = document.getElementById('activeUserContainer');
                 if (users.length > 0) {
-                    container.innerHTML = users.map(u => `<div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;"><span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> ${u}</div>`).join('');
+                    container.innerHTML = users.map(u => 
+                        `<div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;"><span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> ${u}</div>`
+                    ).join('');
                 } else {
                     container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-gray);">접속 중인 직원이 없습니다.</span>';
                 }
             }
-        } catch (e) {}
+        } catch (e) {
+            console.error('접속자 목록 업데이트 오류:', e);
+        }
     }
 
     window.taskDataMap = window.taskDataMap || {};
+    window.allCalendarEvents = {{ events | tojson | safe }};
     const currentUser = '{{ current_user }}';
 
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         const holidays = {{ holidays_dict | tojson | safe }};
+        
+        const displayEvents = [];
+        const seenCategories = new Set();
+        
+        window.allCalendarEvents.forEach(ev => {
+            const d = ev.start ? ev.start.split('T')[0] : '';
+            const cat = ev.category || ev.title || '기타';
+            const key = d + '_' + cat;
+            
+            if (!seenCategories.has(key)) {
+                seenCategories.add(key);
+                displayEvents.push(ev);
+            }
+        });
+
         var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth', locale: 'ko',
-            events: {{ events | tojson | safe }},
-            height: 'auto', contentHeight: 'auto', fixedWeekCount: false, dayMaxEvents: 2, 
-            dayCellContent: function(arg) { return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` }; },
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            events: displayEvents,
+            height: 'auto', 
+            contentHeight: 'auto', 
+            fixedWeekCount: false,
+            dayMaxEvents: 2, 
+            
+            dayCellContent: function(arg) {
+                return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` };
+            },
+            
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
                 return { html: `<div class="fc-event-main" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
             },
+
             dateClick: function(info) {
-                if (info.jsEvent.target.classList.contains('fc-daygrid-day-number')) {
+                const target = info.jsEvent.target;
+                if (target.classList.contains('fc-daygrid-day-number')) {
                     document.getElementById('taskForm').reset();
                     document.getElementById('taskId').value = ''; 
+                    document.getElementById('taskOwner').value = currentUser;
                     document.getElementById('taskDate').value = info.dateStr;
+                    document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
                     document.getElementById('taskModal').style.display = 'block';
-                } else { openDayDetails(info.dateStr, calendar); }
+                } else {
+                    openDayDetails(info.dateStr);
+                }
             },
-            eventClick: function(info) { info.jsEvent.preventDefault(); openDayDetails(info.event.startStr.split('T')[0], calendar); },
+
+            eventClick: function(info) {
+                info.jsEvent.preventDefault();
+                openDayDetails(info.event.startStr.split('T')[0]);
+            },
+
             dayCellDidMount: function(arg) {
                 const d = arg.date;
                 const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
@@ -692,49 +750,85 @@
                     arg.el.classList.add('holiday-day');
                     let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
                     if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
-                        let span = document.createElement('span'); span.className = 'holiday-name'; span.innerText = holidays[dateStr];
+                        let span = document.createElement('span'); 
+                        span.className = 'holiday-name'; 
+                        span.innerText = holidays[dateStr];
                         dayTopEl.appendChild(span);
                     }
                 }
             }
         });
+        
         calendar.render();
 
         var weblinkEl = document.getElementById('weblink-container');
         if(weblinkEl) {
             Sortable.create(weblinkEl, {
-                animation: 150, ghostClass: 'weblink-ghost',
+                animation: 150,
+                ghostClass: 'weblink-ghost',
                 onEnd: function (evt) {
                     var itemEls = weblinkEl.querySelectorAll('.weblink-item');
                     var newOrder = [];
-                    itemEls.forEach(function(item) { newOrder.push(item.getAttribute('data-id')); });
-                    fetch('/update_weblink_order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: newOrder }) });
+                    itemEls.forEach(function(item) {
+                        newOrder.push(item.getAttribute('data-id'));
+                    });
+                    fetch('/update_weblink_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: newOrder })
+                    }).catch(err => console.error("순서 저장 실패:", err));
                 }
             });
         }
-        loadNotificationWidget(); fetchActiveUsers();
-        setInterval(fetchActiveUsers, 60000); setInterval(loadNotificationWidget, 60000);
+
+        loadNotificationWidget();
+        fetchActiveUsers();
+        setInterval(fetchActiveUsers, 60000);
+        setInterval(loadNotificationWidget, 60000);
     });
 
-    function openDayDetails(dateStr, calendarInstance) {
-        const dayEvents = calendarInstance.getEvents().filter(e => e.startStr.split('T')[0] === dateStr);
+    function openDayDetails(dateStr) {
+        const dayEvents = window.allCalendarEvents.filter(e => {
+            const s = e.start ? e.start.split('T')[0] : '';
+            return dateStr === s;
+        });
+        
         document.getElementById('dayEventsTitle').innerText = dateStr + " 상세 일정";
         let html = '';
-        dayEvents.forEach(ev => {
-            let p = ev.extendedProps; let bgColor = ev.backgroundColor || 'var(--primary-color)';
+        let renderedTaskIds = new Set(); 
+        
+        dayEvents.forEach(p => {
+            let bgColor = p.color || p.backgroundColor || 'var(--primary-color)';
             if(p.task_id) window.taskDataMap[p.task_id] = p; 
+            
             html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
-            html += `<div style="font-weight: bold;">${p.owner ? '['+p.owner+'] ' + p.task_title : ev.title}</div>`;
-            if(p.task_time) html += `<div style="font-size: 0.8rem; color: var(--text-gray);">시간: ${p.task_time}</div>`;
-            if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); border-top: 1px dashed #eee; margin-top: 5px; padding-top: 5px;">${p.note}</div>`;
-            if (p.owner === currentUser && p.task_id) {
-                html += `<div style="text-align:right; margin-top:10px;">
-                    <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${dateStr}')">수정</button>
-                    <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button></div>`;
+            
+            if (p.category === "근태/휴가" || !p.owner) {
+                html += `<div style="font-weight: bold; color: var(--text-dark);">${p.title}</div>`;
+            } else {
+                html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
+                html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
+                if (p.task_time) {
+                    html += ` <strong>시간:</strong> ${p.task_time}`;
+                }
+                html += `</div>`;
+            }
+            
+            if (p.note) {
+                html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
+            }
+            
+            if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
+                html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
+                            <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${dateStr}')" style="margin-right:5px;">수정</button>
+                            <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>
+                         </div>`;
+                renderedTaskIds.add(p.task_id);
             }
             html += `</div>`;
         });
-        document.getElementById('dayEventsContent').innerHTML = html || '<p style="text-align:center;">일정이 없습니다.</p>';
+        
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
         document.getElementById('dayEventsModal').style.display = 'block';
     }
 
@@ -746,79 +840,230 @@
         });
     }
 
-    function toggleEmojiPicker(id) { const p = document.getElementById(id); p.style.display = (p.style.display === 'none') ? 'grid' : 'none'; }
-    function addEmoji(id, e) { const i = document.getElementById(id); i.value += e; document.getElementById('newMsgEmojiPicker').style.display = 'none'; }
-    function openChat(n) { window.open(`/chat_popup/${encodeURIComponent(n)}`, `chat_${n}`, 'width=450,height=650'); }
+    function toggleEmojiPicker(pickerId) {
+        const picker = document.getElementById(pickerId);
+        picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
+    }
+    
+    function addEmoji(inputId, emoji) {
+        const input = document.getElementById(inputId);
+        input.value += emoji;
+        input.focus();
+        document.getElementById('newMsgEmojiPicker').style.display = 'none';
+    }
+
+    function openChat(partnerName) {
+        const popupWidth = 450; 
+        const popupHeight = 650;
+        const left = (window.screen.width / 2) - (popupWidth / 2);
+        const top = (window.screen.height / 2) - (popupHeight / 2);
+        window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
+    }
 
     async function sendNewMessage() {
-        const r = document.getElementById('msgReceiver').value; const c = document.getElementById('msgContent').value;
-        if(!r) return;
-        let fd = new FormData(); fd.append('receiver', r); fd.append('content', c);
-        const res = await fetch('/send_message', { method: 'POST', body: fd });
-        if(res.ok) { document.getElementById('msgModal').style.display='none'; openChat(r); }
+        const receiver = document.getElementById('msgReceiver').value;
+        const content = document.getElementById('msgContent').value;
+        const fileInput = document.getElementById('msgFile');
+        
+        if(!receiver) return;
+        
+        let formData = new FormData();
+        formData.append('receiver', receiver);
+        formData.append('content', content);
+        
+        if (fileInput.files.length > 0) {
+            formData.append('file', fileInput.files[0]);
+        }
+        
+        try {
+            const res = await fetch('/send_message', { method: 'POST', body: formData });
+            if (res.ok) { 
+                document.getElementById('msgModal').style.display = 'none'; 
+                openChat(receiver); 
+            }
+        } catch (error) {
+            console.error("쪽지 전송 실패:", error);
+        }
     }
 
-    function editTask(tid, d) {
-        document.getElementById('dayEventsModal').style.display = 'none';
-        const p = window.taskDataMap[tid]; document.getElementById('taskForm').reset();
-        document.getElementById('taskId').value = tid; document.getElementById('taskDate').value = d;
+    function editTask(taskId, dateStr) {
+        document.getElementById('dayEventsModal').style.display = 'none'; 
+        const props = window.taskDataMap[taskId];
+        
+        document.getElementById('taskForm').reset();
+        document.getElementById('taskId').value = taskId; 
+        document.getElementById('taskDate').value = dateStr;
+        
         ['회의','면접','미팅','외근','기타'].forEach(c => {
-            document.getElementById(`cat_${c}_제목`).value = p[`cat_${c}_제목`] || '';
-            document.getElementById(`cat_${c}_시간`).value = p[`cat_${c}_시간`] || '';
+            document.getElementById(`cat_${c}_제목`).value = props[`cat_${c}_제목`] || '';
+            document.getElementById(`cat_${c}_시간`).value = props[`cat_${c}_시간`] || '';
         });
-        document.getElementById('taskNote').value = p.note || ''; document.getElementById('taskModal').style.display = 'block';
+        
+        document.getElementById('taskNote').value = props.note || '';
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 일정 수정';
+        document.getElementById('taskModal').style.display = 'block';
     }
 
-    async function deleteTask(tid) { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_task/${tid}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
+    async function deleteTask(taskId) {
+        if (!confirm("삭제하시겠습니까?")) return;
+        
+        try {
+            const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("일정 삭제 실패:", error);
+        }
+    }
+
     async function saveTask() {
-        const tid = document.getElementById('taskId').value;
-        const data = { date: document.getElementById('taskDate').value, owner: currentUser, note: document.getElementById('taskNote').value };
-        ['회의','면접','미팅','외근','기타'].forEach(c => { data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value; data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value; });
-        const res = await fetch(tid ? `/update_task/${tid}` : '/save_task', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if(res.ok) location.reload();
+        const taskId = document.getElementById('taskId').value;
+        const data = { 
+            date: document.getElementById('taskDate').value, 
+            owner: currentUser, 
+            note: document.getElementById('taskNote').value 
+        };
+        
+        ['회의','면접','미팅','외근','기타'].forEach(c => {
+            data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value;
+            data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value;
+        });
+        
+        const url = taskId ? `/update_task/${taskId}` : '/save_task';
+        
+        try {
+            const res = await fetch(url, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(data) 
+            });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("일정 저장 실패:", error);
+        }
     }
-    function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
 
-    function openBoardForm() { document.getElementById('boardForm').reset(); document.getElementById('boardId').value = ''; document.getElementById('boardModal').style.display = 'block'; }
+    function closeTaskModal() { 
+        document.getElementById('taskModal').style.display = 'none'; 
+    }
+
+    function openBoardForm() {
+        document.getElementById('boardForm').reset();
+        document.getElementById('boardId').value = '';
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen"></i> 게시글 작성';
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
     function openBoardDetail(el) {
         currentBoardId = el.getAttribute('data-id');
+        
         document.getElementById('detailTitle').innerText = el.getAttribute('data-title');
         document.getElementById('detailAuthor').innerText = el.getAttribute('data-author');
         document.getElementById('detailDate').innerText = el.getAttribute('data-date');
         document.getElementById('detailContent').innerText = el.getAttribute('data-content');
-        const fn = el.getAttribute('data-filename'); const fw = document.getElementById('detailFileWrap');
-        if(fn && fn !== 'None') { document.getElementById('detailFile').innerText = fn; document.getElementById('detailFile').href = '/uploads/' + fn; fw.style.display = 'block'; } else fw.style.display = 'none';
-        document.getElementById('detailActions').style.display = (el.getAttribute('data-author') === currentUser) ? 'block' : 'none';
+        
+        const fname = el.getAttribute('data-filename');
+        const fwrap = document.getElementById('detailFileWrap');
+        
+        if (fname && fname !== 'None') {
+            document.getElementById('detailFile').innerText = fname;
+            document.getElementById('detailFile').href = '/uploads/' + fname;
+            fwrap.style.display = 'block';
+        } else {
+            fwrap.style.display = 'none';
+        }
+        
+        if (el.getAttribute('data-author') === currentUser) {
+            document.getElementById('detailActions').style.display = 'block';
+        } else {
+            document.getElementById('detailActions').style.display = 'none';
+        }
+        
         document.getElementById('boardDetailModal').style.display = 'block';
     }
 
     async function saveBoard() {
-        const id = document.getElementById('boardId').value; let fd = new FormData();
-        fd.append('title', document.getElementById('boardTitle').value); fd.append('content', document.getElementById('boardContent').value);
-        const fi = document.getElementById('boardFile'); if(fi.files.length > 0) fd.append('file', fi.files[0]);
-        const res = await fetch(id ? `/update_board/${id}` : '/save_board', { method: 'POST', body: fd });
-        if(res.ok) location.reload();
+        const id = document.getElementById('boardId').value;
+        let fd = new FormData();
+        
+        fd.append('title', document.getElementById('boardTitle').value);
+        fd.append('content', document.getElementById('boardContent').value);
+        
+        const fi = document.getElementById('boardFile');
+        if (fi.files.length > 0) {
+            fd.append('file', fi.files[0]);
+        }
+        
+        try {
+            const res = await fetch(id ? `/update_board/${id}` : '/save_board', { method: 'POST', body: fd });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("게시글 저장 실패:", error);
+        }
     }
+
     function editBoardFromDetail() {
         document.getElementById('boardDetailModal').style.display = 'none';
         document.getElementById('boardId').value = currentBoardId;
         document.getElementById('boardTitle').value = document.getElementById('detailTitle').innerText;
         document.getElementById('boardContent').value = document.getElementById('detailContent').innerText;
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 게시글 수정';
         document.getElementById('boardModal').style.display = 'block';
     }
-    async function deleteBoardFromDetail() { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
+
+    async function deleteBoardFromDetail() {
+        if (!confirm("삭제하시겠습니까?")) return;
+        
+        try {
+            const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("게시글 삭제 실패:", error);
+        }
+    }
 
     function toggleWeblinkType() {
         const t = document.querySelector('input[name="weblinkType"]:checked').value;
-        document.getElementById('weblinkUrl').style.display = (t === 'url') ? 'block' : 'none';
-        document.getElementById('weblinkFile').style.display = (t === 'file') ? 'block' : 'none';
+        
+        if (t === 'url') {
+            document.getElementById('weblinkUrl').style.display = 'block';
+            document.getElementById('weblinkFile').style.display = 'none';
+        } else {
+            document.getElementById('weblinkUrl').style.display = 'none';
+            document.getElementById('weblinkFile').style.display = 'block';
+        }
     }
+
     async function saveWebLink() {
-        const ti = document.getElementById('weblinkTitle').value; const ty = document.querySelector('input[name="weblinkType"]:checked').value;
-        let fd = new FormData(); fd.append('title', ti); fd.append('type', ty);
-        if(ty === 'url') fd.append('url', document.getElementById('weblinkUrl').value); else fd.append('file', document.getElementById('weblinkFile').files[0]);
-        const res = await fetch('/save_weblink', { method: 'POST', body: fd }); if(res.ok) location.reload();
+        const title = document.getElementById('weblinkTitle').value;
+        const type = document.querySelector('input[name="weblinkType"]:checked').value;
+        
+        let fd = new FormData();
+        fd.append('title', title); 
+        fd.append('type', type);
+        
+        if (type === 'url') {
+            fd.append('url', document.getElementById('weblinkUrl').value);
+        } else {
+            fd.append('file', document.getElementById('weblinkFile').files[0]);
+        }
+        
+        try {
+            const res = await fetch('/save_weblink', { method: 'POST', body: fd });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("웹링크 저장 실패:", error);
+        }
     }
-    async function deleteWebLink(id) { if(confirm("삭제하시겠습니까?")) { const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' }); if(res.ok) location.reload(); } }
+
+    async function deleteWebLink(id) {
+        if (!confirm("삭제하시겠습니까?")) return;
+        
+        try {
+            const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' });
+            if (res.ok) location.reload();
+        } catch (error) {
+            console.error("웹링크 삭제 실패:", error);
+        }
+    }
 </script>
 {% endblock %}
