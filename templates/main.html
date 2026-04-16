@@ -93,10 +93,10 @@
     .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
     .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
     
-    /* 캘린더 기본 이벤트 박스 투명화 (내부 커스텀 Div에서 스타일 적용) */
+    /* 이벤트 기본 투명화 */
     .fc-event { background-color: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; }
 
-    /* 커스텀 달력 날짜 숫자 호버/클릭 효과용 */
+    /* 커스텀 달력 날짜 숫자 효과 */
     .saedam-date-num {
         cursor: pointer;
         display: inline-block;
@@ -111,48 +111,68 @@
         transform: scale(1.1);
     }
 
-    /* === 달력 셀 2x2 고정 배열 및 왼쪽부터 채우기 CSS === */
+    /* =========================================================
+       🚀 달력 사각형 절대 고정 & 2x2 강제 배치 (늘어남 원천 차단)
+       ========================================================= */
     .fc-daygrid-day-frame {
+        position: relative !important;
         overflow: hidden !important; 
-        max-height: 100% !important;
-        cursor: pointer; /* 빈 여백 클릭 유도를 위한 포인터 */
+        min-height: 65px !important; /* 2줄 아이콘을 담기 위한 최소 공간 보장 */
+        cursor: pointer; /* 빈칸 클릭 유도 */
     }
     
+    .fc-daygrid-day-top {
+        height: 24px !important; /* 상단 날짜 영역 고정 */
+        line-height: 24px !important;
+        display: flex;
+        align-items: center;
+    }
+
     .fc-daygrid-day-events {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-content: flex-start !important;
-        justify-content: flex-start !important; /* 왼쪽부터 채움 */
-        padding: 2px !important;
-        gap: 2px !important;
-        margin: 0 !important;
-        min-height: 0 !important; 
-    }
-    
-    .fc-daygrid-event-harness {
-        position: static !important; 
-        width: calc(50% - 1px) !important; /* 한 줄에 2개 (50% 너비) */
-        flex: 0 0 auto !important;
-        margin: 0 !important;
-    }
-    
-    .fc-daygrid-day-bottom {
         position: static !important;
-        width: calc(50% - 1px) !important; /* +more 버튼도 50% 폭 차지 */
-        flex: 0 0 auto !important;
+        min-height: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
     }
     
-    /* 이벤트 배경 아이콘 디자인 (원래대로 복구) */
+    /* 각 이벤트 아이콘을 문서 흐름에서 분리(absolute)하여 셀이 팽창하지 않게 함 */
+    .fc-daygrid-event-harness {
+        position: absolute !important;
+        width: calc(50% - 3px) !important;
+        height: 18px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* 1~4번째 아이콘의 고정 위치 (왼쪽부터 차례대로) */
+    .fc-daygrid-event-harness:nth-child(1) { top: 26px; left: 2px; }
+    .fc-daygrid-event-harness:nth-child(2) { top: 26px; right: 2px; left: auto !important; }
+    .fc-daygrid-event-harness:nth-child(3) { top: 46px; left: 2px; }
+    .fc-daygrid-event-harness:nth-child(4) { top: 46px; right: 2px; left: auto !important; }
+    .fc-daygrid-event-harness:nth-child(n+5) { display: none !important; } /* 5번째 초과 차단 */
+
+    /* +more 버튼 영역 (무조건 4번째 자리인 우측 하단에 고정) */
+    .fc-daygrid-day-bottom {
+        position: absolute !important;
+        top: 46px !important;
+        right: 2px !important;
+        width: calc(50% - 3px) !important;
+        height: 18px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* 이벤트 배경 있는 커스텀 디자인 복구 */
     .fc-event-main-custom {
-        font-size: 0.65rem;
+        font-size: 0.65rem !important; /* 좁은 공간을 위해 축소 */
         font-weight: 700;
         text-align: center;
-        padding: 3px 2px;
+        padding: 1px 2px !important;
         border-radius: 4px;
-        color: white !important; /* 배경색 대비 하얀색 텍스트 */
+        color: white !important; /* 배경색에 맞춘 하얀 글씨 */
         width: 100%;
+        height: 18px !important; /* 높이 절대 고정 */
+        line-height: 16px !important;
         box-sizing: border-box;
         white-space: nowrap;
         overflow: hidden;
@@ -160,14 +180,15 @@
         display: block;
     }
     
-    /* +more 버튼 텍스트 디자인 */
+    /* +more 버튼 디자인 (배경 있는 디자인과 밸런스 맞춤) */
     .fc-daygrid-more-link {
         font-size: 0.65rem !important;
         background: var(--widget-hover) !important;
         color: var(--primary-color) !important;
-        padding: 2px 0 !important;
         border-radius: 4px !important;
         width: 100% !important;
+        height: 18px !important; /* 다른 이벤트와 높이 통일 */
+        line-height: 16px !important;
         text-align: center !important;
         box-sizing: border-box !important;
         font-weight: 800 !important;
@@ -880,14 +901,14 @@
             initialView: 'dayGridMonth', locale: 'ko',
             events: processedEvents,
             height: 510, fixedWeekCount: false, 
-            dayMaxEvents: 4, /* 일정이 3개를 초과(4개째)하면 +more 버튼으로 표시 */
+            dayMaxEvents: 4, /* 4번째 칸부터는 +more 표시 적용 (3개 초과시 발동) */
             dayCellContent: function(arg) { 
                 return { html: `<span class="saedam-date-num">${arg.date.getDate()}</span>` }; 
             },
             eventContent: function(arg) {
                 const props = arg.event.extendedProps;
                 let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
-                /* 원래 디자인(배경색 있음 + 하얀 글씨)으로 복구 */
+                /* 원래 배경 있는 디자인으로 렌더링 */
                 return { html: `<div class="fc-event-main-custom" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
             },
             eventDidMount: function(info) {
