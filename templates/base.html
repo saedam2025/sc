@@ -10,105 +10,86 @@
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
-    <script>
-        (function() {
-            const savedTheme = localStorage.getItem('saedam_theme_config');
-            if (savedTheme) {
-                try {
-                    const config = JSON.parse(savedTheme);
-                    for (const [key, value] of Object.entries(config.vars)) {
-                        document.documentElement.style.setProperty(key, value);
-                    }
-                } catch(e) {}
-            }
-        })();
-    </script>
-    
     <style>
-        /* === 다이나믹 테마 변수 기본값 (전역 적용) === */
+        /* === 깔끔한 고정 테마 변수 === */
         :root {
-            --body-bg: #f8fafc;
+            --body-bg: #f0f2f5; 
+            --app-bg: #ffffff; 
+            --main-bg: #f8fafc; 
+            
             --primary-color: #4a90e2;
             --primary-dark: #357abd;
             --text-dark: #1e293b;
             --text-gray: #64748b;
             
-            --card-bg: rgba(255, 255, 255, 0.6);
-            --card-border: rgba(255, 255, 255, 0.9);
-            --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
-            --card-backdrop: blur(24px);
+            --border-color: #d1d5db; 
+            --border-light: #e5e7eb; 
             
-            --input-bg: rgba(255, 255, 255, 0.8);
-            --input-text: #1e293b;
-            --widget-bg: rgba(255, 255, 255, 0.7);
-            --widget-hover: rgba(255, 255, 255, 1);
-            --widget-border: rgba(255, 255, 255, 1);
-            
-            --effect-color1: transparent;
-            --effect-color2: transparent;
-            --effect-color3: transparent;
-            --navbar-bg: rgba(255, 255, 255, 0.6);
+            --widget-hover: #f1f5f9;
         }
 
-        /* 기본 설정 (테마 변수 강제 연동) */
+        /* 기본 설정 */
         body {
             font-family: 'Pretendard', sans-serif;
-            background: var(--body-bg) !important;
-            background-size: 400% 400% !important;
-            animation: gradientBG 20s ease infinite !important;
+            background: var(--body-bg);
             min-height: 100vh;
             margin: 0;
-            color: var(--text-dark) !important;
-            transition: background 1.5s ease, color 0.5s ease;
+            padding: 30px 15px 60px 15px;
+            color: var(--text-dark);
+            box-sizing: border-box;
         }
 
-        @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-
-        .content-container {
-            max-width: 1550px !important;
-            width: 95% !important;
+        /* ✨ 앱 래퍼: 넓이를 기존 1550px에서 1700px로 확장하여 좁아진 문제 해결 */
+        .app-wrapper {
+            max-width: 1700px;
+            width: 97%;
             margin: 0 auto;
-            padding-top: 30px;
-            position: relative;
-            z-index: 10;
+            background: var(--app-bg);
+            border: 1px solid var(--border-color); 
+            border-radius: 20px; 
+            overflow: hidden; 
+            display: flex;
+            flex-direction: column;
+            min-height: calc(50vh - 100px);       /* ✨ 메인 메뉴 하단 여백 조정 50vh */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03); 
         }
 
-        /* 네비게이션바 (글래스모피즘 연동) */
+        /* ✨ 네비게이션바 */
         .navbar {
-            background: var(--navbar-bg) !important;
-            backdrop-filter: var(--card-backdrop) !important;
-            -webkit-backdrop-filter: var(--card-backdrop) !important;
-            border-bottom: 1px solid var(--card-border) !important;
-            box-shadow: var(--card-shadow) !important;
-            position: sticky;
-            top: 0;
+            background: #ffffff;
+            border-bottom: 1px solid var(--border-color); 
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 35px;
+            height: 75px;
             z-index: 1000;
-            transition: all 0.5s ease;
         }
 
-        .nav-container { display: flex; align-items: center; justify-content: space-between; padding: 0 20px; height: 75px; max-width: 1550px; margin: 0 auto; }
-        .logo-img { height: 55px; width: auto; display: block; }
+        .nav-container { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; }
+        .logo-img { height: 45px; width: auto; display: block; }
 
         /* 메인 메뉴 목록 */
         .menu-list { display: flex; list-style: none; margin: 0; padding: 0; height: 100%; align-items: center; gap: 10px; }
         .menu-item-wrapper { position: relative; height: 100%; display: flex; align-items: center; }
         
         .menu-item {
-            color: var(--text-dark) !important;
+            color: var(--text-dark);
             text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 1rem; transition: all 0.2s ease-in-out;
         }
-        .menu-item:hover { background: var(--widget-bg) !important; color: var(--primary-color) !important; }
-        .menu-item:hover i { color: var(--primary-color) !important; }
+        .menu-item:hover { background: var(--widget-hover); color: var(--primary-color); }
+        .menu-item:hover i { color: var(--primary-color); }
         
         .menu-item.active {
-            color: var(--primary-color) !important;
+            color: var(--primary-color);
             font-weight: 700;
-            border-bottom: 2px solid var(--primary-color);
-            border-radius: 0; background-color: transparent; box-shadow: none; 
+            border-bottom: 3px solid var(--primary-color);
+            border-radius: 0; 
+            padding-bottom: 7px;
         }
 
         .dropdown { height: 100%; }
-        .dropdown-content { display: none; position: absolute; top: 85%; left: 50%; transform: translateX(-50%); background: var(--card-bg) !important; backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); min-width: 200px; box-shadow: var(--card-shadow) !important; border-radius: 10px; border: 1px solid var(--card-border); z-index: 1100; padding: 10px 0; }
+        .dropdown-content { display: none; position: absolute; top: 85%; left: 50%; transform: translateX(-50%); background: #ffffff; min-width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 12px; border: 1px solid var(--border-light); z-index: 1100; padding: 10px 0; }
         .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 20px; }
         .menu-item-wrapper:hover .dropdown-content { display: block; animation: fadeIn 0.2s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -116,257 +97,183 @@
         .dropdown-content a { color: var(--text-dark); padding: 12px 20px; text-decoration: none; display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 500; transition: all 0.2s; }
         .dropdown-content a:hover { background: var(--widget-hover); color: var(--primary-color); padding-left: 25px; }
 
-        /* 우측 유저 섹션 (가독성을 위해 배경 디자인 추가) */
+        /* 우측 유저 섹션 */
         .user-section { 
             display: flex; 
             align-items: center; 
             gap: 12px;
-            background: var(--card-bg) !important;
-            backdrop-filter: var(--card-backdrop);
-            -webkit-backdrop-filter: var(--card-backdrop);
-            border: 1px solid var(--card-border);
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
             padding: 6px 15px 6px 10px;
-            border-radius: 30px; /* 캡슐 형태 */
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border-radius: 30px; 
             transition: all 0.3s ease;
         }
         
         .btn-memo { color: var(--text-gray); font-size: 1.3rem; text-decoration: none; padding: 8px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: var(--widget-hover); }
+        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: #e2e8f0; }
         .user-profile { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; padding: 8px 12px; border-radius: 20px; color: var(--text-dark); transition: background 0.2s; }
-        .user-profile:hover { background: var(--widget-hover); }
+        .user-profile:hover { background: #e2e8f0; }
         .btn-logout { font-size: 1.1rem; color: var(--text-gray); text-decoration: none; padding: 5px; transition: color 0.2s; }
         .btn-logout:hover { color: #e53e3e; }
 
-        /* 모달 및 폼 전역 스타일 */
-        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
-        .modal-content { 
-            background: var(--card-bg) !important; 
-            backdrop-filter: var(--card-backdrop) !important; 
-            -webkit-backdrop-filter: var(--card-backdrop) !important;
-            border: 1px solid var(--card-border) !important; 
-            box-shadow: var(--card-shadow) !important;
-            margin: 8% auto; padding: 0; border-radius: 15px; width: 450px; overflow: hidden; color: var(--text-dark) !important;
+        /* 메인 컨텐츠 영역 */
+        .main-content {
+            background: var(--main-bg);
+            flex: 1;
+            position: relative;
         }
-        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; background: transparent; }
+
+        .content-container {
+            width: 100%;
+            max-width: 90% !important; /*  메인메뉴들 넓이를 화면에 채우는 핵심 코드 ===========================*/
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+           /* 하단에 약 50px 정도의 여유 공간을 줍니다 */
+           padding-bottom: 50px;
+        }
+
+        /* 모달 및 폼 전역 스타일 */
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
+        .modal-content { 
+            background: #ffffff; 
+            border: 1px solid var(--border-color); 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            margin: 8% auto; padding: 0; border-radius: 16px; width: 450px; overflow: hidden; color: var(--text-dark);
+        }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
         .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--primary-color); }
         
         .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 15px 25px; background: rgba(100,100,100,0.1); text-align: left; color: var(--text-gray); border-bottom: 1px solid var(--card-border); width: 35%; font-size: 0.9rem; font-weight: 700; }
-        .info-table td { padding: 15px 25px; color: var(--text-dark); font-weight: 600; border-bottom: 1px solid var(--card-border); background: rgba(100,100,100,0.05); font-size: 0.95rem; }
+        .info-table th { padding: 15px 25px; background: #f8fafc; text-align: left; color: var(--text-gray); border-bottom: 1px solid var(--border-light); width: 35%; font-size: 0.9rem; font-weight: 700; }
+        .info-table td { padding: 15px 25px; color: var(--text-dark); font-weight: 600; border-bottom: 1px solid var(--border-light); background: #ffffff; font-size: 0.95rem; }
 
-        .btn-close-modal { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
-        .btn-close-modal:hover { background: var(--widget-hover); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .btn-close-modal { background: #f1f5f9; color: var(--text-dark); border: 1px solid var(--border-light); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
+        .btn-close-modal:hover { background: #e2e8f0; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
 
-        .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--card-border); border-radius: 10px; box-sizing: border-box; background: var(--input-bg); color: var(--input-text); outline: none; transition: all 0.3s; }
-        .glass-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+        .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--border-light); border-radius: 10px; box-sizing: border-box; background: #f8fafc; color: var(--text-dark); outline: none; transition: all 0.3s; font-family: inherit;}
+        .glass-input:focus { border-color: var(--primary-color); background: #ffffff; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
 
         .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
-        .btn-primary-glass:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.15); }
+        .btn-primary-glass:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
 
-        .main-footer { position: relative; z-index: 10; text-align: center; padding: 40px 0 80px 0; color: var(--text-gray); font-size: 0.85rem; border-top: 1px solid var(--card-border); margin-top: 50px; background: transparent; }
+        .main-footer { text-align: center; padding: 20px 0; color: var(--text-gray); font-size: 0.85rem; background: transparent; }
 
-        /* ===============================================================
-           ✨ 우측 하단 테마 랜덤 컨트롤러 (텍스트 클릭형)
-           =============================================================== */
-        .theme-control-wrapper {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            z-index: 3000;
-        }
-
-        .theme-name-display {
-            color: var(--text-dark);
-            font-size: 0.75rem;
-            font-weight: 400;
-            transition: all 0.3s ease;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* 가독성을 위한 은은한 그림자 */
-            cursor: pointer; /* 마우스를 올렸을 때 손가락 모양으로 변경 */
-            user-select: none; /* 텍스트 더블클릭 드래그 방지 */
-        }
-
-        .theme-name-display:hover {
-            transform: translateY(-2px);
-            color: var(--primary-color);
-        }
-
-        @media (max-width: 600px) {
-            .theme-control-wrapper { flex-direction: column; align-items: flex-end; right: 15px; bottom: 15px; }
-        }
-
-        /* ===============================================================
-           🚀 배경 애니메이션 효과 모음
-           =============================================================== */
-        #bg-effect-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
-        
-        .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
-        .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
-        .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
-        .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
-        @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
-        @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
-
-        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
-        @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
-
-        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; mix-blend-mode: multiply; }
-        .dark-mode-blob .blob { mix-blend-mode: screen; opacity: 0.4; }
-        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
-        .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
-        .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
-        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.6; animation: orbOrbit 20s infinite alternate ease-in-out; }
-        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
-        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
-        .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
-        .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
-        @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
-
-        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
-        .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
-        .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
-        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
-
-        .glass-ring { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
-        @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
-
-        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
-        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
-        .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
-
-        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
-        .line-pos { animation: slideLinePos infinite linear; }
-        .line-neg { animation: slideLineNeg infinite linear; }
-        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
-        @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+.main-footer {
+    border-top: none !important;
+}
     </style>
     
+
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     
-    <div id="bg-effect-container"></div>
-
-    <header class="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo">
-                <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="logo-img">
-            </a>
-
-            <nav style="height: 100%;">
-                <ul class="menu-list">
-                    <li class="menu-item-wrapper">
-                        <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
-                            <i class="fa-solid fa-calendar-days"></i> 메인달력
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item-wrapper">
-                        <a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-file-signature"></i> 사내결재
-                        </a>
-                    </li>
-                    
-                    <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-print"></i> 증명서발급
-                        </a>
-                        <div class="dropdown-content">
-                            <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서 신청</a>
-                            <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 신청 현황</a>
-                        </div>
-                    </li>
-
-                    {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                    <li class="menu-item-wrapper">
-                        <a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-file-contract"></i> 전자계약
-                        </a>
-                    </li>
-                    {% endif %}
-
-                    <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color); font-weight: 700;">
-                            <i class="fa-solid fa-briefcase"></i> 업무지원
-                        </a>
-                        <div class="dropdown-content">
-                            <a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i> 명세서 발송</a>
-                            <a href="/excel-generator"><i class="fa-solid fa-file-excel"></i> 입금용 엑셀 생성</a>
-                            <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i> 근태 관리</a>
-                        </div>
-                    </li>
-
-                    <li class="menu-item-wrapper dropdown">
-                        <a href="javascript:void(0);" class="menu-item {% if 'workspace' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-layer-group"></i> 업무공간
-                        </a>
-                        <div class="dropdown-content">
-                            <a href="/workspace/board"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</a>
-                            <a href="/workspace/archive"><i class="fa-solid fa-folder-open"></i> 사내 자료실</a>
-                            <a href="/workspace/manual"><i class="fa-solid fa-book"></i> 업무메뉴얼</a>
-                            <a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i> 개인화이트보드</a>
-                        </div>
-                    </li>
-
-                    {% if session.get('user_level') in [1, 2] or session.get('user_name') == 'admin' %}
-                    <li class="menu-item-wrapper">
-                        <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
-                            <i class="fa-solid fa-user-gear"></i> 인사관리
-                        </a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
-
-            <div class="user-section">
-                <a href="javascript:void(0);" onclick="applyRandomTheme()" class="btn-memo" title="다이나믹 테마 랜덤 변경">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    <div class="app-wrapper">
+        <header class="navbar">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="logo-img">
                 </a>
 
-                {% if session.get('user_name') %}
-                <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
-                    <i class="fa-solid fa-chalkboard"></i>
-                </a>
+                <nav style="height: 100%;">
+                    <ul class="menu-list">
+                        <li class="menu-item-wrapper">
+                            <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
+                                <i class="fa-solid fa-calendar-days"></i> 메인달력
+                            </a>
+                        </li>
+                        
+                        <li class="menu-item-wrapper">
+                            <a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-file-signature"></i> 사내결재
+                            </a>
+                        </li>
+                        
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-print"></i> 증명서발급
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서 신청</a>
+                                <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 신청 현황</a>
+                            </div>
+                        </li>
 
-                <div class="user-profile" onclick="openMyInfoModal()">
-                    <span>{{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}</span>
-                    <span><strong>{{ session['user_name'] }}</strong>님</span>
+                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                        <li class="menu-item-wrapper">
+                            <a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-file-contract"></i> 전자계약
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color); font-weight: 700;">
+                                <i class="fa-solid fa-briefcase"></i> 업무지원
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i> 명세서 발송</a>
+                                <a href="/excel-generator"><i class="fa-solid fa-file-excel"></i> 입금용 엑셀 생성</a>
+                                <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i> 근태 관리</a>
+                            </div>
+                        </li>
+
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'workspace' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-layer-group"></i> 업무공간
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/workspace/board"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</a>
+                                <a href="/workspace/archive"><i class="fa-solid fa-folder-open"></i> 사내 자료실</a>
+                                <a href="/workspace/manual"><i class="fa-solid fa-book"></i> 업무메뉴얼</a>
+                                <a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i> 개인화이트보드</a>
+                            </div>
+                        </li>
+
+                        {% if session.get('user_level') in [1, 2] or session.get('user_name') == 'admin' %}
+                        <li class="menu-item-wrapper">
+                            <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-user-gear"></i> 인사관리
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+                <div class="user-section">
+                    {% if session.get('user_name') %}
+                    <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
+                        <i class="fa-solid fa-chalkboard"></i>
+                    </a>
+
+                    <div class="user-profile" onclick="openMyInfoModal()">
+                        <span>{{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}</span>
+                        <span><strong>{{ session['user_name'] }}</strong>님</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </a>
+                    {% endif %}
                 </div>
-                <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                </a>
-                {% endif %}
             </div>
-        </div>
-    </header>
+        </header>
 
-    <main class="main-content">
-        <div class="content-container">
-            {% block content %}{% endblock %}
-        </div>
-    </main>
+        <main class="main-content">
+            <div class="content-container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
 
     <footer class="main-footer">
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
 
-    <div class="theme-control-wrapper">
-        <div id="currentThemeName" class="theme-name-display" onclick="applyRandomTheme()" title="클릭하여 테마 랜덤 변경">테마를 불러오는 중...</div>
-    </div>
-
     <div id="myInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-id-card"></i> 내 프로필 정보</h3>
+                <h3><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> 내 프로필 정보</h3>
                 <span style="cursor:pointer; font-size:1.6rem; color: var(--text-gray); transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='var(--text-gray)'">&times;</span>
             </div>
             <div id="myInfoLoading" style="text-align: center; padding: 40px; color: var(--text-gray); font-weight: 600;">데이터를 불러오는 중입니다...</div>
@@ -375,18 +282,18 @@
             <div id="myInfoDisplay" style="display: none;">
                 <table class="info-table" id="myInfoTable"></table>
                 
-                <div id="passwordChangeSection" style="display: none; padding: 20px; background: rgba(100,100,100,0.1); border-top: 1px solid var(--card-border);">
+                <div id="passwordChangeSection" style="display: none; padding: 20px; background: #f8fafc; border-top: 1px solid var(--border-light);">
                     <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color);"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
                     <input type="password" id="currPwd" class="glass-input" placeholder="현재 비밀번호">
                     <input type="password" id="newPwd" class="glass-input" placeholder="새 비밀번호">
                     <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
                     <div style="display: flex; gap: 10px; margin-top: 10px;">
                         <button type="button" class="btn-primary-glass" onclick="changeMyPassword()">변경 완료</button>
-                        <button type="button" class="btn-close-modal" style="width: 100%; background: var(--widget-bg); border: 1px solid var(--card-border);" onclick="togglePasswordForm()">취소</button>
+                        <button type="button" class="btn-close-modal" style="width: 100%; background: #ffffff; border: 1px solid var(--border-color);" onclick="togglePasswordForm()">취소</button>
                     </div>
                 </div>
 
-                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: rgba(100,100,100,0.1); border-top: 1px solid var(--card-border);">
+                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: #f8fafc; border-top: 1px solid var(--border-light);">
                     <button type="button" class="btn-close-modal" id="btnTogglePwd" onclick="togglePasswordForm()"><i class="fa-solid fa-key"></i> 비밀번호 변경</button>
                     <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
                 </div>
@@ -490,203 +397,6 @@
 
         function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
-
-        // =====================================================================================
-        // 🚀 1100 테마 다이나믹 생성 엔진 복구 및 LocalStorage 연동
-        // =====================================================================================
-        
-        const uiStyles = ['glass', 'solid', 'glow'];
-        const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
-        
-        const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
-        const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
-
-        const generatedThemes = [];
-
-        // 1100가지 테마 생성 루프
-        for (let i = 0; i < 1100; i++) {
-            const hue = Math.floor((i / 1100) * 360);
-            const useComplementary = (i % 5 === 0);
-            const pointHue = useComplementary ? (hue + 180) % 360 : hue;
-            
-            let effectType;
-            if(i >= 1000) {
-                const geoEffects = ['geometry', 'rings', 'polygons', 'lines'];
-                effectType = geoEffects[i % geoEffects.length];
-            } else {
-                effectType = effectsList[i % effectsList.length];
-            }
-            
-            const isDark = i % 2 === 0;
-            const uiStyle = uiStyles[i % uiStyles.length]; 
-            
-            const styleNameKOR = uiStyle === 'glass' ? "유리" : (uiStyle === 'solid' ? "솔리드" : "네온");
-            const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
-            
-            let vars = {};
-            
-            if (isDark) {
-                const primary = `hsl(${pointHue}, 80%, 60%)`;
-                const primaryDark = `hsl(${pointHue}, 80%, 40%)`;
-                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 10%), hsl(${(hue + 45) % 360}, 50%, 5%), hsl(${(hue - 45 + 360) % 360}, 40%, 10%))`;
-                
-                vars = {
-                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
-                    "--text-dark": "#ffffff", "--text-gray": "#cbd5e1",
-                    "--input-text": "#ffffff", 
-                    "--effect-color1": `hsl(${hue}, 80%, 50%)`, 
-                    "--effect-color2": `hsl(${(hue + 40) % 360}, 80%, 50%)`, 
-                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 80%, 50%)`
-                };
-
-                if (uiStyle === 'glass') {
-                    vars["--card-bg"] = "rgba(20, 20, 30, 0.4)"; vars["--card-border"] = "rgba(255, 255, 255, 0.15)";
-                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.15)";
-                    vars["--input-bg"] = "rgba(0, 0, 0, 0.4)"; vars["--widget-bg"] = "rgba(30, 30, 45, 0.5)"; 
-                    vars["--widget-hover"] = "rgba(45, 45, 60, 0.8)"; vars["--widget-border"] = "rgba(255, 255, 255, 0.15)";
-                    vars["--navbar-bg"] = "rgba(20, 20, 30, 0.6)";
-                } else if (uiStyle === 'solid') {
-                    vars["--card-bg"] = "#1e293b"; vars["--card-border"] = "transparent";
-                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 50px rgba(0, 0, 0, 0.5)";
-                    vars["--input-bg"] = "#0f172a"; vars["--widget-bg"] = "#0f172a"; 
-                    vars["--widget-hover"] = "#334155"; vars["--widget-border"] = "transparent";
-                    vars["--navbar-bg"] = "#1e293b";
-                } else if (uiStyle === 'glow') {
-                    vars["--card-bg"] = "rgba(0, 0, 0, 0.6)"; vars["--card-border"] = primary;
-                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 30px ${primaryDark}`;
-                    vars["--input-bg"] = "rgba(0,0,0,0.5)"; vars["--widget-bg"] = "rgba(0,0,0,0.5)"; 
-                    vars["--widget-hover"] = "rgba(0,0,0,0.8)"; vars["--widget-border"] = primaryDark;
-                    vars["--navbar-bg"] = "rgba(0, 0, 0, 0.8)";
-                }
-            } else {
-                const primary = `hsl(${pointHue}, 70%, 50%)`;
-                const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
-                const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
-                
-                vars = {
-                    "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
-                    "--text-dark": "#0f172a", "--text-gray": "#64748b",
-                    "--input-text": "#1e293b",
-                    "--effect-color1": `hsl(${hue}, 70%, 75%)`, 
-                    "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, 
-                    "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`
-                };
-
-                if (uiStyle === 'glass') {
-                    vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
-                    vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
-                    vars["--input-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; 
-                    vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
-                    vars["--navbar-bg"] = "rgba(255, 255, 255, 0.7)";
-                } else if (uiStyle === 'solid') {
-                    vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
-                    vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
-                    vars["--input-bg"] = "#f1f5f9"; vars["--widget-bg"] = "#f1f5f9"; 
-                    vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
-                    vars["--navbar-bg"] = "#ffffff";
-                } else if (uiStyle === 'glow') {
-                    vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
-                    vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
-                    vars["--input-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-bg"] = "rgba(255,255,255,0.5)"; 
-                    vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
-                    vars["--navbar-bg"] = "rgba(255, 255, 255, 0.9)";
-                }
-            }
-            
-            generatedThemes.push({ name: name, type: effectType, vars: vars, isDark: isDark });
-        }
-
-        let currentThemeIndex = -1;
-
-        function applyRandomTheme() {
-            let newIndex = Math.floor(Math.random() * generatedThemes.length);
-            while (newIndex === currentThemeIndex) {
-                newIndex = Math.floor(Math.random() * generatedThemes.length);
-            }
-            currentThemeIndex = newIndex;
-            
-            const t = generatedThemes[currentThemeIndex];
-            
-            // 변수 적용
-            for (const [key, value] of Object.entries(t.vars)) {
-                document.documentElement.style.setProperty(key, value);
-            }
-
-            // 우측 하단 테마명 출력 업데이트 (텍스트만)
-            const fullThemeName = `[Theme ${currentThemeIndex + 1}/1100] ${t.name}`;
-            document.getElementById('currentThemeName').innerText = fullThemeName;
-
-            // 로컬 스토리지에 저장하여 다른 페이지에서도 유지
-            localStorage.setItem('saedam_theme_config', JSON.stringify({
-                name: fullThemeName,
-                type: t.type,
-                vars: t.vars,
-                isDark: t.isDark
-            }));
-
-            // 배경 효과 렌더링
-            renderBackgroundEffects(t.type, t.isDark);
-        }
-
-        function renderBackgroundEffects(style, isDark) {
-            const container = document.getElementById('bg-effect-container');
-            container.style.opacity = '0';
-            
-            if(isDark) document.body.classList.add('dark-mode-blob');
-            else document.body.classList.remove('dark-mode-blob');
-
-            setTimeout(() => {
-                container.innerHTML = ''; 
-                
-                if (style === 'stars') {
-                    container.innerHTML = `<div class="stars-small"></div><div class="stars-medium"></div><div class="stars-large"></div><div class="shooting-star" style="top:20%; right:-10%;"></div>`;
-                } else if (style === 'bubbles') {
-                    for(let i=0; i<30; i++) {
-                        let b = document.createElement('div'); b.className = 'bubble'; b.style.left = Math.random() * 100 + '%'; b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px'; b.style.animationDuration = (Math.random() * 8 + 4) + 's'; b.style.animationDelay = (Math.random() * 5) + 's'; container.appendChild(b);
-                    }
-                } else if (style === 'blobs') {
-                    container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div><div class="blob blob-3" style="background: var(--effect-color3)"></div>`;
-                } else if (style === 'orbs') {
-                    container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div><div class="cyber-grid"></div>`;
-                } else if (style === 'waves') {
-                    container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div><div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div><div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>`;
-                } else if (style === 'geometry') {
-                    for(let i=0; i<15; i++) {
-                        let el = document.createElement('div'); el.className = 'shape-box'; if(i%3===0) el.style.borderRadius = '50%'; el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 60 + 20; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                    }
-                } else if (style === 'rings') {
-                    for(let i=0; i<6; i++) {
-                        let el = document.createElement('div'); el.className = 'glass-ring'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.top = (Math.random() * 80 + 10) + '%'; let size = Math.random() * 300 + 150; el.style.width = el.style.height = size + 'px'; el.style.marginLeft = el.style.marginTop = -(size/2) + 'px'; el.style.animationDuration = (Math.random() * 4 + 4) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                    }
-                } else if (style === 'polygons') {
-                    for(let i=0; i<12; i++) {
-                        let el = document.createElement('div'); el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon'); el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 80 + 30; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.background = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
-                    }
-                } else if (style === 'lines') {
-                    for(let i=0; i<12; i++) {
-                        let el = document.createElement('div'); el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg'); el.style.top = (Math.random() * 150 - 25) + '%'; el.style.animationDuration = (Math.random() * 8 + 5) + 's'; el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`; container.appendChild(el);
-                    }
-                } else if (style === 'cyber') {
-                    container.innerHTML = `<div class="cyber-grid"></div><div class="glow-orb orb-1" style="background: var(--effect-color1); opacity: 0.3;"></div>`;
-                }
-                container.style.opacity = '1';
-            }, 300);
-        }
-
-        // 페이지 로드 시 기존 저장된 테마 복원 또는 초기 테마 생성
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedTheme = localStorage.getItem('saedam_theme_config');
-            if (savedTheme) {
-                try {
-                    const config = JSON.parse(savedTheme);
-                    document.getElementById('currentThemeName').innerText = config.name;
-                    renderBackgroundEffects(config.type, config.isDark);
-                } catch(e) {}
-            } else {
-                // 저장된 테마가 없으면 랜덤 테마로 시작
-                applyRandomTheme();
-            }
-        });
     </script>
 </body>
 </html>

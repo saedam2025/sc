@@ -100,6 +100,37 @@
 
     #imageModal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
     #imageModalContent { display: block; max-width: 90%; max-height: 90%; margin: 2% auto; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+
+    /* === 타이머 카드 스타일 === */
+    .timer-card {
+        background: white; padding-bottom: 15px; text-align: center; width: 180px;
+        border: 2px solid #e2e8f0; border-radius: 8px;
+    }
+    .timer-title {
+        font-weight: bold; color: #475569; margin: 10px 0 5px; font-size: 1rem;
+    }
+    .timer-time {
+        font-size: 2.2rem; font-family: monospace; font-weight: bold; color: #1e293b;
+    }
+    .btn-stop-alarm {
+        background: #e74c3c; color: white; border: none; padding: 6px 15px; border-radius: 5px;
+        font-weight: bold; cursor: pointer; margin-top: 10px; animation: blink 1s infinite;
+    }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+
+    /* 타이머 설정 모달 */
+    #timerModal {
+        display: none; position: fixed; z-index: 4000; left: 0; top: 0; width: 100%; height: 100%; 
+        background: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+    }
+    .timer-modal-content {
+        background: white; padding: 25px; border-radius: 12px; width: 300px; text-align: center;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .timer-modal-content input {
+        width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;
+    }
+    .timer-modal-content .time-inputs { display: flex; gap: 10px; }
 </style>
 
 <div class="memo-toolbar">
@@ -120,6 +151,10 @@
             <i class="fa-solid fa-paperclip"></i> 그림 / 파일 보드에 붙이기
         </label>
         <input type="file" id="memoUpload" style="display:none;" onchange="uploadMemoFile(this)">
+
+        <button class="tool-btn" style="background: #8b5cf6;" onclick="document.getElementById('timerModal').style.display='flex'">
+            <i class="fa-solid fa-stopwatch"></i> 타이머 추가
+        </button>
     </div>
 </div>
 
@@ -153,8 +188,38 @@
                 <div style="font-size: 0.85rem; padding-bottom: 5px;">{{ memo.content }}</div> 
             </a>
         </div>
+
+        {% elif memo.type == 'timer' %}
+        {% set t_data = memo.content.split('|') %}
+        <div class="draggable-item timer-card" id="memo_{{ memo.id }}" 
+             style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};" 
+             data-endtime="{{ t_data[1] }}">
+            <button class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+            <div class="drag-handle" style="background: #f1f5f9;"><i class="fa-solid fa-grip-lines" style="color:rgba(0,0,0,0.2);"></i></div>
+            
+            <div class="timer-title"><i class="fa-solid fa-clock"></i> {{ t_data[0] }}</div>
+            <div class="timer-time">--:--</div>
+            <button class="btn-stop-alarm" style="display:none;" onclick="stopAlarm({{ memo.id }})">알람 끄기</button>
+        </div>
         {% endif %}
     {% endfor %}
+</div>
+
+<audio id="alarmSound" src="/static/alarm.mp3" loop preload="auto"></audio>
+
+<div id="timerModal">
+    <div class="timer-modal-content">
+        <h3 style="margin-top:0; color:#334155;"><i class="fa-solid fa-clock"></i> 타이머 설정</h3>
+        <input type="text" id="t_title" placeholder="타이머 제목 (예: 회의시간)">
+        <div class="time-inputs">
+            <input type="number" id="t_min" placeholder="분" min="0" value="5">
+            <input type="number" id="t_sec" placeholder="초" min="0" max="59" value="0">
+        </div>
+        <div style="margin-top: 15px; display:flex; gap:10px;">
+            <button class="tool-btn" style="flex:1; justify-content:center; background:#94a3b8;" onclick="document.getElementById('timerModal').style.display='none'">취소</button>
+            <button class="tool-btn" style="flex:1; justify-content:center;" onclick="submitTimer()">시작</button>
+        </div>
+    </div>
 </div>
 
 <div id="imageModal" onclick="this.style.display='none'">
@@ -312,5 +377,78 @@
             } catch(error) {}
         }
     });
+
+    // === 타이머 관련 스크립트 ===
+
+    // 1. 타이머 서버로 전송
+    async function submitTimer() {
+        const title = document.getElementById('t_title').value || '타이머';
+        const minutes = document.getElementById('t_min').value || 0;
+        const seconds = document.getElementById('t_sec').value || 0;
+
+        if (minutes == 0 && seconds == 0) {
+            alert("시간을 설정해주세요."); return;
+        }
+
+        try {
+            const res = await fetch('/memo/add_timer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: title, minutes: minutes, seconds: seconds })
+            });
+            if(res.ok) { location.reload(); }
+        } catch(e) { alert("오류 발생"); }
+    }
+
+    // 2. 알람 끄기 기능
+    function stopAlarm(id) {
+        const card = document.getElementById(`memo_${id}`);
+        const audio = document.getElementById('alarmSound');
+        
+        card.classList.add('stopped');
+        card.style.background = '#f8fafc'; // 배경색 원상복구
+        card.querySelector('.btn-stop-alarm').style.display = 'none';
+        
+        // 오디오 정지
+        audio.pause();
+        audio.currentTime = 0;
+    }
+
+    // 3. 1초마다 남은 시간 계산 및 알람 울림 처리
+    setInterval(() => {
+        const now = new Date().getTime();
+        let isAnyAlarmRinging = false;
+
+        document.querySelectorAll('.timer-card').forEach(card => {
+            if (card.classList.contains('stopped')) return;
+
+            const endtime = parseInt(card.dataset.endtime);
+            const timeLeft = endtime - now;
+            const timeDisplay = card.querySelector('.timer-time');
+
+            if (timeLeft <= 0) {
+                timeDisplay.innerText = "00:00";
+                
+                // 알람이 안 울리고 있었다면 UI 변경 및 소리 재생
+                if (!card.classList.contains('ringing')) {
+                    card.classList.add('ringing');
+                    card.style.background = '#fee2e2'; // 빨간색 알림 배경
+                    card.querySelector('.btn-stop-alarm').style.display = 'inline-block';
+                }
+                isAnyAlarmRinging = true;
+            } else {
+                // 남은 시간 포맷팅 (분:초)
+                const m = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                timeDisplay.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+        });
+
+        // 타이머가 다 된 카드가 있으면 오디오 재생
+        if (isAnyAlarmRinging) {
+            const audio = document.getElementById('alarmSound');
+            if(audio.paused) audio.play().catch(e => console.log("자동 재생이 차단되었습니다."));
+        }
+    }, 1000);
 </script>
 {% endblock %}

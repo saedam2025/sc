@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, session, request, send_fi
 import os
 import uuid
 import io
+import time
 from cryptography.fernet import Fernet
 from .database import get_db
 
@@ -234,4 +235,38 @@ def memo_delete(memo_id):
                     pass
                     
     conn.close()
+    return jsonify({"status": "success"})
+
+@memo_bp.route('/add_timer', methods=['POST'])
+def memo_add_timer():
+    current_user = session.get('user_name')
+    data = request.get_json()
+    title = data.get('title', '타이머')
+    minutes = int(data.get('minutes', 0))
+    seconds = int(data.get('seconds', 0))
+    
+    # 총 초(seconds) 계산
+    duration_sec = (minutes * 60) + seconds
+    
+    # 종료 시간(밀리초) = 현재 시간 + 설정 시간
+    end_time = int(time.time() * 1000) + (duration_sec * 1000)
+    
+    # DB에는 '타이틀|종료시간' 형태로 저장합니다.
+    content = f"{title}|{end_time}"
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # 최상단 배치를 위한 z-index 계산
+    row = cursor.execute("SELECT MAX(z_index) as max_z FROM whiteboard_memos WHERE owner = ?", (current_user,)).fetchone()
+    new_z = (row['max_z'] if row and row['max_z'] is not None else 99) + 1
+    
+    cursor.execute('''
+        INSERT INTO whiteboard_memos (owner, type, content, pos_x, pos_y, z_index) 
+        VALUES (?, 'timer', ?, 200, 200, ?)
+    ''', (current_user, content, new_z))
+    
+    conn.commit()
+    conn.close()
+    
     return jsonify({"status": "success"})

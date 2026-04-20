@@ -1,14 +1,30 @@
 import sqlite3
 import os
+import platform
 
-# 1. 경로 설정
-DB_FILE = '/mnt/data/saedam.db' # 렌더 영구저장소 DB 경로
-GALLERY_ROOT = '/mnt/data/gallery'
+# =====================================================================
+# [경로 설정 수정] 환경에 따라 자동으로 경로를 전환합니다.
+# =====================================================================
+if platform.system() == 'Windows':
+    # 윈도우 환경: 현재 app.py가 있는 폴더를 기준으로 설정
+    BASE_DIR = os.getcwd() 
+else:
+    # 렌더 서버 환경: 마운트된 영구 저장소 경로 사용
+    BASE_DIR = '/mnt/data' if os.path.exists('/mnt/data') else os.getcwd()
+
+# 실제 파일 위치들
+DB_FILE = os.path.join(BASE_DIR, 'saedam.db')
+GALLERY_ROOT = os.path.join(BASE_DIR, 'gallery')
 GALLERY_UPLOADS = os.path.join(GALLERY_ROOT, 'uploads')
 GALLERY_THUMBS = os.path.join(GALLERY_ROOT, 'thumbnails')
+# =====================================================================
 
 def get_db():
     """데이터베이스 연결 객체 생성"""
+    # 윈도우에서 실행 시 실제로 파일을 읽고 있는지 터미널에 경로를 출력해줍니다.
+    if platform.system() == 'Windows':
+        print(f"DEBUG: 현재 연결된 DB 파일 위치 -> {DB_FILE}")
+        
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn

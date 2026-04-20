@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>새담 디자인 테스트 페이지</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #10b981;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --card-bg: rgba(255, 255, 255, 0.7);
+            --card-border: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --glass-blur: blur(15px);
+        }
+
+        body {
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Pretendard', sans-serif;
+            margin: 0;
+        }
+
+        /* 메인 컨테이너 */
+        .test-container {
+            width: 90%;
+            max-width: 800px;
+            background: var(--card-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--card-border);
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* 1. 개선된 타이틀 스타일 */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .title-icon-box {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, var(--primary-color), #3b82f6);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 1.4rem;
+            box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+            /* 애니메이션 효과 */
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--text-dark);
+            letter-spacing: -0.5px;
+        }
+
+        .section-title span {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-gray);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        /* 2. 세련된 그리드 카드 스타일 */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 20px;
+        }
+
+        .design-card {
+            background: white;
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 25px 15px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 카드 호버 시 이미지 파일 없이도 화려한 효과 */
+        .design-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .design-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border-color: var(--primary-color);
+        }
+
+        .design-card:hover::before {
+            opacity: 1;
+        }
+
+        /* 아이콘별 고유 컬러 그라데이션 적용 */
+        .card-icon {
+            font-size: 2.2rem;
+            margin-bottom: 15px;
+            display: inline-block;
+            /* 텍스트 그라데이션 기법 */
+            background: linear-gradient(135deg, var(--primary-color), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-label {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 5px;
+        }
+
+        .card-sub {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        /* 알림 배지 (이미지 없이 포인트 주기) */
+        .badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #ef4444;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="test-container">
+        
+        <div class="section-header">
+            <div class="title-icon-box">
+                <i class="fa-solid fa-rocket"></i>
+            </div>
+            <h2 class="section-title">
+                나의 업무 알림
+                <span>실시간으로 업데이트되는 새담의 소식입니다.</span>
+            </h2>
+        </div>
+
+        <div class="grid-layout">
+            
+            <a href="#" class="design-card">
+                <div class="badge">NEW</div>
+                <div class="card-icon"><i class="fa-solid fa-file-invoice"></i></div>
+                <span class="card-label">전자결재</span>
+                <span class="card-sub">대기문서 3건</span>
+            </a>
+
+            <a href="#" class="design-card">
+                <div class="card-icon" style="background: linear-gradient(135deg, #3b82f6, #60a5fa); -webkit-background-clip: text;"><i class="fa-solid fa-comments"></i></div>
+                <span class="card-label">쪽지함</span>
+                <span class="card-sub">미확인 12건</span>
+            </a>
+
+            <a href="#" class="design-card">
+                <div class="card-icon" style="background: linear-gradient(135deg, #f59e0b, #fbbf24); -webkit-background-clip: text;"><i class="fa-solid fa-calendar-check"></i></div>
+                <span class="card-label">근태관리</span>
+                <span class="card-sub">정상 근무중</span>
+            </a>
+
+            <a href="#" class="design-card">
+                <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa); -webkit-background-clip: text;"><i class="fa-solid fa-bullhorn"></i></div>
+                <span class="card-label">사내게시판</span>
+                <span class="card-sub">새로운 공지 1건</span>
+            </a>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

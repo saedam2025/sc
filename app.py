@@ -187,4 +187,5 @@ def internal_server_error(e):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    # 여기에 debug=True를 추가하여 윈도우 환경에서 빠른 개발(자동 새로고침)을 지원합니다.
+    app.run(host='0.0.0.0', port=port, debug=True)

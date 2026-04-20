@@ -4,6 +4,7 @@ import pdfkit
 import yagmail
 import smtplib
 import shutil
+import platform
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
@@ -32,9 +33,22 @@ os.makedirs(PDF_FOLDER, exist_ok=True)
 
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
 
-# PDF 엔진 설정
-WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
-PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+# =====================================================================
+# [수정된 부분: PDF 엔진 설정] - 윈도우 에러 방지 처리 추가
+# =====================================================================
+if platform.system() == 'Windows':
+    # 윈도우 로컬 환경에서는 기본적으로 C드라이브 경로를 찾거나, 못 찾으면 None으로 처리
+    WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+else:
+    # Render (리눅스) 환경
+    WKHTMLTOPDF_PATH = shutil.which("wkhtmltopdf") or "/usr/bin/wkhtmltopdf"
+
+try:
+    PDF_CONFIG = pdfkit.configuration(wkhtmltopdf=WKHTMLTOPDF_PATH)
+except OSError:
+    PDF_CONFIG = None
+    print("⚠️ [안내] wkhtmltopdf 실행 파일을 찾을 수 없어 PDF 변환 기능이 비활성화됩니다. (기본 앱 실행에는 문제 없음)")
+# =====================================================================
 
 # --- [환경변수 이름 contract.py와 동일하게 통일] ---
 def get_email_credentials():
@@ -215,7 +229,14 @@ def create_pdf_file(row, issue_no):
         'margin-top': '0', 'margin-bottom': '0', 'margin-left': '0', 'margin-right': '0'
     }
     
-    pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
+    # 윈도우에서 PDF_CONFIG가 없어도(None) 에러가 나지 않도록 조건 처리
+    if PDF_CONFIG:
+        pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
+    else:
+        # PDF_CONFIG가 없다면 (로컬 개발 환경) 그냥 빈 파일 생성 또는 에러 우회
+        with open(output_path, "w", encoding="utf-8") as text_file:
+            text_file.write("PDF 생성 환경이 설정되지 않았습니다. (로컬 테스트용 텍스트 파일)")
+        
     return output_path
 
 # --- [이중 방어벽이 적용된 이메일 발송 함수들] ---

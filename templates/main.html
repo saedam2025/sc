@@ -2,617 +2,733 @@
 
 {% block content %}
 <style>
-    /* === 글래스모피즘(유리) 속성 및 공통 변수 === */
+    /* === 샤프하고 산뜻한 SaaS/그룹웨어 메인 대시보드 스타일 === */
     :root {
-        --text-dark: #1e293b;
-        --text-gray: #64748b;
+        --text-main: #0f172a;     /* 더 짙고 선명한 메인 텍스트 */
+        --text-sub: #475569;      /* 깔끔한 서브 텍스트 */
+        --text-muted: #94a3b8;    
         
-        --card-bg: rgba(255, 255, 255, 0.7);
-        --card-border: rgba(255, 255, 255, 0.9);
-        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        --card-backdrop: blur(15px);
+        --card-bg: #ffffff;
+        --card-radius: 12px;      /* 16px -> 12px로 줄여 샤프한 느낌 강조 */
         
-        --input-bg: rgba(255, 255, 255, 0.8);
-        --input-text: #1e293b;
-        --widget-bg: rgba(255, 255, 255, 0.8);
-        --widget-hover: rgba(255, 255, 255, 1);
-        --widget-border: rgba(255, 255, 255, 1);
+        --blue-primary: #2563eb;  /* 기존보다 채도가 높고 전문적인 블루 (Tailwind Blue 600) */
+        --blue-light: #eff6ff;    /* 산뜻한 호버/배경용 연한 블루 */
+        
+        --widget-border-color: #e2e8f0; /* 선명하고 밝은 테두리 */
+        --hover-bg: #f8fafc;
     }
 
-    /* === 레이아웃 정렬 강제 === */
-    .dashboard-container {
-        display: flex !important;
-        align-items: stretch !important;
-        gap: 20px !important;
-        padding-top: 30px !important; 
+    .dashboard-wrapper {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 30px 40px 20px 40px;
+        font-family: 'Pretendard', sans-serif;
+    }
+
+    /* 그리드 비율 및 간격 정돈 */
+    .ustra-grid {
+        display: grid;
+        grid-template-columns: 0.9fr 1.6fr 1.1fr; 
+        grid-template-rows: 280px 260px auto; 
+        gap: 20px;
+    }
+
+    .widget-card {
+        background: var(--card-bg);
+        border-radius: var(--card-radius);
+        border: 1px solid var(--widget-border-color); 
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02); /* 아주 미세한 그림자로 입체감만 부여 */
+        transition: border-color 0.2s ease;
+    }
+    
+    .widget-card:hover {
+        border-color: #cbd5e1;
+    }
+
+    .widget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--widget-border-color);
+    }
+    .widget-icons {
+        display: flex;
+        gap: 12px;
+        color: var(--text-muted);
+        font-size: 1.05rem;
+    }
+    .widget-icons i { cursor: pointer; transition: color 0.2s; }
+    .widget-icons i:hover { color: var(--blue-primary); }
+
+    .cal-title-area { 
+        font-size: 1.05rem; 
+        font-weight: 700; 
+        color: var(--text-main); 
         margin: 0;
+        display: flex; 
+        gap: 8px; 
+        align-items: center;
+        letter-spacing: -0.3px;
     }
 
-    .main-content {
-        flex: 1;
+    /* 탭 디자인 정돈 */
+    .pill-tabs { 
+        display: flex; 
+        gap: 6px; 
+        flex-wrap: nowrap; 
+        overflow-x: auto; 
+        background: var(--hover-bg);
+        padding: 4px;
+        border-radius: 8px;
+        border: 1px solid var(--widget-border-color);
+    }
+    .pill-tabs::-webkit-scrollbar { display: none; }
+    .pill-btn {
+        padding: 6px 14px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap; 
+    }
+    .blue-pill-active, .white-pill-active { background: #ffffff; color: var(--blue-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .blue-pill-inactive, .white-pill-inactive { background: transparent; color: var(--text-sub); border: 1px solid transparent; }
+    .blue-pill-inactive:hover { color: var(--text-main); }
+
+    /* 리스트 공통 스타일 (게시판, 쪽지 등) - 샤프한 Hover Effect */
+    .list-item-common {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--widget-border-color); 
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-left: 3px solid transparent; 
+    }
+    .list-item-common:hover { 
+        background: var(--blue-light); 
+        border-left: 3px solid var(--blue-primary);
+        padding-left: 14px; 
+    }
+    
+    .board-title { font-weight: 500; color: var(--text-main); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .board-info { color: var(--text-muted); font-size: 0.8rem; min-width: 140px; text-align: right; }
+
+    .msg-list-name { color: var(--text-main); font-weight: 600; font-size: 0.9rem; }
+    .msg-list-date { color: var(--text-muted); font-size: 0.75rem; }
+
+    /* 좌측 프로필 영역 정돈 */
+    .profile-card {
+        background: var(--card-bg);
+        border: 1px solid var(--widget-border-color);
+        border-radius: var(--card-radius);
+        padding: 24px;
         display: flex;
         flex-direction: column;
         gap: 20px;
-        margin: 0 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
     }
 
-    /* === 인트라넷 전용 스타일 업데이트 === */
-    .glass-box {
-        background: var(--card-bg) !important; 
-        backdrop-filter: var(--card-backdrop) !important; 
-        -webkit-backdrop-filter: var(--card-backdrop) !important;
-        border: 1px solid var(--card-border) !important; 
-        box-shadow: var(--card-shadow) !important;
-        border-radius: 20px; 
-        padding: 20px;
-        color: var(--text-dark) !important;
-        transition: all 0.3s ease;
-        box-sizing: border-box; 
-    }
+    /* 달력 커스텀 */
+    .fc { font-size: 0.75rem; color: var(--text-main); }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--widget-border-color) !important; border-top: none !important; border-left: none !important; }
+    .fc-theme-standard .fc-scrollgrid { border: none !important; }
+    .fc .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 700; letter-spacing: -0.5px; }
+    .fc-daygrid-day-frame { height: 45px !important; overflow: hidden !important; }
+    .fc-daygrid-day-number { padding: 4px 6px; border-radius: 4px; cursor: pointer; text-decoration: none !important; font-weight: 500; }
+    .fc-day-sun .fc-daygrid-day-number { color: #ef4444 !important; }
+    .fc-day-sat .fc-daygrid-day-number { color: var(--blue-primary) !important; }
+    .holiday-day .fc-daygrid-day-number { color: #ef4444 !important; }
 
-    .list-item, .widget-box {
-        background: var(--widget-bg) !important; 
-        border: 1px solid var(--widget-border) !important;
-        color: var(--text-dark) !important;
-        transition: all 0.3s ease;
+    /* Web/File Link */
+    .weather-weblink-grid { 
+        display: grid; 
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); 
+        gap: 12px; 
+        margin-top: 5px; 
     }
-    
-    .glass-event-card {
-        background: transparent !important;
-        border-top: none !important;
-        border-right: none !important;
-        border-bottom: none !important;
-        color: var(--text-dark) !important;
-        transition: all 0.3s ease;
-    }
-
-    .col-msg .list-item, .col-board .list-item {
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    .glass-event-card:hover, .list-item:hover {
-        background: var(--widget-hover) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-    }
-
-    .list-item { border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--card-border); }
-    .list-item:last-child { margin-bottom: 0; }
-
-    /* === 풀캘린더 수정사항 (아이콘 밀착, 스크롤 제거 및 창 크기 고정) === */
-    .fc { font-size: 0.8em; color: var(--text-dark); }
-    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: 800; color: var(--text-dark) !important; transition: color 0.5s; }
-    .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
-    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--card-border) !important; }
-    .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
-    .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
-    .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
-    .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
-    
-    .fc-scroller { overflow: hidden !important; }
-    .fc-daygrid-day-frame { height: 85px !important; overflow: hidden !important; }
-    
-    .fc-daygrid-day-events { 
-        display: flex !important; 
-        flex-wrap: wrap !important; 
-        gap: 0 !important; 
-        justify-content: flex-start !important; 
-        margin: 0 !important; 
-        padding: 0 !important; 
-    }
-    .fc-daygrid-event-harness { 
-        flex: 0 0 50% !important; 
-        max-width: 50% !important; 
-        margin: 0 !important; 
-        padding: 1px !important; 
-        box-sizing: border-box;
-    }
-    
-    .fc-daygrid-more-link { 
-        display: block !important;
-        width: 100% !important; 
-        text-align: center !important; 
-        font-size: 0.65rem !important; 
-        font-weight: bold !important; 
-        color: #e74c3c !important; 
-        margin: 0 !important; 
-        padding: 0 !important; 
-        line-height: 1.1 !important;
-    }
-
-    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; margin: 0 !important; }
-    .fc-event-main { padding: 1px 0 !important; font-weight: 700; font-size: 0.7rem; border-radius: 3px; display: block; color: white; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 !important; }
-
-    .fc-daygrid-day-number { cursor: pointer; padding: 2px 5px; border-radius: 4px; transition: background 0.2s; position: relative; z-index: 10; }
-    .fc-daygrid-day-number:hover { background: var(--primary-color); color: white !important; }
-
-    /* 글꼴 및 타이포그래피 */
-    .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
-    .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
-    h3, h4 { color: var(--text-dark) !important; transition: color 0.3s ease; margin-top: 0; }
-    
-    /* === 🚀 리뉴얼된 스케줄 리스트 디자인 === */
-    .schedule-carousel-wrapper {
+    .weather-pill { 
+        background: var(--hover-bg); 
+        padding: 12px 6px; 
+        border-radius: 8px; 
+        text-align: center; 
+        display: flex; 
+        flex-direction: column; 
+        align-items: center; 
+        justify-content: center; 
+        border: 1px solid var(--widget-border-color); 
+        cursor: pointer; 
+        transition: all 0.2s ease; 
         position: relative;
-        flex: 1;
-        width: 100%;
-        height: calc(100% - 30px);
+    }
+    .weather-pill:hover { 
+        border-color: var(--blue-primary); 
+        background: #ffffff; 
+        box-shadow: 0 4px 6px rgba(37, 99, 235, 0.05);
+        transform: translateY(-2px);
+    }
+    .weather-pill-value { 
+        font-size: 0.75rem; 
+        font-weight: 600; 
+        color: var(--text-main); 
+        white-space: nowrap; 
         overflow: hidden; 
+        text-overflow: ellipsis; 
+        max-width: 5em; 
+        width: 100%;
+        margin-top: 4px;
     }
-    .schedule-slide {
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.5s ease-in-out;
-        overflow-y: auto;
-        padding-right: 5px;
-    }
-    .schedule-slide.active { opacity: 1; visibility: visible; z-index: 2; }
+
+    .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
     
-    .schedule-slide::-webkit-scrollbar { width: 4px; }
-    .schedule-slide::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+    .scroll-area { overflow-y: auto; padding-right: 5px; }
+    .scroll-area::-webkit-scrollbar { width: 4px; }
+    .scroll-area::-webkit-scrollbar-track { background: transparent; }
+    .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .scroll-area::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    .sched-report-box {
-        border-top: 2px dashed var(--card-border);
-        border-bottom: 2px dashed var(--card-border);
-        padding: 15px 0;
-        margin-bottom: 15px;
-    }
-    .sched-report-title {
-        font-size: 1rem;
-        font-weight: 800;
-        color: var(--text-dark);
-        margin-bottom: 15px;
-        text-align: center;
-    }
+    /* 버튼 및 폼 스타일 */
+    .modal-content { background: #fff !important; border: 1px solid var(--widget-border-color) !important; border-radius: 12px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important; color: var(--text-main) !important; }
+    .modal-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--widget-border-color) !important; border-radius: 8px; background: #f8fafc !important; color: var(--text-main) !important; transition: 0.2s; font-family: inherit;}
+    .modal-input:focus { border-color: var(--blue-primary) !important; outline: none; background: #fff !important; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    
+    .btn-primary { background: var(--blue-primary) !important; color: white !important; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 0.9rem; }
+    .btn-primary:hover { background: #1d4ed8 !important; }
+    .btn-action { background: #ffffff; color: var(--text-sub); border: 1px solid var(--widget-border-color); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; font-family: inherit; font-size: 0.9rem; }
+    .btn-action:hover { background: var(--hover-bg); color: var(--text-main); border-color: #cbd5e1; }
 
-    .sched-cat-group {
+    /* 조직도 상태 스타일 */
+    .org-status-item { display: flex; align-items: center; padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+    .org-status-item:hover { background: var(--hover-bg); border-color: var(--widget-border-color); }
+    .org-avatar { width: 28px; height: 28px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 0.85rem; position: relative; }
+    .org-status-dot { position: absolute; bottom: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid #fff; }
+    .status-online { background: var(--blue-primary); box-shadow: 0 0 5px rgba(37, 99, 235, 0.8); animation: pulse-glow 1.5s infinite; }
+    .status-offline { background: #cbd5e1; }
+    @keyframes pulse-glow {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+    }
+    .org-info { flex: 1; line-height: 1.2; }
+    .org-name { font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; } 
+    .org-dept { font-size: 0.65rem; color: var(--text-muted); font-weight: 500; } 
+    .org-msg-icon { color: var(--text-muted); font-size: 0.75rem; transition: 0.2s; }
+    .org-status-item:hover .org-msg-icon { color: var(--blue-primary); transform: scale(1.1); }
+    .org-rank-header { font-size: 0.75rem; font-weight: 800; color: var(--blue-primary); padding: 12px 8px 6px 8px; margin-top: 5px; border-bottom: 1px solid var(--widget-border-color); margin-bottom: 8px; }
+
+    /* 하단 가로형 주간 스케줄 위젯 */
+    .weekly-schedule-widget {
         display: flex;
-        align-items: flex-start;
-        margin-bottom: 10px;
+        gap: 30px;
+        background: var(--card-bg);
+        border-radius: var(--card-radius);
+        border: 1px solid var(--widget-border-color);
+        padding: 24px 30px; 
+        min-height: 220px;
     }
-    .sched-cat-name {
-        width: 50px;
-        font-weight: 800;
-        font-size: 0.85rem;
+
+    .mini-cal-section {
+        width: 250px;
         flex-shrink: 0;
-        text-align: right;
-        padding-right: 12px;
-        margin-top: 3px;
+        border-right: 1px solid var(--widget-border-color);
+        padding-right: 30px;
+        display: flex;
+        flex-direction: column;
     }
-    .sched-events-wrapper {
-        flex: 1;
-        border-left: 2px solid rgba(0,0,0,0.05);
-        padding-left: 10px;
-    }
-    .sched-event-row {
-        cursor: pointer;
-        padding: 3px 6px;
-        border-radius: 6px;
-        transition: background 0.2s;
-        margin-bottom: 2px;
-    }
-    .sched-event-row:hover { background: rgba(255,255,255,0.7); box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
     
-    .sched-event-content {
+    #mini-calendar { font-size: 0.75rem; flex: 1; }
+    #mini-calendar .fc-toolbar-title { font-size: 1rem !important; font-weight: 800; color: var(--text-main); }
+    #mini-calendar .fc-header-toolbar { margin-bottom: 15px !important; }
+    #mini-calendar .fc-button { padding: 0.2rem 0.4rem !important; background: transparent !important; border: none !important; color: var(--text-muted) !important; }
+    #mini-calendar .fc-button:hover { color: var(--blue-primary) !important; }
+    #mini-calendar .fc-daygrid-day-frame { height: 35px !important; min-height: 35px !important; display: flex; align-items: center; justify-content: center;}
+    #mini-calendar .fc-daygrid-day-top { flex-direction: row; justify-content: center; width: 100%; }
+    #mini-calendar .fc-daygrid-day-events { display: none !important; } 
+    #mini-calendar td, #mini-calendar th { border: none !important; } 
+    #mini-calendar .fc-daygrid-day { cursor: pointer; }
+    #mini-calendar .fc-daygrid-day-number { padding: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; }
+
+    .weekly-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .weekly-header {
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--widget-border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .day-col {
+        flex: 1; 
+        min-width: 0; 
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border-right: 1px dashed var(--widget-border-color);
+        padding: 0 8px;
+    }
+    .day-col:last-child { border-right: none; }
+    
+    .day-header-box {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        padding-bottom: 8px; 
+        border-bottom: 2px solid transparent; 
+    }
+    .day-num { font-size: 1.1rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
+    .day-name { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    
+/* 오늘 날짜 하이라이트 색상 변경 */
+.day-col.is-today .day-header-box { border-bottom: 2px solid #14b8a6; }
+.day-col.is-today .day-num, .day-col.is-today .day-name { color: #14b8a6; }
+
+    .day-events-list { display: flex; flex-direction: column; gap: 8px; padding: 5px 0; }
+
+    .weekly-event-item {
+        font-size: 0.85rem;
+        color: var(--text-sub);
         display: flex;
         align-items: center;
-        flex-wrap: wrap;
-        gap: 5px;
-        font-size: 0.85rem;
-        color: var(--text-dark);
+        line-height: 1.5;
+        cursor: pointer;
+        padding: 4px 6px;
+        border-radius: 4px;
+        transition: background 0.2s;
+        position: relative;
     }
-    .sched-dash { color: var(--text-gray); opacity: 0.5; }
-    .sched-title-text { font-weight: 600; }
-    .sched-time-text { font-size: 0.75rem; color: var(--text-gray); }
-    .sched-owner-text { font-size: 0.65rem; color: var(--text-gray); font-weight: bold; background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; }
-    .sched-date-text { font-size: 0.75rem; color: var(--primary-color); font-weight: bold; }
+    .weekly-event-item:hover { background: var(--hover-bg); color: var(--text-main); }
+    .weekly-event-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
     
-    .sched-note-box {
-        margin-top: 4px;
-        padding: 6px 10px;
-        border-radius: 6px;
-        background: rgba(255,255,255,0.4);
-        font-size: 0.75rem;
-        color: var(--text-gray);
-        display: none;
+    .tooltip-box {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        top: 100%;
+        left: 0; 
+        transform: translateY(5px); 
+        background: #1f2937;
+        color: #ffffff;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        white-space: pre-wrap;
+        z-index: 1000;
+        min-width: 180px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        transition: all 0.2s ease;
+        pointer-events: none;
     }
-
-    /* 모달 및 폼 스타일 */
-    .modal-content { 
-        background: var(--card-bg) !important; 
-        backdrop-filter: var(--card-backdrop) !important; 
-        -webkit-backdrop-filter: var(--card-backdrop) !important;
-        border: 1px solid var(--card-border) !important; 
-        box-shadow: var(--card-shadow) !important;
-        color: var(--text-dark) !important;
+    .tooltip-box::before {
+        content: ''; position: absolute; bottom: 100%; 
+        left: 15px; 
+        transform: none; 
+        border-width: 6px; border-style: solid; border-color: transparent transparent #1f2937 transparent;
     }
-    
-    .modal-input { 
-        width: 100%; padding: 12px; margin-bottom: 10px; 
-        border: 1px solid var(--card-border) !important; 
-        border-radius: 10px; box-sizing: border-box; 
-        background: var(--input-bg) !important; 
-        color: var(--input-text) !important; 
-        transition: all 0.3s;
-    }
-    .modal-input:focus { border-color: var(--primary-color) !important; outline: none; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05); }
-    
-    .task-input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .task-input-group label { width: 45px; font-weight: bold; font-size: 0.85rem; color: var(--text-gray); text-align: right; }
-    .task-input-group input[type="text"] { flex: 1; margin-bottom: 0; }
-    .task-input-group input[type="time"] { width: 110px; flex: 0 0 110px; margin-bottom: 0; }
+    .weekly-event-item:hover .tooltip-box { visibility: visible; opacity: 1; transform: translateY(0); }
 
-    /* 버튼 스타일 */
-    .btn-action { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s; }
-    .btn-action:hover { background: var(--widget-hover); }
-    .btn-edit { color: var(--primary-color) !important; }
-    .btn-delete { color: #e74c3c !important; }
-    .btn-primary { background: var(--primary-color) !important; color: white !important; transition: all 0.3s; }
-    .btn-primary:hover { filter: brightness(0.9); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-
-    /* 쪽지 스타일 */
-    .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
-    .msg-unread { font-weight: bold; border-left: 4px solid var(--primary-color) !important; }
-    
-    .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
-    .emoji-item:hover { background: var(--widget-hover); }
-
-    .noti-widget-wrapper { display: flex; flex-direction: column; gap: 12px; height: 100%; width: 100%; box-sizing: border-box; }
-    #notification-widget-area { display: flex; flex-direction: column; width: 100%; }
-    #notification-widget-area > div, 
-    #notification-widget-area .noti-container,
-    #notification-widget-area .noti-widget-wrapper { background: transparent !important; border: none !important; box-shadow: none !important; padding: 0 !important; }
-
-    .col-weblink { width: 130px !important; height: 920px !important; max-height: 920px !important; flex-shrink: 0; display: flex; flex-direction: column; padding: 20px; margin: 0 !important; box-sizing: border-box; min-height: 0 !important; }
-    .weblink-item { position: relative; width: 100%; height: auto; min-height: 85px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 5px; border-radius: 12px; box-sizing: border-box; }
-    .weblink-ghost { opacity: 0.4; background-color: var(--card-border); border: 2px dashed var(--primary-color) !important; }
-    .weblink-delete-btn { position: absolute; top: 5px; right: 5px; background: #e74c3c; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.2s; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-    .weblink-item:hover .weblink-delete-btn { opacity: 1; }
-    #weblink-container { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overflow-x: hidden; padding-right: 5px; align-items: center; }
-    #weblink-container::-webkit-scrollbar { width: 6px; }
-    #weblink-container::-webkit-scrollbar-track { background: transparent; }
-    #weblink-container::-webkit-scrollbar-thumb { background-color: rgba(0, 0, 0, 0.15); border-radius: 10px; }
-    #weblink-container::-webkit-scrollbar-thumb:hover { background-color: rgba(0, 0, 0, 0.3); }
 </style>
 
-<div class="dashboard-container">
-    
-    <div class="main-content">
-        <div class="row" style="display: flex; gap: 20px; align-items: stretch; margin: 0 !important; padding: 0;">
+<div class="dashboard-wrapper">
+    <div class="ustra-grid">
+        
+        <div style="grid-column: 1 / 2; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 20px;">
             
-            <div class="col-calendar glass-box" style="flex: 5; height: 550px; overflow: hidden; margin: 0;">
-                <div id='calendar'></div>
-            </div>
-
-            <div class="col-today glass-box" style="flex: 2; height: 550px; margin: 0; display: flex; flex-direction: column; overflow: hidden;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; height: 26px; flex-shrink: 0;">
-                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important;">
-                        <i class="fa-solid fa-calendar-check"></i> SCHEDULE
-                    </h3>
-                    <div style="display: flex; gap: 6px;">
-                        <span id="dot-today" style="width: 8px; height: 8px; border-radius: 50%; background: var(--primary-color); transition: 0.3s;"></span>
-                        <span id="dot-upcoming" style="width: 8px; height: 8px; border-radius: 50%; background: var(--card-border); transition: 0.3s;"></span>
+            <div class="profile-card">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 64px; height: 64px; background: var(--hover-bg); border: 1px solid var(--widget-border-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: var(--text-sub);">
+                        {{ user_icons.get(current_user, '👤') if user_icons else '👤' }}
+                    </div>
+                    <div>
+                        <div style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; font-weight: 500;">새담 교육문화원 | 매니저</div>
                     </div>
                 </div>
                 
-                <div class="schedule-carousel-wrapper">
-                    <div id="slide-today" class="schedule-slide active">
-                        <div class="sched-report-box">
-                            <div class="sched-report-title">Today {{ today_str }} 일정입니다.</div>
-                            
-                            {% set ns_today = namespace(empty=true) %}
-                            {% for cat in cats %}{% if today_grouped[cat] %}{% set ns_today.empty = false %}
-                                <div class="sched-cat-group">
-                                    <div class="sched-cat-name" style="color: {{ today_grouped[cat][0].color }};">{{ cat }}</div>
-                                    <div class="sched-events-wrapper">
-                                        {% for event in today_grouped[cat] %}
-                                        <div class="sched-event-row" onclick="toggleSchedNote(this)">
-                                            <div class="sched-event-content">
-                                                <span class="sched-dash">-</span>
-                                                <span class="sched-title-text">{{ event.extendedProps.task_title }}</span>
-                                                <span class="sched-dash">-</span>
-                                                <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
-                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
-                                            </div>
-                                            {% if event.extendedProps.note %}
-                                            <div class="sched-note-box">
-                                                <i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            {% endif %}{% endfor %}
-                            {% if ns_today.empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">오늘 일정이 없습니다.</div>{% endif %}
-                        </div>
-                    </div>
-
-                    <div id="slide-upcoming" class="schedule-slide">
-                        <div class="sched-report-box">
-                            <div class="sched-report-title">Upcoming 주간 일정입니다.</div>
-                            
-                            {% set ns_weekly = namespace(empty=true) %}
-                            {% for cat in cats %}{% if weekly_grouped[cat] %}{% set ns_weekly.empty = false %}
-                                <div class="sched-cat-group">
-                                    <div class="sched-cat-name" style="color: {{ weekly_grouped[cat][0].color }};">{{ cat }}</div>
-                                    <div class="sched-events-wrapper">
-                                        {% for event in weekly_grouped[cat] %}
-                                        <div class="sched-event-row" onclick="toggleSchedNote(this)">
-                                            <div class="sched-event-content">
-                                                <span class="sched-dash">-</span>
-                                                <span class="sched-date-text">[{{ event.start[5:10] | replace('-', '/') }}]</span>
-                                                <span class="sched-title-text">{{ event.extendedProps.task_title }}</span>
-                                                <span class="sched-dash">-</span>
-                                                <span class="sched-time-text">({% if event.extendedProps.task_time %}{{ event.extendedProps.task_time }}{% else %}종일{% endif %})</span>
-                                                {% if event.extendedProps.owner %}<span class="sched-owner-text">{{ event.extendedProps.owner }}</span>{% endif %}
-                                            </div>
-                                            {% if event.extendedProps.note %}
-                                            <div class="sched-note-box">
-                                                <i class="fa-solid fa-quote-left" style="font-size:0.6rem; opacity:0.5;"></i> {{ event.extendedProps.note }}
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                </div>
-                            {% endif %}{% endfor %}
-                            {% if ns_weekly.empty %}<div style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">예정된 주간 일정이 없습니다.</div>{% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-side" style="flex: 3; height: 550px; display: flex; flex-direction: column; padding: 0; background: transparent !important; border: none !important; box-shadow: none !important; gap: 20px; box-sizing: border-box; margin: 0;">
-                
-                <div class="glass-box" style="flex: 0 0 140px; overflow-y: auto; padding: 15px;">
-                    <h3 style="margin: 0 0 10px 0; font-weight: 800; font-size: 1.05rem; color: var(--primary-color) !important;">
-                        <i class="fa-solid fa-users"></i> 접속 중인 직원
-                    </h3>
-                    <div id="activeUserContainer" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <span style="font-size: 0.8rem; color: var(--text-gray);">실시간 접속자 정보를 불러오는 중...</span>
-                    </div>
-                </div>
-
-                <div class="glass-box col-msg" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.05rem;">
-                            <i class="fa-solid fa-envelope"></i> 쪽지함
-                        </h3>
-                        <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:4px 10px; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight: 600;"><i class="fa-solid fa-pen"></i> 쓰기</button>
-                    </div>
+<div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" style="flex: 1;" onclick="alert('출근 처리되었습니다.')"><i class="fa-solid fa-sign-in-alt"></i> 출근</button>
+                    <button class="btn-action" style="flex: 1;" onclick="alert('퇴근 처리되었습니다.')"><i class="fa-solid fa-sign-out-alt"></i> 퇴근</button>
                     
-                    <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
-                        <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.85rem;" onclick="switchMsgTab('partners')">상대</span>
-                        <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('recv')">받음 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
-                        <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.85rem;" onclick="switchMsgTab('sent')">보냄</span>
-                    </div>
+                    <button class="btn-action" style="width: 42px; padding: 0; display: flex; align-items: center; justify-content: center;" onclick="location.href='{{ url_for('memo.memo_board') }}'" title="개인 화이트보드">
+                        <i class="fa-solid fa-chalkboard" style="font-size: 1.1rem; color: var(--text-main);"></i>
+                    </button>
+                </div>
+            </div>
 
-                    <div id="list-partners" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px;">
-                        {% for partner in chat_partners %}
-                        <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 10px; border:none; border-radius: 0;">
-                            <div style="font-size: 1.5rem;">{{ user_icons.get(partner.name, '👤') }}</div>
-                            <div style="flex: 1;">
-                                <strong style="color: var(--text-dark); font-size: 0.9rem;">{{ partner.name }}</strong>
-                                {% if partner.unread > 0 %}<span class="unread-badge">{{ partner.unread }}</span>{% endif %}
-                            </div>
-                            <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
-                        </div>
-                        {% else %}
-                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">대화 기록이 없습니다.</p>
-                        {% endfor %}
+            <div class="widget-card" style="flex: 1;">
+                <div class="widget-header">
+                    <div class="cal-title-area">
+                        <i class="fa-solid fa-list-check" style="color: var(--blue-primary);"></i> 나의 주간 업무 요약
                     </div>
+                </div>
+                <div id="my-weekly-tasks-summary" class="scroll-area" style="flex: 1; display: flex; flex-direction: column;">
+                </div>
+            </div>
+            
+        </div>
 
-                    <div id="list-recv" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
-                        {% for msg in received_messages %}
-                        <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
-                            <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                                <span style="color: var(--text-dark); font-size: 0.85rem;">{{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
-                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
-                            </div>
-                            <div style="color: var(--text-gray); font-size:0.8rem;">
-                                {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
-                            </div>
-                        </div>
-                        {% else %}
-                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
-                        {% endfor %}
-                    </div>
-
-                    <div id="list-sent" style="flex: 1; overflow-y: auto; background: transparent; border: none; border-radius: 12px; padding: 10px; display: none;">
-                        {% for msg in sent_messages %}
-                        <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 10px;">
-                            <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
-                                <span style="color: var(--text-dark); font-size: 0.85rem;">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
-                                <span style="font-size: 0.65rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
-                            </div>
-                            <div style="color: var(--text-gray); font-size:0.8rem;">
-                                {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 파일{% else %}{{ msg.content }}{% endif %}
-                            </div>
-                        </div>
-                        {% else %}
-                        <p style="text-align: center; color: var(--text-gray); font-size: 0.8rem; padding: 20px 0;">쪽지가 없습니다.</p>
-                        {% endfor %}
-                    </div>
+        <div class="widget-card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
+            <div class="widget-header">
+                <div class="cal-title-area">업무 알림</div>
+                <div class="widget-icons"><i class="fa-solid fa-rotate-right" onclick="loadNotificationWidget()"></i></div>
+            </div>
+            <div id="notification-widget-area" class="scroll-area" style="flex:1;">
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding-top: 40px;">
+                    <i class="fa-solid fa-spinner fa-spin"></i> 로딩 중...
                 </div>
             </div>
         </div>
 
-        <div class="row" style="display: flex; gap: 20px; margin: 0 !important; padding: 0;">
-            <div class="col-board glass-box" style="flex: 0 0 calc(50% - 20px); height: 350px; overflow-y: auto; margin: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--text-dark) !important;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
-                    <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
+        <div class="widget-card" style="grid-column: 3 / 4; grid-row: 1 / 2;">
+
+
+<div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
+                
+                <div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1;">
+                    <div id="tab-partners" class="pill-btn blue-pill-active" onclick="switchMsgTab('partners')" style="padding: 5px 8px; font-size: 0.75rem;">대화 상대</div>
+                    <div id="tab-recv" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('recv')" style="padding: 5px 8px; font-size: 0.75rem;">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></div>
+                    <div id="tab-sent" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('sent')" style="padding: 5px 8px; font-size: 0.75rem;">보낸 쪽지</div>
                 </div>
-                <div style="background: transparent; border: none; border-radius: 12px; padding: 10px;">
-                    {% for post in board_posts %}
-                    <div class="list-item" style="cursor: pointer; padding: 12px;" onclick="openBoardDetail(this)"
-                         data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
-                         data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}">
-                        <div style="flex: 1; color: var(--text-dark);">
-                            <strong>{{ post.title }}</strong> 
-                            {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
-                        </div>
-                        <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
+
+<div class="widget-icons" style="flex-shrink: 0; gap: 14px; align-items: center;">
+                    
+                    <div style="position: relative; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('unreadMsgModal').style.display='block'" title="미확인 쪽지 보기">
+                        <i class="fa-regular fa-envelope"></i>
+                        <span id="left-unread-badge" style="position: absolute; top: -6px; right: -8px; background: #ef4444; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 10px; font-weight: bold; display: none; pointer-events: none;">0</span>
+                    </div>
+
+                    <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기"></i>
+                    
+                    <i class="fa-solid fa-pen-to-square" onclick="document.getElementById('msgModal').style.display='block'" title="새 쪽지 쓰기"></i>
+                </div>
+            </div>
+
+
+             <div id="list-partners" class="scroll-area" style="flex: 1; padding-top: 8px;">
+                {% for partner in chat_partners %}
+                <div class="list-item-common" onclick="openChat('{{ partner.name }}')">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size:1.1rem; color: var(--text-sub);">{{ user_icons.get(partner.name, '👤') }}</span>
+                        
+                        <span class="msg-list-name">{{ partner.name }} 
+                            <span class="unread-badge partner-badge" data-partner="{{ partner.name }}" style="{% if partner.unread == 0 %}display:none;{% endif %}">{{ partner.unread }}</span>
+                        </span>
+                    </div>
+                    <span class="msg-list-date">채팅하기 <i class="fa-solid fa-chevron-right" style="font-size:0.7rem; margin-left:4px;"></i></span>
+                </div>
+
+                {% else %}
+                <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">대화 기록이 없습니다.</div>
+                {% endfor %}
+            </div>
+
+            <div id="list-recv" class="scroll-area" style="flex: 1; display: none; padding-top: 8px;">
+                {% for msg in received_messages %}
+                <div class="list-item-common {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')">
+                    <span class="msg-list-name">{{ msg.sender }}님이 보낸 쪽지 {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted);"></i>{% endif %}</span>
+                    <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+                </div>
+                {% else %}
+                <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">도착한 쪽지가 없습니다.</div>
+                {% endfor %}
+            </div>
+
+            <div id="list-sent" class="scroll-area" style="flex: 1; display: none; padding-top: 8px;">
+                {% for msg in sent_messages %}
+                <div class="list-item-common" onclick="openChat('{{ msg.receiver }}')">
+                    <span class="msg-list-name">To. {{ msg.receiver }} {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted);"></i>{% endif %}</span>
+                    <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+                </div>
+                {% else %}
+                <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">보낸 쪽지가 없습니다.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="widget-card" style="grid-column: 2 / 3; grid-row: 2 / 3;">
+            <div class="widget-header">
+                <div class="cal-title-area">사내 게시판</div>
+                <div class="widget-icons">
+                    <i class="fa-solid fa-rotate-right" onclick="location.reload()"></i>
+                    <i class="fa-solid fa-plus" onclick="openBoardForm()"></i>
+                </div>
+            </div>
+            
+            <div class="scroll-area" style="flex: 1;">
+                {% for post in board_posts %}
+                <div class="list-item-common" onclick="openBoardDetail(this)"
+                     data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
+                     data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}">
+                    <div class="board-title">{{ post.title }} {% if post.filename %}<i class="fa-solid fa-paperclip" style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;"></i>{% endif %}</div>
+                    <div class="board-info">{{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
+                </div>
+                {% else %}
+                <div style="text-align:center; padding:40px 0; color:var(--text-muted); font-size:0.9rem;">등록된 게시글이 없습니다.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="widget-card" style="grid-column: 3 / 4; grid-row: 2 / 3;">
+            <div class="widget-header">
+                <div class="cal-title-area">Web / File Link</div>
+                <div class="widget-icons">
+                    <i class="fa-solid fa-plus" onclick="document.getElementById('weblinkModal').style.display='block'" title="링크 추가"></i>
+                </div>
+            </div>
+            
+            <div class="scroll-area" style="flex: 1;">
+                <div id="weblink-container" class="weather-weblink-grid">
+                    {% for link in weblinks %}
+                    <div class="weather-pill" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
+                        {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
+                        <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s;"><i class="fa-solid fa-xmark"></i></div>
+                        {% endif %}
+                        
+                        {% if link.favicon_url == 'FILE' %}
+                            {% set ext = link.url.split('.')[-1] | lower %}
+                            {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'] %}
+                                <img src="{{ link.url }}" alt="thumb" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover; border: 1px solid var(--widget-border-color);">
+                            {% else %}
+                                <div style="width: 24px; height: 24px; background: #ffffff; border-radius: 4px; border: 1px solid var(--widget-border-color); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-sub);">
+                                    <i class="fa-solid fa-file"></i>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <img src="{{ link.favicon_url }}" alt="icon" onerror="this.style.display='none'" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                        {% endif %}
+                        
+                        <div class="weather-pill-value">{{ link.title }}</div>
                     </div>
                     {% else %}
-                    <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">등록된 게시글이 없습니다.</p>
+                    <div style="grid-column: 1 / -1; text-align:center; color:var(--text-muted); font-size:0.8rem; padding:30px 0;">등록된 링크가 없습니다.</div>
                     {% endfor %}
                 </div>
             </div>
+        </div>
 
-            <div class="col-noti glass-box" style="flex: 1; height: 350px; display: flex; flex-direction: column; margin: 0;">
-                <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;">
-                        <i class="fa-solid fa-bell"></i> 나의 업무 알림
-                    </h3>
-                    <button class="btn-primary" onclick="loadNotificationWidget()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;">
-                        <i class="fa-solid fa-rotate-right"></i> 새로고침
-                    </button>
-                </div>
-                <div id="notification-widget-area" class="noti-widget-wrapper">
-                    <div style="text-align: center; color: var(--text-gray); font-size: 0.9rem;">
-                        <i class="fa-solid fa-spinner fa-spin"></i> 알림 데이터를 불러오는 중입니다...
+        <div class="weekly-schedule-widget" style="grid-column: 1 / 4; grid-row: 3 / 4;">
+            <div class="mini-cal-section">
+                <div id="mini-calendar"></div>
+            </div>
+            
+            <div class="weekly-section">
+                <div class="weekly-header">
+                    <div class="cal-title-area">주간 자원관리 현황</div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span id="weekly-date-range" style="font-size:0.85rem; color:var(--text-muted); font-weight:500; margin-right: 10px;">로딩중...</span>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="btn-action" style="padding: 4px 12px;" onclick="currentWeeklyStart = new Date(); renderWeeklySchedule();">오늘</button>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-weblink glass-box">
-        <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 10px; width: 100%;">
-            <div style="height: 26px; display: flex; align-items: center; justify-content: center; width: 100%;">
-                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; line-height: 26px; color: var(--primary-color) !important; text-align: center; white-space: nowrap;">
-                    <i class="fa-solid fa-link"></i> WebLink
-                </h3>
-            </div>
-            <button onclick="document.getElementById('weblinkModal').style.display='block'" style="background: var(--widget-bg); border: 1px dashed var(--primary-color); color: var(--primary-color); width: 100%; border-radius: 8px; padding: 5px; cursor: pointer; font-size: 0.75rem; font-weight: bold; transition: all 0.2s; margin-top: 10px; flex-shrink: 0;">
-                + 등록
-            </button>
-        </div>
-        <div id="weblink-container">
-            {% for link in weblinks %}
-            <div class="weblink-item list-item" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
-                {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
-                <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제">
-                    <i class="fa-solid fa-xmark"></i>
+                <div style="display: flex; flex: 1; width: 100%;" id="weekly-schedule-container">
                 </div>
-                {% endif %}
-                <img src="{{ link.favicon_url }}" alt="icon" style="width: 36px; height: 36px; border-radius: 10px; margin-bottom: 4px; background: #fff; padding: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); pointer-events: none;">
-                <span style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-width: 90px; font-size: 0.75rem; color: var(--text-dark); font-weight: normal; text-align: center; white-space: normal; overflow: hidden; text-overflow: ellipsis; margin: 0 auto; line-height: 1.2; pointer-events: none;">{{ link.title }}</span>
             </div>
-            {% else %}
-            <div style="text-align: center; color: var(--text-gray); font-size: 0.8rem; margin-top: 20px; line-height: 1.5; width: 100%;">등록된 링크가<br>없습니다.</div>
+        </div>
+
+    </div>
+</div>
+
+<div id="orgChartModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:8% auto; padding:30px; width:400px; position:relative; display:flex; flex-direction:column; max-height:80vh;">
+        <span onclick="document.getElementById('orgChartModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:15px; font-weight:800;"><i class="fa-solid fa-sitemap" style="color:var(--blue-primary); margin-right:8px;"></i>임직원 현황 (조직도)</h3>
+        
+        <div class="scroll-area" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column;">
+            <div class="org-rank-header" style="margin-top: 0;">임원 및 팀원 목록</div>
+            {% for u in user_list %}
+            <div class="org-status-item" onclick="document.getElementById('orgChartModal').style.display='none'; openMsgModalWithReceiver('{{ u }}')">
+                <div class="org-avatar">
+                    {{ user_icons.get(u, '👤') }}
+                    <div data-user="{{ u }}" class="org-status-dot status-offline"></div>
+                </div>
+                <div class="org-info">
+                    <div class="org-name">{{ u }}</div>
+                    <div class="org-dept">새담 교육문화원</div>
+                </div>
+                <div class="org-msg-icon">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </div>
+            </div>
             {% endfor %}
         </div>
     </div>
 </div>
 
-<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:10% auto; padding:25px; width:400px; border-radius:15px; position:relative;">
-        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
-        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-paper-plane"></i> 새 쪽지 보내기</h3>
+<div id="unreadMsgModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:420px; position:relative; max-height: 70vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('unreadMsgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;">
+            <i class="fa-regular fa-envelope" style="color:var(--blue-primary); margin-right:8px;"></i>미확인 쪽지함
+        </h3>
+        
+        <div class="scroll-area" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+            <div id="unreadMsgEmpty" style="text-align:center; padding:40px 0; color:var(--text-muted); font-size:0.9rem; display: none;">
+                새로 도착한 미확인 쪽지가 없습니다.
+            </div>
+            
+            {% for msg in received_messages %}
+                {% if not msg.is_read %}
+                <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
+                    
+                    <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
+                        {{ user_icons.get(msg.sender, '👤') }}
+                        <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
+                    </div>
+
+                    <div class="org-info" style="display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <div class="org-name" style="font-size: 0.85rem;">{{ msg.sender }}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">{{ msg.sent_at[5:16] }}</div>
+                        </div>
+                        <div class="org-dept" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ msg.title | default(msg.sender ~ '님이 보낸 새로운 쪽지입니다.') }}
+                            {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted); margin-left:4px;"></i>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="org-msg-icon" style="margin-left: 10px;">
+                        <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem;"></i>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const unreadItems = document.querySelectorAll('.unread-msg-item');
+                    if(unreadItems.length === 0) {
+                        const emptyDiv = document.getElementById('unreadMsgEmpty');
+                        if(emptyDiv) emptyDiv.style.display = 'block';
+                    }
+                });
+            </script>
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:400px; position:relative;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-solid fa-paper-plane" style="color:var(--blue-primary); margin-right:8px;"></i>새 쪽지 보내기</h3>
         <form id="msgForm">
             <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
-                <option value="" style="color: #666;">수신자를 선택하세요</option>
-                {% for u in user_list %}{% if u != current_user %}<option value="{{ u }}" style="color: #000;">{{ u }}</option>{% endif %}{% endfor %}
+                <option value="" style="color: #9ca3af;">수신자를 선택하세요</option>
+                {% for u in user_list %}{% if u != current_user %}<option value="{{ u }}" style="color: #1f2937;">{{ u }}</option>{% endif %}{% endfor %}
             </select>
             <div style="position:relative;">
-                <i class="fa-regular fa-face-smile" style="position:absolute; right:10px; top:-25px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
-                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-120px; right:35px; background:var(--card-bg); backdrop-filter:var(--card-backdrop); border:1px solid var(--card-border); border-radius:10px; padding:12px; box-shadow:var(--card-shadow); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:12px; top:-28px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-130px; right:40px; background:#fff; border:1px solid var(--widget-border-color); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
                      <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('msgContent', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('msgContent', '😭')">😭</span><span class="emoji-item" onclick="addEmoji('msgContent', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('msgContent', '👍')">👍</span>
                 </div>
                 <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
             </div>
-            <input type="file" id="msgFile" class="modal-input">
-            <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">전송하기</button>
+            <input type="file" id="msgFile" class="modal-input" style="padding:10px;">
+            <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; padding:14px;">전송하기</button>
         </form>
     </div>
 </div>
 
-<div id="boardModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:10% auto; padding:25px; width:450px; border-radius:15px; position:relative;">
-        <span onclick="document.getElementById('boardModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
-        <h3 id="boardFormTitle" style="margin-top: 0;"><i class="fa-solid fa-pen"></i> 게시글 작성</h3>
+<div id="boardModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:450px; position:relative;">
+        <span onclick="document.getElementById('boardModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 id="boardFormTitle" style="margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-solid fa-pen" style="color:var(--blue-primary); margin-right:8px;"></i>게시글 작성</h3>
         <form id="boardForm">
             <input type="hidden" id="boardId"> 
             <input type="text" id="boardTitle" class="modal-input" placeholder="제목을 입력하세요" required>
-            <textarea id="boardContent" class="modal-input" placeholder="내용을 입력하세요" style="height:150px; resize:none;" required></textarea>
-            <input type="file" id="boardFile" class="modal-input">
-            <button type="button" class="btn-primary" onclick="saveBoard()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">저장하기</button>
+            <textarea id="boardContent" class="modal-input" placeholder="내용을 입력하세요" style="height:160px; resize:none;" required></textarea>
+            <input type="file" id="boardFile" class="modal-input" style="padding:10px;">
+            <button type="button" class="btn-primary" onclick="saveBoard()" style="width:100%; padding:14px;">저장하기</button>
         </form>
     </div>
 </div>
 
-<div id="boardDetailModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:10% auto; padding:30px; width:500px; border-radius:15px; position:relative;">
-        <span onclick="document.getElementById('boardDetailModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
-        <h3 id="detailTitle" style="margin-top: 0; margin-bottom: 5px;"></h3>
-        <div style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">
-            <i class="fa-solid fa-user"></i> <span id="detailAuthor"></span> &nbsp;|&nbsp;
+<div id="boardDetailModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:8% auto; padding:35px; width:500px; position:relative;">
+        <span onclick="document.getElementById('boardDetailModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</span>
+        <h3 id="detailTitle" style="margin-top: 0; margin-bottom: 10px; font-weight:800; font-size:1.3rem;"></h3>
+        <div style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 20px; border-bottom: 1px solid var(--widget-border-color); padding-bottom: 15px;">
+            <i class="fa-solid fa-user"></i> <span id="detailAuthor" style="font-weight:600; color:var(--text-main);"></span> &nbsp;|&nbsp;
             <i class="fa-regular fa-clock"></i> <span id="detailDate"></span>
         </div>
-        <div id="detailContent" style="min-height: 120px; font-size: 0.95rem; line-height: 1.6; color: var(--text-dark); white-space: pre-wrap; margin-bottom: 20px;"></div>
-        <div id="detailFileWrap" style="display:none; background:var(--input-bg); padding:10px; border-radius:8px; margin-bottom:20px; font-size:0.85rem; border: 1px solid var(--card-border);">
-            <i class="fa-solid fa-paperclip" style="color:var(--primary-color);"></i> 첨부파일: <a id="detailFile" href="#" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;"></a>
+        <div id="detailContent" style="min-height: 120px; font-size: 1rem; line-height: 1.6; color: var(--text-main); white-space: pre-wrap; margin-bottom: 20px;"></div>
+        <div id="detailFileWrap" style="display:none; background:var(--hover-bg); padding:12px; border-radius:10px; margin-bottom:20px; font-size:0.9rem; border: 1px solid var(--widget-border-color);">
+            <i class="fa-solid fa-paperclip" style="color:var(--blue-primary); margin-right:5px;"></i> <a id="detailFile" href="#" target="_blank" style="color:var(--blue-primary); text-decoration:none; font-weight:bold;"></a>
         </div>
-        <div id="detailActions" style="display:none; text-align: right; border-top: 1px solid var(--card-border); padding-top: 15px;">
+        <div id="detailActions" style="display:none; text-align: right; padding-top: 10px;">
             <button class="btn-action btn-edit" onclick="editBoardFromDetail()">수정</button>
             <button class="btn-action btn-delete" onclick="deleteBoardFromDetail()">삭제</button>
         </div>
     </div>
 </div>
 
-<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:8% auto; padding:25px; width:420px; border-radius:20px; position:relative;">
-        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
-        <h3 id="taskModalTitle" style="color: var(--primary-color) !important; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
+<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:6% auto; padding:30px; width:420px; position:relative;">
+        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 id="taskModalTitle" style="color: var(--text-main); margin-top: 0; margin-bottom: 20px; font-weight:800;"><i class="fa-solid fa-pen-clip" style="color:var(--blue-primary); margin-right:8px;"></i>새 일정 등록</h3>
         <form id="taskForm">
             <input type="hidden" id="taskId">
-            <input type="date" id="taskDate" class="modal-input" required readonly style="opacity: 0.8;">
-            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="opacity: 0.8;">
-            <div style="background: var(--widget-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--card-border); margin-bottom: 15px;">
-                {% for c in ['회의','면접','미팅','외근','기타'] %}
-                <div class="task-input-group">
-                    <label>{{ c }}</label>
-                    <input type="text" id="cat_{{ c }}_제목" class="modal-input" placeholder="제목">
-                    <input type="time" id="cat_{{ c }}_시간" class="modal-input">
+            <input type="date" id="taskDate" class="modal-input" required readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
+            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
+            
+            <div style="background: var(--hover-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--widget-border-color); margin-bottom: 15px;">
+                <select id="taskCategory" class="modal-input" style="margin-bottom: 10px; cursor: pointer; font-weight:bold;">
+                    <option value="회의">회의</option>
+                    <option value="면접">면접</option>
+                    <option value="미팅">미팅</option>
+                    <option value="외근">외근</option>
+                    <option value="기타">기타</option>
+                </select>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="taskTitle" class="modal-input" placeholder="일정 제목" style="margin-bottom:0; flex:1;" required>
+                    <input type="time" id="taskTime" class="modal-input" style="margin-bottom:0; width:130px;">
                 </div>
-                {% endfor %}
             </div>
-            <textarea id="taskNote" class="modal-input" placeholder="비고 및 내용" style="height:60px; resize: none;"></textarea>
-            <button type="button" class="btn-primary" onclick="saveTask()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">일정 저장하기</button>
+            
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 세부 내용" style="height:60px; resize: none;"></textarea>
+            <button type="button" class="btn-primary" onclick="saveTask()" style="width:100%; padding:14px;">일정 저장하기</button>
         </form>
     </div>
 </div>
 
-<div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:8% auto; padding:25px; width:380px; border-radius:20px; position:relative;">
-        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
-        <h3 id="dayEventsTitle" style="margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 800;"></h3>
-        <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto;"></div>
+<div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:8% auto; padding:30px; width:450px; position:relative;">
+        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</span>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-right:30px;">
+            <h3 id="dayEventsTitle" style="margin: 0; font-size: 1.2rem; font-weight: 800; color:var(--text-main);"></h3>
+            <button class="btn-action" style="background:var(--blue-primary); color:white; border:none; padding:6px 12px; font-size:0.8rem; border-radius: 6px;" onclick="openTaskModalFromDetails()"><i class="fa-solid fa-plus"></i> 추가</button>
+        </div>
+        
+        <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto; padding-right:5px;"></div>
     </div>
 </div>
 
-<div id="weblinkModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-    <div class="modal-content" style="margin:10% auto; padding:25px; width:350px; border-radius:15px; position:relative;">
-        <span onclick="document.getElementById('weblinkModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
-        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-link"></i> 사이트/파일 등록</h3>
+<div id="weblinkModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:380px; position:relative;">
+        <span onclick="document.getElementById('weblinkModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom: 20px; font-weight:800;"><i class="fa-solid fa-link" style="color:var(--blue-primary); margin-right:8px;"></i>링크 등록</h3>
         <form id="weblinkForm">
             <input type="text" id="weblinkTitle" class="modal-input" placeholder="표시될 이름" required>
-            <div style="margin-bottom: 15px; padding: 0 5px; display: flex; gap: 20px; font-size: 0.9rem; color: var(--text-dark); font-weight: 600;">
-                <label style="cursor: pointer;"><input type="radio" name="weblinkType" value="url" checked onchange="toggleWeblinkType()"> URL 링크</label>
-                <label style="cursor: pointer;"><input type="radio" name="weblinkType" value="file" onchange="toggleWeblinkType()"> 파일 업로드</label>
+            <div style="margin-bottom: 15px; padding: 12px; background:var(--hover-bg); border-radius:10px; border:1px solid var(--widget-border-color); display: flex; gap: 20px; font-size: 0.9rem; font-weight: 600;">
+                <label style="cursor: pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="weblinkType" value="url" checked onchange="toggleWeblinkType()"> URL 링크</label>
+                <label style="cursor: pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="weblinkType" value="file" onchange="toggleWeblinkType()"> 파일 업로드</label>
             </div>
             <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소">
-            <input type="file" id="weblinkFile" class="modal-input" style="display: none; background: #fff !important;">
-            <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">등록하기</button>
+            <input type="file" id="weblinkFile" class="modal-input" style="display: none; padding:10px;">
+            <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; padding:14px;">등록하기</button>
         </form>
     </div>
 </div>
@@ -621,36 +737,27 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
-    function toggleSchedNote(row) {
-        const note = row.parentElement.querySelector('.sched-note-box') || row.nextElementSibling;
-        if (note && note.classList.contains('sched-note-box')) {
-            note.style.display = (note.style.display === 'block') ? 'none' : 'block';
-        }
+    function openMsgModalWithReceiver(targetUser) {
+        if(targetUser === currentUser) return; 
+        const modal = document.getElementById('msgModal');
+        const receiverSelect = document.getElementById('msgReceiver');
+        receiverSelect.value = targetUser;
+        modal.style.display = 'block';
     }
 
-    let currentScheduleSlide = 'today';
-    setInterval(() => {
-        const slideToday = document.getElementById('slide-today');
-        const slideUpcoming = document.getElementById('slide-upcoming');
-        const dotToday = document.getElementById('dot-today');
-        const dotUpcoming = document.getElementById('dot-upcoming');
-
-        if (!slideToday || !slideUpcoming) return;
-
-        if (currentScheduleSlide === 'today') {
-            slideToday.classList.remove('active');
-            slideUpcoming.classList.add('active');
-            dotToday.style.background = 'var(--card-border)';
-            dotUpcoming.style.background = 'var(--primary-color)';
-            currentScheduleSlide = 'upcoming';
-        } else {
-            slideUpcoming.classList.remove('active');
-            slideToday.classList.add('active');
-            dotUpcoming.style.background = 'var(--card-border)';
-            dotToday.style.background = 'var(--primary-color)';
-            currentScheduleSlide = 'today';
-        }
-    }, 6000);
+    function switchMsgTab(tab) {
+        ['partners', 'recv', 'sent'].forEach(t => {
+            document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
+            const tabEl = document.getElementById('tab-' + t);
+            if(t === tab) {
+                tabEl.classList.remove('blue-pill-inactive');
+                tabEl.classList.add('blue-pill-active');
+            } else {
+                tabEl.classList.remove('blue-pill-active');
+                tabEl.classList.add('blue-pill-inactive');
+            }
+        });
+    }
 
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
@@ -663,103 +770,153 @@
             .catch(err => console.error(err));
     }
 
-    async function fetchActiveUsers() {
-        try {
-            const res = await fetch('/get_active_users');
-            if (res.ok) {
-                const data = await res.json();
-                const users = Array.isArray(data) ? data : (data.active_users || []);
-                const container = document.getElementById('activeUserContainer');
-                if (users.length > 0) {
-                    container.innerHTML = users.map(u => 
-                        `<div style="background: var(--widget-bg); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--card-border); color: var(--text-dark); display: flex; align-items: center; gap: 5px;"><span style="color: #2ecc71; font-size: 0.6rem;"><i class="fa-solid fa-circle"></i></span> ${u}</div>`
-                    ).join('');
-                } else {
-                    container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-gray);">접속 중인 직원이 없습니다.</span>';
-                }
-            }
-        } catch (e) {
-            console.error('접속자 목록 업데이트 오류:', e);
+    function renderMyWeeklyTasksSummary() {
+        const container = document.getElementById('my-weekly-tasks-summary');
+        if (!container) return;
+
+        const now = new Date();
+        const startOfRange = new Date(now); 
+        const endOfRange = new Date(now);
+        endOfRange.setDate(now.getDate() + 6); 
+
+        function getLocalYMD(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
         }
+
+        const sStr = getLocalYMD(startOfRange);
+        const eStr = getLocalYMD(endOfRange);
+
+        const myTasks = window.allCalendarEvents.filter(ev => {
+            const props = ev.extendedProps || {};
+            const owner = props.owner || currentUser;
+            if (owner !== currentUser) return false;
+            
+            const d = ev.start ? ev.start.split('T')[0] : '';
+            return d >= sStr && d <= eStr;
+        });
+
+        myTasks.sort((a, b) => (a.start > b.start ? 1 : -1));
+
+        const groupedTasks = {};
+        myTasks.forEach(ev => {
+            const dStr = ev.start ? ev.start.split('T')[0] : '';
+            if (!groupedTasks[dStr]) groupedTasks[dStr] = [];
+            groupedTasks[dStr].push(ev);
+        });
+
+        let html = '<div style="background: var(--card-bg); border: 1px solid var(--widget-border-color); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 16px;">';
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+
+        if (Object.keys(groupedTasks).length === 0) {
+            html += `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 20px 0; font-weight: 400;">예정된 업무가 없습니다.</div>`;
+        } else {
+            for (const dStr of Object.keys(groupedTasks).sort()) {
+                const dObj = new Date(dStr);
+                const dayName = days[dObj.getDay()];
+                const mmdd = `${dObj.getMonth()+1}/${dObj.getDate()}`;
+                
+                html += `
+                    <div style="display: flex; gap: 16px;">
+                        <div style="min-width: 40px; text-align: center; padding-top: 2px;">
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400;">${dayName}</div>
+                            <div style="font-size: 0.95rem; color: var(--text-main); font-weight: 500;">${mmdd}</div>
+                        </div>
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid var(--widget-border-color); padding-left: 16px;">
+                `;
+
+                groupedTasks[dStr].forEach(ev => {
+                    const props = ev.extendedProps || {};
+                    let title = props.task_title || ev.title || '일정';
+                    let cat = props.category || '기타';
+                    if (!props.category && !props.task_title) {
+                        ['회의','면접','미팅','외근','기타'].forEach(c => {
+                            if (props[`cat_${c}_제목`]) {
+                                cat = c;
+                                title = props[`cat_${c}_제목`];
+                            }
+                        });
+                    }
+                    let bgColor = ev.backgroundColor || ev.color || 'var(--blue-primary)';
+
+                    html += `
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="background: ${bgColor}; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 400; text-align: center; min-width: 28px;">${cat}</span>
+                            <span style="font-size: 0.85rem; color: var(--text-main); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</span>
+                        </div>
+                    `;
+                });
+
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        html += '</div>';
+
+        container.innerHTML = html;
     }
 
     window.taskDataMap = window.taskDataMap || {};
     window.allCalendarEvents = {{ events | tojson | safe }};
     const currentUser = '{{ current_user }}';
+    
+    const globalHolidays = {{ holidays_dict | tojson | safe }};
+    let currentWeeklyStart = new Date();
 
     document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        const holidays = {{ holidays_dict | tojson | safe }};
-        
-        const displayEvents = [];
-        const seenCategories = new Set();
-        
-        window.allCalendarEvents.forEach(ev => {
-            const d = ev.start ? ev.start.split('T')[0] : '';
-            const cat = ev.category || ev.title || '기타';
-            const key = d + '_' + cat;
-            
-            if (!seenCategories.has(key)) {
-                seenCategories.add(key);
-                displayEvents.push(ev);
-            }
-        });
-
-        var calendar = new FullCalendar.Calendar(calendarEl, {
+        var miniCalendarEl = document.getElementById('mini-calendar');
+        var miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
             initialView: 'dayGridMonth',
             locale: 'ko',
-            events: displayEvents,
-            height: 'auto', 
-            contentHeight: 'auto', 
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            contentHeight: 'auto',
             fixedWeekCount: false,
-            dayMaxEvents: 2, 
-            
+            events: window.allCalendarEvents,
             dayCellContent: function(arg) {
-                return { html: `<div class="fc-daygrid-day-number" data-date="${arg.dateStr}">${arg.date.getDate()}</div>` };
+                return { html: `<div class="fc-daygrid-day-number">${arg.date.getDate()}</div>` };
             },
-            
-            eventContent: function(arg) {
-                const props = arg.event.extendedProps;
-                let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
-                return { html: `<div class="fc-event-main" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
-            },
+            dayCellDidMount: function(arg) {
+                const dStr = arg.dateStr; 
+                const dObj = arg.date;
+                const dateStrForHoliday = dObj.getFullYear() + "-" + String(dObj.getMonth() + 1).padStart(2, '0') + "-" + String(dObj.getDate()).padStart(2, '0');
+                
+                if (globalHolidays[dateStrForHoliday]) {
+                    arg.el.classList.add('holiday-day');
+                }
 
-            dateClick: function(info) {
-                const target = info.jsEvent.target;
-                if (target.classList.contains('fc-daygrid-day-number')) {
-                    document.getElementById('taskForm').reset();
-                    document.getElementById('taskId').value = ''; 
-                    document.getElementById('taskOwner').value = currentUser;
-                    document.getElementById('taskDate').value = info.dateStr;
-                    document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
-                    document.getElementById('taskModal').style.display = 'block';
-                } else {
-                    openDayDetails(info.dateStr);
+                const hasEvent = window.allCalendarEvents.some(e => (e.start && e.start.split('T')[0] === dStr));
+                if (hasEvent) {
+                    const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
+                    if (numberEl) {
+                        numberEl.style.backgroundColor = 'rgba(37, 99, 235, 0.15)'; 
+                        numberEl.style.borderRadius = '50%';
+                    }
                 }
             },
-
+            dateClick: function(info) {
+                openDayDetails(info.dateStr);
+            },
             eventClick: function(info) {
                 info.jsEvent.preventDefault();
                 openDayDetails(info.event.startStr.split('T')[0]);
-            },
-
-            dayCellDidMount: function(arg) {
-                const d = arg.date;
-                const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-                if (holidays[dateStr]) {
-                    arg.el.classList.add('holiday-day');
-                    let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
-                    if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
-                        let span = document.createElement('span'); 
-                        span.className = 'holiday-name'; 
-                        span.innerText = holidays[dateStr];
-                        dayTopEl.appendChild(span);
-                    }
-                }
             }
         });
-        
-        calendar.render();
+        miniCalendar.render();
+
+        renderWeeklySchedule();
+        renderMyWeeklyTasksSummary();
+
+        let totalUnread = 0;
+        document.querySelectorAll('#list-partners .unread-badge').forEach(el => {
+            totalUnread += parseInt(el.innerText) || 0;
+        });
+        const leftBadge = document.getElementById('left-unread-badge');
+        if (leftBadge && totalUnread > 0) {
+            leftBadge.innerText = totalUnread;
+            leftBadge.style.display = 'block';
+        }
 
         var weblinkEl = document.getElementById('weblink-container');
         if(weblinkEl) {
@@ -767,7 +924,7 @@
                 animation: 150,
                 ghostClass: 'weblink-ghost',
                 onEnd: function (evt) {
-                    var itemEls = weblinkEl.querySelectorAll('.weblink-item');
+                    var itemEls = weblinkEl.querySelectorAll('.weather-pill');
                     var newOrder = [];
                     itemEls.forEach(function(item) {
                         newOrder.push(item.getAttribute('data-id'));
@@ -782,10 +939,109 @@
         }
 
         loadNotificationWidget();
-        fetchActiveUsers();
-        setInterval(fetchActiveUsers, 60000);
         setInterval(loadNotificationWidget, 60000);
     });
+
+    function shiftWeeklySchedule(days) {
+        currentWeeklyStart.setDate(currentWeeklyStart.getDate() + days);
+        renderWeeklySchedule();
+    }
+
+    function renderWeeklySchedule() {
+        const container = document.getElementById('weekly-schedule-container');
+        if (!container) return;
+
+        let html = '';
+        const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+        const endDate = new Date(currentWeeklyStart);
+        endDate.setDate(currentWeeklyStart.getDate() + 6);
+        const startStr = `${currentWeeklyStart.getFullYear()}.${String(currentWeeklyStart.getMonth() + 1).padStart(2, '0')}.${String(currentWeeklyStart.getDate()).padStart(2, '0')}`;
+        const endStr = `${endDate.getFullYear()}.${String(endDate.getMonth() + 1).padStart(2, '0')}.${String(endDate.getDate()).padStart(2, '0')}`;
+        document.getElementById('weekly-date-range').innerText = `${startStr} ~ ${endStr}`;
+
+        const realToday = new Date();
+        const todayStr = realToday.getFullYear() + '-' + String(realToday.getMonth() + 1).padStart(2, '0') + '-' + String(realToday.getDate()).padStart(2, '0');
+
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(currentWeeklyStart);
+            d.setDate(currentWeeklyStart.getDate() + i);
+            const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            const dayNum = d.getDate();
+            const dayName = daysOfWeek[d.getDay()];
+            const isToday = (dateStr === todayStr);
+
+            let textColorStyle = '';
+            let nameColorStyle = '';
+            if (d.getDay() === 0) {
+                textColorStyle = 'color: #ef4444 !important;'; 
+                nameColorStyle = 'color: #ef4444 !important;';
+            } else if (d.getDay() === 6) {
+                textColorStyle = 'color: #3b82f6 !important;'; 
+                nameColorStyle = 'color: #3b82f6 !important;';
+            }
+
+            let holidayBadge = '';
+            if (globalHolidays[dateStr]) {
+                textColorStyle = 'color: #ef4444 !important;';
+                nameColorStyle = 'color: #ef4444 !important;';
+                holidayBadge = `<div style="font-size: 0.65rem; color: #ef4444; font-weight: 700; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; text-align: center;">${globalHolidays[dateStr]}</div>`;
+            }
+
+            const dayEvents = window.allCalendarEvents.filter(ev => {
+                const s = ev.start ? ev.start.split('T')[0] : '';
+                return dateStr === s;
+            });
+
+            let eventsHtml = '';
+            dayEvents.forEach(ev => {
+                const props = ev.extendedProps || {};
+                
+                let catFallback = ev.category || '기타';
+                let titleFallback = props.task_title || ev.title || '일정';
+                let timeFallback = props.task_time || '';
+                
+                if (!ev.category && !props.task_title) {
+                    ['회의','면접','미팅','외근','기타'].forEach(c => {
+                        if (props[`cat_${c}_제목`]) {
+                            catFallback = c;
+                            titleFallback = props[`cat_${c}_제목`];
+                            timeFallback = props[`cat_${c}_시간`] || '';
+                        }
+                    });
+                }
+
+                const timeDisp = timeFallback ? `[${timeFallback}] ` : '';
+                const noteDisp = props.note ? `\n비고: ${props.note}` : '';
+                const color = ev.backgroundColor || ev.color || 'var(--text-main)';
+                const tooltipText = `${timeDisp}${titleFallback}${noteDisp}`;
+                
+                eventsHtml += `
+                    <div class="weekly-event-item">
+                        <span style="color:${color}; margin-right:6px; font-size:0.6rem; transform: translateY(3px);">●</span>
+                        <span class="weekly-event-text">${titleFallback}</span>
+                        <div class="tooltip-box">${tooltipText}</div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div class="day-col ${isToday ? 'is-today' : ''}">
+                    <div class="day-header-box" style="flex-direction: column; align-items: stretch;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="day-num" style="${textColorStyle}">${dayNum}</span>
+                            <span class="day-name" style="${nameColorStyle}">${dayName}</span>
+                        </div>
+                        ${holidayBadge}
+                    </div>
+                    <div class="day-events-list">
+                        ${eventsHtml || '<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding-top:15px;">일정 없음</div>'}
+                    </div>
+                </div>
+            `;
+        }
+        container.innerHTML = html;
+    }
 
     function openDayDetails(dateStr) {
         const dayEvents = window.allCalendarEvents.filter(e => {
@@ -793,51 +1049,81 @@
             return dateStr === s;
         });
         
-        document.getElementById('dayEventsTitle').innerText = dateStr + " 상세 일정";
+        document.getElementById('dayEventsTitle').innerText = dateStr + " 일정";
         let html = '';
         let renderedTaskIds = new Set(); 
         
         dayEvents.forEach(p => {
-            let bgColor = p.color || p.backgroundColor || 'var(--primary-color)';
-            if(p.task_id) window.taskDataMap[p.task_id] = p; 
+            let bgColor = p.color || p.backgroundColor || 'var(--blue-primary)';
+            const props = p.extendedProps || {};
             
-            html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
+            const rawId = props.task_id || p.id || '';
+            const taskId = String(rawId).replace(/[^0-9]/g, '');
+            if(taskId) window.taskDataMap[taskId] = p; 
             
-            if (p.category === "근태/휴가" || !p.owner) {
-                html += `<div style="font-weight: bold; color: var(--text-dark);">${p.title}</div>`;
+            let catStr = props.category || '기타';
+            let titleStr = props.task_title || p.title || '일정';
+            let timeStr = props.task_time ? props.task_time : '종일';
+            let ownerStr = props.owner || currentUser; 
+
+            if (!props.category && !props.task_title) {
+                let found = false;
+                ['회의','면접','미팅','외근','기타'].forEach(c => {
+                    if (props[`cat_${c}_제목`]) {
+                        catStr = c;
+                        titleStr = props[`cat_${c}_제목`];
+                        timeStr = props[`cat_${c}_시간`] ? props[`cat_${c}_시간`] : '종일';
+                        found = true;
+                    }
+                });
+                if(!found && p.title) titleStr = p.title;
+            }
+
+            html += `<div style="border-left: 4px solid ${bgColor}; padding: 16px; margin-bottom: 12px; background: var(--hover-bg); border: 1px solid var(--widget-border-color); border-radius: 12px;">`;
+            
+            if (catStr === "근태/휴가") {
+                html += `<div style="font-weight: 700; color: var(--text-main); font-size:1.05rem;">${titleStr}</div>`;
             } else {
-                html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
-                html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
-                if (p.task_time) {
-                    html += ` <strong>시간:</strong> ${p.task_time}`;
+                html += `<div style="font-weight: 700; color: var(--text-main); font-size:1.05rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">`;
+                html += `<span style="background:${bgColor}; color:white; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">${catStr}</span>`;
+                html += `<span>${titleStr}</span>`;
+                html += `</div>`;
+                
+                html += `<div style="font-size: 0.85rem; color: var(--text-sub); line-height: 1.6; background: #ffffff; padding: 12px; border-radius: 8px; border: 1px solid #f3f4f6;">`;
+                html += `<div><strong style="color:var(--text-main); width: 50px; display: inline-block;">시간</strong> ${timeStr}</div>`;
+                html += `<div><strong style="color:var(--text-main); width: 50px; display: inline-block;">작성자</strong> ${ownerStr}</div>`;
+                if (props.note) {
+                    html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e5e7eb;"><strong style="color:var(--text-main); width: 50px; display: inline-block; vertical-align: top;">내용</strong> <span style="display:inline-block; width:calc(100% - 55px); white-space: pre-wrap;">${props.note}</span></div>`;
                 }
                 html += `</div>`;
             }
             
-            if (p.note) {
-                html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
-            }
-            
-            if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
-                html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
-                            <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${dateStr}')" style="margin-right:5px;">수정</button>
-                            <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>
+            if (taskId && (!props.owner || props.owner === currentUser) && !renderedTaskIds.has(taskId)) {
+                html += `<div style="text-align:right; margin-top:12px;">
+                            <button class="btn-action btn-edit" onclick="editTask('${taskId}', '${dateStr}')" style="margin-right:6px;"><i class="fa-solid fa-pen"></i> 수정</button>
+                            <button class="btn-action btn-delete" onclick="deleteTask('${taskId}')"><i class="fa-solid fa-trash"></i> 삭제</button>
                          </div>`;
-                renderedTaskIds.add(p.task_id);
+                renderedTaskIds.add(taskId);
             }
             html += `</div>`;
         });
         
-        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-muted); text-align:center; padding: 40px 0;">등록된 일정이 없습니다.</p>';
         document.getElementById('dayEventsModal').style.display = 'block';
     }
 
-    function switchMsgTab(tab) {
-        ['partners', 'recv', 'sent'].forEach(t => {
-            document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
-            document.getElementById('tab-' + t).style.fontWeight = (t === tab) ? 'bold' : 'normal';
-            document.getElementById('tab-' + t).style.color = (t === tab) ? 'var(--primary-color)' : 'var(--text-gray)';
-        });
+    function openTaskModalFromDetails() {
+        const dateStr = document.getElementById('dayEventsTitle').innerText.split(' ')[0];
+        document.getElementById('dayEventsModal').style.display = 'none';
+        
+        document.getElementById('taskForm').reset();
+        document.getElementById('taskId').value = ''; 
+        document.getElementById('taskOwner').value = currentUser;
+        document.getElementById('taskDate').value = dateStr;
+        document.getElementById('taskCategory').value = '회의';
+        
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip" style="color:var(--blue-primary); margin-right:8px;"></i>새 일정 등록';
+        document.getElementById('taskModal').style.display = 'block';
     }
 
     function toggleEmojiPicker(pickerId) {
@@ -888,19 +1174,36 @@
 
     function editTask(taskId, dateStr) {
         document.getElementById('dayEventsModal').style.display = 'none'; 
-        const props = window.taskDataMap[taskId];
+        const p = window.taskDataMap[taskId] || {};
+        const props = p.extendedProps || {};
         
         document.getElementById('taskForm').reset();
         document.getElementById('taskId').value = taskId; 
         document.getElementById('taskDate').value = dateStr;
         
-        ['회의','면접','미팅','외근','기타'].forEach(c => {
-            document.getElementById(`cat_${c}_제목`).value = props[`cat_${c}_제목`] || '';
-            document.getElementById(`cat_${c}_시간`).value = props[`cat_${c}_시간`] || '';
-        });
-        
+        let foundCat = props.category || '기타';
+        let title = props.task_title || p.title || '';
+        let time = props.task_time || '';
+
+        if (!props.category && !props.task_title) {
+            ['회의','면접','미팅','외근','기타'].forEach(c => {
+                if (props[`cat_${c}_제목`]) {
+                    foundCat = c;
+                    title = props[`cat_${c}_제목`];
+                    time = props[`cat_${c}_시간`] || '';
+                }
+            });
+        }
+
+        const validCats = ['회의','면접','미팅','외근','기타'];
+        if(!validCats.includes(foundCat)) foundCat = '기타';
+
+        document.getElementById('taskCategory').value = foundCat;
+        document.getElementById('taskTitle').value = title;
+        document.getElementById('taskTime').value = time;
         document.getElementById('taskNote').value = props.note || '';
-        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 일정 수정';
+
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square" style="color:var(--blue-primary); margin-right:8px;"></i>일정 수정';
         document.getElementById('taskModal').style.display = 'block';
     }
 
@@ -910,8 +1213,10 @@
         try {
             const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
             if (res.ok) location.reload();
+            else alert("일정 삭제에 실패했습니다.");
         } catch (error) {
             console.error("일정 삭제 실패:", error);
+            alert("서버 통신 중 오류가 발생했습니다.");
         }
     }
 
@@ -923,10 +1228,22 @@
             note: document.getElementById('taskNote').value 
         };
         
+        const selectedCat = document.getElementById('taskCategory').value;
+        
         ['회의','면접','미팅','외근','기타'].forEach(c => {
-            data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value;
-            data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value;
+            if (c === selectedCat) {
+                data[c+'_제목'] = document.getElementById('taskTitle').value;
+                data[c+'_시간'] = document.getElementById('taskTime').value;
+            } else {
+                data[c+'_제목'] = '';
+                data[c+'_시간'] = '';
+            }
         });
+        
+        data.category = selectedCat;
+        data.task_title = document.getElementById('taskTitle').value;
+        data.task_time = document.getElementById('taskTime').value;
+        data.title = data.task_title; 
         
         const url = taskId ? `/update_task/${taskId}` : '/save_task';
         
@@ -937,6 +1254,7 @@
                 body: JSON.stringify(data) 
             });
             if (res.ok) location.reload();
+            else alert("일정 저장에 실패했습니다.");
         } catch (error) {
             console.error("일정 저장 실패:", error);
         }
@@ -949,7 +1267,7 @@
     function openBoardForm() {
         document.getElementById('boardForm').reset();
         document.getElementById('boardId').value = '';
-        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen"></i> 게시글 작성';
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen" style="color:var(--blue-primary); margin-right:8px;"></i>게시글 작성';
         document.getElementById('boardModal').style.display = 'block';
     }
 
@@ -1006,7 +1324,7 @@
         document.getElementById('boardId').value = currentBoardId;
         document.getElementById('boardTitle').value = document.getElementById('detailTitle').innerText;
         document.getElementById('boardContent').value = document.getElementById('detailContent').innerText;
-        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 게시글 수정';
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square" style="color:var(--blue-primary); margin-right:8px;"></i>게시글 수정';
         document.getElementById('boardModal').style.display = 'block';
     }
 
@@ -1065,5 +1383,123 @@
             console.error("웹링크 삭제 실패:", error);
         }
     }
+
+// === 쪽지함 안 읽은 메시지 배지 실시간 조회 함수 ===
+    function updateMessageBadge() {
+        fetch('/api/unread_messages')
+            .then(res => res.json())
+            .then(data => {
+                // 1. 메인 편지봉투 배지 업데이트 (전체 개수)
+                const mainBadge = document.getElementById('left-unread-badge');
+                if (mainBadge) {
+                    if (data.total_unread > 0) {
+                        mainBadge.innerText = data.total_unread;
+                        mainBadge.style.display = 'block'; 
+                    } else {
+                        mainBadge.style.display = 'none';  
+                    }
+                }
+
+                // 2. 대화 상대방 목록 배지 개별 업데이트
+                const partnerBadges = document.querySelectorAll('.partner-badge');
+                partnerBadges.forEach(badge => {
+                    const partnerName = badge.getAttribute('data-partner');
+                    const count = data.details[partnerName] || 0; // 해당 사람의 미확인 개수 (없으면 0)
+                    
+                    if (count > 0) {
+                        badge.innerText = count;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                });
+            })
+            .catch(err => console.error('메시지 갱신 에러:', err));
+    }
+
+    // === 모든 스크립트가 로드되었을 때 실행되는 메인 블록 ===
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // 1. 캘린더 초기화 및 렌더링
+        var miniCalendarEl = document.getElementById('mini-calendar');
+        var miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            contentHeight: 'auto',
+            fixedWeekCount: false,
+            events: window.allCalendarEvents,
+            dayCellContent: function(arg) {
+                return { html: `<div class="fc-daygrid-day-number">${arg.date.getDate()}</div>` };
+            },
+            dayCellDidMount: function(arg) {
+                const dStr = arg.dateStr; 
+                const dObj = arg.date;
+                const dateStrForHoliday = dObj.getFullYear() + "-" + String(dObj.getMonth() + 1).padStart(2, '0') + "-" + String(dObj.getDate()).padStart(2, '0');
+                
+                if (globalHolidays[dateStrForHoliday]) {
+                    arg.el.classList.add('holiday-day');
+                }
+
+                const hasEvent = window.allCalendarEvents.some(e => (e.start && e.start.split('T')[0] === dStr));
+                if (hasEvent) {
+                    const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
+                    if (numberEl) {
+                        numberEl.style.backgroundColor = 'rgba(37, 99, 235, 0.15)'; 
+                        numberEl.style.borderRadius = '50%';
+                    }
+                }
+            },
+            dateClick: function(info) { openDayDetails(info.dateStr); },
+            eventClick: function(info) {
+                info.jsEvent.preventDefault();
+                openDayDetails(info.event.startStr.split('T')[0]);
+            }
+        });
+        miniCalendar.render();
+
+        // 2. 주간 스케줄 및 태스크 렌더링
+        renderWeeklySchedule();
+        renderMyWeeklyTasksSummary();
+
+        // 3. 페이지 로드 시점의 '안 읽은 쪽지 뱃지' 초기 세팅 (서버에서 받아온 렌더링 값)
+        let totalUnread = 0;
+        document.querySelectorAll('#list-partners .unread-badge').forEach(el => {
+            totalUnread += parseInt(el.innerText) || 0;
+        });
+        const leftBadge = document.getElementById('left-unread-badge');
+        if (leftBadge && totalUnread > 0) {
+            leftBadge.innerText = totalUnread;
+            leftBadge.style.display = 'block';
+        }
+
+        // 4. 드래그 앤 드롭 정렬 (WebLink)
+        var weblinkEl = document.getElementById('weblink-container');
+        if(weblinkEl) {
+            Sortable.create(weblinkEl, {
+                animation: 150,
+                ghostClass: 'weblink-ghost',
+                onEnd: function (evt) {
+                    var itemEls = weblinkEl.querySelectorAll('.weather-pill');
+                    var newOrder = [];
+                    itemEls.forEach(function(item) {
+                        newOrder.push(item.getAttribute('data-id'));
+                    });
+                    fetch('/update_weblink_order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: newOrder })
+                    }).catch(err => console.error("순서 저장 실패:", err));
+                }
+            });
+        }
+
+        // 5. 알림 위젯 로드 및 60초 주기 갱신
+        loadNotificationWidget();
+        setInterval(loadNotificationWidget, 60000);
+
+        // 6. 🚀 쪽지함 안 읽은 메시지 뱃지 10초 주기 자동 갱신 시작!
+        setInterval(updateMessageBadge, 10000); 
+    });
 </script>
 {% endblock %}

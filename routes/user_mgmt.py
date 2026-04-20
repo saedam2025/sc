@@ -182,7 +182,8 @@ def delete_user():
 @user_mgmt_bp.route('/list')
 def get_user_list():
     conn = get_db()
-    users = conn.execute("SELECT * FROM users").fetchall()
+    # 🚀 수정된 부분: 레벨(level) 오름차순(숫자가 작을수록 우선) -> 가입순서(id) 오름차순 정렬
+    users = conn.execute("SELECT * FROM users ORDER BY level ASC, id ASC").fetchall()
     conn.close()
     
     result = []

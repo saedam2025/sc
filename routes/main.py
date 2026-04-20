@@ -241,13 +241,16 @@ def index():
                 'unread': p['unread_count']
             })
 
-    # 7. 전체 회원 명단 및 프로필 아이콘 로드
-    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인'").fetchall()
-    user_list = sorted(list(set([u['name'] for u in db_users])))
+    # 7. 전체 회원 명단 및 프로필 아이콘 로드 (🚀 수정된 부분: 직급별, 가입순 정렬 적용)
+    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
     
+    user_list = []
     user_icons = {}
     for u in db_users:
-        user_icons[u['name']] = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
+        name = u['name']
+        if name not in user_list: # 순서를 유지하면서 중복 제거
+            user_list.append(name)
+        user_icons[name] = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
         
     if current_user not in user_icons:
         user_icons[current_user] = '👤'
@@ -400,6 +403,25 @@ def download_file(name):
     return send_from_directory(UPLOAD_FOLDER, name)
 
 # --- 메시지/쪽지 관련 API ---
+
+@main_bp.route('/api/unread_messages')
+def api_unread_messages():
+    """현재 사용자의 안 읽은 메시지 총 개수 및 보낸 사람별 개수를 반환하는 API (자동 갱신용)"""
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({"total_unread": 0, "details": {}})
+    
+    conn = get_db()
+    # 1. 전체 미확인 쪽지 개수
+    total_count = conn.execute("SELECT COUNT(*) as count FROM messages WHERE receiver=? AND is_read=0", (current_user,)).fetchone()['count']
+    
+    # 2. 보낸 사람(발신자)별 미확인 쪽지 개수
+    details_query = conn.execute("SELECT sender, COUNT(*) as count FROM messages WHERE receiver=? AND is_read=0 GROUP BY sender", (current_user,)).fetchall()
+    details = {row['sender']: row['count'] for row in details_query}
+    
+    conn.close()
+    
+    return jsonify({"total_unread": total_count, "details": details})
 
 @main_bp.route('/send_message', methods=['POST'])
 def send_message():
