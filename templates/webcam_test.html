@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>웹캠 프로필 촬영 (Zoom + 좌우반전)</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        padding: 30px;
+        background: #f5f5f5;
+    }
+
+    .video-wrapper {
+        width: 320px;
+        height: 240px;
+        margin: 0 auto;
+        overflow: hidden;
+        border-radius: 12px;
+        background: black;
+    }
+
+    /* 👇 zoom + 좌우반전 */
+    #video {
+        width: 320px;
+        height: 240px;
+        transform: scale(1.5) scaleX(-1);
+        transform-origin: center;
+    }
+
+    button {
+        margin: 10px;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 8px;
+        background: #4CAF50;
+        color: white;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #45a049;
+    }
+
+    img {
+        margin-top: 15px;
+        border-radius: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+<h2>📸 프로필 촬영 (확대 + 좌우반전)</h2>
+
+<div class="video-wrapper">
+    <video id="video" autoplay playsinline></video>
+</div>
+
+<br>
+
+<button id="start">카메라 켜기</button>
+<button id="capture">사진 찍기</button>
+<button id="download">다운로드</button>
+
+<br>
+
+<canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+
+<h3>미리보기</h3>
+<img id="preview" width="160">
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const preview = document.getElementById('preview');
+
+let stream = null;
+
+document.getElementById('start').onclick = async () => {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+    } catch (err) {
+        alert("카메라 접근 실패: " + err.message);
+    }
+};
+
+// ⚠️ 현재 캡처는 반전 안됨 (원본 그대로 저장)
+document.getElementById('capture').onclick = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    preview.src = canvas.toDataURL('image/png');
+};
+
+document.getElementById('download').onclick = () => {
+    if (!preview.src) {
+        alert("먼저 사진을 찍어주세요!");
+        return;
+    }
+    const a = document.createElement('a');
+    a.href = preview.src;
+    a.download = 'profile.png';
+    a.click();
+};
+
+window.onbeforeunload = () => {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+};
+</script>
+
+</body>
+</html>

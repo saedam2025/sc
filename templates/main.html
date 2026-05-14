@@ -2,7 +2,6 @@
 
 {% block content %}
 <style>
-    /* === 샤프하고 산뜻한 SaaS/그룹웨어 메인 대시보드 스타일 === */
     :root {
         --text-main: #0f172a;     /* 더 짙고 선명한 메인 텍스트 */
         --text-sub: #475569;      /* 깔끔한 서브 텍스트 */
@@ -16,20 +15,25 @@
         
         --widget-border-color: #e2e8f0; /* 선명하고 밝은 테두리 */
         --hover-bg: #f8fafc;
+
+        /* 새로 추가된 우측 메뉴의 넓이를 240px로 얄쌍하게 줄여서 기존 메뉴 넓이 보장 */
+        --new-widget-width: 240px; 
     }
 
     .dashboard-wrapper {
-        width: 100%;
+        width: 100%; 
         box-sizing: border-box;
-        padding: 30px 40px 20px 40px;
+        padding: 30px 0 4px 0; /* 4px 부분이 그리드 메뉴 아래쪽 여백 수치임 */
         font-family: 'Pretendard', sans-serif;
     }
 
-    /* 그리드 비율 및 간격 정돈 */
+    /* 메인화면 각 메뉴들 가로넓이 즉, 그리드 비율 및 간격 정돈 */
     .ustra-grid {
         display: grid;
-        grid-template-columns: 0.9fr 1.6fr 1.1fr; 
-        grid-template-rows: 280px 260px auto; 
+        /* 앞에부터 1번, 2번, 3번째 줄 메뉴 넓이 조절, 4번째 날씨위젯은 위에서 줄인 --new-widget-width(240px) 적용 */
+        grid-template-columns: 0.9fr 1.5fr 1.1fr var(--new-widget-width); 
+        /* 하단 3행 높이를 320px로 늘려 달력 짤림 방지 및 피드 높이 맞춤 */
+        grid-template-rows: 280px 260px 320px; 
         gap: 20px;
     }
 
@@ -175,6 +179,14 @@
         box-shadow: 0 4px 6px rgba(37, 99, 235, 0.05);
         transform: translateY(-2px);
     }
+    /* WebLink 삭제 버튼 호버 효과 연결 */
+    .weather-pill:hover .weblink-delete-btn {
+        opacity: 1 !important;
+    }
+    .weblink-delete-btn:hover {
+        background: #dc2626 !important;
+        transform: scale(1.1);
+    }
     .weather-pill-value { 
         font-size: 0.75rem; 
         font-weight: 600; 
@@ -189,7 +201,7 @@
 
     .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
     
-    .scroll-area { overflow-y: auto; padding-right: 5px; }
+    .scroll-area { overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
     .scroll-area::-webkit-scrollbar { width: 4px; }
     .scroll-area::-webkit-scrollbar-track { background: transparent; }
     .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -233,6 +245,7 @@
         border: 1px solid var(--widget-border-color);
         padding: 24px 30px; 
         min-height: 220px;
+        overflow: hidden; /* 부모 요소 밖으로 넘치지 않도록 */
     }
 
     .mini-cal-section {
@@ -260,6 +273,8 @@
         flex: 1;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
+        min-height: 0; /* 컨테이너가 팽창하지 않도록 강제 */
     }
     .weekly-header {
         margin-bottom: 16px;
@@ -268,8 +283,17 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-shrink: 0; /* 헤더는 줄어들지 않도록 */
     }
     
+    /* 일별 스크롤 설정을 위해 컨테이너들의 min-height:0 부여 */
+    #weekly-schedule-container {
+        display: flex;
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
+        min-height: 0;
+    }
     .day-col {
         flex: 1; 
         min-width: 0; 
@@ -278,6 +302,8 @@
         gap: 12px;
         border-right: 1px dashed var(--widget-border-color);
         padding: 0 8px;
+        overflow: hidden; 
+        min-height: 0;
     }
     .day-col:last-child { border-right: none; }
     
@@ -287,15 +313,30 @@
         gap: 6px;
         padding-bottom: 8px; 
         border-bottom: 2px solid transparent; 
+        flex-shrink: 0; /* 헤더 고정 */
     }
     .day-num { font-size: 1.1rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
     .day-name { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
     
-/* 오늘 날짜 하이라이트 색상 변경 */
-.day-col.is-today .day-header-box { border-bottom: 2px solid #14b8a6; }
-.day-col.is-today .day-num, .day-col.is-today .day-name { color: #14b8a6; }
+    /* 오늘 날짜 하이라이트 색상 변경 */
+    .day-col.is-today .day-header-box { border-bottom: 2px solid #14b8a6; }
+    .day-col.is-today .day-num, .day-col.is-today .day-name { color: #14b8a6; }
 
-    .day-events-list { display: flex; flex-direction: column; gap: 8px; padding: 5px 0; }
+    /* 리스트 스크롤 기능 추가 적용 (좌우 스크롤 방지, 세로 스크롤 조건부) */
+    .day-events-list { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 8px; 
+        padding: 5px 4px 5px 0; 
+        flex: 1; 
+        overflow-y: auto; 
+        overflow-x: hidden; /* 좌우 스크롤 방지 */
+        min-height: 0;
+    }
+    .day-events-list::-webkit-scrollbar { width: 4px; }
+    .day-events-list::-webkit-scrollbar-track { background: transparent; }
+    .day-events-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .day-events-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
     .weekly-event-item {
         font-size: 0.85rem;
@@ -312,33 +353,51 @@
     .weekly-event-item:hover { background: var(--hover-bg); color: var(--text-main); }
     .weekly-event-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
     
-    .tooltip-box {
+    /* 잘림 현상 방지를 위한 글로벌 툴팁 CSS */
+    #global-tooltip {
         visibility: hidden;
         opacity: 0;
-        position: absolute;
-        top: 100%;
-        left: 0; 
-        transform: translateY(5px); 
+        position: fixed; /* 부모 요소의 영향 완벽 차단 */
         background: #1f2937;
         color: #ffffff;
         padding: 10px 14px;
         border-radius: 8px;
         font-size: 0.8rem;
         white-space: pre-wrap;
-        z-index: 1000;
+        z-index: 99999; /* 최상단 배치 */
         min-width: 180px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        transition: all 0.2s ease;
+        transition: opacity 0.2s ease;
         pointer-events: none;
     }
-    .tooltip-box::before {
-        content: ''; position: absolute; bottom: 100%; 
+    #global-tooltip::before {
+        content: ''; 
+        position: absolute; 
+        bottom: 100%; 
         left: 15px; 
-        transform: none; 
-        border-width: 6px; border-style: solid; border-color: transparent transparent #1f2937 transparent;
+        border-width: 6px; 
+        border-style: solid; 
+        border-color: transparent transparent #1f2937 transparent;
     }
-    .weekly-event-item:hover .tooltip-box { visibility: visible; opacity: 1; transform: translateY(0); }
 
+    /* 🚀 내 정보 수정 모달 디자인 (user_list.html과 100% 동일) */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
+    .full-width { grid-column: 1 / -1; }
+    .profile-setup-area { display: flex; gap: 20px; align-items: flex-start; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 5px; }
+    .modal-field { margin-bottom: 5px; text-align: left; }
+    .modal-field label { display: block; margin-bottom: 8px; color: #64748b; font-size: 0.85rem; font-weight: 700; }
+    .readonly-field { background-color: #f1f5f9 !important; color: #64748b !important; cursor: not-allowed; border: 1px solid #e2e8f0 !important; font-weight: 600; }
+    .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
+    .profile-icon-option.selected { border-color: var(--blue-primary); background: var(--blue-light); }
+    .profile-icon-option:hover { background: #f8f9fa; }
+    .emoji-scroll-box {
+        display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+        max-height: 130px; overflow-y: auto; border: 1px solid var(--widget-border-color); 
+        padding: 10px; border-radius: 10px; background: #fff;
+    }
+    .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+    .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+    .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid var(--widget-border-color); margin-top: 10px; display: none; }
 </style>
 
 <div class="dashboard-wrapper">
@@ -347,19 +406,27 @@
         <div style="grid-column: 1 / 2; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 20px;">
             
             <div class="profile-card">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <div style="width: 64px; height: 64px; background: var(--hover-bg); border: 1px solid var(--widget-border-color); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: var(--text-sub);">
-                        {{ user_icons.get(current_user, '👤') if user_icons else '👤' }}
+                <div style="display: flex; align-items: center; gap: 16px; cursor: pointer;" onclick="openMyInfoModal()" title="내 프로필 정보 수정">
+                    <div id="nav-profile-icon-container" style="width: 70px; height: 70px; background: #ffffff; border: 2px solid var(--widget-border-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: var(--text-sub); overflow: hidden;">
+                        {% if current_user_profile_path %}
+                            <img src="{{ current_user_profile_path }}" alt="Profile" style="width: 100%; height: 100%; object-fit: contain; background: #fff;">
+                        {% elif user_profile_paths and user_profile_paths.get(current_user) %}
+                            <img src="{{ user_profile_paths.get(current_user) }}" alt="Profile" style="width: 100%; height: 100%; object-fit: contain; background: #fff;">
+                        {% else %}
+                            {{ user_icons.get(current_user, '👤') if user_icons else '👤' }}
+                        {% endif %}
                     </div>
                     <div>
-                        <div style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; font-weight: 500;">새담 교육문화원 | 매니저</div>
+                        <div id="nav-user-name" style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
+                        <div id="nav-user-dept-pos" style="font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; font-weight: 500;">
+                            {{ session.get('department', '소속미지정') }} | {{ session.get('position', '직급미지정') }}
+                        </div>
                     </div>
                 </div>
                 
-<div style="display: flex; gap: 8px;">
-                    <button class="btn-primary" style="flex: 1;" onclick="alert('출근 처리되었습니다.')"><i class="fa-solid fa-sign-in-alt"></i> 출근</button>
-                    <button class="btn-action" style="flex: 1;" onclick="alert('퇴근 처리되었습니다.')"><i class="fa-solid fa-sign-out-alt"></i> 퇴근</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" style="flex: 1;" onclick="recordAttendance('in')"><i class="fa-solid fa-sign-in-alt"></i> 출근</button>
+                    <button class="btn-action" style="flex: 1;" onclick="recordAttendance('out')"><i class="fa-solid fa-sign-out-alt"></i> 퇴근</button>
                     
                     <button class="btn-action" style="width: 42px; padding: 0; display: flex; align-items: center; justify-content: center;" onclick="location.href='{{ url_for('memo.memo_board') }}'" title="개인 화이트보드">
                         <i class="fa-solid fa-chalkboard" style="font-size: 1.1rem; color: var(--text-main);"></i>
@@ -394,7 +461,7 @@
         <div class="widget-card" style="grid-column: 3 / 4; grid-row: 1 / 2;">
 
 
-<div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
+            <div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
                 
                 <div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1;">
                     <div id="tab-partners" class="pill-btn blue-pill-active" onclick="switchMsgTab('partners')" style="padding: 5px 8px; font-size: 0.75rem;">대화 상대</div>
@@ -402,7 +469,7 @@
                     <div id="tab-sent" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('sent')" style="padding: 5px 8px; font-size: 0.75rem;">보낸 쪽지</div>
                 </div>
 
-<div class="widget-icons" style="flex-shrink: 0; gap: 14px; align-items: center;">
+                <div class="widget-icons" style="flex-shrink: 0; gap: 14px; align-items: center;">
                     
                     <div style="position: relative; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('unreadMsgModal').style.display='block'" title="미확인 쪽지 보기">
                         <i class="fa-regular fa-envelope"></i>
@@ -493,7 +560,7 @@
                     {% for link in weblinks %}
                     <div class="weather-pill" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
                         {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
-                        <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 9px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s;"><i class="fa-solid fa-xmark"></i></div>
+                        <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" style="position: absolute; top: -4px; right: -4px; z-index: 10; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"><i class="fa-solid fa-xmark"></i></div>
                         {% endif %}
                         
                         {% if link.favicon_url == 'FILE' %}
@@ -533,11 +600,108 @@
                         <button class="btn-action" style="padding: 4px 12px;" onclick="currentWeeklyStart = new Date(); renderWeeklySchedule();">오늘</button>
                     </div>
                 </div>
-                <div style="display: flex; flex: 1; width: 100%;" id="weekly-schedule-container">
+                <div id="weekly-schedule-container">
                 </div>
             </div>
         </div>
 
+        <div style="grid-column: 4 / 5; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 20px;">
+            
+            <div class="widget-card" style="flex: 0 0 auto; min-height: 200px;">
+                <div class="widget-header">
+                    <div class="cal-title-area">오늘의 날씨</div>
+                    <div class="widget-icons"><i class="fa-solid fa-rotate-right" style="cursor:pointer;" onclick="alert('날씨 정보를 갱신합니다.')"></i></div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+                    <i class="fa-solid fa-cloud-sun" style="font-size: 3rem; color: #60a5fa; margin-bottom: 8px;"></i>
+                    <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); letter-spacing:-0.5px;">18°C</div>
+                    <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 2px;">수원시 맑음 (강수확률 10%)</div>
+                    
+                    <div style="margin-top: 16px; display: flex; gap: 20px; font-size: 0.8rem; border-top: 1px dashed var(--widget-border-color); padding-top: 16px; width: 100%; justify-content: center;">
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                            <span style="color:var(--text-muted); font-size:0.75rem;">미세먼지</span>
+                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
+                        </div>
+                        <div style="width: 1px; background: var(--widget-border-color);"></div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                            <span style="color:var(--text-muted); font-size:0.75rem;">초미세</span>
+                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="widget-card" style="flex: 1;">
+                <div class="widget-header">
+                    <div class="cal-title-area">실시간 활동 피드</div>
+                </div>
+                <div class="scroll-area" style="flex: 1; padding-top: 4px;">
+                    
+                    <div style="display:flex; gap:12px; margin-bottom:20px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:var(--blue-light); color:var(--blue-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                            <i class="fa-solid fa-file-signature"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:0.85rem; color:var(--text-main); line-height:1.4;">
+                                <b>오자룡</b>님이 <b>새로운 전자결재</b>를 기안했습니다.
+                            </div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">방금 전</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:12px; margin-bottom:20px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#fef3c7; color:#d97706; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                            <i class="fa-solid fa-bullhorn"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:0.85rem; color:var(--text-main); line-height:1.4;">
+                                <b>박은숙</b>님이 사내게시판에 <b>새 글</b>을 등록했습니다.
+                            </div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">15분 전</div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; gap:12px; margin-bottom:20px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#dcfce7; color:#16a34a; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                            <i class="fa-solid fa-calendar-check"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-size:0.85rem; color:var(--text-main); line-height:1.4;">
+                                <b>시스템알림</b><br>주간 외부회의 일정이 등록되었습니다.
+                            </div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">1시간 전</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+        </div>
+</div>
+
+<div id="global-tooltip"></div>
+
+<div id="myInfoModal" class="modal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background:#fff; border:1px solid var(--widget-border-color); box-shadow:0 25px 50px rgba(0,0,0,0.15); margin:6% auto; padding:0; border-radius:20px; width:800px; max-width:95vw; max-height:85vh; overflow-y:auto; color:var(--text-main);">
+        <div class="modal-header" style="padding:25px 30px; border-bottom:1px solid var(--widget-border-color); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1.3rem; font-weight:800; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-address-card" style="color:var(--blue-primary);"></i> 개인 프로필 정보</h3>
+            <span style="cursor:pointer; font-size:1.8rem; color:var(--text-muted);" onclick="closeMyInfoModal()">&times;</span>
+        </div>
+        
+        <div id="myInfoLoading" style="text-align:center; padding:50px; color:var(--text-muted); font-weight:600;">데이터를 불러오는 중입니다...</div>
+        <div id="myInfoError" style="display:none; text-align:center; padding:50px; color:#ef4444; font-weight:600;"></div>
+        
+        <div id="myInfoDisplay" style="display:none;">
+            <form id="myInfoForm" onsubmit="event.preventDefault(); submitMyInfoUpdate();">
+                <div class="form-grid" id="myInfoGrid"></div>
+                
+                <div style="padding:20px 30px; display:flex; gap:10px; justify-content:flex-end; background:#f8fafc; border-top:1px solid var(--widget-border-color);">
+                    <button type="submit" class="btn-primary" style="padding:12px 30px;"><i class="fa-solid fa-check" style="margin-right:5px;"></i> 변경사항 저장</button>
+                    <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -737,6 +901,198 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
+    // 🚀 출결 관리 통신 함수 (SQLite 오류 수정됨)
+    async function recordAttendance(type) {
+        const actionTxt = type === 'in' ? '출근' : '퇴근';
+        if (!confirm(`현재 시간으로 ${actionTxt} 처리하시겠습니까?`)) return;
+
+        try {
+            const res = await fetch(`/api/attendance/${type}`, { method: 'POST' });
+            const result = await res.json();
+            
+            if (res.ok && result.status === 'success') {
+                alert(result.message);
+            } else {
+                alert(result.message || '처리 중 오류가 발생했습니다.');
+            }
+        } catch (error) {
+            alert('서버 통신 오류가 발생했습니다.');
+        }
+    }
+
+    // 🚀 이모티콘 배열 세팅 (내 정보 모달용)
+    const avatarEmojis = [
+        '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
+        '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
+        '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
+        '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
+    ];
+    let currentMyInfo = null; // 백업용
+
+    function previewImage(input, previewId) {
+        const preview = document.getElementById(previewId);
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.src = "";
+            preview.style.display = 'none';
+        }
+    }
+
+    function formatPhoneNumber(input) {
+        let val = input.value.replace(/[^0-9]/g, '');
+        if (val.length > 3 && val.length <= 7) val = val.slice(0, 3) + '-' + val.slice(3);
+        else if (val.length > 7) val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+        input.value = val;
+    }
+
+    function renderIcons(containerId, inputId, currentIcon) {
+        const container = document.getElementById(containerId);
+        if(!container) return;
+        container.innerHTML = avatarEmojis.map((e, i) => {
+            const isSelected = (currentIcon && currentIcon === e) || (!currentIcon && i === 0);
+            return `<div class="profile-icon-option ${isSelected ? 'selected' : ''}" onclick="selectIcon(this, '${inputId}', '${e}')" style="font-size:1.8rem; cursor:pointer; padding:6px; border-radius:50%; border:3px solid ${isSelected ? 'var(--blue-primary)' : 'transparent'}; background:${isSelected ? 'var(--blue-light)' : 'transparent'};">${e}</div>`;
+        }).join('');
+        if(!currentIcon && document.getElementById(inputId)) document.getElementById(inputId).value = avatarEmojis[0];
+    }
+
+    function selectIcon(el, inputId, emoji) {
+        document.querySelectorAll('#' + el.parentElement.id + ' .profile-icon-option').forEach(opt => {
+            opt.style.borderColor = 'transparent';
+            opt.style.background = 'transparent';
+        });
+        el.style.borderColor = 'var(--blue-primary)';
+        el.style.background = 'var(--blue-light)';
+        document.getElementById(inputId).value = emoji;
+    }
+
+    // 🚀 내 정보 모달창 띄우기 로직 추가
+    async function openMyInfoModal() {
+        const modal = document.getElementById('myInfoModal');
+        const loading = document.getElementById('myInfoLoading');
+        const errorDiv = document.getElementById('myInfoError');
+        const display = document.getElementById('myInfoDisplay');
+        const grid = document.getElementById('myInfoGrid');
+
+        modal.style.display = "block";
+        loading.style.display = "block";
+        errorDiv.style.display = "none";
+        display.style.display = "none";
+        grid.innerHTML = "";
+
+        try {
+            const res = await fetch('/user/list'); 
+            const users = await res.json();
+            
+            const currentEmpNo = "{{ session.get('emp_no', '') }}";
+            const currentName = "{{ session.get('user_name', '') }}";
+            
+            currentMyInfo = users.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+            
+            if (currentMyInfo) {
+                const u = currentMyInfo;
+                const profilePath = u.profile_path || '';
+                const icon = u.아이콘 || '👤';
+
+                let html = `
+                    <div class="full-width profile-setup-area">
+                        <div style="flex:1;">
+                            <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
+                            <input type="file" id="myinfo_profile_image" class="glass-input" accept="image/*" onchange="previewImage(this, 'preview_myinfo')" style="padding: 8px; font-size: 0.85em;">
+                            <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px; margin-top:10px; border-radius:50%; object-fit:cover;">
+                        </div>
+                        <div style="flex:2;">
+                            <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">기본 프로필 아이콘 선택</label>
+                            <div id="icon-container-myinfo" class="emoji-scroll-box" style="display:flex; flex-wrap:wrap; gap:5px; max-height:130px; overflow-y:auto; border:1px solid #e2e8f0; padding:10px; border-radius:10px; background:#fff;"></div>
+                            <input type="hidden" id="myinfo_profile_icon" value="${icon}">
+                        </div>
+                    </div>
+
+                    <div class="modal-field"><label>사번</label><input type="text" value="${u.사번||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field"><label>성명</label><input type="text" value="${u.이름||'-'}" readonly class="glass-input readonly-field"></div>
+                    
+                    <div class="modal-field"><label>새 비밀번호 <span style="color:#d9480f; font-weight:normal;">(영문/숫자/특수문자 조합 6자 이상)</span></label><input type="password" id="myinfo_pass" class="glass-input" placeholder="*** (변경시에만 입력)"></div>
+                    <div class="modal-field"><label>새 비밀번호 확인</label><input type="password" id="myinfo_pass_confirm" class="glass-input" placeholder="새 비밀번호 재입력"></div>
+
+                    <div class="modal-field"><label>연락처</label><input type="text" id="myinfo_phone" value="${u.전화번호||''}" oninput="formatPhoneNumber(this)" class="glass-input"></div>
+                    <div class="modal-field"><label>이메일</label><input type="email" id="myinfo_email" value="${u.이메일||''}" class="glass-input"></div>
+                    
+                    <div class="modal-field full-width"><label>주소지</label><input type="text" id="myinfo_address" value="${u.주소||''}" class="glass-input"></div>
+                    
+                    <div class="modal-field"><label>소속부서</label><input type="text" value="${u.소속||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field"><label>직급 (레벨: ${u.레벨||'-'})</label><input type="text" value="${u.직급||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field full-width"><label>급여통장번호</label><input type="text" value="${u.계좌||'-'}" readonly class="glass-input readonly-field"></div>
+                `;
+
+                grid.innerHTML = html;
+                renderIcons('icon-container-myinfo', 'myinfo_profile_icon', icon);
+
+                loading.style.display = "none";
+                display.style.display = "block";
+            } else { throw new Error('사용자 정보를 불러올 수 없습니다. 관리자에게 문의하세요.'); }
+        } catch (e) {
+            loading.style.display = "none";
+            errorDiv.style.display = "block";
+            errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 시스템 오류가 발생했습니다.<br><small>${e.message}</small>`;
+        }
+    }
+
+    // 🚀 내 프로필 업데이트 로직
+    async function submitMyInfoUpdate() {
+        if (!currentMyInfo) return alert("사용자 정보가 없습니다.");
+
+        const password = document.getElementById('myinfo_pass').value;
+        const passwordConfirm = document.getElementById('myinfo_pass_confirm').value;
+        const phone = document.getElementById('myinfo_phone').value;
+        const email = document.getElementById('myinfo_email').value;
+        const address = document.getElementById('myinfo_address').value;
+        const profileIcon = document.getElementById('myinfo_profile_icon').value;
+        const profileImage = document.getElementById('myinfo_profile_image').files[0];
+
+        if (password) {
+            if (password !== passwordConfirm) return alert("입력하신 새 비밀번호가 서로 일치하지 않습니다.");
+            const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{6,}$/;
+            if (!pwRegex.test(password)) return alert("비밀번호는 영문, 숫자, 특수문자를 모두 포함하여 6자리 이상이어야 합니다."); 
+        }
+
+        const formData = new FormData();
+        formData.append('user_idx', currentMyInfo.id);
+        formData.append('password', password || currentMyInfo.비밀번호 || ''); 
+        formData.append('phone', phone);
+        formData.append('email', email);
+        formData.append('address', address);
+        formData.append('profile_icon', profileIcon);
+        
+        formData.append('position', currentMyInfo.직급 || '사원');
+        formData.append('level', currentMyInfo.레벨 || 10);
+        formData.append('department', currentMyInfo.소속 || '');
+        formData.append('bank_account', currentMyInfo.계좌 || '');
+        
+        if (profileImage) formData.append('profile_image', profileImage);
+
+        try {
+            const res = await fetch('/user/update', {
+                method: 'POST', 
+                body: formData 
+            });
+            const result = await res.json();
+
+            if (res.ok) {
+                alert('프로필 정보가 성공적으로 변경되었습니다.');
+                closeMyInfoModal();
+                location.reload(); 
+            } else { alert(result.message || '정보 수정 처리에 실패했습니다.'); }
+        } catch (e) { alert('서버와의 통신이 원활하지 않습니다. 잠시 후 다시 시도해주세요.'); }
+    }
+
+    function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+    window.onclick = (e) => { if (e.target.id === 'myInfoModal') closeMyInfoModal(); }
+
     function openMsgModalWithReceiver(targetUser) {
         if(targetUser === currentUser) return; 
         const modal = document.getElementById('msgModal');
@@ -865,7 +1221,29 @@
     const globalHolidays = {{ holidays_dict | tojson | safe }};
     let currentWeeklyStart = new Date();
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
+        
+        try {
+            const userRes = await fetch('/user/list');
+            if (userRes.ok) {
+                const users = await userRes.json();
+                const currentEmpNo = "{{ session.get('emp_no', '') }}";
+                const currentName = "{{ session.get('user_name', '') }}";
+                const me = users.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+                
+                if (me) {
+                    if (me.이름) document.getElementById('nav-user-name').innerText = me.이름;
+                    
+                    const deptPosEl = document.getElementById('nav-user-dept-pos');
+                    if (deptPosEl) {
+                        const dept = me.소속 || '소속미지정';
+                        const pos = me.직급 || '직급미지정';
+                        deptPosEl.innerText = `${dept} | ${pos}`;
+                    }
+                }
+            }
+        } catch(e) {}
+
         var miniCalendarEl = document.getElementById('mini-calendar');
         var miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
             initialView: 'dayGridMonth',
@@ -940,6 +1318,46 @@
 
         loadNotificationWidget();
         setInterval(loadNotificationWidget, 60000);
+
+        setInterval(updateMessageBadge, 10000); 
+        
+        const globalTooltip = document.getElementById('global-tooltip');
+
+        document.addEventListener('mouseover', (e) => {
+            const item = e.target.closest('.weekly-event-item');
+            if (item) {
+                const text = item.getAttribute('data-tooltip');
+                if (text) {
+                    globalTooltip.innerHTML = text;
+                    globalTooltip.style.visibility = 'visible';
+                    globalTooltip.style.opacity = '1';
+
+                    const rect = item.getBoundingClientRect();
+                    let topPos = rect.bottom + 8;
+                    let leftPos = rect.left;
+                    const ttRect = globalTooltip.getBoundingClientRect();
+
+                    if (leftPos + ttRect.width > window.innerWidth) {
+                        leftPos = window.innerWidth - ttRect.width - 15;
+                    }
+
+                    if (topPos + ttRect.height > window.innerHeight) {
+                        topPos = rect.top - ttRect.height - 8;
+                    }
+
+                    globalTooltip.style.top = topPos + 'px';
+                    globalTooltip.style.left = leftPos + 'px';
+                }
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const item = e.target.closest('.weekly-event-item');
+            if (item) {
+                globalTooltip.style.visibility = 'hidden';
+                globalTooltip.style.opacity = '0';
+            }
+        });
     });
 
     function shiftWeeklySchedule(days) {
@@ -1017,10 +1435,9 @@
                 const tooltipText = `${timeDisp}${titleFallback}${noteDisp}`;
                 
                 eventsHtml += `
-                    <div class="weekly-event-item">
+                    <div class="weekly-event-item" data-tooltip="${tooltipText.replace(/"/g, '&quot;')}">
                         <span style="color:${color}; margin-right:6px; font-size:0.6rem; transform: translateY(3px);">●</span>
                         <span class="weekly-event-text">${titleFallback}</span>
-                        <div class="tooltip-box">${tooltipText}</div>
                     </div>
                 `;
             });
@@ -1384,7 +1801,6 @@
         }
     }
 
-// === 쪽지함 안 읽은 메시지 배지 실시간 조회 함수 ===
     function updateMessageBadge() {
         fetch('/api/unread_messages')
             .then(res => res.json())
@@ -1416,90 +1832,5 @@
             })
             .catch(err => console.error('메시지 갱신 에러:', err));
     }
-
-    // === 모든 스크립트가 로드되었을 때 실행되는 메인 블록 ===
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        // 1. 캘린더 초기화 및 렌더링
-        var miniCalendarEl = document.getElementById('mini-calendar');
-        var miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'ko',
-            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
-            contentHeight: 'auto',
-            fixedWeekCount: false,
-            events: window.allCalendarEvents,
-            dayCellContent: function(arg) {
-                return { html: `<div class="fc-daygrid-day-number">${arg.date.getDate()}</div>` };
-            },
-            dayCellDidMount: function(arg) {
-                const dStr = arg.dateStr; 
-                const dObj = arg.date;
-                const dateStrForHoliday = dObj.getFullYear() + "-" + String(dObj.getMonth() + 1).padStart(2, '0') + "-" + String(dObj.getDate()).padStart(2, '0');
-                
-                if (globalHolidays[dateStrForHoliday]) {
-                    arg.el.classList.add('holiday-day');
-                }
-
-                const hasEvent = window.allCalendarEvents.some(e => (e.start && e.start.split('T')[0] === dStr));
-                if (hasEvent) {
-                    const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
-                    if (numberEl) {
-                        numberEl.style.backgroundColor = 'rgba(37, 99, 235, 0.15)'; 
-                        numberEl.style.borderRadius = '50%';
-                    }
-                }
-            },
-            dateClick: function(info) { openDayDetails(info.dateStr); },
-            eventClick: function(info) {
-                info.jsEvent.preventDefault();
-                openDayDetails(info.event.startStr.split('T')[0]);
-            }
-        });
-        miniCalendar.render();
-
-        // 2. 주간 스케줄 및 태스크 렌더링
-        renderWeeklySchedule();
-        renderMyWeeklyTasksSummary();
-
-        // 3. 페이지 로드 시점의 '안 읽은 쪽지 뱃지' 초기 세팅 (서버에서 받아온 렌더링 값)
-        let totalUnread = 0;
-        document.querySelectorAll('#list-partners .unread-badge').forEach(el => {
-            totalUnread += parseInt(el.innerText) || 0;
-        });
-        const leftBadge = document.getElementById('left-unread-badge');
-        if (leftBadge && totalUnread > 0) {
-            leftBadge.innerText = totalUnread;
-            leftBadge.style.display = 'block';
-        }
-
-        // 4. 드래그 앤 드롭 정렬 (WebLink)
-        var weblinkEl = document.getElementById('weblink-container');
-        if(weblinkEl) {
-            Sortable.create(weblinkEl, {
-                animation: 150,
-                ghostClass: 'weblink-ghost',
-                onEnd: function (evt) {
-                    var itemEls = weblinkEl.querySelectorAll('.weather-pill');
-                    var newOrder = [];
-                    itemEls.forEach(function(item) {
-                        newOrder.push(item.getAttribute('data-id'));
-                    });
-                    fetch('/update_weblink_order', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ order: newOrder })
-                    }).catch(err => console.error("순서 저장 실패:", err));
-                }
-            });
-        }
-
-        // 5. 알림 위젯 로드 및 60초 주기 갱신
-        loadNotificationWidget();
-        setInterval(loadNotificationWidget, 60000);
-
-        // 6. 🚀 쪽지함 안 읽은 메시지 뱃지 10초 주기 자동 갱신 시작!
-        setInterval(updateMessageBadge, 10000); 
-    });
 </script>
 {% endblock %}

@@ -1,0 +1,1101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
+
+<style>
+    /* 기본 컨테이너 넓이 확장 및 바탕 흰색, 테두리 둥글게 적용 */
+    .school-container { 
+        width: 98%; 
+        max-width: 1800px; 
+        min-height: 85vh; 
+        margin: 0 auto; 
+        padding: 30px; 
+        background: #ffffff;
+        border-radius: 20px; 
+        box-shadow: 0 4px 20px rgba(0,0,0,0.03); 
+        font-family: 'Pretendard', sans-serif; 
+        box-sizing: border-box;
+    }
+    
+    .page-header { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 20px; }
+    
+    /* 버튼 스타일 */
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; font-size: 0.95em; }
+    .btn-primary { background: #004ea2; color: white; } 
+    .btn-primary:hover { background: #003a7a; }
+    .btn-danger { background: #e74c3c; color: white; }
+    
+    /* 학교 목록 그리드 레이아웃 */
+    .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; }
+    .school-card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-decoration: none; color: inherit; border-left: 5px solid #004ea2; display: block; transition: 0.3s; border: 1px solid #f1f5f9; }
+    .school-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+    
+    /* =========================================
+        🚀 리뉴얼된 대시보드 헤더 (화이트 & 연한 그레이)
+       ========================================= */
+    .dashboard-header {
+        position: relative;
+        width: 100%;
+        min-height: 160px; 
+        border-radius: 24px;
+        margin-bottom: 30px;
+        overflow: hidden;
+        background: linear-gradient(to right, #ffffff, #f8fafc);
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        color: #1e293b;
+    }
+    
+    .dashboard-overlay {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 25px 40px;
+        box-sizing: border-box;
+    }
+
+    .dash-left-info {
+        flex: 1.2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
+    }
+    .dash-school-year { 
+        font-size: 1.05em; 
+        color: #64748b; 
+        font-weight: 600; 
+        margin-bottom: 4px; 
+    }
+    .dash-school-name { 
+        font-size: 2.2em; 
+        font-weight: 900; 
+        margin: 0 0 12px 0; 
+        letter-spacing: -0.04em;
+        color: #0f172a;
+    }
+    
+    .dash-meta-grid {
+        display: flex; gap: 18px; justify-content: flex-start; flex-wrap: wrap;
+        font-size: 0.88em; 
+        font-weight: 500;  
+        color: #475569;
+    }
+    .dash-meta-item i { margin-right: 5px; color: #004ea2; }
+
+    /* 디지털 시계 디자인 */
+    .digital-clock-container {
+        flex: 0.8;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        padding: 15px 25px;
+        border-radius: 20px;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+    #clock-time {
+        font-size: 2.4em;
+        font-weight: 800;
+        color: #004ea2;
+        letter-spacing: 0.05em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+    #clock-date {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #64748b;
+        margin-top: 6px;
+    }
+
+    .dash-menu-container {
+        flex: 1;
+        display: flex;
+        justify-content: flex-end; 
+    }
+    .dash-menu-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr); 
+        grid-template-rows: repeat(2, 1fr);    
+        gap: 8px;
+        background: #f1f5f9;
+        padding: 10px;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+    }
+    .dash-menu-item {
+        width: 65px; height: 65px;
+        background: #ffffff;
+        border-radius: 10px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        color: #1e293b; text-decoration: none; font-size: 0.7rem; font-weight: 700;
+        transition: all 0.2s ease;
+        border: 1px solid #e2e8f0;
+    }
+    .dash-menu-item i { font-size: 1.4em; color: #004ea2; margin-bottom: 4px; transition: 0.2s; }
+    .dash-menu-item:hover { transform: translateY(-3px); background: #ffffff; box-shadow: 0 6px 12px rgba(0,0,0,0.08); border-color: #004ea2; }
+    .dash-menu-item.active { background: #004ea2; color: #ffffff; border: 2px solid #fff; }
+    .dash-menu-item.active i { color: #ffffff; }
+
+    @media (max-width: 1350px) {
+        .dashboard-overlay { flex-direction: column; text-align: center; padding: 25px; gap: 20px;}
+        .dash-left-info { align-items: center; text-align: center; margin-bottom: 10px; }
+        .dash-meta-grid { justify-content: center; }
+        .digital-clock-container { width: 100%; max-width: 300px; }
+        .dash-menu-container { justify-content: center; }
+    }
+
+    /* 게시판 레이아웃 */
+    .workspace-layout { display: flex; gap: 25px; align-items: flex-start; }
+    .board-section { flex: 3; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; min-width: 0; }
+    .memo-section { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; display: flex; flex-direction: column; overflow: hidden; }
+    
+    table.board-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    /* 🚀 폰트 사이즈 조정 및 굵기 해제, 패딩 축소로 행 높이 최적화 */
+    table.board-table th, table.board-table td { padding: 12px 15px; border-bottom: 1px solid #eee; text-align: left; font-size: 0.9rem; font-weight: normal; }
+    table.board-table th { background: #f8f9fa; font-weight: 600; font-size: 0.85rem; color: #555; }
+    .board-table tbody tr:hover { background: #f8fafc; cursor: pointer; }
+
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; }
+    .status-접수 { background: #fef3c7; color: #d97706; }
+    .status-처리중 { background: #dbeafe; color: #2563eb; }
+    .status-완료 { background: #dcfce3; color: #16a34a; }
+
+    .glass-input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-family: inherit; font-size: 1em; }
+    .glass-input:focus { outline: none; border-color: #004ea2; box-shadow: 0 0 0 3px rgba(0,78,162,0.1); }
+
+    .sd-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
+    .sd-modal-content { background: white; width: 750px; max-width: 90%; margin: 80px auto; padding: 30px; border-radius: 20px; max-height: 85vh; overflow-y: auto; box-sizing: border-box; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #333; font-size: 0.95em; }
+    .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;}
+
+    .pagination-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 30px; }
+    .page-btn { border: 1px solid #cbd5e1; background: #ffffff; padding: 8px 16px; border-radius: 8px; cursor: pointer; color: #64748b; font-weight: 600; transition: all 0.2s; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+    .page-btn:hover:not(:disabled) { background: #eff6ff; color: #004ea2; border-color: #004ea2; }
+    .page-btn.active { background: #004ea2; color: #ffffff; border-color: #004ea2; pointer-events: none; }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; background: #f8fafc; }
+
+    .pill-tabs { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; background: #f8fafc; padding: 4px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .pill-btn { padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .blue-pill-active { background: #ffffff; color: #004ea2; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .blue-pill-inactive { background: transparent; color: #475569; border: 1px solid transparent; }
+    .blue-pill-inactive:hover { color: #0f172a; }
+
+    .widget-icons { display: flex; gap: 12px; color: #94a3b8; font-size: 1.05rem; }
+    .widget-icons i { cursor: pointer; transition: color 0.2s; }
+    .widget-icons i:hover { color: #004ea2; }
+
+    .list-item-common { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; cursor: pointer; transition: all 0.2s ease; border-left: 3px solid transparent; }
+    .list-item-common:hover { background: #eff6ff; border-left: 3px solid #004ea2; padding-left: 14px; }
+    
+    .msg-list-name { color: #0f172a; font-weight: 600; font-size: 0.9rem; }
+    .msg-list-date { color: #94a3b8; font-size: 0.75rem; }
+    .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
+
+    .scroll-area { overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+    .scroll-area::-webkit-scrollbar { width: 4px; }
+    .scroll-area::-webkit-scrollbar-track { background: transparent; }
+    .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .msg-modal-content { background: #fff; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); color: #0f172a; margin: 10% auto; padding: 30px; width: 400px; position: relative; box-sizing: border-box;}
+    .modal-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #0f172a; transition: 0.2s; font-family: inherit; box-sizing: border-box;}
+    .modal-input:focus { border-color: #004ea2; outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(0, 78, 162, 0.1); }
+    
+    .org-status-item { display: flex; align-items: center; padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+    .org-status-item:hover { background: #f8f9fa; border-color: #e2e8f0; }
+    .org-avatar { width: 28px; height: 28px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 0.85rem; position: relative; }
+    .org-status-dot { position: absolute; bottom: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid #fff; }
+    .status-offline { background: #cbd5e1; }
+    .org-info { flex: 1; line-height: 1.2; overflow: hidden;}
+    .org-name { font-size: 0.8rem; font-weight: 700; color: #1e293b; margin-bottom: 2px; } 
+    .org-dept { font-size: 0.65rem; color: #94a3b8; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;} 
+    .org-msg-icon { color: #94a3b8; font-size: 0.75rem; transition: 0.2s; }
+    .org-status-item:hover .org-msg-icon { color: #004ea2; transform: scale(1.1); }
+    .org-rank-header { font-size: 0.75rem; font-weight: 800; color: #004ea2; padding: 12px 8px 6px 8px; margin-top: 5px; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px; }
+    
+    .emoji-item { cursor:pointer; padding:5px; transition:0.2s; text-align:center; border-radius:5px; }
+    .emoji-item:hover { background:#f1f5f9; transform:scale(1.2); }
+
+    .mini-cal { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .mini-cal th { color: #94a3b8; padding-bottom: 8px; font-weight: 500; }
+    .mini-cal td { text-align: center; padding: 8px 0; color: #1e293b; position: relative; cursor: pointer; }
+    .mini-cal td.today { background: #004ea2; color: white; border-radius: 8px; font-weight: bold; }
+    .mini-cal td.has-event::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: #ff4757; border-radius: 50%; }
+
+    .read-card { background:#fff; border:1px solid #d7dde5; border-radius:18px; overflow:hidden; box-shadow:none; }
+    .read-header { padding:26px 30px 18px; background:#fff; border-bottom:0; }
+    .read-topline { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
+    .read-title { margin:0; color:#111827; font-size:1.7rem; line-height:1.38; letter-spacing:-0.035em; font-weight:800; }
+    .read-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; margin-top:14px; color:#6b7280; font-size:0.88rem; }
+    .read-meta-item { display:inline-flex; align-items:center; gap:6px; }
+    .read-body-wrap { margin:0; background:#fff; border:0; border-radius:0; padding:10px 30px 30px; }
+    .read-body { min-height:260px; line-height:1.85; font-size:1.04rem; color:#1f2937; word-break:break-word; }
+    .read-body img { max-width:100%; height:auto; border-radius:8px; }
+    .read-file-box { margin:0; padding:0 30px 28px; background:transparent; border:0; color:#6b7280; font-size:0.9rem; }
+    .read-file-line { display:flex; flex-wrap:wrap; gap:7px; align-items:center; color:#6b7280; }
+    .read-file-prefix { font-weight:700; color:#4b5563; }
+    .read-file-link { display:inline; padding:0; border:0; background:transparent; color:#2563eb; text-decoration:none; font-weight:600; }
+    .read-file-link:hover { text-decoration:underline; text-underline-offset:3px; }
+    .read-footer-actions { text-align:right; padding:0 30px 26px; border-top:0; background:#fff; }
+    .read-back-btn, .post-action-btn, .comment-mini-btn { border:0; background:transparent; color:#6b7280; border-radius:7px; padding:6px 9px; cursor:pointer; font-size:0.82rem; font-weight:700; transition:all .15s ease; }
+    .read-back-btn:hover, .post-action-btn:hover, .comment-mini-btn:hover { background:#f3f4f6; color:#111827; }
+    .post-action-btn.primary { color:#2563eb; }
+    .post-action-btn.danger, .comment-mini-btn.danger { color:#dc2626; }
+    .post-action-btn.danger:hover, .comment-mini-btn.danger:hover { background:#fef2f2; color:#b91c1c; }
+
+    .comment-box { margin-top:28px; border:0; border-radius:0; background:#fff; overflow:visible; box-shadow:none; }
+    .comment-header { display:flex; align-items:center; justify-content:space-between; padding:20px 2px 12px; background:#fff; border-bottom:0; }
+    .comment-header h3 { font-size:1rem !important; font-weight:800; letter-spacing:-0.02em; }
+    .comment-write { background:#fff; border-bottom:0; padding:0 0 22px; }
+    .comment-textarea { width:100%; min-height:76px; border:1px solid #d1d5db; border-radius:12px; padding:12px 13px; resize:vertical; font-family:inherit; box-sizing:border-box; line-height:1.55; background:#fff; color:#111827; }
+    .comment-textarea:focus { outline:none; border-color:#9ca3af; box-shadow:none; }
+    .comment-file-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; }
+    .comment-file-input { flex:1; border:0; border-radius:0; padding:6px 0; background:transparent; font-size:0.83rem; color:#6b7280; }
+    .comment-list { padding:0; background:#fff; }
+    .comment-empty { text-align:center; padding:26px 0; color:#9ca3af; background:#fff; border:0; }
+    .comment-item { border:0; border-radius:0; padding:16px 0; margin:0; background:transparent; overflow:visible; }
+    .comment-item + .comment-item { border-top:1px solid #eef0f3; }
+    .comment-item.reply { margin-left:34px; background:transparent; border-left:0; }
+    .comment-item.reply .comment-top-row::before { display:none; }
+    .comment-top-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0; background:transparent; border-bottom:0; }
+    .comment-left-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+    .comment-author { color:#111827; font-weight:800; display:flex; align-items:center; gap:6px; min-width:0; }
+    .comment-date { color:#9ca3af; font-size:0.8rem; white-space:nowrap; flex-shrink:0; }
+    .comment-actions { display:flex; justify-content:flex-end; align-items:center; gap:4px; white-space:nowrap; margin-left:auto; }
+    .comment-content { color:#374151; line-height:1.7; white-space:pre-wrap; word-break:break-word; padding:9px 0 0; }
+    .comment-attachments { padding:7px 0 0; color:#6b7280; font-size:0.84rem; }
+    .comment-file-prefix { font-weight:700; color:#6b7280; }
+    .comment-file-link { display:inline; padding:0; border-radius:0; background:transparent; color:#2563eb; text-decoration:none; font-size:0.84rem; font-weight:600; border:0; }
+    .comment-file-link:hover { text-decoration:underline; text-underline-offset:3px; }
+    .reply-form { margin:12px 0 0; padding:0; background:transparent; border-radius:0; border:0; }
+
+    .post-file-dropzone { background:#f8fafc; border:1px dashed #cbd5e1; padding:22px; border-radius:14px; text-align:center; transition:all .15s ease; }
+    .post-file-dropzone.dragover { background:#eff6ff; border-color:#004ea2; }
+    .post-file-pick-btn { display:inline-block; padding:10px 20px; background:#fff; border:1px solid #cbd5e1; border-radius:8px; cursor:pointer; color:#475569; margin-bottom:0; font-weight:700; }
+    .post-file-help { margin-top:8px; color:#64748b; font-size:0.85rem; }
+    .post-file-list { margin-top:14px; display:flex; flex-direction:column; gap:7px; text-align:left; }
+    .existing-file-title { margin-top:14px; color:#475569; font-size:0.85rem; font-weight:800; text-align:left; }
+    .existing-file-list { margin-top:8px; display:flex; flex-direction:column; gap:7px; text-align:left; }
+    .post-file-chip { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 11px; border:1px solid #e5e7eb; border-radius:9px; background:#fff; color:#334155; font-size:0.9rem; }
+    .post-file-chip-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .post-file-remove { border:0; background:transparent; color:#dc2626; cursor:pointer; font-size:0.82rem; font-weight:800; padding:4px 6px; border-radius:6px; flex-shrink:0; }
+    .post-file-remove:hover { background:#fef2f2; }
+    .read-file-delete { border:0; background:transparent; color:#dc2626; cursor:pointer; font-size:0.78rem; font-weight:800; padding:3px 6px; border-radius:6px; }
+    .read-file-delete:hover { background:#fef2f2; }
+
+    @media (max-width:720px) {
+        .read-header { padding:22px 20px 14px; }
+        .read-body-wrap { padding:8px 20px 24px; }
+        .read-file-box { padding:0 20px 22px; }
+        .read-footer-actions { padding:0 20px 22px; }
+        .comment-top-row { flex-wrap:wrap; align-items:flex-start; gap:6px; }
+        .comment-actions { width:100%; justify-content:flex-start; margin-left:0; }
+        .comment-left-meta { width:100%; }
+        .comment-item.reply { margin-left:18px; }
+    }
+</style>
+
+<div class="school-container">
+    {% if view_type == 'list' %}
+    <div class="page-header">
+        <h1 style="margin:0; color:#2c3e50;"><i class="fas fa-school" style="color:#004ea2;"></i> 학교업무공간</h1>
+        <button class="btn btn-primary" onclick="openModal('regModal')"><i class="fas fa-plus"></i> 신규 학교 등록</button>
+    </div>
+
+    <div class="school-grid">
+        {% for s in schools %}
+        <a href="{{ url_for('school.school_detail', school_id=s.id) }}" class="school-card">
+            <span style="display:inline-block; padding:4px 8px; background:#e1f0fa; color:#004ea2; border-radius:4px; font-size:0.85em; font-weight:bold; margin-bottom:10px;">{{ s.year }}년도</span>
+            <h3 style="margin:0 0 10px 0;">{{ s.school_name }}</h3>
+            <p style="margin:5px 0; color:#666; font-size:0.95em;"><i class="fas fa-phone-alt" style="width:20px; color:#999;"></i> {{ s.office_phone }}</p>
+            <p style="margin:5px 0; color:#666; font-size:0.95em;"><i class="fas fa-user-tie" style="width:20px; color:#999;"></i> 센터장: <strong>{{ s.director_name or '미지정' }}</strong></p>
+        </a>
+        {% endfor %}
+    </div>
+
+    {% elif view_type == 'detail' %}
+    
+    <div class="dashboard-header" id="dashboard-bg">
+        <div class="dashboard-overlay">
+            
+            <div class="dash-left-info">
+                <div class="dash-school-year">{{ school.year }}년도 업무공간</div>
+                <div class="dash-school-name">{{ school.school_name }}</div>
+                
+                <div class="dash-meta-grid">
+                    <span class="dash-meta-item"><i class="fas fa-user-tie"></i> 센터장: {{ school.director_name or '미지정' }}</span>
+                    <span class="dash-meta-item"><i class="fas fa-phone-alt"></i> 전화: {{ school.office_phone }}</span>
+                    <span class="dash-meta-item"><i class="fas fa-map-marker-alt"></i> 위치: {{ school.office_location }}</span>
+                    <span class="dash-meta-item"><i class="fas fa-user"></i> 실무사: {{ school.neulbom_assistant }}</span>
+                    <span class="dash-meta-item"><i class="fas fa-user-cog"></i> 실장: {{ school.neulbom_manager }}</span>
+                </div>
+            </div>
+
+            <!-- ⏰ 디지털 시계 영역 -->
+            <div class="digital-clock-container">
+                <div id="clock-time">00:00:00</div>
+                <div id="clock-date">2026. 05. 09 (토)</div>
+            </div>
+
+            <div class="dash-menu-container">
+                <div class="dash-menu-grid">
+                    {% for cat in school_categories %}
+                    <a href="?category={{ cat.id }}" class="dash-menu-item {{ 'active' if category == cat.id }}" title="{{ cat.name }}">
+                        <i class="fas {{ cat.icon }}"></i>
+                        <span>{{ cat.name }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    {% set active_cat = namespace(name='게시판') %}
+    {% for cat in school_categories %}
+        {% if cat.id|string == category|string %}
+            {% set active_cat.name = cat.name %}
+        {% endif %}
+    {% endfor %}
+
+    <div class="workspace-layout">
+        <div class="board-section">
+            <div id="boardListView">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin:0; font-size:1.4em;"><i class="fas fa-list-ul" style="color:#004ea2;"></i> {{ active_cat.name }}</h3>
+                    <div>
+                        <button class="btn btn-danger" onclick="submitMultiDelete()" style="margin-right:5px;">선택삭제</button>
+                        <button class="btn btn-primary" onclick="openPostForm('{{ category }}')"><i class="fas fa-pen"></i> 글쓰기</button>
+                    </div>
+                </div>
+                
+                <form id="multiDeleteForm" action="{{ url_for('school.delete_multi') }}" method="POST">
+                    <input type="hidden" name="school_id" value="{{ school.id }}">
+                    <input type="hidden" name="category" value="{{ category }}">
+                    <table class="board-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px; text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th>
+                                <th style="width:60px; text-align:center;">번호</th>
+                                <th>제목</th>
+                                <th style="width:100px; text-align:center;">작성자</th>
+                                <th style="width:80px; text-align:center;">상태</th>
+                                <th style="width:120px; text-align:center;">작성일</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in posts %}
+                            <tr onclick="viewPost({{ p.id }})">
+                                <td style="text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" name="post_ids" value="{{ p.id }}" class="post-checkbox"></td>
+                                <td style="text-align:center; color:#888;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * 10 }}</td>
+                                <!-- 🚀 td의 inline style에서 font-weight 제거 -->
+                                <td style="color: #1e293b;">
+                                    {{ p.title }}
+                                    {% if p.filename %}<i class="fas fa-paperclip" style="color:#94a3b8; margin-left:5px;"></i>{% endif %}
+                                </td>
+                                <td style="text-align:center;">{{ p.author }}</td>
+                                <td style="text-align:center;">
+                                    <span class="badge status-{{ p.status or '접수' }}">{{ p.status or '접수' }}</span>
+                                </td>
+                                <td style="text-align:center; color:#888;">{{ p.created_at[:10] }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align:center; padding:80px 0; color:#94a3b8; font-size:1.1em;">등록된 게시글이 없습니다.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </form>
+                
+                {% if pagination.total_pages > 1 %}
+                <div class="pagination-container">
+                    {% if pagination.has_prev %}
+                    <a href="?category={{ category }}&page={{ pagination.page - 1 }}" class="page-btn"><i class="fas fa-chevron-left"></i> Prev</a>
+                    {% else %}
+                    <button class="page-btn" disabled><i class="fas fa-chevron-left"></i> Prev</button>
+                    {% endif %}
+
+                    {% for p_num in range(pagination.start_page, pagination.end_page + 1) %}
+                    <a href="?category={{ category }}&page={{ p_num }}" class="page-btn {{ 'active' if p_num == pagination.page else '' }}">{{ p_num }}</a>
+                    {% endfor %}
+
+                    {% if pagination.has_next %}
+                    <a href="?category={{ category }}&page={{ pagination.page + 1 }}" class="page-btn">Next <i class="fas fa-chevron-right"></i></a>
+                    {% else %}
+                    <button class="page-btn" disabled>Next <i class="fas fa-chevron-right"></i></button>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+
+            <div id="boardReadView" style="display:none;">
+                <div class="read-card">
+                    <div class="read-header">
+                        <div class="read-topline">
+                            <h2 id="readTitle" class="read-title"></h2>
+                            <button class="read-back-btn" style="flex-shrink:0;" onclick="showBoardList()"><i class="fas fa-list"></i> 목록으로</button>
+                        </div>
+                        <div id="readMeta" class="read-meta"></div>
+                    </div>
+
+                    <div class="read-body-wrap">
+                        <div id="readContent" class="read-body"></div>
+                    </div>
+                    <div id="readFiles" class="read-file-box"></div>
+
+                    <div class="read-footer-actions">
+                        <span id="readActionBtns" style="display:none;">
+                            <button class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
+                            <form id="singleDelForm" method="POST" style="display:inline;">
+                                <input type="hidden" name="school_id" value="{{ school.id if school else '' }}">
+                                <input type="hidden" name="category" value="{{ category }}">
+                                <button type="submit" class="post-action-btn danger" onclick="return confirm('정말 삭제하시겠습니까?')"><i class="fas fa-trash"></i> 게시글 삭제</button>
+                            </form>
+                        </span>
+                    </div>
+                </div>
+
+                <div id="commentBox" class="comment-box">
+                    <div class="comment-header">
+                        <h3 style="margin:0; color:#1e293b; font-size:1.15em;"><i class="fa-regular fa-comments" style="color:#004ea2;"></i> 댓글 <span id="commentCount" style="color:#004ea2;">0</span></h3>
+                    </div>
+                    <div class="comment-write">
+                        <textarea id="newCommentContent" class="comment-textarea" placeholder="댓글을 입력하세요."></textarea>
+                        <div class="comment-file-row">
+                            <input type="file" id="newCommentFiles" class="comment-file-input" multiple>
+                            <button type="button" class="btn btn-primary" onclick="submitComment(null)"><i class="fas fa-comment-dots"></i> 댓글 등록</button>
+                        </div>
+                    </div>
+                    <div id="commentList" class="comment-list"></div>
+                </div>
+            </div>
+
+            <div id="boardWriteView" style="display:none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #004ea2; padding-bottom: 15px;">
+                    <h2 id="postFormTitle" style="margin:0; color:#1e293b; font-size: 1.6em;"><i class="fas fa-pen-nib" style="color:#004ea2;"></i> 글쓰기</h2>
+                </div>
+                
+                <form id="postForm" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="school_id" value="{{ school.id if school else '' }}">
+                    <input type="hidden" name="category" id="postCategory">
+                    
+                    <div class="form-group">
+                        <label>제목</label>
+                        <input type="text" name="title" id="postTitle" required class="glass-input">
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 30px;">
+                        <label>내용</label>
+                        <textarea name="content" id="postContent"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>파일첨부</label>
+                        <div id="postFileDropzone" class="post-file-dropzone">
+                            <input type="file" name="file" multiple id="fileInput" onchange="handlePostFileSelect(this.files)" style="display: none;">
+                            <label for="fileInput" class="post-file-pick-btn"><i class="fas fa-upload"></i> 파일 선택</label>
+                            <div class="post-file-help">드래그해서 첨부 가능 (최대 5개)</div>
+                            <div id="fileLabel" style="margin-top:12px; color:#004ea2; font-weight: 600;"></div>
+                            <div id="existingFileTitle" class="existing-file-title" style="display:none;">기존 첨부파일</div>
+                            <div id="existingFileList" class="existing-file-list"></div>
+                            <div id="postFileList" class="post-file-list"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align:center; margin-top:40px; display: flex; justify-content: center; gap: 10px;" id="postActionArea">
+                        <button type="button" class="btn" id="btnCancelEdit" style="background:#e2e8f0; color:#475569; width: 140px; padding: 14px; font-size: 1.1em; border-radius: 12px; display:none;" onclick="cancelEditMode()">수정취소</button>
+                        <button type="button" class="btn" id="btnCancelWrite" style="background:#e2e8f0; color:#475569; width: 140px; padding: 14px; font-size: 1.1em; border-radius: 12px;" onclick="showBoardList()">취소</button>
+                        <button type="submit" id="btnSubmitPost" class="btn btn-primary" style="width: 250px; padding: 14px; font-size: 1.1em; border-radius: 12px;"><i class="fas fa-save"></i> 저장하기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 25px; flex: 1; max-width: 420px; min-width: 320px;">
+            <!-- 🚀 쪽지 위젯 높이 축소 (400px -> 330px) -->
+            <div class="memo-section" style="height: 330px; flex-shrink: 0;">
+                <div style="padding: 18px 20px 12px 20px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid #e2e8f0;">
+                    <div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1;">
+                        <div id="tab-partners" class="pill-btn blue-pill-active" onclick="switchMsgTab('partners')" style="padding: 5px 8px; font-size: 0.75rem;">대화 상대</div>
+                        <div id="tab-recv" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('recv')" style="padding: 5px 8px; font-size: 0.75rem;">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></div>
+                        <div id="tab-sent" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('sent')" style="padding: 5px 8px; font-size: 0.75rem;">보낸 쪽지</div>
+                    </div>
+                    <div class="widget-icons" style="flex-shrink: 0; gap: 14px; align-items: center;">
+                        <div style="position: relative; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('unreadMsgModal').style.display='block'" title="미확인 쪽지">
+                            <i class="fa-regular fa-envelope"></i>
+                            <span id="left-unread-badge" style="position: absolute; top: -6px; right: -8px; background: #ef4444; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 10px; font-weight: bold; display: none;">0</span>
+                        </div>
+                        <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도"></i>
+                        <i class="fa-solid fa-pen-to-square" onclick="document.getElementById('msgModal').style.display='block'" title="쪽지 쓰기"></i>
+                    </div>
+                </div>
+
+                <div id="list-partners" class="scroll-area msg-tab-content" style="flex: 1; padding: 8px 10px;">
+                    {% for partner in chat_partners %}
+                    <div class="list-item-common" onclick="openChat('{{ partner.name }}')">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size:1.1rem; color: #475569;">
+                                {% if partner.profile_path %}<img src="{{ partner.profile_path }}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
+                                {% else %}{{ user_icons.get(partner.name, '👤') if user_icons else '👤' }}{% endif %}
+                            </span>
+                            <span class="msg-list-name">{{ partner.name }} 
+                                <span class="unread-badge partner-badge" data-partner="{{ partner.name }}" style="{% if partner.unread == 0 %}display:none;{% endif %}">{{ partner.unread }}</span>
+                            </span>
+                        </div>
+                        <span class="msg-list-date">채팅하기 <i class="fa-solid fa-chevron-right" style="font-size:0.7rem; margin-left:4px;"></i></span>
+                    </div>
+                    {% else %}
+                    <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">대화 기록이 없습니다.</div>
+                    {% endfor %}
+                </div>
+
+                <div id="list-recv" class="scroll-area msg-tab-content" style="flex: 1; display: none; padding: 8px 10px;">
+                    {% for msg in received_messages %}
+                    <div class="list-item-common" onclick="openChat('{{ msg.sender }}')">
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <span class="msg-list-name" style="color:#004ea2;">from. {{ msg.sender }}</span><br>
+                            <small style="color:#64748b;">{{ msg.content[:20] }}{% if msg.content|length > 20 %}...{% endif %}</small>
+                        </div>
+                        <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+                    </div>
+                    {% else %}
+                    <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">받은 쪽지가 없습니다.</div>
+                    {% endfor %}
+                </div>
+
+                <div id="list-sent" class="scroll-area msg-tab-content" style="flex: 1; display: none; padding: 8px 10px;">
+                    {% for msg in sent_messages %}
+                    <div class="list-item-common" onclick="openChat('{{ msg.receiver }}')">
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            <span class="msg-list-name" style="color:#64748b;">To. {{ msg.receiver }}</span><br>
+                            <small style="color:#1e293b;">{{ msg.content[:20] }}{% if msg.content|length > 20 %}...{% endif %}</small>
+                        </div>
+                        <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+                    </div>
+                    {% else %}
+                    <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">보낸 쪽지가 없습니다.</div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- 🚀 캘린더 위젯 높이 축소 (350px -> 300px) -->
+            <div class="memo-section" style="height: 300px; flex-shrink: 0; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="font-size: 1.05rem; font-weight: 700; color: #1e293b;">일정</div>
+                    <div id="calendar-month" style="font-size: 0.9rem; font-weight: 600; color: #004ea2;"></div>
+                </div>
+                <table class="mini-cal">
+                    <thead>
+                        <tr><th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr>
+                    </thead>
+                    <tbody id="calendar-body"></tbody>
+                </table>
+                <div style="margin-top: 15px; font-size: 0.75rem; color: #64748b;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: #ff4757;"></span>
+                        <span>중요 일정은 별도 공지 참조</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div id="orgChartModal" class="sd-modal" style="z-index: 99999;">
+    <div class="msg-modal-content" style="width: 400px; max-height: 80vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('orgChartModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: #94a3b8;">&times;</span>
+        <h3 style="color: #1e293b; margin-top: 0; margin-bottom:15px; font-weight:800;"><i class="fa-solid fa-sitemap" style="color:#004ea2; margin-right:8px;"></i>임직원 현황</h3>
+        <div class="scroll-area" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column;">
+            <div class="org-rank-header" style="margin-top: 0;">임원 및 팀원 목록</div>
+            {% for u in users_list %}
+            <div class="org-status-item" onclick="handleOrgItemClick('{{ u.name }}')">
+                <div class="org-avatar">
+                    {% if u.profile_path %}<img src="{{ u.profile_path }}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
+                    {% else %}{{ u.profile_icon or '👤' }}{% endif %}
+                    <div data-user="{{ u.name }}" class="org-status-dot status-offline"></div>
+                </div>
+                <div class="org-info">
+                    <div class="org-name">{{ u.name }} <span style="font-size:0.7rem; color:#64748b; font-weight:400; margin-left:4px;">{{ u.position or '' }}</span></div>
+                    <div class="org-dept" style="color: #004ea2;">{{ u.department or '새담 교육문화원' }}</div>
+                </div>
+                <div class="org-msg-icon"><i class="fa-solid fa-paper-plane"></i></div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div id="unreadMsgModal" class="sd-modal" style="z-index: 99999;">
+    <div class="msg-modal-content" style="width: 420px; max-height: 70vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('unreadMsgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: #94a3b8;">&times;</span>
+        <h3 style="color: #1e293b; margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-regular fa-envelope" style="color:#004ea2; margin-right:8px;"></i>미확인 쪽지함</h3>
+        <div class="scroll-area" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+            <div id="unreadMsgEmpty" style="text-align:center; padding:40px 0; color:#94a3b8; font-size:0.9rem; display: none;">새로 도착한 미확인 쪽지가 없습니다.</div>
+            {% for msg in received_messages %}
+                {% if not msg.is_read %}
+                <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
+                    <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
+                        {{ user_icons.get(msg.sender, '👤') if user_icons else '👤' }}
+                        <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
+                    </div>
+                    <div class="org-info" style="display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <div class="org-name" style="font-size: 0.85rem;">{{ msg.sender }}</div>
+                            <div style="font-size: 0.7rem; color: #94a3b8;">{{ msg.sent_at[5:16] }}</div>
+                        </div>
+                        <div class="org-dept" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ msg.title | default(msg.sender ~ '님이 보낸 새로운 쪽지입니다.') }}
+                            {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:#94a3b8; margin-left:4px;"></i>{% endif %}
+                        </div>
+                    </div>
+                    <div class="org-msg-icon" style="margin-left: 10px;"><i class="fa-solid fa-chevron-right" style="font-size: 0.8rem;"></i></div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="sd-modal" style="z-index: 99999;">
+    <div class="msg-modal-content" style="width: 400px;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: #94a3b8;">&times;</span>
+        <h3 style="color: #1e293b; margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-solid fa-paper-plane" style="color:#004ea2; margin-right:8px;"></i>새 쪽지 보내기</h3>
+        <form id="msgForm">
+            <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
+                <option value="" style="color: #9ca3af;">수신자를 선택하세요</option>
+                {% for u in users_list %}{% if u.name != current_user %}<option value="{{ u.name }}" style="color: #1f2937;">{{ u.name }}</option>{% endif %}{% endfor %}
+            </select>
+            <div style="position:relative; width:100%;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:12px; top:12px; cursor:pointer; color:#f59e0b; font-size:1.3rem; z-index:10;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:40px; right:10px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                     <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('msgContent', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('msgContent', '😭')">😭</span><span class="emoji-item" onclick="addEmoji('msgContent', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('msgContent', '👍')">👍</span>
+                </div>
+                <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none; padding-right:40px;" required></textarea>
+            </div>
+            <input type="file" id="msgFile" class="modal-input" style="padding:10px;">
+            <button type="button" class="btn btn-primary" onclick="sendNewMessage()" style="width:100%; padding:14px; border-radius: 8px;">전송하기</button>
+        </form>
+    </div>
+</div>
+
+<div id="regModal" class="sd-modal">
+    <div class="sd-modal-content" style="width:550px;">
+        <h2 style="margin-top:0; border-bottom:2px solid #004ea2; padding-bottom:15px; color:#2c3e50;">학교 신규 등록</h2>
+        <form action="{{ url_for('school.register_school') }}" method="POST">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <div class="form-group"><label>대상 연도</label><input type="number" name="year" value="2026" required></div>
+                <div class="form-group"><label>학교명</label><input type="text" name="school_name" placeholder="예: 청곡초등학교" required></div>
+            </div>
+            <div class="form-group"><label>사무실 전화</label><input type="text" name="office_phone" placeholder="031-000-0000"></div>
+            <div class="form-group"><label>위치</label><input type="text" name="office_location" placeholder="예: 본관 2층"></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                <div class="form-group"><label>늘봄 실무사</label><input type="text" name="neulbom_assistant"></div>
+                <div class="form-group"><label>늘봄 실장</label><input type="text" name="neulbom_manager"></div>
+            </div>
+            <div class="form-group">
+                <label>센터장 담당 지정</label>
+                <div style="display:flex; gap:5px;"><input type="text" id="dirSearch" placeholder="이름 검색..."><button type="button" class="btn btn-primary" onclick="searchUser()">검색</button></div>
+                <div id="dirList" style="margin-top:5px; max-height:100px; overflow-y:auto; border:1px solid #eee; display:none;"></div>
+                <input type="hidden" name="center_director_id" id="selectedDirId" required>
+                <div id="selectedDirName" style="margin-top:8px; color:#004ea2; font-weight:bold;"></div>
+            </div>
+            <div style="text-align:right; margin-top:25px;">
+                <button type="button" class="btn" style="background:#ccc; margin-right:5px;" onclick="closeModal('regModal')">취소</button>
+                <button type="submit" class="btn btn-primary">등록완료</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    /* ---------------------------------------------------------------------- */
+    /* 디지털 시계 로직 */
+    /* ---------------------------------------------------------------------- */
+    function updateClock() {
+        const now = new Date();
+        
+        // 시간 포맷팅 (00:00:00)
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        $('#clock-time').text(`${h}:${m}:${s}`);
+        
+        // 날짜 포맷팅 (2026. 05. 09 (토))
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const date = String(now.getDate()).padStart(2, '0');
+        const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
+        const day = dayNames[now.getDay()];
+        $('#clock-date').text(`${year}. ${month}. ${date} (${day})`);
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* 게시판 화면 인라인 전환 처리 및 기타 로직 */
+    /* ---------------------------------------------------------------------- */
+    const currentUser = "{{ session.get('user_name') }}";
+    const userLevel = parseInt("{{ session.get('user_level', 1) }}");
+    let currentPostData = null;
+    let selectedPostFiles = [];
+    const activeCategoryName = "{% if view_type == 'detail' %}{{ active_cat.name|e }}{% else %}게시판{% endif %}";
+
+    function initMiniCalendar() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const today = now.getDate();
+        const monthHeader = document.getElementById('calendar-month');
+        if(monthHeader) monthHeader.innerText = `${year}.${String(month + 1).padStart(2, '0')}`;
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+        const tbody = document.getElementById('calendar-body');
+        if(!tbody) return;
+        tbody.innerHTML = '';
+        let date = 1;
+        for (let i = 0; i < 6; i++) {
+            let row = document.createElement('tr');
+            for (let j = 0; j < 7; j++) {
+                let cell = document.createElement('td');
+                if (i === 0 && j < firstDay) { cell.innerText = ''; } 
+                else if (date > lastDate) { row.appendChild(cell); } 
+                else {
+                    cell.innerText = date;
+                    if (date === today) cell.className = 'today';
+                    if ([8, 15, 22].includes(date)) cell.classList.add('has-event');
+                    date++;
+                }
+                row.appendChild(cell);
+            }
+            tbody.appendChild(row);
+            if (date > lastDate) break;
+        }
+    }
+
+    $(document).ready(function() {
+        setInterval(updateClock, 1000);
+        updateClock();
+        initMiniCalendar();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetPostId = urlParams.get('post_id');
+        if (targetPostId) {
+            viewPost(targetPostId);
+            const newUrl = window.location.pathname + "?category=" + (urlParams.get('category') || 'notice');
+            window.history.replaceState({}, document.title, newUrl);
+        }
+
+        const unreadItems = document.querySelectorAll('.unread-msg-item');
+        if(unreadItems.length === 0) {
+            const emptyDiv = document.getElementById('unreadMsgEmpty');
+            if(emptyDiv) emptyDiv.style.display = 'block';
+        }
+    });
+
+    $('#postForm').on('submit', function(e) {
+        const btn = $('#btnSubmitPost');
+        if(btn.prop('disabled')) { e.preventDefault(); return false; }
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 처리중...');
+    });
+
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    function getOriginalFileName(name) {
+        const raw = String(name || '').trim();
+        if(!raw) return '';
+        let result = raw;
+        result = result.replace(/^[0-9a-f]{32}_/i, '');
+        result = result.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, '');
+        result = result.replace(/^\d{10,14}_/, '');
+        return result;
+    }
+
+    function makeFileUrl(path) { return String(path || '#'); }
+    function canManage(author) { return currentUser === author || userLevel >= 3; }
+
+    function showView(viewId) {
+        ['boardListView', 'boardReadView', 'boardWriteView'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.style.display = (id === viewId) ? 'block' : 'none';
+        });
+    }
+
+    function showBoardList() { showView('boardListView'); }
+
+    async function viewPost(id) {
+        const data = await $.get('/school/post/api/' + id);
+        currentPostData = data;
+        const statusText = data.status || '접수';
+        $('#readTitle').text(data.title);
+        $('#readMeta').html(`
+            <span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusText}</span>
+            <span class="read-meta-item"><i class="fas fa-user-circle"></i> <strong style="color:#334155;">${escapeHtml(data.author || '')}</strong></span>
+            <span class="read-meta-item"><i class="fas fa-clock"></i> ${escapeHtml(data.created_at || '')}</span>
+            <span class="read-meta-item"><i class="fa-regular fa-comments"></i> 댓글 <span id="viewCommentCount">${data.comment_count || 0}</span></span>
+        `);
+        $('#readContent').html(data.content);
+        
+        let fileHtml = '';
+        if(data.filename) {
+            const names = String(data.filename || '').split(',');
+            const paths = String(data.filepath || '').split(',');
+            const links = [];
+            names.forEach((n, i) => {
+                const originalName = getOriginalFileName(n);
+                const originalPath = String(paths[i] || '').trim();
+                const fileUrl = makeFileUrl(originalPath);
+                links.push(`<span style="display:inline-flex; align-items:center; gap:3px;"><a href="${escapeHtml(fileUrl)}" target="_blank" class="read-file-link" download="${escapeHtml(originalName)}">${escapeHtml(originalName)}</a></span>`);
+            });
+            fileHtml = `<div class="read-file-line"><span class="read-file-prefix">@첨부파일:</span> ${links.join('<span style="color:#94a3b8;">/</span>')}</div>`;
+            $('#readFiles').html(fileHtml).show();
+        } else { $('#readFiles').hide(); }
+
+        if(currentUser === data.author || userLevel >= 3) {
+            $('#readActionBtns').show();
+            $('#singleDelForm').attr('action', '/school/post/delete/' + id);
+        } else { $('#readActionBtns').hide(); }
+
+        await loadComments(id);
+        showView('boardReadView');
+    }
+
+    async function loadComments(postId) {
+        try {
+            const res = await fetch(`/school/post/${postId}/comments`);
+            const data = await res.json();
+            const comments = data.comments || [];
+            const roots = comments.filter(c => !c.parent_id);
+            const replies = comments.filter(c => c.parent_id);
+            const replyMap = {};
+            replies.forEach(r => {
+                if(!replyMap[r.parent_id]) replyMap[r.parent_id] = [];
+                replyMap[r.parent_id].push(r);
+            });
+            $('#commentCount').text(comments.length);
+            if(comments.length === 0) {
+                $('#commentList').html('<div class="comment-empty">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</div>');
+                return;
+            }
+            let html = '';
+            roots.forEach(c => {
+                html += renderCommentItem(c, false);
+                (replyMap[c.id] || []).forEach(r => html += renderCommentItem(r, true));
+            });
+            $('#commentList').html(html);
+        } catch(err) { $('#commentList').html('<div style="color:#ef4444; padding:15px;">댓글을 불러오지 못했습니다.</div>'); }
+    }
+
+    function renderCommentItem(c, isReply) {
+        const editableBtns = canManage(c.author) ? `<button type="button" class="comment-mini-btn" onclick="editComment(${c.id}, '${encodeURIComponent(c.content || '')}')">수정</button><button type="button" class="comment-mini-btn danger" onclick="deleteComment(${c.id})">삭제</button>` : '';
+        const replyBtn = !isReply ? `<button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">답글</button>` : '';
+        const edited = c.updated_at ? ' · 수정됨' : '';
+        return `<div class="comment-item ${isReply ? 'reply' : ''}" id="comment-${c.id}"><div class="comment-top-row"><div class="comment-left-meta"><div class="comment-author"><span>${escapeHtml(c.author || '익명')}</span></div><div class="comment-date">${escapeHtml(c.created_at || '')}${edited}</div></div><div class="comment-actions">${replyBtn}${editableBtns}</div></div><div class="comment-content">${escapeHtml(c.content || '')}</div>${renderFileLinks(c.filename, c.filepath)}${!isReply ? `<div id="replyForm-${c.id}" class="reply-form" style="display:none;"><textarea id="replyContent-${c.id}" class="comment-textarea" placeholder="답글을 입력하세요."></textarea><div class="comment-file-row"><input type="file" id="replyFiles-${c.id}" class="comment-file-input" multiple><div style="display:flex; gap:7px; flex-shrink:0;"><button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">취소</button><button type="button" class="btn btn-primary" onclick="submitComment(${c.id})">답글 등록</button></div></div></div>` : ''}</div>`;
+    }
+
+    function renderFileLinks(filename, filepath) {
+        if(!filename || !filepath) return '';
+        const names = String(filename).split(',');
+        const paths = String(filepath).split(',');
+        const links = names.map((n, i) => `<a href="${escapeHtml(String(paths[i] || '').trim())}" target="_blank" class="comment-file-link" download="${escapeHtml(getOriginalFileName(n))}">${escapeHtml(getOriginalFileName(n))}</a>`);
+        return `<div class="comment-attachments"><span class="comment-file-prefix">@첨부파일:</span> ${links.join('<span style="color:#94a3b8;">/</span>')}</div>`;
+    }
+
+    async function submitComment(parentId) {
+        if(!currentPostData) return alert('게시글 정보가 없습니다.');
+        const textareaId = parentId ? `replyContent-${parentId}` : 'newCommentContent';
+        const fileInputId = parentId ? `replyFiles-${parentId}` : 'newCommentFiles';
+        const contentEl = document.getElementById(textareaId);
+        const fileEl = document.getElementById(fileInputId);
+        const content = (contentEl.value || '').trim();
+        if(!content) return alert('내용을 입력하세요.');
+        const formData = new FormData();
+        formData.append('content', content);
+        if(parentId) formData.append('parent_id', parentId);
+        if(fileEl && fileEl.files.length > 0) { Array.from(fileEl.files).forEach(file => formData.append('file', file)); }
+        const res = await fetch(`/school/post/${currentPostData.id}/comments/add`, { method: 'POST', body: formData });
+        const data = await res.json().catch(() => ({}));
+        if(!res.ok || data.ok === false) return alert(data.message || '댓글 등록에 실패했습니다.');
+        contentEl.value = ''; if(fileEl) fileEl.value = ''; if(parentId) toggleReplyForm(parentId);
+        await loadComments(currentPostData.id);
+    }
+
+    function toggleReplyForm(commentId) {
+        const el = document.getElementById('replyForm-' + commentId);
+        if(!el) return;
+        el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'block' : 'none';
+    }
+
+    async function editComment(commentId, encodedContent) {
+        const oldContent = decodeURIComponent(encodedContent || '');
+        const content = prompt('댓글 내용을 수정하세요.', oldContent);
+        if(content === null) return;
+        if(!content.trim()) return alert('내용을 입력하세요.');
+        const res = await fetch(`/school/comments/${commentId}/edit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: content.trim() }) });
+        if(res.ok) await loadComments(currentPostData.id);
+    }
+
+    async function deleteComment(commentId) {
+        if(!confirm('댓글을 삭제하시겠습니까?\n원댓글 삭제 시 답글도 함께 삭제됩니다.')) return;
+        const res = await fetch(`/school/comments/${commentId}/delete`, { method: 'POST' });
+        if(res.ok) await loadComments(currentPostData.id);
+    }
+
+    function openPostForm(cat) {
+        showView('boardWriteView');
+        $('#postForm').attr('action', "{{ url_for('school.add_post') }}");
+        $('#postFormTitle').html(`<i class="fas fa-pen-nib" style="color:#004ea2;"></i> ${escapeHtml(activeCategoryName)} 게시글 작성`);
+        $('#postCategory').val(cat);
+        $('#postTitle').val('');
+        $('#btnCancelWrite').show();
+        $('#btnCancelEdit').hide();
+        $('#btnSubmitPost').html('<i class="fas fa-save"></i> 저장하기').prop('disabled', false);
+        resetPostFiles();
+        try { $('#postContent').summernote('destroy'); } catch(e){}
+        $('#postContent').summernote({ height: 400, lang: 'ko-KR', placeholder: '내용을 입력하세요...' });
+        $('#postContent').summernote('code', '');
+    }
+
+    function openEditFromRead() {
+        const data = currentPostData;
+        showView('boardWriteView');
+        $('#postForm').attr('action', '/school/post/edit/' + data.id);
+        $('#postFormTitle').html(`<i class="fas fa-edit" style="color:#004ea2;"></i> ${escapeHtml(activeCategoryName)} 게시글 수정`);
+        $('#btnCancelWrite').hide();
+        $('#btnCancelEdit').show();
+        $('#btnSubmitPost').html('<i class="fas fa-check"></i> 수정완료').prop('disabled', false);
+        resetPostFiles();
+        renderExistingPostFiles(data);
+        $('#postTitle').val(data.title);
+        try { $('#postContent').summernote('destroy'); } catch(e){}
+        $('#postContent').summernote({ height: 400, lang: 'ko-KR' });
+        $('#postContent').summernote('code', data.content);
+    }
+
+    function cancelEditMode() {
+        if(currentPostData) { viewPost(currentPostData.id); } 
+        else { showBoardList(); }
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'block'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    window.onclick = function(e) { if(e.target.classList.contains('sd-modal')) e.target.style.display='none'; }
+    function toggleAll(src) { $('.post-checkbox').prop('checked', src.checked); }
+    function submitMultiDelete() { if(confirm('선택한 항목을 모두 삭제할까요?')) $('#multiDeleteForm').submit(); }
+
+    function handlePostFileSelect(fileList) {
+        const incoming = Array.from(fileList || []);
+        const merged = [...selectedPostFiles];
+        incoming.forEach(file => {
+            const exists = merged.some(f => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified);
+            if(!exists) merged.push(file);
+        });
+        if(merged.length > 5) { alert('최대 5개까지 등록 가능합니다.'); return false; }
+        selectedPostFiles = merged;
+        syncPostFileInput();
+        renderPostFileList();
+    }
+
+    function syncPostFileInput() {
+        const input = document.getElementById('fileInput');
+        if(!input) return;
+        const dt = new DataTransfer();
+        selectedPostFiles.forEach(file => dt.items.add(file));
+        input.files = dt.files;
+    }
+
+    function renderPostFileList() {
+        const listEl = document.getElementById('postFileList');
+        const labelEl = document.getElementById('fileLabel');
+        if(!listEl || !labelEl) return;
+        if(selectedPostFiles.length === 0) { listEl.innerHTML = ''; labelEl.innerHTML = ''; return; }
+        labelEl.innerHTML = `<i class="fas fa-check-circle"></i> ${selectedPostFiles.length}개의 파일 선택됨`;
+        listEl.innerHTML = selectedPostFiles.map((file, idx) => `<div class="post-file-chip"><span class="post-file-chip-name"><i class="fa-regular fa-file"></i> ${escapeHtml(file.name)}</span><button type="button" class="post-file-remove" onclick="removePostFile(${idx})">삭제</button></div>`).join('');
+    }
+
+    function removePostFile(idx) { selectedPostFiles.splice(idx, 1); syncPostFileInput(); renderPostFileList(); }
+    function resetPostFiles() { selectedPostFiles = []; document.getElementById('fileInput').value = ''; renderPostFileList(); }
+
+    function renderExistingPostFiles(data) {
+        const titleEl = document.getElementById('existingFileTitle');
+        const listEl = document.getElementById('existingFileList');
+        const filenames = String((data && data.filename) || '').trim();
+        const filepaths = String((data && data.filepath) || '').trim();
+        if(!filenames) { titleEl.style.display = 'none'; listEl.innerHTML = ''; return; }
+        const names = filenames.split(',');
+        const paths = filepaths.split(',');
+        titleEl.style.display = 'block';
+        listEl.innerHTML = names.map((n, i) => `<div class="post-file-chip existing-file-item"><input type="hidden" name="existing_filenames" value="${escapeHtml(n)}"><input type="hidden" name="existing_filepaths" value="${escapeHtml(String(paths[i]||'').trim())}"><span class="post-file-chip-name"><i class="fa-regular fa-file"></i> ${escapeHtml(getOriginalFileName(n))}</span><button type="button" class="post-file-remove" onclick="$(this).closest('.existing-file-item').remove()">삭제</button></div>`).join('');
+    }
+
+    function switchMsgTab(tab) {
+        document.querySelectorAll('.msg-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.pill-btn').forEach(btn => { btn.classList.remove('blue-pill-active'); btn.classList.add('blue-pill-inactive'); });
+        document.getElementById('list-' + tab).style.display = 'block';
+        document.getElementById('tab-' + tab).classList.add('blue-pill-active');
+    }
+
+    function openChat(partnerName) {
+        const pw = 450; const ph = 650;
+        const left = (window.screen.width / 2) - (pw / 2);
+        const top = (window.screen.height / 2) - (ph / 2);
+        window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${pw},height=${ph},left=${left},top=${top}`);
+    }
+
+    function handleOrgItemClick(targetUser) {
+        closeModal('orgChartModal');
+        setTimeout(() => {
+            const receiverSelect = document.getElementById('msgReceiver');
+            if(receiverSelect) { receiverSelect.value = targetUser; document.getElementById('msgModal').style.display='block'; }
+        }, 150);
+    }
+
+    async function sendNewMessage() {
+        const receiver = document.getElementById('msgReceiver').value;
+        const content = document.getElementById('msgContent').value;
+        const fileInput = document.getElementById('msgFile');
+        if(!receiver || !content.trim()) return alert("수신자와 내용을 확인하세요.");
+        let formData = new FormData();
+        formData.append('receiver', receiver);
+        formData.append('content', content);
+        if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+        const res = await fetch('/send_message', { method: 'POST', body: formData });
+        if (res.ok) { alert('쪽지를 보냈습니다.'); document.getElementById('msgModal').style.display = 'none'; openChat(receiver); }
+    }
+
+    function searchUser() {
+        const q = $('#dirSearch').val();
+        if(!q) return;
+        $.get('/school/employee_search?query='+q, function(data) {
+            let html = data.map(u => `<div style="padding:10px; cursor:pointer; border-bottom:1px solid #f4f4f4;" onclick="selectDir('${u.emp_no}', '${u.name}')">${u.name} (${u.position})</div>`).join('');
+            $('#dirList').html(html).show();
+        });
+    }
+    
+    function selectDir(id, name) {
+        $('#selectedDirId').val(id);
+        $('#selectedDirName').html('<i class="fas fa-check-circle"></i> 지정됨: ' + name);
+        $('#dirList').hide();
+    }
+    
+    function toggleEmojiPicker(pickerId) {
+        const picker = document.getElementById(pickerId);
+        picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
+    }
+    
+    function addEmoji(inputId, emoji) {
+        const input = document.getElementById(inputId);
+        input.value += emoji;
+        input.focus();
+        document.getElementById('newMsgEmojiPicker').style.display = 'none';
+    }
+</script>
+{% endblock %}

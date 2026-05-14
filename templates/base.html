@@ -11,21 +11,28 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
     
     <style>
+        /* === 스크롤바 영역 상시 확보 (꿀렁거림 원천 차단 1) === */
+        html {
+            overflow-y: scroll;
+        }
+
         /* === 깔끔한 고정 테마 변수 === */
         :root {
             --body-bg: #f0f2f5; 
             --app-bg: #ffffff; 
             --main-bg: #f8fafc; 
             
-            --primary-color: #4a90e2;
-            --primary-dark: #357abd;
-            --text-dark: #1e293b;
+            --primary-color: #2563eb; 
+            --primary-light: #eff6ff; 
+            --primary-dark: #1d4ed8;
+            
+            --text-dark: #0f172a;
             --text-gray: #64748b;
             
-            --border-color: #d1d5db; 
-            --border-light: #e5e7eb; 
+            --border-color: #e2e8f0; 
+            --border-light: #f1f5f9; 
             
-            --widget-hover: #f1f5f9;
+            --widget-hover: #f8fafc;
         }
 
         /* 기본 설정 */
@@ -34,27 +41,27 @@
             background: var(--body-bg);
             min-height: 100vh;
             margin: 0;
-            padding: 30px 15px 60px 15px;
+            padding: 30px 15px 30px 15px; 
             color: var(--text-dark);
             box-sizing: border-box;
         }
 
-        /* ✨ 앱 래퍼: 넓이를 기존 1550px에서 1700px로 확장하여 좁아진 문제 해결 */
+        /* 앱 래퍼 */
         .app-wrapper {
             max-width: 1700px;
             width: 97%;
             margin: 0 auto;
             background: var(--app-bg);
             border: 1px solid var(--border-color); 
-            border-radius: 20px; 
+            border-radius: 24px; 
             overflow: hidden; 
             display: flex;
             flex-direction: column;
-            min-height: calc(50vh - 100px);       /* ✨ 메인 메뉴 하단 여백 조정 50vh */
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03); 
+            min-height: calc(50vh - 100px); 
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04); 
         }
 
-        /* ✨ 네비게이션바 */
+        /* 네비게이션바 */
         .navbar {
             background: #ffffff;
             border-bottom: 1px solid var(--border-color); 
@@ -62,59 +69,131 @@
             align-items: center;
             justify-content: space-between;
             padding: 0 35px;
-            height: 75px;
+            height: 80px; 
             z-index: 1000;
         }
 
         .nav-container { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; }
-        .logo-img { height: 45px; width: auto; display: block; }
+        .logo-img { height: 40px; width: auto; display: block; cursor: pointer; }
 
-        /* 메인 메뉴 목록 */
-        .menu-list { display: flex; list-style: none; margin: 0; padding: 0; height: 100%; align-items: center; gap: 10px; }
+        /* 세련된 메인 메뉴 목록 디자인 */
+        .menu-list { display: flex; list-style: none; margin: 0; padding: 0; height: 100%; align-items: center; gap: 8px; }
         .menu-item-wrapper { position: relative; height: 100%; display: flex; align-items: center; }
         
         .menu-item {
-            color: var(--text-dark);
-            text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 1rem; transition: all 0.2s ease-in-out;
+            color: var(--text-gray);
+            text-decoration: none; 
+            font-weight: 600; 
+            padding: 10px 16px; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            font-size: 0.95rem; 
+            transition: all 0.2s ease;
+            background: transparent;
         }
-        .menu-item:hover { background: var(--widget-hover); color: var(--primary-color); }
-        .menu-item:hover i { color: var(--primary-color); }
+        
+        .menu-item:hover { 
+            background: #f1f5f9; 
+            color: var(--text-dark); 
+        }
         
         .menu-item.active {
-            color: var(--primary-color);
-            font-weight: 700;
-            border-bottom: 3px solid var(--primary-color);
-            border-radius: 0; 
-            padding-bottom: 7px;
+            background: var(--primary-color); 
+            color: #ffffff;                    
+            font-weight: 600;                  
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); 
         }
 
+        /* 세련된 드롭다운 디자인 */
         .dropdown { height: 100%; }
-        .dropdown-content { display: none; position: absolute; top: 85%; left: 50%; transform: translateX(-50%); background: #ffffff; min-width: 200px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 12px; border: 1px solid var(--border-light); z-index: 1100; padding: 10px 0; }
-        .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 20px; }
-        .menu-item-wrapper:hover .dropdown-content { display: block; animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .dropdown-content { 
+            display: none; 
+            position: absolute; 
+            top: 90%; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: #ffffff; 
+            min-width: 210px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.08); 
+            border-radius: 16px; 
+            border: 1px solid var(--border-color); 
+            z-index: 1100; 
+            padding: 12px 8px; 
+        }
+        .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 25px; }
+        .menu-item-wrapper:hover .dropdown-content { display: block; animation: floatUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
         
-        .dropdown-content a { color: var(--text-dark); padding: 12px 20px; text-decoration: none; display: flex; align-items: center; gap: 12px; font-size: 0.95rem; font-weight: 500; transition: all 0.2s; }
-        .dropdown-content a:hover { background: var(--widget-hover); color: var(--primary-color); padding-left: 25px; }
+        @keyframes floatUp { 
+            from { opacity: 0; transform: translate(-50%, 15px); } 
+            to { opacity: 1; transform: translate(-50%, 0); } 
+        }
+        
+        .dropdown-content a { 
+            color: var(--text-gray); 
+            padding: 10px 16px; 
+            text-decoration: none; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-size: 0.9rem; 
+            font-weight: 500; 
+            border-radius: 10px; 
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        .dropdown-content a:hover { 
+            background: #f8fafc; 
+            color: var(--primary-color); 
+            padding-left: 20px; 
+        }
 
         /* 우측 유저 섹션 */
         .user-section { 
             display: flex; 
             align-items: center; 
-            gap: 12px;
-            background: #f8fafc;
-            border: 1px solid var(--border-light);
-            padding: 6px 15px 6px 10px;
-            border-radius: 30px; 
-            transition: all 0.3s ease;
+            gap: 10px;
+            background: transparent;
         }
         
-        .btn-memo { color: var(--text-gray); font-size: 1.3rem; text-decoration: none; padding: 8px; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: #e2e8f0; }
-        .user-profile { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; padding: 8px 12px; border-radius: 20px; color: var(--text-dark); transition: background 0.2s; }
-        .user-profile:hover { background: #e2e8f0; }
-        .btn-logout { font-size: 1.1rem; color: var(--text-gray); text-decoration: none; padding: 5px; transition: color 0.2s; }
-        .btn-logout:hover { color: #e53e3e; }
+        .btn-memo { 
+            color: var(--text-gray); 
+            font-size: 1.2rem; 
+            text-decoration: none; 
+            width: 40px; height: 40px;
+            border-radius: 50%; 
+            transition: all 0.2s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #f1f5f9;
+        }
+        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: var(--primary-light); }
+        
+        .user-profile { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            cursor: pointer; 
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            padding: 6px 14px 6px 6px; 
+            border-radius: 30px; 
+            color: var(--text-dark); 
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+        }
+        .user-profile:hover { background: #f8fafc; border-color: #cbd5e1; }
+        
+        .btn-logout { 
+            font-size: 1.1rem; 
+            color: var(--text-gray); 
+            text-decoration: none; 
+            padding: 8px; 
+            transition: color 0.2s; 
+        }
+        .btn-logout:hover { color: #ef4444; }
 
         /* 메인 컨텐츠 영역 */
         .main-content {
@@ -123,48 +202,69 @@
             position: relative;
         }
 
+        /* 메인 및 서브페이지의 가로 넓이 통일 */
         .content-container {
             width: 100%;
-            max-width: 90% !important; /*  메인메뉴들 넓이를 화면에 채우는 핵심 코드 ===========================*/
+            max-width: 100% !important; 
+            padding: 0 45px 50px 45px;  
+            box-sizing: border-box;
             margin: 0 auto;
             position: relative;
             z-index: 10;
-           /* 하단에 약 50px 정도의 여유 공간을 줍니다 */
-           padding-bottom: 50px;
         }
 
-        /* 모달 및 폼 전역 스타일 */
-        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
+        /* 🚀 모달 및 폼 전역 스타일 */
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
         .modal-content { 
             background: #ffffff; 
             border: 1px solid var(--border-color); 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            margin: 8% auto; padding: 0; border-radius: 16px; width: 450px; overflow: hidden; color: var(--text-dark);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            margin: 6% auto; padding: 0; border-radius: 20px; 
+            width: 800px;
+            max-width: 95vw;
+            max-height: 85vh;
+            overflow-y: auto;
+            color: var(--text-dark);
         }
-        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
-        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--primary-color); }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-dark); display: flex; align-items: center; gap: 8px;}
         
-        .info-table { width: 100%; border-collapse: collapse; }
-        .info-table th { padding: 15px 25px; background: #f8fafc; text-align: left; color: var(--text-gray); border-bottom: 1px solid var(--border-light); width: 35%; font-size: 0.9rem; font-weight: 700; }
-        .info-table td { padding: 15px 25px; color: var(--text-dark); font-weight: 600; border-bottom: 1px solid var(--border-light); background: #ffffff; font-size: 0.95rem; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
+        .full-width { grid-column: 1 / -1; }
+        
+        .profile-setup-area { display: flex; gap: 20px; align-items: flex-start; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 5px; }
+        
+        .modal-field { margin-bottom: 5px; text-align: left; }
+        .modal-field label { display: block; font-weight: 700; margin-bottom: 8px; color: var(--text-gray); font-size: 0.85rem; }
+        .readonly-field { background-color: #f1f5f9 !important; color: #64748b !important; cursor: not-allowed; border: 1px solid #e2e8f0 !important; font-weight: 600; }
 
-        .btn-close-modal { background: #f1f5f9; color: var(--text-dark); border: 1px solid var(--border-light); padding: 10px 30px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
-        .btn-close-modal:hover { background: #e2e8f0; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        .btn-close-modal { background: #f1f5f9; color: var(--text-dark); border: 1px solid var(--border-color); padding: 10px 30px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
+        .btn-close-modal:hover { background: #e2e8f0; transform: translateY(-2px); }
 
-        .glass-input { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid var(--border-light); border-radius: 10px; box-sizing: border-box; background: #f8fafc; color: var(--text-dark); outline: none; transition: all 0.3s; font-family: inherit;}
-        .glass-input:focus { border-color: var(--primary-color); background: #ffffff; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+        .glass-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 10px; box-sizing: border-box; background: #f8fafc; color: var(--text-dark); outline: none; transition: all 0.3s; font-family: inherit;}
+        .glass-input:focus { border-color: var(--primary-color); background: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
         .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
-        .btn-primary-glass:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .btn-primary-glass:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.2); }
 
-        .main-footer { text-align: center; padding: 20px 0; color: var(--text-gray); font-size: 0.85rem; background: transparent; }
+        .main-footer { text-align: center; padding: 20px 0; color: var(--text-gray); font-size: 0.85rem; background: transparent; border-top: none !important; }
 
-.main-footer {
-    border-top: none !important;
-}
+        /* 이모티콘 및 이미지 관련 CSS */
+        .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
+        .profile-icon-option.selected { border-color: var(--primary-color); background: var(--primary-light); }
+        .profile-icon-option:hover { background: #f8f9fa; }
+
+        .emoji-scroll-box {
+            display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+            max-height: 130px; overflow-y: auto; border: 1px solid var(--border-color); 
+            padding: 10px; border-radius: 10px; background: #fff;
+        }
+        .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+        .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+        
+        .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid var(--border-color); margin-top: 10px; display: none; }
     </style>
     
-
     {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -178,38 +278,46 @@
 
                 <nav style="height: 100%;">
                     <ul class="menu-list">
+                        <!-- 1. 메인달력 -> 메인메뉴 명칭 변경 -->
                         <li class="menu-item-wrapper">
                             <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
-                                <i class="fa-solid fa-calendar-days"></i> 메인달력
+                                <i class="fa-solid fa-calendar-days"></i> 메인메뉴
                             </a>
                         </li>
                         
-                        <li class="menu-item-wrapper">
-                            <a href="/approval" class="menu-item {% if 'approval' in request.path %}active{% endif %}">
+                        <!-- 2. 사내결재 메뉴 통합 (드롭다운 구조로 변경) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'approval' in request.path or 'contract' in request.path or 'document' in request.path %}active{% endif %}">
                                 <i class="fa-solid fa-file-signature"></i> 사내결재
                             </a>
-                        </li>
-                        
-                        <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'document' in request.path %}active{% endif %}">
-                                <i class="fa-solid fa-print"></i> 증명서발급
-                            </a>
                             <div class="dropdown-content">
+                                <a href="/approval"><i class="fa-solid fa-file-signature"></i> 사내결재</a>
+                                
+                                {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                                <a href="/contract/admin"><i class="fa-solid fa-file-contract"></i> 전자계약</a>
+                                {% endif %}
+                                
+                                <!-- 기존 증명서발급 세부 메뉴들 -->
                                 <a href="/document/apply"><i class="fa-solid fa-file-circle-plus"></i> 증명서 신청</a>
-                                <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 신청 현황</a>
+                                <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i> 증명서 현황</a>
                             </div>
                         </li>
 
-                        {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                        <li class="menu-item-wrapper">
-                            <a href="/contract/admin" class="menu-item {% if 'contract' in request.path %}active{% endif %}">
-                                <i class="fa-solid fa-file-contract"></i> 전자계약
-                            </a>
-                        </li>
-                        {% endif %}
-
+                        <!-- 3. 학교관리 메뉴 신설 (드롭다운 서브메뉴 추가) -->
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item" style="color: var(--primary-color); font-weight: 700;">
+                            <a href="javascript:void(0);" class="menu-item {% if 'school' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-school"></i> 학교관리
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/school"><i class="fa-solid fa-chalkboard-user"></i> 학교업무공간</a>
+                                <a href="/school/tasks"><i class="fa-solid fa-list-check"></i> 학교업무처리</a>
+                                <a href="/school/schedule"><i class="fa-solid fa-calendar-week"></i> 학교일정표</a>
+                            </div>
+                        </li>
+
+                        <!-- 4. 업무지원 메뉴 (기존 유지) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'excel-generator' in request.path or 'attendance' in request.path %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
@@ -219,8 +327,9 @@
                             </div>
                         </li>
 
+                        <!-- 5. 업무공간 메뉴 (기존 유지) -->
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'workspace' in request.path %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'workspace' in request.path or 'memo' in request.path %}active{% endif %}">
                                 <i class="fa-solid fa-layer-group"></i> 업무공간
                             </a>
                             <div class="dropdown-content">
@@ -231,6 +340,7 @@
                             </div>
                         </li>
 
+                        <!-- 6. 인사관리 메뉴 (기존처럼 권한이 1, 2인 관리자만 접근 가능) -->
                         {% if session.get('user_level') in [1, 2] or session.get('user_name') == 'admin' %}
                         <li class="menu-item-wrapper">
                             <a href="/user" class="menu-item {% if 'user' in request.path %}active{% endif %}">
@@ -248,8 +358,10 @@
                     </a>
 
                     <div class="user-profile" onclick="openMyInfoModal()">
-                        <span>{{ user_icons.get(session['user_name'], '👤') if user_icons else '👤' }}</span>
-                        <span><strong>{{ session['user_name'] }}</strong>님</span>
+                        <div id="nav-profile-icon-container" style="background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; font-size: 1.1rem;">
+                            {{ session.get('profile_icon', '👤') }}
+                        </div>
+                        <span id="nav-user-name">{{ session.get('name', session.get('user_name')) }}</span>
                     </div>
                     <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
                         <i class="fa-solid fa-right-from-bracket"></i>
@@ -270,129 +382,229 @@
         <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
     </footer>
 
+    <!-- 개인 프로필 모달 (기존과 동일하게 작동) -->
     <div id="myInfoModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3><i class="fa-solid fa-id-card" style="color:var(--primary-color);"></i> 내 프로필 정보</h3>
-                <span style="cursor:pointer; font-size:1.6rem; color: var(--text-gray); transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#e53e3e'" onmouseout="this.style.color='var(--text-gray)'">&times;</span>
+                <h3><i class="fa-solid fa-id-badge" style="color:var(--primary-color);"></i> 개인 프로필 정보</h3>
+                <span style="cursor:pointer; font-size:1.6rem; color: var(--text-gray); transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-gray)'">&times;</span>
             </div>
+            
             <div id="myInfoLoading" style="text-align: center; padding: 40px; color: var(--text-gray); font-weight: 600;">데이터를 불러오는 중입니다...</div>
-            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #e53e3e; font-weight: 600;"></div>
+            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #ef4444; font-weight: 600;"></div>
             
             <div id="myInfoDisplay" style="display: none;">
-                <table class="info-table" id="myInfoTable"></table>
-                
-                <div id="passwordChangeSection" style="display: none; padding: 20px; background: #f8fafc; border-top: 1px solid var(--border-light);">
-                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--primary-color);"><i class="fa-solid fa-lock"></i> 비밀번호 변경</h4>
-                    <input type="password" id="currPwd" class="glass-input" placeholder="현재 비밀번호">
-                    <input type="password" id="newPwd" class="glass-input" placeholder="새 비밀번호">
-                    <input type="password" id="confirmPwd" class="glass-input" placeholder="새 비밀번호 확인">
-                    <div style="display: flex; gap: 10px; margin-top: 10px;">
-                        <button type="button" class="btn-primary-glass" onclick="changeMyPassword()">변경 완료</button>
-                        <button type="button" class="btn-close-modal" style="width: 100%; background: #ffffff; border: 1px solid var(--border-color);" onclick="togglePasswordForm()">취소</button>
+                <form id="myInfoForm" onsubmit="event.preventDefault(); submitMyInfoUpdate();">
+                    <div class="form-grid" id="myInfoGrid"></div>
+                    
+                    <div style="padding: 20px 25px; display: flex; gap: 10px; justify-content: flex-end; background: #f8fafc; border-top: 1px solid var(--border-color);">
+                        <button type="submit" class="btn-primary-glass" style="width: auto; padding: 12px 30px;"><i class="fa-solid fa-check" style="margin-right:5px;"></i> 변경사항 적용</button>
+                        <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
                     </div>
-                </div>
-
-                <div style="padding: 20px; display: flex; gap: 10px; justify-content: center; background: #f8fafc; border-top: 1px solid var(--border-light);">
-                    <button type="button" class="btn-close-modal" id="btnTogglePwd" onclick="togglePasswordForm()"><i class="fa-solid fa-key"></i> 비밀번호 변경</button>
-                    <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
-                </div>
+                </form>
             </div>
         </div>
     </div>
 
     <script>
+        let currentMyInfo = null;
+
+        const avatarEmojis = [
+            '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
+            '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
+            '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
+            '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
+        ];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/user/list');
+                if(!res.ok) return;
+                const users = await res.json();
+                const currentEmpNo = "{{ session.get('emp_no', '') }}";
+                const currentName = "{{ session.get('user_name', '') }}";
+                const me = users.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+                if (me) {
+                    const navContainer = document.getElementById('nav-profile-icon-container');
+                    if (me.profile_path) navContainer.innerHTML = `<img src="${me.profile_path}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                    else if (me.아이콘) navContainer.innerHTML = me.아이콘;
+                    if (me.이름) document.getElementById('nav-user-name').innerText = me.이름;
+                }
+            } catch(e) {}
+        });
+
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.src = "";
+                preview.style.display = 'none';
+            }
+        }
+
+        function formatPhoneNumber(input) {
+            let val = input.value.replace(/[^0-9]/g, '');
+            if (val.length > 3 && val.length <= 7) {
+                val = val.slice(0, 3) + '-' + val.slice(3);
+            } else if (val.length > 7) {
+                val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+            }
+            input.value = val;
+        }
+
+        function renderIcons(containerId, inputId, currentIcon) {
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            container.innerHTML = avatarEmojis.map((e, i) => {
+                const isSelected = (currentIcon && currentIcon === e) || (!currentIcon && i === 0);
+                return `<div class="profile-icon-option ${isSelected ? 'selected' : ''}" onclick="selectIcon(this, '${inputId}', '${e}')">${e}</div>`;
+            }).join('');
+            
+            if(!currentIcon && document.getElementById(inputId)) {
+                document.getElementById(inputId).value = avatarEmojis[0];
+            }
+        }
+
+        function selectIcon(el, inputId, emoji) {
+            document.querySelectorAll('#' + el.parentElement.id + ' .profile-icon-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById(inputId).value = emoji;
+        }
+
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
             const errorDiv = document.getElementById('myInfoError');
             const display = document.getElementById('myInfoDisplay');
-            const table = document.getElementById('myInfoTable');
-            const pwdSection = document.getElementById('passwordChangeSection');
-            const toggleBtn = document.getElementById('btnTogglePwd');
+            const grid = document.getElementById('myInfoGrid');
 
             modal.style.display = "block";
             loading.style.display = "block";
             errorDiv.style.display = "none";
             display.style.display = "none";
-            pwdSection.style.display = "none";
-            toggleBtn.style.display = "block";
-            table.innerHTML = "";
-
-            document.getElementById('currPwd').value = '';
-            document.getElementById('newPwd').value = '';
-            document.getElementById('confirmPwd').value = '';
+            grid.innerHTML = "";
 
             try {
-                const res = await fetch('/user/my_info'); 
-                const result = await res.json();
+                const res = await fetch('/user/list'); 
+                const users = await res.json();
                 
-                if (result.status === 'success' && result.data) {
-                    const data = result.data;
-                    let html = '';
-                    
-                    const keyMap = {
-                        'id': '고유번호', 'emp_no': '사원번호(사번)', 'username': '아이디', 
-                        'name': '이름', 'position': '직급', 'role': '직책', 'department': '부서', 
-                        'level': '권한 레벨', 'ssn': '주민등록번호', 'phone': '전화번호', 
-                        'email': '이메일', 'join_date': '입사일', 'address': '주소', 
-                        'bank_name': '급여 은행명', 'account_number': '급여 계좌번호', 
-                        'status': '재직 상태', 'created_at': '계정 생성일', 'updated_at': '최근 수정일'
-                    };
+                const currentEmpNo = "{{ session.get('emp_no', '') }}";
+                const currentName = "{{ session.get('user_name', '') }}";
+                
+                currentMyInfo = users.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+                
+                if (currentMyInfo) {
+                    const u = currentMyInfo;
+                    const profilePath = u.profile_path || '';
+                    const icon = u.아이콘 || '👤';
 
-                    for (const [key, value] of Object.entries(data)) {
-                        const lowerKey = key.toLowerCase();
-                        if (lowerKey.includes('password') || lowerKey.includes('pwd') || lowerKey.includes('hash')) {
-                            continue;
-                        }
+                    let html = `
+                        <div class="full-width profile-setup-area">
+                            <div style="flex:1;">
+                                <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (변경시에만 선택)</label>
+                                <input type="file" id="myinfo_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_myinfo')">
+                                <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px;">
+                            </div>
+                            <div style="flex:2;">
+                                <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">기본 프로필 아이콘 설정</label>
+                                <div id="icon-container-myinfo" class="emoji-scroll-box"></div>
+                                <input type="hidden" id="myinfo_profile_icon" value="${icon}">
+                            </div>
+                        </div>
 
-                        const displayKey = keyMap[key] || key; 
-                        const displayValue = (value === null || value === '') ? '-' : value;
-                        html += `<tr><th>${displayKey}</th><td>${displayValue}</td></tr>`;
-                    }
+                        <div class="modal-field"><label>사번</label><input type="text" value="${u.사번 || '-'}" readonly class="glass-input readonly-field"></div>
+                        <div class="modal-field"><label>성명</label><input type="text" value="${u.이름 || '-'}" readonly class="glass-input readonly-field"></div>
+                        <div class="modal-field"><label>소속부서</label><input type="text" value="${u.소속 || '-'}" readonly class="glass-input readonly-field"></div>
+                        <div class="modal-field"><label>직급</label><input type="text" value="${u.직급 || '-'}" readonly class="glass-input readonly-field"></div>
+                        
+                        <div class="modal-field">
+                            <label>새 비밀번호 <span style="color:#d9480f; font-size:0.85em; font-weight:normal;">(영문/숫자/특수문자 조합 6자리 이상)</span></label>
+                            <input type="password" id="myinfo_pass" class="glass-input" placeholder="*** (변경시에만 입력)">
+                        </div>
+                        <div class="modal-field">
+                            <label>새 비밀번호 확인</label>
+                            <input type="password" id="myinfo_pass_confirm" class="glass-input" placeholder="새 비밀번호 재입력">
+                        </div>
+                        
+                        <div class="modal-field"><label>연락처</label><input type="text" id="myinfo_phone" value="${u.전화번호 || ''}" oninput="formatPhoneNumber(this)" class="glass-input"></div>
+                        <div class="modal-field"><label>이메일</label><input type="email" id="myinfo_email" value="${u.이메일 || ''}" class="glass-input"></div>
+                        <div class="modal-field full-width"><label>주소지</label><input type="text" id="myinfo_address" value="${u.주소 || ''}" class="glass-input"></div>
+                        <div class="modal-field full-width"><label>급여통장번호</label><input type="text" value="${u.계좌 || '-'}" readonly class="glass-input readonly-field"></div>
+                    `;
 
-                    if (html === '') { html = '<tr><td colspan="2" style="text-align:center;">표시할 데이터가 없습니다.</td></tr>'; }
+                    grid.innerHTML = html;
+                    renderIcons('icon-container-myinfo', 'myinfo_profile_icon', icon);
 
-                    table.innerHTML = html;
                     loading.style.display = "none";
                     display.style.display = "block";
-                } else { throw new Error(result.message || '데이터를 불러오지 못했습니다.'); }
+                } else { throw new Error('사용자 정보를 불러올 수 없습니다. 관리자에게 문의하세요.'); }
             } catch (e) {
                 loading.style.display = "none";
                 errorDiv.style.display = "block";
-                errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 오류가 발생했습니다.<br><small>${e.message}</small>`;
+                errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 시스템 오류가 발생했습니다.<br><small>${e.message}</small>`;
             }
         }
 
-        function togglePasswordForm() {
-            const pwdSection = document.getElementById('passwordChangeSection');
-            const toggleBtn = document.getElementById('btnTogglePwd');
-            if (pwdSection.style.display === 'none') { pwdSection.style.display = 'block'; toggleBtn.style.display = 'none'; } 
-            else { pwdSection.style.display = 'none'; toggleBtn.style.display = 'block'; }
-        }
+        async function submitMyInfoUpdate() {
+            if (!currentMyInfo) return alert("사용자 정보가 없습니다.");
 
-        async function changeMyPassword() {
-            const currPwd = document.getElementById('currPwd').value;
-            const newPwd = document.getElementById('newPwd').value;
-            const confirmPwd = document.getElementById('confirmPwd').value;
+            const password = document.getElementById('myinfo_pass').value;
+            const passwordConfirm = document.getElementById('myinfo_pass_confirm').value;
+            const phone = document.getElementById('myinfo_phone').value;
+            const email = document.getElementById('myinfo_email').value;
+            const address = document.getElementById('myinfo_address').value;
+            const profileIcon = document.getElementById('myinfo_profile_icon').value;
+            const profileImage = document.getElementById('myinfo_profile_image').files[0];
 
-            if (!currPwd || !newPwd || !confirmPwd) { alert('모든 필드를 입력해주세요.'); return; }
-            if (newPwd !== confirmPwd) { alert('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.'); return; }
-            if (newPwd.length < 4) { alert('새 비밀번호는 4자리 이상이어야 합니다.'); return; }
+            if (password) {
+                if (password !== passwordConfirm) return alert("입력하신 새 비밀번호가 서로 일치하지 않습니다.");
+                const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{6,}$/;
+                if (!pwRegex.test(password)) { 
+                    alert("비밀번호는 영문, 숫자, 특수문자를 모두 포함하여 6자리 이상이어야 합니다."); 
+                    return; 
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('user_idx', currentMyInfo.id);
+            
+            if (password) formData.append('password', password); 
+            formData.append('phone', phone);
+            formData.append('email', email);
+            formData.append('address', address);
+            formData.append('profile_icon', profileIcon);
+            
+            formData.append('position', currentMyInfo.직급 || '미지정');
+            formData.append('level', currentMyInfo.레벨 || 10);
+            formData.append('department', currentMyInfo.소속 || '');
+            formData.append('bank_account', currentMyInfo.계좌 || '');
+            
+            if (profileImage) formData.append('profile_image', profileImage);
 
             try {
-                const res = await fetch('/user/change_password', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ current_password: currPwd, new_password: newPwd })
+                const res = await fetch('/user/update', {
+                    method: 'POST', 
+                    body: formData 
                 });
+                
                 const result = await res.json();
 
-                if (res.ok && result.status === 'success') {
-                    alert('비밀번호가 성공적으로 변경되었습니다.');
-                    togglePasswordForm();
-                    document.getElementById('currPwd').value = ''; document.getElementById('newPwd').value = ''; document.getElementById('confirmPwd').value = '';
-                } else { alert(result.message || '비밀번호 변경에 실패했습니다. 현재 비밀번호를 확인해주세요.'); }
-            } catch (e) { alert('서버와 통신 중 오류가 발생했습니다.'); }
+                if (res.ok) {
+                    alert('프로필 정보가 성공적으로 수정되었습니다.');
+                    closeMyInfoModal();
+                    location.reload(); 
+                } else { 
+                    alert(result.message || '정보 수정에 실패했습니다.'); 
+                }
+            } catch (e) { 
+                alert('서버와 통신 중 오류가 발생했습니다.'); 
+            }
         }
 
         function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
