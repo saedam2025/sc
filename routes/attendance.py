@@ -126,7 +126,7 @@ def clock_out():
     
     return jsonify({"success": True, "message": f"{action_type} 처리가 완료되었습니다."})
 
-# [신규 추가] 기록 삭제 처리 API
+# [기존] 기록 삭제 처리 API
 @attendance_bp.route('/attendance/delete', methods=['POST'])
 def delete_record():
     user_level = session.get('user_level', 4)
@@ -144,3 +144,65 @@ def delete_record():
     conn.close()
     
     return jsonify({"success": True, "message": "기록이 정상적으로 삭제되었습니다."})
+
+
+# 🚀 [신규 통합] 메인 화면 출퇴근 버튼 처리용 API
+@attendance_bp.route('/api/attendance/<action_type>', methods=['POST'])
+def record_attendance(action_type):
+    if 'emp_no' not in session:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    
+    emp_no = session.get('emp_no')
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    now_time = datetime.now().strftime('%H:%M:%S')
+    
+    conn = get_db()
+    # 오늘 날짜의 출퇴근 기록 확인
+    record = conn.execute("SELECT * FROM daily_attendance WHERE emp_no = ? AND date = ?", (emp_no, current_date)).fetchone()
+    
+    if action_type == 'in':
+        if record and record['clock_in_time']:
+            conn.close()
+            return jsonify({'status': 'error', 'message': '이미 오늘의 출근 처리가 완료되었습니다.'})
+        
+        position = session.get('position', '미지정')
+        
+        if not record:
+            conn.execute(
+                "INSERT INTO daily_attendance (emp_no, date, clock_in_time, status, position) VALUES (?, ?, ?, ?, ?)",
+                (emp_no, current_date, now_time, '출근', position)
+            )
+        else:
+            conn.execute(
+                "UPDATE daily_attendance SET clock_in_time = ?, status = '출근' WHERE id = ?",
+                (now_time, record['id'])
+            )
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': f'{now_time} 출근 처리되었습니다.'})
+        
+    elif action_type == 'out':
+        if not record or not record['clock_in_time']:
+            conn.close()
+            return jsonify({'status': 'error', 'message': '출근 기록이 없습니다. 먼저 출근 처리를 해주세요.'})
+        
+        if record['clock_out_time']:
+            conn.close()
+            return jsonify({'status': 'error', 'message': '이미 퇴근 처리가 완료되었습니다.'})
+        
+        # 근무시간 계산 로직 (시:분:초 -> 시간 단위)
+        fmt = '%H:%M:%S'
+        tdelta = datetime.strptime(now_time, fmt) - datetime.strptime(record['clock_in_time'], fmt)
+        hours = round(tdelta.total_seconds() / 3600, 1)
+        
+        conn.execute(
+            "UPDATE daily_attendance SET clock_out_time = ?, status = '퇴근', reason = ? WHERE id = ?",
+            (now_time, f"{hours}시간 근무", record['id'])
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success', 'message': f'{now_time} 퇴근 처리되었습니다. (근무시간: {hours}시간)'})
+    
+    conn.close()
+    return jsonify({'status': 'error', 'message': '잘못된 요청입니다.'})
