@@ -7,7 +7,7 @@ import traceback
 # 배포 환경에서 모듈 임포트 에러 방지를 위해 현재 디렉토리를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# 블루프린트 임포트 (기존 유지 + 경로 확인)
+# 블루프린트 임포트
 from routes.main import main_bp
 from routes.document import document_bp
 from routes.contract import contract_bp
@@ -21,6 +21,8 @@ from routes.excel_generator import excel_bp
 from routes.explorer import explorer_bp
 from routes.notifications import noti_bp  # 나의 업무 알림 위젯 시스템
 from routes.gallery import gallery_bp
+from routes.school_bp import school_bp            # [기존] 학교업무공간 블루프린트
+from routes.school_task import school_task_bp   # [신규 추가] 학교 업무 관리 블루프린트
 
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
@@ -71,50 +73,89 @@ def check_login():
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
 
+# =====================================================================
+# [전역 변수 설정] 모든 템플릿에서 로그인 사용자 정보와 사진 경로를 바로 사용 가능하게 함
+# =====================================================================
+@app.context_processor
+def inject_user_data():
+    return {
+        'current_user': session.get('user_name'),
+        'current_user_profile_path': session.get('profile_path') # 대시보드 사진 표시용
+    }
+
 # --- 로그인/로그아웃 로직 ---
 
 @app.route('/login_page')
 def login_page():
+    # 🚀 [추가] 관리자 계정 존재 여부 확인 로직
+    try:
+        conn = get_db()
+        admin = conn.execute("SELECT id FROM users WHERE emp_no = 'admin'").fetchone()
+        conn.close()
+        
+        # 관리자가 없으면 로그인 페이지 대신 최초 설정 화면(user_list.html) 렌더링
+        if not admin:
+            return render_template('user_list.html', mode='admin_setup')
+    except Exception as e:
+        print(f"로그인 페이지 관리자 체크 오류: {e}")
+
     return render_template('login.html')
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    emp_no = data.get('emp_no')
-    password = data.get('password')
+    
+    # 🚀 [추가] 최고관리자 최초 설정 처리 (POST 응답)
+    if data.get('action') == 'setup_admin':
+        try:
+            password = data.get('password')
+            if not password:
+                return jsonify({"status": "error", "message": "비밀번호를 입력해주세요."}), 400
+                
+            conn = get_db()
+            today = datetime.now().strftime('%Y-%m-%d')
+            conn.execute('''
+                INSERT INTO users (emp_no, name, password, position, level, rrn, email, status, join_date, profile_icon, department)
+                VALUES ('admin', 'admin', ?, '최고관리자', 1, '-', 'admin@admin.com', '승인', ?, '👑', '본부')
+            ''', (password, today))
+            conn.commit()
+            conn.close()
+            return jsonify({"status": "success", "message": "최고관리자 설정 완료! 이제 로그인하세요."})
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+
+    # --- 기존 로그인 로직 ---
+    emp_no = str(data.get('emp_no', '')).strip()
+    password = str(data.get('password', '')).strip()
     
     conn = get_db()
-    user = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
+    user_row = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
     
-    if not user:
+    if not user_row:
         conn.close()
         return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
 
-    if user['status'] != '승인':
+    # 🚀 [해결] sqlite3.Row 객체를 안전한 파이썬 딕셔너리로 변환하여 KeyError 및 AttributeError 원천 차단
+    user = dict(user_row)
+
+    if user.get('status') != '승인':
         conn.close()
         return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
     
-    # 로그인 시 출근 처리 로직
-    today_date = datetime.now().strftime('%Y-%m-%d')
-    current_time = datetime.now().strftime('%H:%M:%S')
-
-    attendance = conn.execute("SELECT * FROM daily_attendance WHERE emp_no=? AND date=?", (str(emp_no), today_date)).fetchone()
-
-    if not attendance:
-        try:
-            conn.execute("INSERT INTO daily_attendance (emp_no, date, clock_in_time, status, position) VALUES (?, ?, ?, ?, ?)",
-                         (str(emp_no), today_date, current_time, '근무중', user['position']))
-            conn.commit()
-        except Exception as e:
-            print(f"근태 기록 생성 실패: {e}")
+    # 세션 정보 안전하게 저장
+    session['emp_no'] = str(user.get('emp_no', ''))
+    session['user_name'] = user.get('name', '알수없음')
+    session['user_level'] = int(user.get('level', 14))
+    
+    # 메인 화면 소속/직급 표시용 데이터 추가
+    session['position'] = str(user.get('position', '미지정'))
+    session['department'] = str(user.get('department', '소속미지정'))
+    session['role'] = str(user.get('position', '미지정'))
+    
+    session['profile_path'] = user.get('profile_path', '')
+    session['profile_icon'] = user.get('profile_icon') or user.get('아이콘') or '👤'
 
     conn.close()
-
-    # 세션 정보 저장 (중요: notifications.py에서 user_name과 role을 사용함)
-    session['emp_no'] = str(user['emp_no'])
-    session['user_name'] = user['name']
-    session['user_level'] = int(user['level'])
-    session['role'] = str(user['position'])
     
     return jsonify({"status": "success"})
 
@@ -163,8 +204,14 @@ app.register_blueprint(memo_bp, url_prefix='/memo')
 app.register_blueprint(attendance_bp)  
 app.register_blueprint(excel_bp)       
 app.register_blueprint(explorer_bp, url_prefix='/explorer')
-app.register_blueprint(noti_bp)  # 나의 업무 알림 (이미 등록됨)
+app.register_blueprint(noti_bp)  # 나의 업무 알림
 app.register_blueprint(gallery_bp) 
+
+# 학교 업무 관련 블루프린트 설정
+app.register_blueprint(school_bp, url_prefix='/school')
+
+# [신규 연동] school_task.py 블루프린트를 /school/tasks 경로로 매핑
+app.register_blueprint(school_task_bp, url_prefix='/school/tasks')
 
 # 에러 핸들러
 @app.errorhandler(404)
@@ -187,5 +234,4 @@ def internal_server_error(e):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    # 여기에 debug=True를 추가하여 윈도우 환경에서 빠른 개발(자동 새로고침)을 지원합니다.
     app.run(host='0.0.0.0', port=port, debug=True)
