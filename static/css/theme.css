@@ -1,0 +1,50 @@
+/* 기본 테마 (사내 시스템에 어울리는 깔끔한 블루) */
+:root {
+    --bg-color: #ffffff;
+    --text-color: #333333;
+    --primary-color: #2b6cb0; 
+    --secondary-color: #ebf8ff;
+    --header-bg: #2b6cb0;
+}
+
+/* 요소에 변수 적용 (예시) */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+header, .sidebar {
+    background-color: var(--header-bg);
+}
+button, .btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* =========================================
+   25가지 테마 컬러셋 (어두운 색상 제외)
+========================================= */
+[data-theme="theme_1"] { --primary-color: #3182ce; --header-bg: #3182ce; --secondary-color: #ebf8ff; } /* 스카이블루 */
+[data-theme="theme_2"] { --primary-color: #00b5d8; --header-bg: #00b5d8; --secondary-color: #e6fffa; } /* 시안 */
+[data-theme="theme_3"] { --primary-color: #38b2ac; --header-bg: #38b2ac; --secondary-color: #e6fffa; } /* 틸(Teal) */
+[data-theme="theme_4"] { --primary-color: #48bb78; --header-bg: #48bb78; --secondary-color: #f0fff4; } /* 그린 */
+[data-theme="theme_5"] { --primary-color: #38a169; --header-bg: #38a169; --secondary-color: #f0fff4; } /* 에메랄드 */
+[data-theme="theme_6"] { --primary-color: #84cc16; --header-bg: #84cc16; --secondary-color: #f7fee7; } /* 라임 */
+[data-theme="theme_7"] { --primary-color: #eab308; --header-bg: #eab308; --secondary-color: #fefce8; } /* 옐로우 */
+[data-theme="theme_8"] { --primary-color: #f6ad55; --header-bg: #f6ad55; --secondary-color: #fffaf0; } /* 라이트 오렌지 */
+[data-theme="theme_9"] { --primary-color: #ed8936; --header-bg: #ed8936; --secondary-color: #fffaf0; } /* 오렌지 */
+[data-theme="theme_10"] { --primary-color: #f56565; --header-bg: #f56565; --secondary-color: #fff5f5; } /* 코랄 */
+[data-theme="theme_11"] { --primary-color: #e53e3e; --header-bg: #e53e3e; --secondary-color: #fff5f5; } /* 로즈 */
+[data-theme="theme_12"] { --primary-color: #fc8181; --header-bg: #fc8181; --secondary-color: #fff5f5; } /* 피치 */
+[data-theme="theme_13"] { --primary-color: #f687b3; --header-bg: #f687b3; --secondary-color: #fff5f7; } /* 핑크 */
+[data-theme="theme_14"] { --primary-color: #ed64a6; --header-bg: #ed64a6; --secondary-color: #fff5f7; } /* 마젠타 */
+[data-theme="theme_15"] { --primary-color: #b83280; --header-bg: #b83280; --secondary-color: #fff5f7; } /* 플럼 */
+[data-theme="theme_16"] { --primary-color: #9f7aea; --header-bg: #9f7aea; --secondary-color: #faf5ff; } /* 퍼플 */
+[data-theme="theme_17"] { --primary-color: #805ad5; --header-bg: #805ad5; --secondary-color: #faf5ff; } /* 바이올렛 */
+[data-theme="theme_18"] { --primary-color: #667eea; --header-bg: #667eea; --secondary-color: #ebf4ff; } /* 인디고 */
+[data-theme="theme_19"] { --primary-color: #5a67d8; --header-bg: #5a67d8; --secondary-color: #ebf4ff; } /* 딥 인디고 */
+[data-theme="theme_20"] { --primary-color: #0bc5ea; --header-bg: #0bc5ea; --secondary-color: #e0ffff; } /* 아쿠아 */
+[data-theme="theme_21"] { --primary-color: #20b2aa; --header-bg: #20b2aa; --secondary-color: #e6fffa; } /* 라이트 씨그린 */
+[data-theme="theme_22"] { --primary-color: #90cdf4; --header-bg: #90cdf4; --secondary-color: #ebf8ff; } /* 파스텔 블루 */
+[data-theme="theme_23"] { --primary-color: #a0aec0; --header-bg: #a0aec0; --secondary-color: #f7fafc; } /* 라이트 그레이블루 */
+[data-theme="theme_24"] { --primary-color: #d6bcfa; --header-bg: #d6bcfa; --secondary-color: #faf5ff; } /* 라벤더 */
+[data-theme="theme_25"] { --primary-color: #fbd38d; --header-bg: #fbd38d; --secondary-color: #fffaf0; } /* 살구 */
