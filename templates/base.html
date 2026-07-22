@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAEDAM INTRANET</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    
+    <!-- === 로그인 테마 적용 스크립트 === -->
+    <script>
+        (function() {
+            try {
+                const disableGlobalTheme = {{ (request.endpoint == 'admin.theme_gallery')|tojson }};
+                window.SAEDAM_DISABLE_GLOBAL_THEME = disableGlobalTheme;
+                if (disableGlobalTheme) return;
+
+                const savedTheme = localStorage.getItem('saedam_theme');
+                const managedTheme = {{ global_theme|tojson }};
+                const managedThemeVars = managedTheme && managedTheme.vars ? managedTheme.vars : null;
+                const themeVars = managedThemeVars || (savedTheme ? JSON.parse(savedTheme) : null);
+                const managedEffect = managedTheme && managedTheme.effect ? managedTheme.effect : null;
+                if (managedEffect) {
+                    localStorage.setItem('saedam_theme_effect', managedEffect);
+                }
+                if (themeVars) {
+                    for (const [key, value] of Object.entries(themeVars)) {
+                        document.documentElement.style.setProperty(key, value);
+
+                        // base.html / 대시보드 변수명에 맞게 매핑
+                        if (key === '--card-border') {
+                            document.documentElement.style.setProperty('--border-color', value);
+                            document.documentElement.style.setProperty('--widget-border-color', value);
+                        }
+                        if (key === '--widget-border') {
+                            document.documentElement.style.setProperty('--widget-border-color', value);
+                        }
+                        if (key === '--card-shadow') {
+                            document.documentElement.style.setProperty('--dashboard-card-shadow', value);
+                            document.documentElement.style.setProperty('--dashboard-card-hover-shadow', value);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('테마 로드 실패', e);
+            }
+        })();
+    </script>
+
+    <style>
+        /* === 스크롤바 영역 상시 확보 (꿀렁거림 원천 차단 1) === */
+        html {
+            overflow-y: scroll;
+        }
+
+        /* === 깔끔한 고정 테마 변수 === */
+        :root {
+            --body-bg: #ffffff; 
+            --app-bg: #ffffff; 
+            --main-bg: #ffffff; 
+            
+            --primary-color: #2563eb; 
+            --primary-light: #eff6ff; 
+            --primary-dark: #1d4ed8;
+            
+            --text-dark: #0f172a;
+            --text-gray: #64748b;
+            
+            --border-color: #e2e8f0; 
+            --border-light: #f1f5f9; 
+            
+            --widget-hover: #f8fafc;
+
+            /* 로그인 테마 호환 변수 */
+            --card-bg: #ffffff;
+            --card-border: var(--border-color);
+            --card-shadow: 0 0 0 rgba(0, 0, 0, 0);
+            --card-backdrop: none;
+            --widget-bg: #ffffff;
+            --widget-border: var(--border-color);
+            --input-bg: #f8fafc;
+            --effect-color1: transparent;
+            --effect-color2: transparent;
+            --effect-color3: transparent;
+        }
+
+        /* 기본 설정 (로그인 테마의 애니메이션 그라데이션 반영) */
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--body-bg);
+            background-size: 400% 400%;
+            animation: gradientBG 20s ease infinite;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0; 
+            color: var(--text-dark);
+            box-sizing: border-box;
+            position: relative;
+            overflow-x: hidden;
+            transition: background 1.5s ease;
+        }
+
+        @keyframes gradientBG { 
+            0% { background-position: 0% 50%; } 
+            50% { background-position: 100% 50%; } 
+            100% { background-position: 0% 50%; } 
+        }
+
+/* ====================================================
+           ✨ 배경 애니메이션 효과 (별, 물방울, 블롭 등)
+           ==================================================== */
+        .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
+        .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
+        .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
+        .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
+        @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
+        @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
+
+        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
+
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
+        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
+        .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
+        .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
+        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
+        .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
+        .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
+        @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
+
+        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+        .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
+        .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
+        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+
+        .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
+        @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
+
+        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+        .line-pos { animation: slideLinePos infinite linear; }
+        .line-neg { animation: slideLineNeg infinite linear; }
+        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+        @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+
+
+        /* ====================================================
+           ✨ 선명한 반짝임 배경 액션 5종
+           starPop / starSprinkle / glitterField / cometTwinkle / neonGeometryFlow
+           ==================================================== */
+
+        /* 1) 군데군데 별이 나타났다 사라지는 효과 */
+        .spark-pop-star {
+            position: absolute;
+            color: var(--primary-color);
+            font-weight: 900;
+            line-height: 1;
+            opacity: 0;
+            pointer-events: none;
+            transform-origin: center;
+            text-shadow:
+                0 0 1px rgba(255, 255, 255, 1),
+                0 0 6px rgba(255, 255, 255, 0.9),
+                0 0 14px var(--effect-color1),
+                0 0 26px var(--primary-color);
+            animation: sparkPopStar ease-in-out infinite;
+        }
+
+        @keyframes sparkPopStar {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0.25) rotate(0deg);
+                filter: brightness(1) blur(0.5px);
+            }
+            12% {
+                opacity: 0.95;
+                transform: scale(1.05) rotate(12deg);
+                filter: brightness(1.25) blur(0);
+            }
+            24% {
+                opacity: 0.35;
+                transform: scale(0.72) rotate(-8deg);
+            }
+            42% {
+                opacity: 1;
+                transform: scale(1.25) rotate(18deg);
+                filter: brightness(1.45);
+            }
+            68% {
+                opacity: 0.18;
+                transform: scale(0.55) rotate(-12deg);
+            }
+        }
+
+        /* 2) 작은 별들이 흩뿌려지듯 깜빡이는 효과 */
+        .sprinkle-star {
+            position: absolute;
+            width: 7px;
+            height: 7px;
+            opacity: 0;
+            pointer-events: none;
+            transform-origin: center;
+            animation: sprinkleStarBlink ease-in-out infinite;
+        }
+
+        .sprinkle-star::before,
+        .sprinkle-star::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            background: var(--primary-color);
+            border-radius: 999px;
+            transform: translate(-50%, -50%);
+            box-shadow:
+                0 0 4px rgba(255, 255, 255, 0.95),
+                0 0 10px var(--effect-color1),
+                0 0 18px var(--primary-color);
+        }
+
+        .sprinkle-star::before {
+            width: 100%;
+            height: 2px;
+        }
+
+        .sprinkle-star::after {
+            width: 2px;
+            height: 100%;
+        }
+
+        @keyframes sprinkleStarBlink {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(0.35) rotate(0deg);
+            }
+            18% {
+                opacity: 0.9;
+                transform: scale(1) rotate(45deg);
+            }
+            45% {
+                opacity: 0.3;
+                transform: scale(0.65) rotate(80deg);
+            }
+            70% {
+                opacity: 1;
+                transform: scale(1.2) rotate(135deg);
+            }
+        }
+
+        /* 3) 고급스러운 반짝 먼지 입자 */
+        .glitter-field-dot {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            opacity: 0;
+            pointer-events: none;
+            box-shadow:
+                0 0 4px rgba(255, 255, 255, 0.95),
+                0 0 9px var(--effect-color1),
+                0 0 18px var(--primary-color);
+            animation: glitterFieldFloat linear infinite;
+        }
+
+        @keyframes glitterFieldFloat {
+            0% {
+                opacity: 0;
+                transform: translate3d(0, 0, 0) scale(0.45);
+            }
+            14% {
+                opacity: 0.9;
+            }
+            48% {
+                opacity: 0.42;
+                transform: translate3d(16px, -28vh, 0) scale(1.05);
+            }
+            76% {
+                opacity: 0.95;
+            }
+            100% {
+                opacity: 0;
+                transform: translate3d(-10px, -62vh, 0) scale(0.45);
+            }
+        }
+
+        /* 4) 짧고 선명한 꼬리별 + 주변 반짝임 */
+        .clean-comet {
+            position: absolute;
+            width: 150px;
+            height: 3px;
+            border-radius: 999px;
+            opacity: 0;
+            pointer-events: none;
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 1),
+                var(--primary-color),
+                var(--effect-color1),
+                transparent
+            );
+            box-shadow:
+                0 0 8px rgba(255, 255, 255, 0.9),
+                0 0 18px var(--primary-color);
+            transform: rotate(-26deg);
+            animation: cleanCometMove linear infinite;
+        }
+
+        .clean-comet::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: -5px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow:
+                0 0 8px rgba(255, 255, 255, 1),
+                0 0 20px var(--primary-color),
+                0 0 32px var(--effect-color1);
+        }
+
+        @keyframes cleanCometMove {
+            0% {
+                opacity: 0;
+                transform: translate3d(0, 0, 0) rotate(-26deg);
+            }
+            7% {
+                opacity: 1;
+            }
+            23% {
+                opacity: 0;
+                transform: translate3d(-42vw, 24vh, 0) rotate(-26deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translate3d(-42vw, 24vh, 0) rotate(-26deg);
+            }
+        }
+
+/* 5) 선형/도형 효과: 네온 지오메트리 플로우 */
+        .neon-flow-line {
+            position: absolute;
+            height: 2px;
+            width: 34vw;
+            min-width: 260px;
+            opacity: 0;
+            pointer-events: none;
+            border-radius: 999px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.95),
+                var(--effect-color1),
+                transparent
+            );
+            box-shadow:
+                0 0 10px rgba(255, 255, 255, 0.75),
+                0 0 22px var(--effect-color1);
+            animation: neonFlowLineMove linear infinite;
+        }
+
+        .neon-flow-line.reverse {
+            animation-name: neonFlowLineMoveReverse;
+        }
+
+        @keyframes neonFlowLineMove {
+            0% {
+                opacity: 0;
+                transform: translate3d(30vw, -10vh, 0) rotate(-18deg) scaleX(0.45);
+            }
+            12% {
+                opacity: 0.8;
+            }
+            45% {
+                opacity: 0.55;
+                transform: translate3d(-18vw, 18vh, 0) rotate(-18deg) scaleX(1);
+            }
+            72% {
+                opacity: 0.15;
+            }
+            100% {
+                opacity: 0;
+                transform: translate3d(-55vw, 35vh, 0) rotate(-18deg) scaleX(0.55);
+            }
+        }
+
+        @keyframes neonFlowLineMoveReverse {
+            0% {
+                opacity: 0;
+                transform: translate3d(-30vw, -8vh, 0) rotate(18deg) scaleX(0.45);
+            }
+            12% {
+                opacity: 0.75;
+            }
+            45% {
+                opacity: 0.5;
+                transform: translate3d(18vw, 18vh, 0) rotate(18deg) scaleX(1);
+            }
+            72% {
+                opacity: 0.15;
+            }
+            100% {
+                opacity: 0;
+                transform: translate3d(55vw, 35vh, 0) rotate(18deg) scaleX(0.55);
+            }
+        }
+
+        .geo-flow-shape {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            background: linear-gradient(
+                135deg,
+                rgba(255,255,255,0.82),
+                var(--effect-color1),
+                rgba(255,255,255,0.28)
+            );
+            border: 1px solid rgba(255,255,255,0.65);
+            box-shadow:
+                0 0 10px rgba(255,255,255,0.45),
+                0 0 24px var(--effect-color1);
+            animation: geoFlowShapeFloat ease-in-out infinite;
+        }
+
+        .geo-flow-shape.diamond {
+            transform: rotate(45deg);
+        }
+
+        .geo-flow-shape.triangle {
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        .geo-flow-shape.slash {
+            height: 8px !important;
+            border-radius: 999px;
+            transform: rotate(-28deg);
+        }
+
+        @keyframes geoFlowShapeFloat {
+            0%, 100% {
+                opacity: 0;
+                filter: blur(1px);
+            }
+            18% {
+                opacity: 0.75;
+                filter: blur(0);
+            }
+            48% {
+                opacity: 0.42;
+                transform: translate3d(18px, -18px, 0) rotate(18deg);
+            }
+            70% {
+                opacity: 0.85;
+            }
+        }
+
+        .snow-flake { position: absolute; border-radius: 50%; background: #fff; opacity: 0.8; box-shadow: 0 0 8px #fff; animation: snowFall linear infinite; }
+        @keyframes snowFall { 0% { transform: translateY(-10vh) translateX(0); } 100% { transform: translateY(110vh) translateX(30px); } }
+        .firefly { position: absolute; border-radius: 50%; box-shadow: 0 0 10px currentColor, 0 0 20px currentColor; animation: fireflyMove ease-in-out infinite alternate; }
+        @keyframes fireflyMove { 0% { transform: translate(0, 0) scale(0.8); opacity: 0.3; } 100% { transform: translate(40px, -60px) scale(1.5); opacity: 1; } }
+        .aurora-band { position: absolute; width: 150vw; height: 50vh; filter: blur(80px); opacity: 0.5; border-radius: 50%; animation: auroraSway 15s infinite alternate ease-in-out; }
+        @keyframes auroraSway { 0% { transform: translateX(-20vw) translateY(-10vh) rotate(-5deg); } 100% { transform: translateX(10vw) translateY(20vh) rotate(5deg); } }
+        .confetti-piece { position: absolute; animation: spinFall linear infinite; }
+        @keyframes spinFall { 0% { transform: translateY(-10vh) rotate(0deg) rotateX(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg) rotateX(360deg); opacity: 0; } }
+        .lantern { position: absolute; border-radius: 10px 10px 5px 5px; box-shadow: 0 0 20px currentColor; animation: lanternFloatUp linear infinite; }
+        @keyframes lanternFloatUp { 0% { transform: translateY(110vh) translateX(0) scale(1); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-10vh) translateX(50px) scale(0.8); opacity: 0; } }
+        .ripple-ring { position: absolute; border-radius: 50%; border: 2px solid; animation: rippleExpand linear infinite; }
+        @keyframes rippleExpand { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+        .meteor { position: absolute; width: 2px; height: 60px; background: linear-gradient(to bottom, transparent, #fff); animation: meteorDrop linear infinite; }
+        @keyframes meteorDrop { 0% { transform: translateY(-20vh) translateX(20vw) rotate(45deg); opacity: 1; } 100% { transform: translateY(120vh) translateX(-40vw) rotate(45deg); opacity: 0; } }
+        .crystal-prism { position: absolute; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); opacity: 0.5; filter: drop-shadow(0 0 10px currentColor); animation: crystalSpin linear infinite; }
+        @keyframes crystalSpin { 0% { transform: translateY(110vh) rotateY(0deg) rotateZ(0deg); } 100% { transform: translateY(-20vh) rotateY(360deg) rotateZ(180deg); } }
+        .cosmic-dust { position: absolute; border-radius: 50%; filter: blur(4px); animation: pulseDust ease-in-out infinite alternate; }
+        @keyframes pulseDust { 0% { transform: scale(0.5); opacity: 0.1; } 100% { transform: scale(2); opacity: 0.7; } }
+        .floating-heart { position: absolute; font-size: 24px; animation: heartFloat ease-in infinite; }
+        @keyframes heartFloat { 0% { transform: translateY(100vh) scale(0.5); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-10vh) scale(1.5); opacity: 0; } }
+        .cyber-line { position: absolute; height: 1px; width: 100vw; left: 0; box-shadow: 0 0 10px currentColor; animation: gridMove linear infinite; }
+        @keyframes gridMove { 0% { transform: translateY(0vh) scaleY(1); opacity: 0; } 50% { opacity: 0.5; } 100% { transform: translateY(100vh) scaleY(2); opacity: 0; } }
+        .matrix-drop { position: absolute; width: 2px; height: 80px; background: linear-gradient(to bottom, transparent, currentColor, #fff); animation: matrixFall linear infinite; }
+        @keyframes matrixFall { 0% { transform: translateY(-100px); opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+        .autumn-leaf { position: absolute; border-radius: 0 50% 0 50%; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); animation: leafFall linear infinite; }
+        @keyframes leafFall { 0% { transform: translateY(-10vh) translateX(0) rotate(0deg) rotateX(0deg); } 100% { transform: translateY(110vh) translateX(100px) rotate(360deg) rotateX(360deg); } }
+        .circuit-path { position: absolute; border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor; animation: drawCircuit linear infinite; }
+        @keyframes drawCircuit { 0% { width: 0; height: 0; opacity: 1; } 50% { width: 80px; height: 0; opacity: 1;} 100% { width: 80px; height: 80px; opacity: 0; } }
+        .electric-spark { position: absolute; background: #fff; box-shadow: 0 0 15px currentColor, 0 0 30px #fff; animation: sparkFlash 0.5s infinite steps(2); }
+        @keyframes sparkFlash { 0% { opacity: 0; transform: scale(1) rotate(0deg); } 50% { opacity: 1; transform: scale(2) rotate(25deg); } 100% { opacity: 0; transform: scale(1) rotate(-25deg); } }
+        .diamond-pulse { position: absolute; transform: rotate(45deg); border: 2px solid currentColor; animation: diamondBeat ease-in-out infinite alternate; }
+        @keyframes diamondBeat { 0% { transform: rotate(45deg) scale(0.5); opacity: 0.1; } 100% { transform: rotate(45deg) scale(1.5); opacity: 0.8; box-shadow: inset 0 0 15px currentColor; } }
+        .light-pillar { position: absolute; height: 100vh; top: 0; background: linear-gradient(to left, transparent, currentColor, transparent); animation: pillarFade linear infinite; }
+        @keyframes pillarFade { 0% { opacity: 0; transform: translateX(-5vw); } 50% { opacity: 0.2; } 100% { opacity: 0; transform: translateX(5vw); } }
+        .magic-rune { position: absolute; font-family: monospace; font-size: 30px; font-weight: bold; animation: runeGlow linear infinite; }
+        @keyframes runeGlow { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 50% { opacity: 0.8; text-shadow: 0 0 15px currentColor; transform: translateY(-30px) scale(1.2); } 100% { opacity: 0; transform: translateY(-60px) scale(0.8); } }
+        .plasma-orb { position: absolute; border-radius: 50%; filter: blur(8px); animation: plasmaBounce ease-in-out infinite alternate; }
+        @keyframes plasmaBounce { 0% { transform: translateY(0) scale(0.8); opacity: 0.4; } 100% { transform: translateY(-80px) scale(1.3); opacity: 0.9; } }
+        .stardust-trail { position: absolute; border-radius: 50%; box-shadow: 0 0 12px currentColor; animation: trailWander linear infinite; }
+        @keyframes trailWander { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(120px, 120px); opacity: 0; } }
+
+        .seasonal-petal, .festival-ribbon, .pepero-stick, .christmas-snowflake, .christmas-ornament, .summer-sparkle, .harvest-moon { position: absolute; pointer-events: none; }
+        .seasonal-petal { top: -12vh; border-radius: 72% 28% 68% 32%; background: var(--effect-color1); box-shadow: 0 0 10px rgba(255,255,255,0.55), 0 0 18px currentColor; animation: seasonalDrift linear infinite; }
+        .seasonal-petal.cherry-petal { background: radial-gradient(circle at 35% 30%, #ffffff, var(--effect-color1) 45%, var(--effect-color2)); color: var(--effect-color1); }
+        .seasonal-petal.spring-leaf { border-radius: 0 72% 0 72%; background: linear-gradient(135deg, var(--effect-color1), var(--effect-color2)); color: var(--effect-color1); }
+        .seasonal-petal.rose-petal { background: radial-gradient(circle at 30% 25%, var(--effect-color3), var(--effect-color2)); color: var(--effect-color2); }
+        .festival-ribbon { top: -12vh; border-radius: 999px 999px 4px 4px; background: linear-gradient(180deg, var(--effect-color1), var(--effect-color2)); box-shadow: 0 0 14px rgba(255,255,255,0.55); animation: seasonalDrift linear infinite; }
+        .pepero-stick { top: -14vh; border-radius: 999px; background: linear-gradient(180deg, #5b2a16 0 46%, #f5c16c 46% 100%); box-shadow: 0 0 10px rgba(124,45,18,0.32); animation: seasonalDrift linear infinite; }
+        .christmas-snowflake { top: -12vh; color: #ffffff; line-height: 1; font-weight: 900; text-shadow: 0 0 10px #fff, 0 0 22px var(--effect-color1); animation: seasonalDrift linear infinite; }
+        .christmas-ornament { top: -12vh; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #ffffff, var(--effect-color2) 36%, var(--effect-color3)); box-shadow: 0 0 16px rgba(255,255,255,0.7), 0 0 24px var(--effect-color2); animation: seasonalDrift linear infinite; }
+        .christmas-ornament::before { content: ''; position: absolute; left: 35%; top: -18%; width: 30%; height: 22%; border-radius: 3px; background: #facc15; }
+        .summer-sparkle { border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.95), var(--effect-color2) 35%, transparent 68%); box-shadow: 0 0 16px var(--effect-color2); animation: summerFloat ease-in-out infinite; }
+        .harvest-moon { right: 8%; top: 9%; width: min(26vw, 240px); height: min(26vw, 240px); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8d6, #fde68a 58%, #f59e0b); box-shadow: 0 0 50px rgba(245,158,11,0.5); animation: moonPulse 5s ease-in-out infinite alternate; }
+        @keyframes seasonalDrift { 0% { transform: translate3d(0, -14vh, 0) rotate(0deg); opacity: 0; } 10% { opacity: var(--season-opacity, 0.9); } 100% { transform: translate3d(var(--drift, 70px), 118vh, 0) rotate(var(--spin, 720deg)); opacity: 0; } }
+        @keyframes summerFloat { 0%, 100% { transform: translate3d(0, 0, 0) scale(0.75); opacity: 0.25; } 50% { transform: translate3d(var(--drift, 35px), -34px, 0) scale(1.15); opacity: 0.95; } }
+        @keyframes moonPulse { 0% { transform: scale(0.96); filter: brightness(1); } 100% { transform: scale(1.03); filter: brightness(1.12); } }
+
+        #bg-effect-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
+
+        /* 로그인 테마 효과가 실제 메뉴/콘텐츠 뒤에 깔리도록 z-index 정리 */
+        .app-wrapper,
+        .main-footer {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 로그인 테마의 글로우 테두리/그림자를 내부 메뉴와 카드에도 적용 */
+        .navbar,
+        .dropdown-content,
+        .modal-content,
+        .user-profile,
+        .btn-memo,
+        .widget-card,
+        .profile-card,
+        .weekly-schedule-widget {
+            border-color: var(--card-border, var(--border-color)) !important;
+            box-shadow: var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0)), inset 0 0 0 1px var(--card-border, transparent) !important;
+        }
+
+        .menu-item:hover,
+        .dropdown-content a:hover,
+        .user-profile:hover,
+        .btn-memo:hover,
+        .btn-memo.active {
+            box-shadow: 0 0 14px color-mix(in srgb, var(--primary-color) 45%, transparent);
+        }
+
+
+        /* 앱 래퍼 - 100%로 확장하여 브라우저 끝까지 닿게 함 (상단메뉴 확장) */
+        .app-wrapper {
+            width: 100%;
+            margin: 0;
+            background: transparent;
+            border: none; 
+            border-radius: 0; 
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh; 
+            box-shadow: none; 
+        }
+
+        /* 네비게이션바 - 로그인 테마 배경(투명도) 및 블러 반영 */
+        .navbar {
+            background: var(--card-bg, #ffffff);
+            backdrop-filter: var(--card-backdrop, none);
+            -webkit-backdrop-filter: var(--card-backdrop, none);
+            border-bottom: 1px solid var(--card-border, var(--border-color)); 
+            box-shadow: var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0)), inset 0 0 0 1px var(--card-border, transparent);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 45px;
+            height: 80px; 
+            width: 100%;
+            box-sizing: border-box;
+            z-index: 1000;
+        }
+
+        .nav-container { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; }
+        .logo-img { height: 40px; width: auto; display: block; cursor: pointer; }
+
+        /* 세련된 메인 메뉴 목록 디자인 */
+        .menu-list { display: flex; list-style: none; margin: 0; padding: 0; height: 100%; align-items: center; gap: 8px; }
+        .menu-item-wrapper { position: relative; height: 100%; display: flex; align-items: center; }
+        
+        .menu-item {
+            color: var(--text-gray);
+            text-decoration: none; 
+            font-weight: 600; 
+            padding: 10px 16px; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            font-size: 0.95rem; 
+            transition: all 0.2s ease;
+            background: transparent;
+        }
+        
+        .menu-item:hover { 
+            background: var(--widget-hover, #f1f5f9); 
+            color: var(--primary-color); 
+        }
+        
+        .menu-item.active {
+            background: var(--primary-color); 
+            color: #ffffff;                    
+            font-weight: 600;                  
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); 
+        }
+
+        /* 세련된 드롭다운 디자인 */
+        .dropdown { height: 100%; }
+        .dropdown-content { 
+            display: none; 
+            position: absolute; 
+            top: 90%; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            background-image: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            opacity: 1 !important;
+            min-width: 210px; 
+            box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18) !important; 
+            border-radius: 16px; 
+            border: 1px solid #dbe2ea !important; 
+            z-index: 1100; 
+            padding: 12px 8px; 
+        }
+        .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 25px; }
+        .menu-item-wrapper:hover .dropdown-content { display: block; animation: floatUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        
+        @keyframes floatUp { 
+            from { transform: translate(-50%, 15px); } 
+            to { transform: translate(-50%, 0); } 
+        }
+        
+        .dropdown-content a { 
+            color: #334155 !important; 
+            background: #ffffff !important;
+            opacity: 1 !important;
+            padding: 10px 16px; 
+            text-decoration: none; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-size: 0.9rem; 
+            font-weight: 500; 
+            border-radius: 10px; 
+            transition: all 0.2s ease;
+            margin-bottom: 2px;
+        }
+        .dropdown-content a:hover { 
+            background: #f1f5f9 !important; 
+            color: var(--primary-color, #2563eb) !important; 
+            padding-left: 20px; 
+        }
+
+        /* 우측 유저 섹션 */
+        .user-section { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+            background: transparent;
+        }
+        
+        .btn-memo { 
+            color: var(--text-gray); 
+            font-size: 1.2rem; 
+            text-decoration: none; 
+            width: 40px; height: 40px;
+            border-radius: 50%; 
+            transition: all 0.2s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: var(--widget-hover, #f1f5f9);
+        }
+        .btn-memo:hover, .btn-memo.active { color: var(--primary-color); background: var(--primary-light); }
+        
+        .user-profile { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            cursor: pointer; 
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            padding: 6px 14px 6px 6px; 
+            border-radius: 30px; 
+            color: var(--text-dark); 
+            transition: all 0.2s ease;
+            border: 1px solid var(--card-border, var(--border-color));
+        }
+        .user-profile:hover { background: var(--widget-hover, #f8fafc); border-color: var(--primary-color); }
+        
+        .btn-logout { 
+            font-size: 1.1rem; 
+            color: var(--text-gray); 
+            text-decoration: none; 
+            padding: 8px; 
+            transition: color 0.2s; 
+        }
+        .btn-logout:hover { color: #ef4444; }
+
+        /* 메인 컨텐츠 영역 */
+        .main-content {
+            background: transparent; /* 배경을 투명하게 하여 테마 그라데이션 노출 */
+            flex: 1;
+            position: relative;
+            width: 100%;
+        }
+
+        /* 컨텐츠(그리드) 영역 - 이 부분만 1700px로 제한 및 가운데 정렬 */
+        .content-container {
+            width: 100%;
+            max-width: 1700px !important; 
+            padding: 0 45px 50px 45px;  
+            box-sizing: border-box;
+            margin: 0 auto; 
+            position: relative;
+            z-index: 10;
+        }
+
+        /* 🚀 모달 및 폼 전역 스타일 */
+        .modal { display: none; position: fixed; z-index: 3000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
+        .modal-content { 
+            background: var(--card-bg, #ffffff); 
+            backdrop-filter: var(--card-backdrop, none);
+            border: 1px solid var(--border-color); 
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            margin: 6% auto; padding: 0; border-radius: 20px; 
+            width: 800px;
+            max-width: 95vw;
+            max-height: 85vh;
+            overflow-y: auto;
+            color: var(--text-dark);
+        }
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: transparent; }
+        .modal-header h3 { margin: 0; font-size: 1.15rem; font-weight: 800; color: var(--text-dark); display: flex; align-items: center; gap: 8px;}
+        
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
+        .full-width { grid-column: 1 / -1; }
+        
+        .profile-setup-area { display: flex; gap: 20px; align-items: flex-start; background: var(--widget-hover, #f8f9fa); padding: 20px; border-radius: 12px; margin-bottom: 5px; }
+        
+        .modal-field { margin-bottom: 5px; text-align: left; }
+        .modal-field label { display: block; font-weight: 700; margin-bottom: 8px; color: var(--text-gray); font-size: 0.85rem; }
+        .readonly-field { background-color: var(--widget-hover, #f1f5f9) !important; color: var(--text-gray) !important; cursor: not-allowed; border: 1px solid var(--border-color) !important; font-weight: 600; }
+
+        .btn-close-modal { background: var(--widget-hover, #f1f5f9); color: var(--text-dark); border: 1px solid var(--border-color); padding: 10px 30px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.95rem; transition: all 0.2s; }
+        .btn-close-modal:hover { filter: brightness(0.9); transform: translateY(-2px); }
+
+        .glass-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 10px; box-sizing: border-box; background: var(--input-bg, #f8fafc); color: var(--text-dark); outline: none; transition: all 0.3s; font-family: inherit;}
+        .glass-input:focus { border-color: var(--primary-color); background: var(--card-bg, #ffffff); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
+        .btn-primary-glass:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.2); }
+
+        .main-footer { text-align: center; padding: 20px 0; color: var(--text-gray); font-size: 0.85rem; background: transparent; border-top: none !important; }
+
+        /* 이모티콘 및 이미지 관련 CSS */
+        .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
+        .profile-icon-option.selected { border-color: var(--primary-color); background: var(--primary-light); }
+        .profile-icon-option:hover { background: var(--widget-hover, #f8f9fa); }
+
+        .emoji-scroll-box {
+            display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+            max-height: 130px; overflow-y: auto; border: 1px solid var(--border-color); 
+            padding: 10px; border-radius: 10px; background: var(--card-bg, #fff);
+        }
+        .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+        .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+        
+        .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid var(--border-color); margin-top: 10px; display: none; }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    
+    <div id="bg-effect-container" aria-hidden="true"></div>
+
+    <div class="app-wrapper">
+        {% if current_user_level|int != 8 %}
+        <header class="navbar">
+            <div class="nav-container">
+                <a href="/" class="logo">
+                    <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="logo-img">
+                </a>
+
+                <nav style="height: 100%;">
+                    <ul class="menu-list">
+                        <!-- 1. 메인달력 -> 메인메뉴 명칭 변경 -->
+                        <li class="menu-item-wrapper">
+                            <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
+                                <i class="fa-solid fa-calendar-days"></i> 메인메뉴
+                            </a>
+                        </li>
+                        
+                        <!-- 2. 사내결재 메뉴 통합 (드롭다운 구조로 변경) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'approval' in request.path or 'expense' in request.path or 'contract' in request.path or 'document' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-file-signature"></i> 사내결재
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>
+                                {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
+                                <a href="/contract/admin"><i class="fa-solid fa-file-contract"></i>전자계약관리</a>
+                                {% endif %}
+                                
+                                <!-- 기존 증명서발급 세부 메뉴들 -->
+                                <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i>증명서 발급관리</a>
+                                <a href="/expense"><i class="fa-solid fa-receipt"></i>지출결의 관리</a>
+                                <a href="/expense/submit"><i class="fa-solid fa-upload"></i>지출결의 전송</a>
+                            </div>
+                        </li>
+
+                        <!-- 3. 학교관리 메뉴 신설 (드롭다운 서브메뉴 추가) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'school' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-school"></i> 학교관리
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/school"><i class="fa-solid fa-chalkboard-user"></i>학교업무공간</a>
+                                <a href="/school/tasks"><i class="fa-solid fa-list-check"></i>학교업무처리</a>
+                                <a href="/school/calendar"><i class="fa-solid fa-calendar-week"></i>학교일정표</a>
+                            </div>
+                        </li>
+
+                        <!-- 4. 업무지원 메뉴 (기존 유지) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path %}active{% endif %}">
+                                <i class="fa-solid fa-briefcase"></i> 업무지원
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i>명세서 발송</a>
+                                <a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일전송</a>
+                                <a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>
+                                <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태 관리</a>
+                                <a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>
+                            </div>
+                        </li>
+
+                        <!-- 5. 업무공간 메뉴 (기존 유지) -->
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') %}active{% endif %}">
+                                <i class="fa-solid fa-layer-group"></i> 업무공간
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>사내 게시판</a>
+                                <a href="/board/archive"><i class="fa-solid fa-folder-open"></i>사내 자료실</a>
+                                <a href="/gall2"><i class="fa-regular fa-images"></i>사내 갤러리</a>
+                                <a href="/board/manual"><i class="fa-solid fa-book"></i>업무메뉴얼</a>
+                                <a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>개인화이트보드</a>
+                            </div>
+                        </li>
+
+                        <!-- 6. 통합관리 메뉴 (권한 레벨 2 이상 관리자 전용) -->
+                        {% if session.get('user_level', 99) <= 2 or session.get('user_name') == 'admin' %}
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') %}active{% endif %}">
+                                <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
+                            </a>
+                            <div class="dropdown-content">
+                                <a href="/user"><i class="fa-solid fa-user-gear"></i>인사관리</a>
+                                <a href="/admin/boards"><i class="fa-solid fa-clipboard-list"></i>게시판관리</a>
+                                <a href="/admin/disk"><i class="fa-solid fa-hard-drive"></i>디스크관리</a>
+                                <a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>
+                                <a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>
+                                <a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>
+                            </div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+                <div class="user-section">
+                    {% if session.get('user_name') %}
+                    <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
+                        <i class="fa-solid fa-chalkboard"></i>
+                    </a>
+
+                    <div class="user-profile" onclick="openMyInfoModal()">
+                        <div id="nav-profile-icon-container" style="background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; font-size: 1.1rem;">
+                            {{ session.get('profile_icon', '👤') }}
+                        </div>
+                        <span id="nav-user-name">{{ session.get('name', session.get('user_name')) }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+        {% endif %}
+
+        <main class="main-content">
+            <div class="content-container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <footer class="main-footer">
+        <p>&copy; 2026 Saedam Youth Education & Culture Center. All Rights Reserved.</p>
+    </footer>
+
+    <!-- 개인 프로필 모달 (기존과 동일하게 작동) -->
+    <div id="myInfoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-id-badge" style="color:var(--primary-color);"></i> 개인 프로필 정보</h3>
+                <span style="cursor:pointer; font-size:1.6rem; color: var(--text-gray); transition: color 0.2s;" onclick="closeMyInfoModal()" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--text-gray)'">&times;</span>
+            </div>
+            
+            <div id="myInfoLoading" style="text-align: center; padding: 40px; color: var(--text-gray); font-weight: 600;">데이터를 불러오는 중입니다...</div>
+            <div id="myInfoError" style="display: none; text-align: center; padding: 40px; color: #ef4444; font-weight: 600;"></div>
+            
+            <div id="myInfoDisplay" style="display: none;">
+                <form id="myInfoForm" onsubmit="event.preventDefault(); submitMyInfoUpdate();">
+                    <div class="form-grid" id="myInfoGrid"></div>
+                    
+                    <div style="padding: 20px 25px; display: flex; gap: 10px; justify-content: flex-end; background: transparent; border-top: 1px solid var(--border-color);">
+                        <button type="submit" class="btn-primary-glass" style="width: auto; padding: 12px 30px;"><i class="fa-solid fa-check" style="margin-right:5px;"></i> 변경사항 적용</button>
+                        <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMyInfo = null;
+
+        const avatarEmojis = [
+            '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
+            '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
+            '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
+            '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
+        ];
+
+        window.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const res = await fetch('/user/my_info');
+        if (!res.ok) return;
+
+        const result = await res.json();
+        if (result.status !== 'success') return;
+
+        const me = result.data;
+        const navContainer = document.getElementById('nav-profile-icon-container');
+
+        if (me.profile_path) {
+            navContainer.innerHTML = `<img src="${me.profile_path}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        } else if (me.profile_icon) {
+            navContainer.innerHTML = me.profile_icon;
+        }
+
+        if (me.name) {
+            document.getElementById('nav-user-name').innerText = me.name;
+        }
+    } catch(e) {}
+});
+
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                preview.src = "";
+                preview.style.display = 'none';
+            }
+        }
+
+        function formatPhoneNumber(input) {
+            let val = input.value.replace(/[^0-9]/g, '');
+            if (val.length > 3 && val.length <= 7) {
+                val = val.slice(0, 3) + '-' + val.slice(3);
+            } else if (val.length > 7) {
+                val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+            }
+            input.value = val;
+        }
+
+        function renderIcons(containerId, inputId, currentIcon) {
+            const container = document.getElementById(containerId);
+            if(!container) return;
+            container.innerHTML = avatarEmojis.map((e, i) => {
+                const isSelected = (currentIcon && currentIcon === e) || (!currentIcon && i === 0);
+                return `<div class="profile-icon-option ${isSelected ? 'selected' : ''}" onclick="selectIcon(this, '${inputId}', '${e}')">${e}</div>`;
+            }).join('');
+            
+            if(!currentIcon && document.getElementById(inputId)) {
+                document.getElementById(inputId).value = avatarEmojis[0];
+            }
+        }
+
+        function selectIcon(el, inputId, emoji) {
+            document.querySelectorAll('#' + el.parentElement.id + ' .profile-icon-option').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            document.getElementById(inputId).value = emoji;
+        }
+
+        async function openMyInfoModal() {
+            const modal = document.getElementById('myInfoModal');
+            const loading = document.getElementById('myInfoLoading');
+            const errorDiv = document.getElementById('myInfoError');
+            const display = document.getElementById('myInfoDisplay');
+            const grid = document.getElementById('myInfoGrid');
+
+            modal.style.display = "block";
+            loading.style.display = "block";
+            errorDiv.style.display = "none";
+            display.style.display = "none";
+            grid.innerHTML = "";
+
+            try {
+                const res = await fetch('/user/my_info');
+
+                if (!res.ok) {
+                throw new Error('사용자 정보를 불러올 수 없습니다.');
+                }
+
+                const result = await res.json();
+
+                if (result.status !== 'success') {
+                throw new Error(result.message || '사용자 정보를 불러올 수 없습니다.');
+                }
+
+                currentMyInfo = result.data;
+                
+if (currentMyInfo) {
+    const u = currentMyInfo;
+    const profilePath = u.profile_path || '';
+    const icon = u.profile_icon || '👤';
+
+    let html = `
+        <div class="full-width profile-setup-area">
+            <div style="flex:1;">
+                <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진</label>
+                <input type="file" id="myinfo_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_myinfo')">
+                <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px;">
+            </div>
+            <div style="flex:2;">
+                <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 아이콘</label>
+                <input type="hidden" id="myinfo_profile_icon" value="${icon}">
+                <div id="icon-container-myinfo" class="emoji-scroll-box"></div>
+            </div>
+        </div>
+
+        <div class="modal-field">
+            <label>사번</label>
+            <input type="text" value="${u.emp_no || ''}" readonly class="glass-input readonly-field">
+        </div>
+
+        <div class="modal-field">
+            <label>성명</label>
+            <input type="text" value="${u.name || ''}" readonly class="glass-input readonly-field">
+        </div>
+
+        <div class="modal-field">
+            <label>직급</label>
+            <input type="text" value="${u.position || ''}" readonly class="glass-input readonly-field">
+        </div>
+
+        <div class="modal-field">
+            <label>소속</label>
+            <input type="text" value="${u.department || ''}" readonly class="glass-input readonly-field">
+        </div>
+
+        <div class="modal-field">
+            <label>새 비밀번호</label>
+            <input type="password" id="myinfo_pass" placeholder="변경 시에만 입력" class="glass-input">
+        </div>
+
+        <div class="modal-field">
+            <label>새 비밀번호 확인</label>
+            <input type="password" id="myinfo_pass_confirm" placeholder="새 비밀번호 확인" class="glass-input">
+        </div>
+
+        <div class="modal-field">
+            <label>전화번호</label>
+            <input type="text" id="myinfo_phone" value="${u.phone || ''}" oninput="formatPhoneNumber(this)" class="glass-input">
+        </div>
+
+        <div class="modal-field">
+            <label>이메일</label>
+            <input type="email" id="myinfo_email" value="${u.email || ''}" class="glass-input">
+        </div>
+
+        <div class="modal-field full-width">
+            <label>주소지</label>
+            <input type="text" id="myinfo_address" value="${u.address || ''}" class="glass-input">
+        </div>
+    `;
+
+    grid.innerHTML = html;
+    renderIcons('icon-container-myinfo', 'myinfo_profile_icon', icon);
+
+    loading.style.display = "none";
+    display.style.display = "block";
+} else { throw new Error('사용자 정보를 불러올 수 없습니다. 관리자에게 문의하세요.'); }
+            } catch (e) {
+                loading.style.display = "none";
+                errorDiv.style.display = "block";
+                errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 시스템 오류가 발생했습니다.<br><small>${e.message}</small>`;
+            }
+        }
+
+        async function submitMyInfoUpdate() {
+            if (!currentMyInfo) return alert("사용자 정보가 없습니다.");
+
+            const password = document.getElementById('myinfo_pass').value;
+            const passwordConfirm = document.getElementById('myinfo_pass_confirm').value;
+            const phone = document.getElementById('myinfo_phone').value;
+            const email = document.getElementById('myinfo_email').value;
+            const address = document.getElementById('myinfo_address').value;
+            const profileIcon = document.getElementById('myinfo_profile_icon').value;
+            const profileImage = document.getElementById('myinfo_profile_image').files[0];
+
+            if (password) {
+                if (password !== passwordConfirm) return alert("입력하신 새 비밀번호가 서로 일치하지 않습니다.");
+                const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{6,}$/;
+                if (!pwRegex.test(password)) { 
+                    alert("비밀번호는 영문, 숫자, 특수문자를 모두 포함하여 6자리 이상이어야 합니다."); 
+                    return; 
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('user_idx', currentMyInfo.id);
+            
+            if (password) formData.append('password', password); 
+            formData.append('phone', phone);
+            formData.append('email', email);
+            formData.append('address', address);
+            formData.append('profile_icon', profileIcon);
+            
+            formData.append('position', currentMyInfo.직급 || '미지정');
+            formData.append('level', currentMyInfo.레벨 || 10);
+            formData.append('department', currentMyInfo.소속 || '');
+            formData.append('bank_account', currentMyInfo.계좌 || '');
+            
+            if (profileImage) formData.append('profile_image', profileImage);
+
+            try {
+const payload = {
+    password: password,
+    phone: phone,
+    email: email,
+    address: address,
+    profile_icon: profileIcon
+};
+
+const res = await fetch('/user/update_my_info', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+});                
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert('프로필 정보가 성공적으로 수정되었습니다.');
+                    closeMyInfoModal();
+                    location.reload(); 
+                } else { 
+                    alert(result.message || '정보 수정에 실패했습니다.'); 
+                }
+            } catch (e) { 
+                alert('서버와 통신 중 오류가 발생했습니다.'); 
+            }
+        }
+
+        function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+        window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
+    </script>
+
+    <script>
+        // === 로그인 테마 배경 액션 효과를 내부 화면에도 렌더링 ===
+        const themeEffectAliases = {
+            none: 'none',
+            stars: 'stars',
+            bubbles: 'bubbles',
+            blobs: 'blobs',
+            orbs: 'orbs',
+            waves: 'waves',
+            geometry: 'geometry',
+            rings: 'rings',
+            polygons: 'polygons',
+            lines: 'lines',
+            starpop: 'starPop',
+            starsprinkle: 'starSprinkle',
+            glitterfield: 'glitterField',
+            comettwinkle: 'cometTwinkle',
+            neongeometryflow: 'neonGeometryFlow',
+            snowfall: 'snowfall',
+            fireflies: 'fireflies',
+            aurora: 'aurora',
+            confetti: 'confetti',
+            lanterns: 'lanterns',
+            ripplewaves: 'rippleWaves',
+            meteorshower: 'meteorShower',
+            crystalprisms: 'crystalPrisms',
+            cosmicdust: 'cosmicDust',
+            floatinghearts: 'floatingHearts',
+            cyberlines: 'cyberLines',
+            matrixdrops: 'matrixDrops',
+            autumnleaves: 'autumnLeaves',
+            circuitpaths: 'circuitPaths',
+            electricsparks: 'electricSparks',
+            diamondpulse: 'diamondPulse',
+            lightpillars: 'lightPillars',
+            magicrunes: 'magicRunes',
+            plasmaorbs: 'plasmaOrbs',
+            stardusttrails: 'stardustTrails',
+            springbreeze: 'springBreeze',
+            cherryblossoms: 'cherryBlossoms',
+            summervacation: 'summerVacation',
+            chuseokmoon: 'chuseokMoon',
+            seollalribbons: 'seollalRibbons',
+            christmasmagic: 'christmasMagic',
+            peperoday: 'peperoDay',
+            roseday: 'roseDay'
+        };
+
+        function normalizeThemeEffect(effectType) {
+            const key = String(effectType || 'blobs').replace(/[\s_-]/g, '').toLowerCase();
+            return themeEffectAliases[key] || effectType || 'blobs';
+        }
+
+        function buildThemeEffectElements(container, className, count, styleConfigurator) {
+            for (let i = 0; i < count; i++) {
+                const el = document.createElement('div');
+                el.className = className;
+                styleConfigurator(el, i);
+                container.appendChild(el);
+            }
+        }
+
+        function configureSeasonalFall(el, options = {}) {
+            const size = Math.random() * (options.sizeRange || 14) + (options.sizeMin || 10);
+            el.style.left = Math.random() * 100 + '%';
+            el.style.width = (options.width ? options.width(size) : size) + 'px';
+            el.style.height = (options.height ? options.height(size) : size) + 'px';
+            el.style.animationDuration = (Math.random() * (options.durationRange || 5) + (options.durationMin || 5)) + 's';
+            el.style.animationDelay = Math.random() * (options.delayMax || 6) + 's';
+            el.style.setProperty('--drift', (Math.random() * 160 - 80) + 'px');
+            el.style.setProperty('--spin', (Math.random() * 720 + 360) + 'deg');
+            if (options.opacity) el.style.setProperty('--season-opacity', options.opacity);
+        }
+
+        function configureSummerSparkle(el) {
+            const size = Math.random() * 22 + 10;
+            el.style.left = Math.random() * 100 + '%';
+            el.style.top = Math.random() * 100 + '%';
+            el.style.width = el.style.height = size + 'px';
+            el.style.animationDuration = (Math.random() * 4 + 3) + 's';
+            el.style.animationDelay = Math.random() * 4 + 's';
+            el.style.setProperty('--drift', (Math.random() * 90 - 45) + 'px');
+        }
+
+        function renderSeasonalThemeEffect(container, effectType, buildFn) {
+            if (effectType === 'springBreeze') {
+                buildFn(container, 'seasonal-petal spring-leaf', 34, (el) => configureSeasonalFall(el, { sizeMin: 8, sizeRange: 14, durationMin: 7, durationRange: 6, opacity: 0.82 }));
+                buildFn(container, 'summer-sparkle', 10, configureSummerSparkle);
+                return true;
+            } else if (effectType === 'cherryBlossoms') {
+                buildFn(container, 'seasonal-petal cherry-petal', 52, (el) => configureSeasonalFall(el, { sizeMin: 9, sizeRange: 17, durationMin: 8, durationRange: 7, opacity: 0.92 }));
+                return true;
+            } else if (effectType === 'summerVacation') {
+                container.innerHTML = '<div class="wave" style="background: var(--effect-color1); opacity:0.2"></div><div class="wave wave-2" style="background: var(--effect-color3); opacity:0.16"></div>';
+                buildFn(container, 'summer-sparkle', 32, configureSummerSparkle);
+                return true;
+            } else if (effectType === 'chuseokMoon') {
+                buildFn(container, 'harvest-moon', 1, () => {});
+                buildFn(container, 'seasonal-petal spring-leaf', 24, (el) => configureSeasonalFall(el, { sizeMin: 10, sizeRange: 18, durationMin: 7, durationRange: 5, opacity: 0.78 }));
+                return true;
+            } else if (effectType === 'seollalRibbons') {
+                buildFn(container, 'festival-ribbon', 38, (el) => configureSeasonalFall(el, { sizeMin: 7, sizeRange: 7, height: size => size * 3.2, durationMin: 5, durationRange: 5, opacity: 0.88 }));
+                return true;
+            } else if (effectType === 'christmasMagic') {
+                buildFn(container, 'christmas-snowflake', 30, (el, i) => {
+                    el.textContent = i % 3 === 0 ? '❄' : '✦';
+                    configureSeasonalFall(el, { sizeMin: 22, sizeRange: 28, durationMin: 7, durationRange: 7, opacity: 0.95 });
+                    el.style.fontSize = el.style.width;
+                });
+                buildFn(container, 'christmas-ornament', 18, (el) => configureSeasonalFall(el, { sizeMin: 14, sizeRange: 20, durationMin: 8, durationRange: 6, opacity: 0.86 }));
+                return true;
+            } else if (effectType === 'peperoDay') {
+                buildFn(container, 'pepero-stick', 34, (el) => configureSeasonalFall(el, { sizeMin: 7, sizeRange: 5, height: size => size * 8, durationMin: 5, durationRange: 5, opacity: 0.88 }));
+                return true;
+            } else if (effectType === 'roseDay') {
+                buildFn(container, 'seasonal-petal rose-petal', 46, (el) => configureSeasonalFall(el, { sizeMin: 11, sizeRange: 18, durationMin: 7, durationRange: 6, opacity: 0.9 }));
+                return true;
+            }
+            return false;
+        }
+
+        function renderSavedLoginThemeEffects() {
+            const container = document.getElementById('bg-effect-container');
+            if (!container) return;
+            if (window.SAEDAM_DISABLE_GLOBAL_THEME) {
+                container.innerHTML = '';
+                container.style.opacity = '0';
+                return;
+            }
+
+            const savedEffect = localStorage.getItem('saedam_theme_effect');
+            const effectType = savedEffect ? normalizeThemeEffect(savedEffect) : 'none';
+            container.style.opacity = '0';
+
+            setTimeout(() => {
+                container.innerHTML = '';
+
+                if (effectType === 'none') {
+                    container.style.opacity = '1';
+                    return;
+                } else if (effectType === 'stars') {
+                    container.innerHTML = `
+                        <div class="stars-small"></div>
+                        <div class="stars-medium"></div>
+                        <div class="stars-large"></div>
+                        <div class="shooting-star" style="top:20%; right:-10%;"></div>
+                        <div class="shooting-star" style="top:50%; right:-20%; animation-delay:4s; animation-duration:12s;"></div>
+                    `;
+                } else if (effectType === 'bubbles') {
+                    for (let i = 0; i < 30; i++) {
+                        const b = document.createElement('div');
+                        b.className = 'bubble';
+                        b.style.left = Math.random() * 100 + '%';
+                        b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px';
+                        b.style.animationDuration = (Math.random() * 8 + 4) + 's';
+                        b.style.animationDelay = (Math.random() * 5) + 's';
+                        container.appendChild(b);
+                    }
+                } else if (effectType === 'blobs') {
+                    container.innerHTML = `
+                        <div class="blob blob-1" style="background: var(--effect-color1)"></div>
+                        <div class="blob blob-2" style="background: var(--effect-color2)"></div>
+                        <div class="blob blob-3" style="background: var(--effect-color3)"></div>
+                    `;
+                } else if (effectType === 'orbs') {
+                    container.innerHTML = `
+                        <div class="glow-orb orb-1" style="background: var(--effect-color1)"></div>
+                        <div class="glow-orb orb-2" style="background: var(--effect-color2)"></div>
+                        <div class="glow-orb orb-3" style="background: var(--effect-color3)"></div>
+                        <div class="cyber-grid"></div>
+                    `;
+                } else if (effectType === 'waves') {
+                    container.innerHTML = `
+                        <div class="wave" style="background: var(--effect-color1); opacity:0.3"></div>
+                        <div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div>
+                        <div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>
+                    `;
+                } else if (effectType === 'geometry') {
+                    for (let i = 0; i < 15; i++) {
+                        const el = document.createElement('div');
+                        el.className = 'shape-box';
+                        if (i % 3 === 0) el.style.borderRadius = '50%';
+                        if (i % 4 === 0) el.style.borderRadius = '30% 70% 70% 30% / 30% 30% 70% 70%';
+                        el.style.left = Math.random() * 100 + '%';
+                        const size = Math.random() * 60 + 20;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                        el.style.animationDelay = (Math.random() * 10) + 's';
+                        el.style.borderColor = `var(--effect-color${(i % 3) + 1})`;
+                        container.appendChild(el);
+                    }
+                } else if (effectType === 'rings') {
+                    for (let i = 0; i < 6; i++) {
+                        const el = document.createElement('div');
+                        el.className = 'glass-ring';
+                        el.style.left = (Math.random() * 80 + 10) + '%';
+                        el.style.top = (Math.random() * 80 + 10) + '%';
+                        const size = Math.random() * 300 + 150;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.marginLeft = -(size / 2) + 'px';
+                        el.style.marginTop = -(size / 2) + 'px';
+                        el.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                        el.style.animationDelay = -(Math.random() * 5) + 's';
+                        el.style.borderColor = `var(--effect-color${(i % 3) + 1})`;
+                        container.appendChild(el);
+                    }
+                } else if (effectType === 'polygons') {
+                    for (let i = 0; i < 15; i++) {
+                        const el = document.createElement('div');
+                        el.className = 'polygon ' + (i % 2 === 0 ? 'poly-triangle' : 'poly-hexagon');
+                        el.style.left = Math.random() * 100 + '%';
+                        const size = Math.random() * 80 + 30;
+                        el.style.width = size + 'px';
+                        el.style.height = size + 'px';
+                        el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                        el.style.animationDelay = (Math.random() * 10) + 's';
+                        el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                        container.appendChild(el);
+                    }
+                } else if (effectType === 'lines') {
+                    for (let i = 0; i < 12; i++) {
+                        const el = document.createElement('div');
+                        el.className = 'glowing-line ' + (i % 2 === 0 ? 'line-pos' : 'line-neg');
+                        el.style.top = (Math.random() * 150 - 25) + '%';
+                        el.style.animationDuration = (Math.random() * 8 + 5) + 's';
+                        el.style.animationDelay = (Math.random() * 5) + 's';
+                        el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i % 3) + 1}), transparent)`;
+                        container.appendChild(el);
+                    }
+                } else if (effectType === 'starPop') {
+                    for (let i = 0; i < 42; i++) {
+                        const star = document.createElement('div');
+                        star.className = 'spark-pop-star';
+                        star.textContent = i % 3 === 0 ? '✦' : (i % 3 === 1 ? '✧' : '✶');
+                        star.style.left = Math.random() * 96 + '%';
+                        star.style.top = Math.random() * 92 + '%';
+                        star.style.fontSize = (Math.random() * 20 + 12) + 'px';
+                        star.style.animationDuration = (Math.random() * 3.8 + 2.2) + 's';
+                        star.style.animationDelay = (Math.random() * 5) + 's';
+                        star.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                        star.style.textShadow = `
+                            0 0 1px rgba(255,255,255,1),
+                            0 0 7px rgba(255,255,255,0.95),
+                            0 0 16px var(--effect-color${(i % 3) + 1}),
+                            0 0 30px var(--primary-color)
+                        `;
+                        container.appendChild(star);
+                    }
+
+                } else if (effectType === 'starSprinkle') {
+                    for (let i = 0; i < 78; i++) {
+                        const star = document.createElement('div');
+                        star.className = 'sprinkle-star';
+                        const size = Math.random() * 8 + 5;
+                        star.style.width = size + 'px';
+                        star.style.height = size + 'px';
+                        star.style.left = Math.random() * 98 + '%';
+                        star.style.top = Math.random() * 94 + '%';
+                        star.style.animationDuration = (Math.random() * 4 + 2.8) + 's';
+                        star.style.animationDelay = (Math.random() * 6) + 's';
+                        container.appendChild(star);
+                    }
+
+                } else if (effectType === 'glitterField') {
+                    for (let i = 0; i < 95; i++) {
+                        const dot = document.createElement('div');
+                        dot.className = 'glitter-field-dot';
+                        dot.style.left = Math.random() * 100 + '%';
+                        dot.style.bottom = (Math.random() * 38 - 12) + '%';
+                        dot.style.width = dot.style.height = (Math.random() * 4 + 2) + 'px';
+                        dot.style.animationDuration = (Math.random() * 10 + 7) + 's';
+                        dot.style.animationDelay = (Math.random() * 8) + 's';
+                        dot.style.background = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                        dot.style.boxShadow = `0 0 4px rgba(255,255,255,0.95), 0 0 10px var(--effect-color${(i % 3) + 1}), 0 0 20px var(--primary-color)`;
+                        container.appendChild(dot);
+                    }
+
+                } else if (effectType === 'cometTwinkle') {
+                    for (let i = 0; i < 7; i++) {
+                        const comet = document.createElement('div');
+                        comet.className = 'clean-comet';
+                        comet.style.left = (Math.random() * 45 + 58) + '%';
+                        comet.style.top = (Math.random() * 64 + 5) + '%';
+                        comet.style.animationDuration = (Math.random() * 7 + 8) + 's';
+                        comet.style.animationDelay = (Math.random() * 7) + 's';
+                        comet.style.background = `linear-gradient(90deg, rgba(255,255,255,1), var(--primary-color), var(--effect-color${(i % 3) + 1}), transparent)`;
+                        container.appendChild(comet);
+                    }
+
+                    for (let i = 0; i < 26; i++) {
+                        const star = document.createElement('div');
+                        star.className = 'spark-pop-star';
+                        star.textContent = i % 2 === 0 ? '✦' : '✧';
+                        star.style.left = Math.random() * 96 + '%';
+                        star.style.top = Math.random() * 90 + '%';
+                        star.style.fontSize = (Math.random() * 12 + 10) + 'px';
+                        star.style.animationDuration = (Math.random() * 4 + 3) + 's';
+                        star.style.animationDelay = (Math.random() * 5) + 's';
+                        container.appendChild(star);
+                    }
+
+                } else if (effectType === 'neonGeometryFlow') {
+                for (let i = 0; i < 14; i++) {
+                    const line = document.createElement('div');
+                    line.className = 'neon-flow-line' + (i % 2 === 0 ? '' : ' reverse');
+                    line.style.left = (Math.random() * 95 - 10) + '%';
+                    line.style.top = (Math.random() * 90) + '%';
+                    line.style.width = (Math.random() * 28 + 24) + 'vw';
+                    line.style.animationDuration = (Math.random() * 7 + 7) + 's';
+                    line.style.animationDelay = (Math.random() * 7) + 's';
+                    line.style.background = `linear-gradient(
+                        90deg,
+                        transparent,
+                        rgba(255,255,255,0.95),
+                        var(--effect-color${(i % 3) + 1}),
+                        transparent
+                    )`;
+                    line.style.boxShadow = `
+                        0 0 10px rgba(255,255,255,0.75),
+                        0 0 22px var(--effect-color${(i % 3) + 1})
+                    `;
+                    container.appendChild(line);
+                }
+
+                const shapeTypes = ['diamond', 'triangle', 'slash'];
+
+                for (let i = 0; i < 22; i++) {
+                    const shape = document.createElement('div');
+                    const type = shapeTypes[i % shapeTypes.length];
+                    shape.className = 'geo-flow-shape ' + type;
+
+                    const size = Math.random() * 24 + 12;
+                    shape.style.width = size + 'px';
+                    shape.style.height = type === 'slash' ? '8px' : size + 'px';
+                    shape.style.left = Math.random() * 96 + '%';
+                    shape.style.top = Math.random() * 88 + '%';
+
+                    shape.style.background = `linear-gradient(
+                        135deg,
+                        rgba(255,255,255,0.82),
+                        var(--effect-color${(i % 3) + 1}),
+                        rgba(255,255,255,0.28)
+                    )`;
+
+                    shape.style.boxShadow = `
+                        0 0 10px rgba(255,255,255,0.45),
+                        0 0 24px var(--effect-color${((i + 1) % 3) + 1})
+                    `;
+
+                    shape.style.animationDuration = (Math.random() * 5 + 4) + 's';
+                    shape.style.animationDelay = (Math.random() * 6) + 's';
+
+                    container.appendChild(shape);
+                }
+            } else if (effectType === 'snowfall') {
+                buildThemeEffectElements(container, 'snow-flake', 60, (el) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 4 + 2) + 'px';
+                    el.style.animationDuration = (Math.random() * 5 + 4) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'fireflies') {
+                buildThemeEffectElements(container, 'firefly', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 5 + 3) + 'px';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (effectType === 'aurora') {
+                buildThemeEffectElements(container, 'aurora-band', 3, (el, i) => {
+                    el.style.top = (i * 20 - 10) + '%';
+                    el.style.background = `var(--effect-color${i + 1})`;
+                    el.style.animationDelay = (i * 2) + 's';
+                });
+            } else if (effectType === 'confetti') {
+                buildThemeEffectElements(container, 'confetti-piece', 40, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 8 + 4) + 'px';
+                    el.style.height = (Math.random() * 15 + 8) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 3) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'lanterns') {
+                buildThemeEffectElements(container, 'lantern', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 15 + 10) + 'px';
+                    el.style.height = (Math.random() * 25 + 15) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 8 + 6) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'rippleWaves') {
+                buildThemeEffectElements(container, 'ripple-ring', 6, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 100 + 50) + 'px';
+                    el.style.borderColor = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (effectType === 'meteorShower') {
+                buildThemeEffectElements(container, 'meteor', 20, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.background = `linear-gradient(to bottom, transparent, var(--effect-color${(i % 3) + 1}), #fff)`;
+                    el.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'crystalPrisms') {
+                buildThemeEffectElements(container, 'crystal-prism', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 10 + 5) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'cosmicDust') {
+                buildThemeEffectElements(container, 'cosmic-dust', 30, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 80 + 30) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (effectType === 'floatingHearts') {
+                buildThemeEffectElements(container, 'floating-heart', 20, (el, i) => {
+                    el.textContent = '\u2661';
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                    el.style.fontSize = (Math.random() * 20 + 10) + 'px';
+                    el.style.animationDuration = (Math.random() * 6 + 4) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'cyberLines') {
+                buildThemeEffectElements(container, 'cyber-line', 10, (el, i) => {
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (effectType === 'matrixDrops') {
+                buildThemeEffectElements(container, 'matrix-drop', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (effectType === 'autumnLeaves') {
+                buildThemeEffectElements(container, 'autumn-leaf', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 20 + 10) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 6 + 4) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (effectType === 'circuitPaths') {
+                buildThemeEffectElements(container, 'circuit-path', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (effectType === 'electricSparks') {
+                buildThemeEffectElements(container, 'electric-spark', 20, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 30 + 10) + 'px';
+                    el.style.height = '2px';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (effectType === 'diamondPulse') {
+                buildThemeEffectElements(container, 'diamond-pulse', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 2 + 1) + 's';
+                    el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (effectType === 'lightPillars') {
+                buildThemeEffectElements(container, 'light-pillar', 8, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 80 + 40) + 'px';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's';
+                    el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (effectType === 'magicRunes') {
+                const runes = ['\u2726', '\u2727', '\u25c7', '\u25cb', '\u25b3', '\u2736'];
+                buildThemeEffectElements(container, 'magic-rune', 18, (el, i) => {
+                    el.textContent = runes[Math.floor(Math.random() * runes.length)];
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (effectType === 'plasmaOrbs') {
+                buildThemeEffectElements(container, 'plasma-orb', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 50 + 20) + 'px';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (effectType === 'stardustTrails') {
+                buildThemeEffectElements(container, 'stardust-trail', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 6 + 3) + 'px';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's';
+                    el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (renderSeasonalThemeEffect(container, effectType, buildThemeEffectElements)) {
+            } else {
+                container.innerHTML = `
+                    <div class="blob blob-1" style="background: var(--effect-color1)"></div>
+                    <div class="blob blob-2" style="background: var(--effect-color2)"></div>
+                    <div class="blob blob-3" style="background: var(--effect-color3)"></div>
+                `;
+            }
+                
+                container.style.opacity = '1';
+            }, 100);
+        }
+
+        document.addEventListener('DOMContentLoaded', renderSavedLoginThemeEffects);
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ partner_name }}님과의 대화</title>
+    <!-- main.html과 동일한 폰트 및 아이콘 로드 -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --text-main: #0f172a;
+            --text-sub: #475569;
+            --text-muted: #94a3b8;
+            --blue-primary: #2563eb;
+            --blue-light: #eff6ff;
+            --widget-border-color: #e2e8f0;
+            --hover-bg: #f8fafc;
+            --bg-body: #f1f5f9;
+        }
+
+        * { box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: var(--bg-body); }
+
+        /* 전체 레이아웃 */
+        .chat-container { display: flex; flex-direction: column; height: 100%; background: #fff; }
+
+        /* 상단 헤더 */
+        .chat-header {
+            padding: 16px 20px;
+            background: #fff;
+            border-bottom: 1px solid var(--widget-border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+        }
+        .partner-info { display: flex; align-items: center; gap: 12px; }
+        .partner-avatar {
+            width: 38px; height: 38px; background: var(--blue-light);
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; border: 1px solid var(--widget-border-color);
+        }
+        .partner-name { font-size: 1.05rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.3px; }
+
+        /* 대화창 본문 (스크롤) */
+        .chat-messages {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 16px;
+            background: #f8fafc;
+        }
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-track { background: transparent; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        /* 말풍선 스타일 */
+        .msg-row { display: flex; flex-direction: column; max-width: 85%; }
+        .msg-row.me { align-self: flex-end; align-items: flex-end; }
+        .msg-row.other { align-self: flex-start; align-items: flex-start; }
+
+        .bubble {
+            padding: 10px 14px; border-radius: 12px; font-size: 0.95rem;
+            line-height: 1.5; position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .me .bubble { background: var(--blue-primary); color: #fff; border-bottom-right-radius: 2px; }
+        .other .bubble { background: #fff; color: var(--text-main); border: 1px solid var(--widget-border-color); border-bottom-left-radius: 2px; }
+
+        .msg-meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
+        .file-attach {
+            margin-top: 6px; display: flex; align-items: center; gap: 6px;
+            font-size: 0.85rem; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.05);
+            text-decoration: none; color: inherit;
+        }
+
+        /* 하단 입력창 */
+        .chat-footer {
+            padding: 15px 20px; background: #fff;
+            border-top: 1px solid var(--widget-border-color);
+        }
+        .input-wrapper {
+            display: flex; flex-direction: column; background: var(--hover-bg);
+            border-radius: 12px; border: 1px solid var(--widget-border-color);
+            transition: all 0.2s;
+        }
+        .input-wrapper:focus-within { border-color: var(--blue-primary); background: #fff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        
+        #chatInput {
+            width: 100%; border: none; background: transparent; padding: 12px;
+            resize: none; font-size: 0.95rem; color: var(--text-main); outline: none;
+            min-height: 40px; max-height: 100px;
+        }
+        .input-actions {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 12px; border-top: 1px dashed var(--widget-border-color);
+        }
+        .action-btns { display: flex; gap: 14px; color: var(--text-sub); }
+        .action-btns i { cursor: pointer; transition: color 0.2s; font-size: 1.1rem; }
+        .action-btns i:hover { color: var(--blue-primary); }
+
+        .btn-send {
+            background: var(--blue-primary); color: #fff; border: none;
+            padding: 6px 14px; border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn-send:hover { background: #1d4ed8; transform: translateY(-1px); }
+
+        /* 파일 업로드 미리보기 배지 */
+        #file-preview {
+            display: none; padding: 6px 12px; background: var(--blue-light);
+            font-size: 0.8rem; color: var(--blue-primary); font-weight: 600;
+        }
+
+        /* 이모티콘 피커 */
+        #emojiPicker {
+            display: none; position: absolute; bottom: 120px; left: 20px;
+            background: #fff; border: 1px solid var(--widget-border-color);
+            border-radius: 12px; padding: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 280px; grid-template-columns: repeat(7, 1fr); gap: 5px; z-index: 100;
+        }
+        .emoji-item { cursor: pointer; font-size: 1.3rem; text-align: center; padding: 5px; border-radius: 6px; transition: 0.2s; }
+        .emoji-item:hover { background: var(--hover-bg); transform: scale(1.2); }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <!-- 헤더 -->
+    <header class="chat-header">
+        <div class="partner-info">
+            <div class="partner-avatar">
+                {{ user_icons.get(partner_name, '👤') }}
+            </div>
+            <div class="partner-name">{{ partner_name }}</div>
+        </div>
+        <div style="color: var(--text-muted); cursor: pointer;" onclick="window.close()">
+            <i class="fa-solid fa-xmark"></i>
+        </div>
+    </header>
+
+    <!-- 메시지 영역 -->
+    <main class="chat-messages" id="chatMessages">
+        {% for msg in messages %}
+        <div class="msg-row {% if msg.sender == current_user %}me{% else %}other{% endif %}">
+            <div class="bubble">
+                {{ msg.content }}
+                {% if msg.filename %}
+                <a href="/uploads/{{ msg.filename }}" class="file-attach" target="_blank">
+                    <i class="fa-solid fa-file-arrow-down"></i>
+                    <span>{{ msg.filename }}</span>
+                </a>
+                {% endif %}
+            </div>
+            <div class="msg-meta">{{ msg.sent_at[5:16] }}</div>
+        </div>
+        {% endfor %}
+    </main>
+
+    <!-- 이모티콘 피커 -->
+    <div id="emojiPicker">
+        <span class="emoji-item" onclick="addEmoji('😀')">😀</span>
+        <span class="emoji-item" onclick="addEmoji('😂')">😂</span>
+        <span class="emoji-item" onclick="addEmoji('🥰')">🥰</span>
+        <span class="emoji-item" onclick="addEmoji('😎')">😎</span>
+        <span class="emoji-item" onclick="addEmoji('😭')">😭</span>
+        <span class="emoji-item" onclick="addEmoji('😡')">😡</span>
+        <span class="emoji-item" onclick="addEmoji('👍')">👍</span>
+        <span class="emoji-item" onclick="addEmoji('🙌')">🙌</span>
+        <span class="emoji-item" onclick="addEmoji('✨')">✨</span>
+        <span class="emoji-item" onclick="addEmoji('✅')">✅</span>
+    </div>
+
+    <!-- 하단 입력창 -->
+    <footer class="chat-footer">
+        <div id="file-preview">
+            <i class="fa-solid fa-paperclip"></i> <span id="fileName"></span>
+            <i class="fa-solid fa-circle-xmark" style="margin-left:5px; cursor:pointer;" onclick="clearFile()"></i>
+        </div>
+        <div class="input-wrapper">
+            <textarea id="chatInput" placeholder="메시지를 입력하세요..." onkeydown="handleKeyDown(event)"></textarea>
+            <div class="input-actions">
+                <div class="action-btns">
+                    <i class="fa-regular fa-face-smile" title="이모티콘" onclick="toggleEmoji()"></i>
+                    <label for="fileInput" style="margin:0;"><i class="fa-solid fa-paperclip" title="파일 첨부"></i></label>
+                    <input type="file" id="fileInput" style="display:none;" onchange="handleFile(this)">
+                </div>
+                <button class="btn-send" onclick="sendMessage()">전송</button>
+            </div>
+        </div>
+    </footer>
+</div>
+
+<script>
+    const partnerName = "{{ partner_name }}";
+    const currentUser = "{{ current_user }}";
+
+    // 페이지 로드시 바닥으로 스크롤
+    window.onload = () => {
+        const chatBox = document.getElementById('chatMessages');
+        chatBox.scrollTop = chatBox.scrollHeight;
+        document.getElementById('chatInput').focus();
+    };
+
+    // 엔터키 처리
+    function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    // 이모티콘 토글
+    function toggleEmoji() {
+        const picker = document.getElementById('emojiPicker');
+        picker.style.display = (picker.style.display === 'grid') ? 'none' : 'grid';
+    }
+
+    function addEmoji(emoji) {
+        const input = document.getElementById('chatInput');
+        input.value += emoji;
+        input.focus();
+        toggleEmoji();
+    }
+
+    // 파일 선택 처리
+    function handleFile(input) {
+        if(input.files.length > 0) {
+            document.getElementById('file-preview').style.display = 'block';
+            document.getElementById('fileName').innerText = input.files[0].name;
+        }
+    }
+
+    function clearFile() {
+        document.getElementById('fileInput').value = "";
+        document.getElementById('file-preview').style.display = 'none';
+    }
+
+    // 쪽지 전송 (AJAX)
+    async function sendMessage() {
+        const content = document.getElementById('chatInput').value.trim();
+        const fileInput = document.getElementById('fileInput');
+        
+        if(!content && fileInput.files.length === 0) return;
+
+        let formData = new FormData();
+        formData.append('receiver', partnerName);
+        formData.append('content', content);
+        if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/send_message', { method: 'POST', body: formData });
+            if (res.ok) {
+                // 성공 시 화면 갱신 (간단하게 새로고침 혹은 DOM 추가)
+                location.reload(); 
+            }
+        } catch (error) {
+            console.error("전송 실패:", error);
+        }
+    }
+
+    // 10초마다 새 메시지 확인 (실시간성 부여)
+    setInterval(() => {
+        // 실제 운영시는 fetch로 데이터만 받아와서 append하는 것이 좋으나,
+        // 현재 로직상 페이지 갱신으로 간단히 처리 가능
+        // location.reload(); 
+    }, 10000);
+</script>
+
+</body>
+</html>

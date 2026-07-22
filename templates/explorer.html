@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    /* === 전체 레이아웃 및 폰트 === */
+    .dashboard-wrapper {
+        font-family: 'Pretendard', sans-serif;
+        color: #1e293b;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        margin-bottom: 40px;
+    }
+
+    /* === 상단 타이틀 영역 === */
+    .page-title-box {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 10px;
+    }
+    .page-title { margin: 0; font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+    .page-subtitle { font-size: 0.9rem; color: #64748b; font-weight: 500; }
+
+    /* === 대시보드 위젯 그리드 === */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+    }
+    .stat-card {
+        background: #ffffff; border-radius: 16px; padding: 24px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f1f5f9;
+        display: flex; align-items: center; justify-content: space-between;
+        transition: transform 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-3px); }
+    
+    .stat-info { display: flex; flex-direction: column; gap: 8px; }
+    .stat-label { font-size: 0.95rem; color: #64748b; font-weight: 600; }
+    .stat-value { font-size: 1.8rem; color: #1e293b; font-weight: 800; line-height: 1; }
+    .stat-icon {
+        width: 50px; height: 50px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    }
+    
+    .icon-blue { background: #e0f2fe; color: #0ea5e9; }
+    .icon-purple { background: #f3e8ff; color: #a855f7; }
+
+    .chart-card {
+        background: #ffffff; border-radius: 16px; padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03); border: 1px solid #f1f5f9;
+        display: flex; gap: 20px; align-items: center;
+    }
+    .chart-container { width: 120px; height: 120px; position: relative; }
+
+    /* === [신규] Admin 액션 카드 스타일 === */
+    .admin-action-card {
+        background: #ffffff; border-radius: 16px; padding: 20px 24px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03); border: 1px solid #fee2e2;
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 15px;
+    }
+    .admin-action-info { display: flex; flex-direction: column; gap: 4px; }
+    .admin-action-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px;}
+    .admin-action-desc { font-size: 0.9rem; color: #64748b; }
+    .admin-action-form { display: flex; gap: 10px; align-items: center; }
+    .pwd-input {
+        padding: 10px 15px; border: 1px solid #cbd5e1; border-radius: 8px;
+        font-size: 0.95rem; outline: none; width: 220px; transition: border-color 0.2s;
+    }
+    .pwd-input:focus { border-color: #ef4444; }
+    .btn-danger {
+        background: #ef4444; color: white; border: none; padding: 10px 20px;
+        border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-danger:hover { background: #dc2626; }
+
+    /* === 탐색기 영역 === */
+    .explorer-container {
+        background: white; border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;
+        overflow: hidden;
+    }
+    .breadcrumb {
+        font-size: 1rem; color: #475569; background: #f8fafc;
+        padding: 15px 20px; border-bottom: 1px solid #e2e8f0;
+        display: flex; align-items: center; gap: 10px; font-weight: 500;
+    }
+    .file-list { width: 100%; border-collapse: collapse; }
+    .file-list th, .file-list td { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; text-align: left; }
+    .file-list th { background: #ffffff; font-weight: 700; color: #64748b; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.5px;}
+    .file-list tr { transition: background 0.15s; }
+    .file-list tr:hover { background: #f8fafc; }
+    
+    .file-link {
+        text-decoration: none; color: #334155; font-weight: 600;
+        display: flex; align-items: center; gap: 12px;
+    }
+    .file-link:hover { color: #3b82f6; }
+    .folder-icon { color: #fbbf24; font-size: 1.3rem; }
+    .file-icon { color: #94a3b8; font-size: 1.3rem; }
+    .up-dir { color: #64748b; font-weight: bold; }
+
+    .admin-grid { display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
+    .side-panel { background: #fff; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0; }
+    .menu-group { margin-bottom: 30px; }
+    .menu-group-title { font-weight: 800; color: #1e293b; margin-bottom: 15px; display:flex; align-items:center; gap:8px;}
+    .admin-link { display: block; padding: 10px; color: #64748b; font-weight: 600; text-decoration: none; border-radius: 8px; transition: 0.2s; }
+    .admin-link:hover { background: #eff6ff; color: #2563eb; }
+
+    .stat-card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 24px; }
+    .stat-box { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; }
+    .stat-box .label { font-size: 0.8rem; color: #64748b; font-weight: 700; }
+    .stat-box .value { font-size: 1.5rem; font-weight: 800; color: #1e3a8a; margin-top: 5px; }
+
+</style>
+
+<div class="dashboard-wrapper">
+    <div class="page-title-box">
+        <h2 class="page-title"><i class="fa-solid fa-server" style="color: #3b82f6; margin-right: 8px;"></i> 스토리지 센터</h2>
+        <span class="page-subtitle">시스템 관리자 전용 모니터링 대시보드</span>
+    </div>
+
+    <div class="stats-grid">
+        <div class="chart-card">
+            <div class="chart-container">
+                <canvas id="storageChart"></canvas>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">디스크 점유율</span>
+                <span class="stat-value">{{ stats.usage_percent }}%</span>
+                <span style="font-size: 0.85rem; color: #94a3b8; margin-top: 4px;">
+                    여유: {{ stats.free_disk_gb }} GB
+                </span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <span class="stat-label">인트라넷 누적 데이터</span>
+                <span class="stat-value">{{ stats.app_used_str }}</span>
+            </div>
+            <div class="stat-icon icon-blue">
+                <i class="fa-solid fa-database"></i>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-info">
+                <span class="stat-label">보관 중인 파일</span>
+                <span class="stat-value">{{ stats.total_files }}<span style="font-size:1rem; font-weight:600; color:#64748b; margin-left:4px;">개</span></span>
+            </div>
+            <div class="stat-icon icon-purple">
+                <i class="fa-solid fa-file-shield"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-action-card">
+        <div class="admin-action-info">
+            <span class="admin-action-title">
+                <i class="fa-solid fa-user-shield" style="color: #ef4444;"></i> Admin 계정 관리
+            </span>
+            <span class="admin-action-desc">최고 관리자(admin)의 로그인 비밀번호를 즉시 재설정합니다.</span>
+        </div>
+        <form action="/explorer/change_admin_password" method="POST" class="admin-action-form" onsubmit="return confirm('정말 Admin 비밀번호를 변경하시겠습니까?');">
+            <input type="password" name="new_password" class="pwd-input" placeholder="새로운 비밀번호 입력" required>
+            <button type="submit" class="btn-danger">변경 적용</button>
+        </form>
+    </div>
+
+
+<div class="menu-group">
+                <div class="menu-group-title"><i class="fa-solid fa-folder-tree"></i> 게시판 관리</div>
+                <a href="/board/admin/setup" class="admin-link">➕ 새 게시판 생성</a>
+                <a href="#" class="admin-link">📋 전체 게시판 목록</a>
+            </div>
+
+
+
+    <div class="explorer-container">
+        <div class="breadcrumb">
+            <i class="fa-solid fa-hard-drive"></i> /mnt/data/<strong>{{ current_path }}</strong>
+        </div>
+
+        <table class="file-list">
+            <thead>
+                <tr>
+                    <th>이름</th>
+                    <th style="width: 150px;">크기</th>
+                    <th style="width: 200px;">수정일</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if parent_path != None %}
+                <tr>
+                    <td colspan="3">
+                        <a href="/explorer/{{ parent_path }}" class="file-link up-dir">
+                            <i class="fa-solid fa-level-up-alt"></i> .. 상위 폴더로 이동
+                        </a>
+                    </td>
+                </tr>
+                {% endif %}
+
+                {% for file in files %}
+                <tr>
+                    <td>
+                        <a href="/explorer/{{ file.rel_path }}" class="file-link">
+                            {% if file.is_dir %}
+                                <i class="fa-solid fa-folder folder-icon"></i>
+                            {% else %}
+                                <i class="fa-solid fa-file file-icon"></i>
+                            {% endif %}
+                            {{ file.name }}
+                        </a>
+                    </td>
+                    <td style="color: #64748b; font-weight: 500;">{{ file.size }}</td>
+                    <td style="color: #64748b; font-size: 0.95rem;">{{ file.mtime }}</td>
+                </tr>
+                {% endfor %}
+                
+                {% if not files %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: #94a3b8; padding: 60px;">
+                        <i class="fa-regular fa-folder-open" style="font-size: 3.5rem; margin-bottom: 15px; display: block; opacity: 0.5;"></i>
+                        이 폴더는 비어있습니다.
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('storageChart').getContext('2d');
+    const usedSpace = {{ stats.used_disk_gb }};
+    const freeSpace = {{ stats.free_disk_gb }};
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['사용 중', '사용 가능'],
+            datasets: [{
+                data: [usedSpace, freeSpace],
+                backgroundColor: ['#3b82f6', '#f1f5f9'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.raw + ' GB';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

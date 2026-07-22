@@ -1,0 +1,571 @@
+<style>
+    .chat-rank-badge {
+        display: none;
+        width: 32px;  /* 38px -> 32px 축소 */
+        height: 32px; /* 38px -> 32px 축소 */
+        border-radius: 10px;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        color: #ffffff;
+        font-weight: 900;
+        font-size: 0.85rem; /* 1rem -> 0.85rem 축소 */
+        background: linear-gradient(145deg, #60a5fa 0%, #f472b6 100%);
+        box-shadow: 0 6px 12px rgba(37, 99, 235, 0.24), inset 0 1px 0 rgba(255,255,255,0.55);
+        border: 2px solid rgba(255,255,255,0.88);
+    }
+    .chat-rank-badge::after {
+        content: '';
+        position: absolute;
+        right: -3px;
+        top: -3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #facc15;
+        border: 2px solid #fff;
+    }
+    .chat-rank-badge .rank-no {
+        line-height: 1;
+        text-shadow: 0 1px 2px rgba(15,23,42,0.22);
+    }
+
+/* 조직도 및 메신저 크게보기 모달에서 유리효과 제거 */
+    #expandedChatModal .modal-content,
+    #orgChartModal .modal-content {
+        /* 테마의 폰트/선 색상은 유지하되, 배경만 완전 불투명한 흰색으로 강제 설정 */
+        background: #ffffff !important; 
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+</style>
+
+<div class="widget-card chat-widget" style="display: flex; flex-direction: column; height: 100%;">
+    <div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
+        <div class="cal-title-area" style="font-size: 1rem; color: #1e293b;">
+            <i class="fa-regular fa-comment-dots" style="color:var(--blue-primary);"></i> 사내메신저
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+<div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1; background: transparent; border: none; padding: 0;">
+    <div id="tab-chats" class="pill-btn blue-pill-active" style="padding: 5px 8px; font-size: 0.75rem; cursor: default; position: relative;">
+        채팅 
+        <span id="unreadBadge" style="display:none; background-color: #ef4444; color: #ffffff; font-size: 0.65rem; font-weight: 800; border-radius: 10px; padding: 2px 6px; margin-left: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">0</span>
+    </div>
+</div>
+            
+            <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
+                <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
+                <i class="fa-solid fa-plus" onclick="document.getElementById('expandedChatModal').style.display='block'" title="메신저 크게 보기" style="font-size: 1.25rem; color: var(--blue-primary); cursor:pointer; padding: 5px;"></i>
+            </div>
+        </div>
+    </div>
+
+    <div id="list-chats" class="scroll-area" style="flex: 1; display: block; padding-top: 8px;">
+        <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">채팅 기록 로딩중...</div>
+    </div>
+</div>
+
+<div id="expandedChatModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:6% auto; padding:25px; width:380px; height: 80vh; max-height: 800px; position:relative; display:flex; flex-direction:column; border-radius: 16px;">
+        <span onclick="document.getElementById('expandedChatModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--widget-border-color);">
+            <h3 style="color: var(--text-main); margin: 0; font-weight:800;">
+                <i class="fa-regular fa-comment-dots" style="color:var(--blue-primary); margin-right:8px;"></i>사내메신저
+            </h3>
+            <div class="widget-icons" style="margin-right: 25px; display: flex; gap: 8px;">
+                <i class="fa-solid fa-users" onclick="document.getElementById('expandedChatModal').style.display='none'; document.getElementById('orgChartModal').style.display='block';" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
+            </div>
+        </div>
+        
+        <div id="expanded-list-chats" class="scroll-area" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column;">
+            <div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">채팅 기록 로딩중...</div>
+        </div>
+    </div>
+</div>
+
+<div id="orgChartModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:4% auto; padding:30px; width:400px; height: 600px; max-height: 600px; position:relative; display:flex; flex-direction:column;">
+        <span onclick="document.getElementById('orgChartModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:15px; font-weight:800;"><i class="fa-solid fa-sitemap" style="color:var(--blue-primary); margin-right:8px;"></i>대화상대 (그룹선택가능)</h3>
+        
+        <div class="scroll-area" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column;">
+            <div id="orgChartListContainer" style="display:flex; flex-direction:column; gap:4px; padding-bottom:10px;">
+                <div style="text-align:center; padding:30px; color:var(--text-muted); font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> 조직도 로딩중...</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--widget-border-color); display:flex; gap: 10px;">
+            <button type="button" class="btn-action" style="flex:1;" onclick="clearOrgChartSelection()">선택 해제</button>
+            <button type="button" class="btn-primary" style="flex:2; padding: 12px; font-size: 0.95rem;" onclick="openMsgModalFromOrg()">
+                <i class="fa-solid fa-paper-plane" style="margin-right:6px;"></i>선택 대상 쓰기
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:400px; position:relative;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-solid fa-users" style="color:var(--blue-primary); margin-right:8px;"></i>새 메시지 작성</h3>
+        <form id="msgForm">
+            
+            <div style="margin-bottom: 15px;">
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600;">받는 사람</div>
+                <div id="msgSelectedReceiversDisplay" style="display:flex; flex-wrap:wrap; gap:6px; padding: 10px; background:#f8fafc; border:1px solid var(--widget-border-color); border-radius:8px; min-height: 45px;">
+                    </div>
+            </div>
+            
+            <div id="msgSendModeContainer" style="margin-bottom: 15px; padding: 12px; background: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe; font-size: 0.9rem; display: none;">
+                <div style="font-weight:700; color:var(--blue-primary); margin-bottom:10px;"><i class="fa-solid fa-circle-exclamation"></i> 3인 이상 다중 전송 방식</div>
+                <label style="display: flex; align-items: center; margin-bottom: 8px; cursor: pointer; color:var(--text-main);">
+                    <input type="radio" name="chatSendMode" value="group" checked style="width: 16px; height: 16px; margin-right:8px; accent-color: var(--blue-primary);"> 
+                    <span><b>그룹 채팅방 개설</b> <span style="font-size:0.75rem; color:var(--text-muted);">(하나의 단톡방에서 함께 대화)</span></span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer; color:var(--text-main);">
+                    <input type="radio" name="chatSendMode" value="individual" style="width: 16px; height: 16px; margin-right:8px; accent-color: var(--blue-primary);"> 
+                    <span><b>개별 쪽지 발송</b> <span style="font-size:0.75rem; color:var(--text-muted);">(선택한 대상 각각에게 1:1 발송)</span></span>
+                </label>
+            </div>
+
+            <div style="position:relative;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:12px; top:-28px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-130px; right:40px; background:#fff; border:1px solid var(--widget-border-color); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                     <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('😎')">😎</span><span class="emoji-item" onclick="addEmoji('😭')">😭</span><span class="emoji-item" onclick="addEmoji('😡')">😡</span><span class="emoji-item" onclick="addEmoji('👍')">👍</span>
+                </div>
+                <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:100px; resize:none;" required></textarea>
+            </div>
+            <input type="file" id="msgFile" class="modal-input" style="padding:10px;">
+            <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; padding:14px;">전송 및 대화방 열기</button>
+        </form>
+    </div>
+</div>
+
+<div id="unreadMsgModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:420px; position:relative; max-height: 70vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('unreadMsgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;">
+            <i class="fa-regular fa-envelope" style="color:var(--blue-primary); margin-right:8px;"></i>미확인 쪽지함
+        </h3>
+        <div class="scroll-area" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+            <div id="unreadMsgEmpty" style="text-align:center; padding:40px 0; color:var(--text-muted); font-size:0.9rem; display: none;">
+                새로 도착한 미확인 쪽지가 없습니다.
+            </div>
+            {% for msg in received_messages %}
+                {% if (msg.is_read|string|lower) not in ['1', 'true'] %}
+                {% set r_id = msg['room_id'] if 'room_id' in msg.keys() and msg['room_id'] else '' %}
+                <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ r_id if r_id else msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
+                    <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
+                        {{ '👥' if r_id else user_icons.get(msg.sender, '👤') }}
+                        <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
+                    </div>
+                    <div class="org-info" style="display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <div class="org-name" style="font-size: 0.85rem;">{{ "그룹 채팅방" if r_id else msg.sender }}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">{{ msg.sent_at[5:16] }}</div>
+                        </div>
+                        <div class="org-dept" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ msg.content | default('새로운 쪽지입니다.') }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatWidgetCurrentUser = '{{ current_user }}';
+    let selectedChatReceivers = [];
+    let chatUnreadDetails = null;
+    let chatRoomsFromApi = null;
+
+    function parseChatTime(dateValue) {
+        const normalized = String(dateValue || '').replace(' ', 'T');
+        const parsed = Date.parse(normalized);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function sortChatRooms(a, b) {
+        if (!!a.is_pinned !== !!b.is_pinned) return a.is_pinned ? -1 : 1;
+        if (a.is_pinned && b.is_pinned) return Number(a.pin_order || 0) - Number(b.pin_order || 0);
+        return parseChatTime(b.date) - parseChatTime(a.date);
+    }
+    // 🚀 채팅방 목록 렌더링 함수 (확장 모달과 위젯 모두 렌더링 반영)
+    function renderChatList() {
+        const chatListDiv = document.getElementById('list-chats');
+        const expandedChatListDiv = document.getElementById('expanded-list-chats');
+        if(!chatListDiv) return;
+        
+        const userIcons = { {% for u in chat_user_list %}"{{ u }}": "{{ chat_user_icons.get(u, '👤') }}",{% endfor %} };
+        
+        const allMsgs = [
+            {% for msg in widget_recv_msgs %}
+            { sender: "{{ msg.sender }}", receiver: chatWidgetCurrentUser, room_id: "{{ msg['room_id'] if 'room_id' in msg.keys() and msg['room_id'] else '' }}", content: {{ msg.content | default('') | tojson }}, date: "{{ msg.sent_at }}", is_read: {{ 'true' if (msg.is_read|string|lower) in ['1', 'true'] else 'false' }} },
+            {% endfor %}
+            {% for msg in widget_sent_msgs %}
+            { sender: chatWidgetCurrentUser, receiver: "{{ msg.receiver }}", room_id: "{{ msg['room_id'] if 'room_id' in msg.keys() and msg['room_id'] else '' }}", content: {{ msg.content | default('') | tojson }}, date: "{{ msg.sent_at }}", is_read: true },
+            {% endfor %}
+        ];
+        
+        let chatArr = [];
+        if (Array.isArray(chatRoomsFromApi)) {
+            chatArr = chatRoomsFromApi.map(c => ({
+                partner: c.partner,
+                is_group: !!c.is_group,
+                lastMsg: c.last_message || '',
+                date: c.last_msg_time || '',
+                unread: Number(c.unread_count || 0),
+                is_pinned: !!c.is_pinned,
+                pin_order: Number(c.pin_order || 0),
+            })).sort(sortChatRooms);
+        } else {
+            const recentChats = {};
+            allMsgs.sort((a, b) => parseChatTime(b.date) - parseChatTime(a.date)).forEach(m => {
+                const partner = m.room_id ? m.room_id : (m.sender === chatWidgetCurrentUser ? m.receiver : m.sender);
+                if(!recentChats[partner]) {
+                    recentChats[partner] = { partner: partner, is_group: !!m.room_id, lastMsg: m.content, date: m.date, unread: (m.receiver === chatWidgetCurrentUser && !m.is_read) ? 1 : 0, is_pinned: false, pin_order: 0 };
+                } else {
+                    if(m.receiver === chatWidgetCurrentUser && !m.is_read) recentChats[partner].unread += 1;
+                }
+            });
+
+            chatArr = Object.values(recentChats).sort(sortChatRooms);
+            if (chatUnreadDetails) {
+                chatArr.forEach(c => {
+                    c.unread = Number(chatUnreadDetails[c.partner] || 0);
+                });
+            }
+        }
+
+        let html = '';
+        if(chatArr.length === 0) {
+            html = '<div style="text-align:center; padding:30px 0; color:var(--text-muted); font-size:0.85rem;">대화 기록이 없습니다.</div>';
+        } else {
+            let pinnedRankCounter = 0;
+            chatArr.forEach(c => {
+                const dateStr = c.date ? c.date.substring(5, 16) : '';
+                let avatar = userIcons[c.partner] || '👤';
+                let displayName = c.partner;
+                const pinnedRank = c.is_pinned ? ++pinnedRankCounter : 0;
+                
+                // 그룹채팅 시 카카오톡처럼 표시
+                if (c.is_group) {
+                    avatar = '👥';
+                    const members = c.partner.split(',').map(s => s.trim()).filter(s => s !== chatWidgetCurrentUser);
+                    displayName = members.join(', ');
+                    if (members.length > 2) {
+                        displayName = members.slice(0, 2).join(', ') + ` 외 ${members.length - 2}명`;
+                    }
+                }
+                
+                const encodedPartner = encodeURIComponent(c.partner);
+                html += `<div class="list-item-common" onclick="openChat(decodeURIComponent('${encodedPartner}'))" style="align-items:center; padding: 8px 10px;">
+                    <div class="chat-list-avatar-wrap" data-pinned="${c.is_pinned ? '1' : '0'}" style="width:32px; height:32px; margin-right:10px; flex-shrink:0;">
+                        <div class="chat-avatar-normal" style="width:32px; height:32px; background:#e2e8f0; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size: 1rem;">${avatar}</div>
+                        <div class="chat-rank-badge" title="고정 순위 ${pinnedRank}"><span class="rank-no">${pinnedRank}</span></div>
+                    </div>
+                    <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px; align-items:center;">
+                            <span class="msg-list-name" style="font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">${displayName}</span>
+                            <span class="msg-list-date" style="font-size:0.7rem;">${dateStr}</span>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.lastMsg}</div>
+                    </div>
+                    ${c.unread > 0 ? `<div style="background:#ef4444; color:#fff; font-size:0.65rem; font-weight:bold; border-radius:10px; padding:2px 5px; margin-left:6px; align-self:center;">${c.unread}</div>` : ''}
+                    <div class="pin-controls" onclick="event.stopPropagation();" style="display:none; gap:4px; margin-left:6px; align-self:center; align-items:center;">
+                        <button type="button" onclick="toggleChatPin('${encodedPartner}')" title="pin" style="width:24px; height:24px; font-size:0.75rem; border:1px solid #bfdbfe; border-radius:6px; background:${c.is_pinned ? '#dbeafe' : '#fff'}; color:#2563eb; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-thumbtack"></i></button>
+                        ${c.is_pinned ? `<button type="button" onclick="movePinnedChat('${encodedPartner}', 'up')" title="up" style="width:24px; height:24px; font-size:0.75rem; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-up"></i></button><button type="button" onclick="movePinnedChat('${encodedPartner}', 'down')" title="down" style="width:24px; height:24px; font-size:0.75rem; border:1px solid #e2e8f0; border-radius:6px; background:#fff; color:#475569; cursor:pointer; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-chevron-down"></i></button>` : ''}
+                    </div>
+                </div>`;
+            });
+        }
+        
+        chatListDiv.innerHTML = html;
+        chatListDiv.querySelectorAll('.pin-controls').forEach(el => { el.style.display = 'none'; });
+        chatListDiv.querySelectorAll('.chat-list-avatar-wrap').forEach(wrap => {
+            const isPinned = wrap.dataset.pinned === '1';
+            const normalAvatar = wrap.querySelector('.chat-avatar-normal');
+            const rankBadge = wrap.querySelector('.chat-rank-badge');
+            if (normalAvatar) normalAvatar.style.display = isPinned ? 'none' : 'flex';
+            if (rankBadge) rankBadge.style.display = isPinned ? 'flex' : 'none';
+        });
+        if (expandedChatListDiv) {
+            expandedChatListDiv.innerHTML = html;
+            expandedChatListDiv.querySelectorAll('.pin-controls').forEach(el => { el.style.display = 'flex'; });
+            expandedChatListDiv.querySelectorAll('.chat-list-avatar-wrap').forEach(wrap => {
+                const isPinned = wrap.dataset.pinned === '1';
+                const normalAvatar = wrap.querySelector('.chat-avatar-normal');
+                const rankBadge = wrap.querySelector('.chat-rank-badge');
+                if (normalAvatar) normalAvatar.style.display = isPinned ? 'none' : 'flex';
+                if (rankBadge) rankBadge.style.display = isPinned ? 'flex' : 'none';
+            });
+        } // ?? ???? ??? ??
+    }
+
+    function openChat(partnerName) {
+        const popupWidth = 450; 
+        const popupHeight = 650;
+        const left = (window.screen.width / 2) - (popupWidth / 2);
+        const top = (window.screen.height / 2) - (popupHeight / 2);
+        
+        const chatWin = window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
+        
+        if (chatWin) {
+            chatWin.onload = function() {
+                try {
+                    const style = chatWin.document.createElement('style');
+                    style.innerHTML = `
+                        body, html, #chat-wrapper, .chat-container, .chat-room { background-color: #b2c7d9 !important; }
+                        .message.me .bubble, .msg-me .bubble, .my-msg .bubble, .sent .bubble, .bubble.me, .chat-message.me .chat-bubble, .message.right .bubble { 
+                            background-color: #fef01b !important; color: #000 !important; border: none !important; 
+                        }
+                        .message.other .bubble, .msg-other .bubble, .partner-msg .bubble, .received .bubble, .bubble.other, .chat-message.other .chat-bubble, .message.left .bubble { 
+                            background-color: #ffffff !important; color: #000 !important; border: none !important; 
+                        }
+                    `;
+                    chatWin.document.head.appendChild(style);
+                } catch(e) {}
+            };
+        }
+    }
+
+    // 조직도 그룹 체크박스 연동
+    function toggleGroupCheckbox(headerCb, event) {
+        event.stopPropagation();
+        const groupId = headerCb.getAttribute('data-group');
+        const isChecked = headerCb.checked;
+        const container = document.getElementById(groupId);
+        if(container) {
+            const memberCbs = container.querySelectorAll('.org-member-checkbox');
+            memberCbs.forEach(cb => cb.checked = isChecked);
+        }
+    }
+
+    function syncGroupCheckbox(groupId) {
+        const container = document.getElementById(groupId);
+        if(!container) return;
+        const memberCbs = container.querySelectorAll('.org-member-checkbox');
+        const headerCb = document.querySelector(`.org-group-checkbox[data-group="${groupId}"]`);
+        
+        let allChecked = true;
+        let anyChecked = false;
+        memberCbs.forEach(cb => {
+            if(cb.checked) anyChecked = true;
+            else allChecked = false;
+        });
+        
+        if(headerCb) {
+            headerCb.checked = allChecked;
+            headerCb.indeterminate = (!allChecked && anyChecked);
+        }
+    }
+
+    function clearOrgChartSelection() {
+        document.querySelectorAll('.org-member-checkbox').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.org-group-checkbox').forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+    }
+
+    // 조직도에서 선택 후 메신저 작성 모달 열기
+    function openMsgModalFromOrg() {
+        const checkboxes = document.querySelectorAll('.org-member-checkbox:checked');
+        selectedChatReceivers = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (selectedChatReceivers.length === 0) {
+            alert('선택된 인원이 없습니다. 메시지를 보낼 조직원 체크박스를 선택해주세요.');
+            return;
+        }
+        
+        document.getElementById('orgChartModal').style.display = 'none';
+        
+        // 상단에 선택된 인원 뱃지 형태로 렌더링
+        const display = document.getElementById('msgSelectedReceiversDisplay');
+        display.innerHTML = selectedChatReceivers.map(name => 
+            `<span style="background:var(--blue-primary); color:white; padding:4px 10px; border-radius:12px; font-size:0.8rem; font-weight:600; box-shadow: 0 2px 4px rgba(37,99,235,0.2);">${name}</span>`
+        ).join('');
+        
+        // 다중 선택(3인 이상 그룹) 시 옵션 노출
+        const modeContainer = document.getElementById('msgSendModeContainer');
+        if (selectedChatReceivers.length >= 2) {
+            modeContainer.style.display = 'block';
+            document.querySelector('input[name="chatSendMode"][value="group"]').checked = true;
+        } else {
+            modeContainer.style.display = 'none';
+            document.querySelector('input[name="chatSendMode"][value="individual"]').checked = true;
+        }
+        
+        document.getElementById('msgModal').style.display = 'block';
+    }
+
+    async function sendNewMessage() {
+        if(selectedChatReceivers.length === 0) return alert("수신자가 없습니다.");
+        
+        const content = document.getElementById('msgContent').value;
+        const fileInput = document.getElementById('msgFile');
+        const sendMode = document.querySelector('input[name="chatSendMode"]:checked').value;
+        
+        if(!content.trim()) return alert("메시지 내용을 입력해주세요.");
+        
+        let formData = new FormData();
+        
+        if (sendMode === 'group' && selectedChatReceivers.length >= 2) {
+            const participants = [...selectedChatReceivers, chatWidgetCurrentUser].sort();
+            const roomId = participants.join(',');
+            formData.append('room_id', roomId);
+        } else {
+            formData.append('receiver', selectedChatReceivers.join(','));
+        }
+        
+        formData.append('content', content);
+        if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+        
+        try {
+            const res = await fetch('/send_message', { method: 'POST', body: formData });
+            if (res.ok) { 
+                const data = await res.json();
+                document.getElementById('msgModal').style.display = 'none'; 
+                document.getElementById('msgForm').reset();
+                clearOrgChartSelection();
+                
+                const targetRoom = data.room_id ? data.room_id : (sendMode === 'group' ? [...selectedChatReceivers, chatWidgetCurrentUser].sort().join(',') : selectedChatReceivers[0]);
+                openChat(targetRoom); 
+                updateMessageBadge();
+            } else { alert("메시지 전송에 실패했습니다."); }
+        } catch (error) { alert("서버 통신 오류가 발생했습니다."); }
+    }
+
+    async function toggleChatPin(encodedPartner) {
+        const partner = decodeURIComponent(encodedPartner);
+        const res = await fetch('/api/toggle_pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ partner })
+        });
+        if (res.ok) updateMessageBadge();
+    }
+
+    async function movePinnedChat(encodedPartner, direction) {
+        const partner = decodeURIComponent(encodedPartner);
+        const res = await fetch('/api/move_pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ partner, direction })
+        });
+        if (res.ok) updateMessageBadge();
+    }
+
+    function updateMessageBadge() {
+        fetch('/api/unread_messages').then(r => r.json()).then(data => {
+            const totalUnread = Number(data.total_unread || 0);
+            chatUnreadDetails = data.details || {};
+
+            chatRoomsFromApi = Array.isArray(data.rooms) ? data.rooms : null;
+            const tabBadge = document.getElementById('unreadBadge');
+            if(tabBadge) {
+                tabBadge.innerText = totalUnread;
+                tabBadge.style.display = totalUnread > 0 ? 'inline-block' : 'none';
+            }
+            renderChatList();
+        });
+    }
+
+    window.toggleOrgGroup = function(groupId) {
+        const content = document.getElementById(groupId);
+        const icon = document.getElementById('icon_' + groupId);
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            icon.classList.remove('fa-chevron-right');
+            icon.classList.add('fa-chevron-down');
+        } else {
+            content.style.display = 'none';
+            icon.classList.remove('fa-chevron-down');
+            icon.classList.add('fa-chevron-right');
+        }
+    };
+
+    async function loadOrgChart() {
+        try {
+            const res = await fetch('/user/list');
+            if(!res.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
+            const users = await res.json();
+            
+            const filteredUsers = users.filter(u => (u.이름||'').toLowerCase() !== 'admin' && (u.사번||'').toLowerCase() !== 'admin');
+            filteredUsers.sort((a, b) => (parseInt(a.레벨) || 999) - (parseInt(b.레벨) || 999));
+            
+            const groups = { '본부': [], '센터장': [], '강사': [], '기타': [] };
+            
+            filteredUsers.forEach(u => {
+                const pos = u.직급 || '';
+                if (['대표이사', '팀장', '사원', '계약직'].includes(pos)) groups['본부'].push(u);
+                else if (['센터장', '안전코디', '센터장(팀장)'].includes(pos)) groups['센터장'].push(u);
+                else if (['강사'].includes(pos)) groups['강사'].push(u);
+                else groups['기타'].push(u);
+            });
+            
+            const container = document.getElementById('orgChartListContainer');
+            if(!container) return;
+            
+            let html = '';
+            ['본부', '센터장', '강사', '기타'].forEach(gName => {
+                const members = groups[gName];
+                if (members.length === 0) return; 
+                
+                const groupId = 'org_group_' + gName;
+                
+                html += `
+                <div class="org-tree-group" style="margin-bottom: 8px;">
+                    <div class="org-tree-header" style="padding:8px 12px; background:var(--hover-bg); border-radius:8px; display:flex; align-items:center; gap:8px; border:1px solid var(--widget-border-color);">
+                        <i class="fa-solid fa-chevron-right tree-toggle-icon" id="icon_${groupId}" onclick="toggleOrgGroup('${groupId}')" style="cursor:pointer; font-size:0.8rem; color:var(--blue-primary); width: 12px;"></i>
+                        <input type="checkbox" class="org-group-checkbox" data-group="${groupId}" onclick="toggleGroupCheckbox(this, event)" style="cursor:pointer; width:16px; height:16px; accent-color:var(--blue-primary);">
+                        <div onclick="toggleOrgGroup('${groupId}')" style="cursor:pointer; flex:1; display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text-main);">
+                            <i class="fa-regular fa-folder-open" style="color:#f59e0b;"></i> ${gName} 
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">(${members.length})</span>
+                        </div>
+                    </div>
+                    <div id="${groupId}" style="display:none; padding-left:10px; margin-top:6px; border-left:2px dashed var(--widget-border-color); margin-left:14px; padding-bottom: 4px;">
+                `;
+                
+                members.forEach(u => {
+                    const name = u.이름 || '-';
+                    const dept = u.소속 || '소속미지정';
+                    const pos = u.직급 || '직급미지정';
+                    const icon = u.아이콘 || '👤';
+                    
+                    html += `
+                    <div class="org-status-item" style="margin-top:2px; display:flex; align-items:center;">
+                        <input type="checkbox" class="org-member-checkbox" value="${name}" data-group="${groupId}" onclick="event.stopPropagation(); syncGroupCheckbox('${groupId}')" style="margin-right:10px; cursor:pointer; width:16px; height:16px; accent-color:var(--blue-primary);">
+                        <div style="flex:1; display:flex; align-items:center; cursor:pointer;" onclick="document.getElementById('orgChartModal').style.display='none'; openChat('${name}')">
+                            <div class="org-avatar">
+                                ${icon}
+                                <div data-user="${name}" class="org-status-dot status-offline"></div>
+                            </div>
+                            <div class="org-info" style="display: flex; align-items: baseline; gap: 8px;">
+                                <div class="org-name" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin:0;">${name}</div>
+                                <div class="org-dept" style="font-size: 0.7rem; color: #9ca3af; font-weight: 500; margin:0;">${dept} / ${pos}</div>
+                            </div>
+                        </div>
+                    </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+            container.innerHTML = html;
+        } catch(e) {
+            document.getElementById('orgChartListContainer').innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px;">${e.message}</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderChatList();
+        updateMessageBadge();
+        loadOrgChart();
+        const unreadItems = document.querySelectorAll('.unread-msg-item');
+        if(unreadItems.length === 0) {
+            const emptyDiv = document.getElementById('unreadMsgEmpty');
+            if(emptyDiv) emptyDiv.style.display = 'block';
+        }
+        setInterval(updateMessageBadge, 10000); 
+        window.addEventListener('focus', updateMessageBadge);
+    });
+</script>

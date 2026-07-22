@@ -1,0 +1,101 @@
+<div id="orgChartModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:8% auto; padding:30px; width:400px; position:relative; display:flex; flex-direction:column; max-height:80vh;">
+        <span onclick="document.getElementById('orgChartModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:15px; font-weight:800;"><i class="fa-solid fa-sitemap" style="color:var(--blue-primary); margin-right:8px;"></i>임직원 현황 (조직도)</h3>
+        
+        <div class="scroll-area" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column;">
+            <div class="org-rank-header" style="margin-top: 0;">임원 및 팀원 목록</div>
+            {% for u in chat_user_list %}
+            <div class="org-status-item" onclick="document.getElementById('orgChartModal').style.display='none'; openMsgModalWithReceiver('{{ u }}')">
+                <div class="org-avatar">
+                    {{ chat_user_icons.get(u, '👤') }}
+                    <div data-user="{{ u }}" class="org-status-dot status-offline"></div>
+                </div>
+                <div class="org-info">
+                    <div class="org-name">{{ u }}</div>
+                    <div class="org-dept">새담 교육문화원</div>
+                </div>
+                <div class="org-msg-icon">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div id="unreadMsgModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:420px; position:relative; max-height: 70vh; display: flex; flex-direction: column;">
+        <span onclick="document.getElementById('unreadMsgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;">
+            <i class="fa-regular fa-envelope" style="color:var(--blue-primary); margin-right:8px;"></i>미확인 쪽지함
+        </h3>
+        
+        <div class="scroll-area" style="flex: 1; overflow-y: auto; padding-right: 5px;">
+            <div id="unreadMsgEmpty" style="text-align:center; padding:40px 0; color:var(--text-muted); font-size:0.9rem; display: none;">
+                새로 도착한 미확인 쪽지가 없습니다.
+            </div>
+            
+            {% for msg in widget_recv_msgs %}
+                {% if not msg.is_read %}
+                <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
+                    
+                    <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
+                        {{ chat_user_icons.get(msg.sender, '👤') }}
+                        <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
+                    </div>
+
+                    <div class="org-info" style="display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                            <div class="org-name" style="font-size: 0.85rem;">{{ msg.sender }}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">{{ msg.sent_at[5:16] }}</div>
+                        </div>
+                        <div class="org-dept" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ msg.title | default(msg.sender ~ '님이 보낸 새로운 쪽지입니다.') }}
+                            {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted); margin-left:4px;"></i>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="org-msg-icon" style="margin-left: 10px;">
+                        <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem;"></i>
+                    </div>
+                </div>
+                {% endif %}
+            {% endfor %}
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const unreadItems = document.querySelectorAll('.unread-msg-item');
+                    if(unreadItems.length === 0) {
+                        const emptyDiv = document.getElementById('unreadMsgEmpty');
+                        if(emptyDiv) emptyDiv.style.display = 'block';
+                    }
+                });
+            </script>
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:400px; position:relative;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom:20px; font-weight:800;"><i class="fa-solid fa-paper-plane" style="color:var(--blue-primary); margin-right:8px;"></i>새 쪽지 보내기</h3>
+        <form id="msgForm">
+            <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
+                <option value="" style="color: #9ca3af;">수신자를 선택하세요</option>
+                {% for u in chat_user_list %}
+                    {% if u != current_user %}<option value="{{ u }}" style="color: #1f2937;">{{ u }}</option>{% endif %}
+                {% endfor %}
+            </select>
+            <div style="position:relative;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:12px; top:-28px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-130px; right:40px; background:#fff; border:1px solid var(--widget-border-color); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                     <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('msgContent', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('msgContent', '😭')">😭</span><span class="emoji-item" onclick="addEmoji('msgContent', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('msgContent', '👍')">👍</span>
+                </div>
+                <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
+            </div>
+            <input type="file" id="msgFile" class="modal-input" style="padding:10px;">
+            <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; padding:14px;">전송하기</button>
+        </form>
+    </div>
+</div>

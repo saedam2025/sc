@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<style>
+    /* 상단 타이틀 및 테이블 스타일 유지 */
+    .board-header-section { text-align: center; margin-bottom: 30px; margin-top: 5px; flex-shrink: 0; }
+    .board-title-kr { color: var(--primary-dark, #1e3a8a); font-weight: 800; font-size: 1.8rem; margin-bottom: 5px; }
+    .board-title-en { color: var(--text-gray, #64748b); font-size: 0.95rem; font-weight: 500; }
+    .board-divider { width: 40px; height: 3px; background: var(--primary-color, #fbbf24); margin: 15px auto; }
+
+    .clean-table { width: 100%; border-collapse: collapse; border-top: 1px solid var(--text-dark, #333); border-bottom: 1px solid var(--border-color, #e2e8f0); }
+    .clean-table th { background: var(--widget-bg, #f8fafc); padding: 12px 10px; font-size: 0.85rem; color: var(--text-dark, #0f172a); border-bottom: 1px solid var(--border-color, #e2e8f0); }
+    .clean-table td { padding: 18px 10px; font-size: 0.9rem; text-align: center; color: var(--text-dark, #475569); border-bottom: 1px solid var(--border-light, #e2e8f0); transition: background 0.2s; }
+    .clean-table tr:hover td { background: var(--widget-hover, #f8fafc); }
+    
+    .td-title { text-align: left !important; color: var(--text-dark, #1e293b) !important; cursor: pointer; }
+    .td-title:hover { font-weight: 600; text-decoration: underline; color: var(--primary-color, #1e3a8a) !important; }
+
+    /* 페이징 및 버튼 스타일 유지 */
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 4px; }
+    .page-link {
+        display: flex; align-items: center; justify-content: center;
+        min-width: 32px; height: 32px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px;
+        color: var(--text-dark, #475569); text-decoration: none; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; background: var(--input-bg, #fff);
+    }
+    .page-link:hover { background: var(--widget-hover, #f1f5f9); border-color: var(--primary-color, #cbd5e1); color: var(--primary-dark, #1e293b); }
+    .page-link.active { background: var(--primary-color, #1e3a8a); color: #ffffff; border-color: var(--primary-color, #1e3a8a); }
+
+    .btn-write { background: var(--primary-dark, #1e3a8a); color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: 0.2s; height: 34px; box-sizing: border-box; }
+    .btn-write:hover { background: var(--primary-color, #1e40af); }
+
+    /* === 💡 공지사항 및 New 뱃지 디자인 추가 === */
+    .notice-row td { background-color: var(--primary-light, #f1f5f9); font-weight: 500; }
+    .notice-badge { background: #ef4444; color: white; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-right: 6px; }
+    
+    .new-badge { 
+        display: inline-block; background: var(--primary-color, #3b82f6); color: white; font-size: 0.65rem; font-weight: 800; 
+        padding: 2px 6px; border-radius: 10px; margin-right: 6px; vertical-align: middle;
+        animation: blinkNew 1.5s infinite; 
+    }
+    @keyframes blinkNew { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+
+
+<div style="max-width: 1200px; margin: 0 auto; background: var(--card-bg, #fff); padding: 35px 40px; border-radius: 12px; border: 1px solid var(--card-border, #e2e8f0); color: var(--text-dark); display: flex; flex-direction: column; height: 920px; box-sizing: border-box;">
+    
+    <div class="board-header-section">
+        <div class="board-title-kr">{{ board.name_kr }}</div>
+        <div class="board-title-en">{{ board.desc_text }}</div>
+        <div class="board-divider"></div>
+    </div>
+
+    <div style="flex: 1; overflow: hidden;">
+        <table class="clean-table">
+            <thead>
+                <tr>
+                    <th style="width: 70px;">번호</th>
+                    <th>제목</th>
+                    <th style="width: 100px;">작성자</th>
+                    <th style="width: 110px;">작성일</th>
+                    <th style="width: 70px;">조회수</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for post in posts %}
+                <!-- 파이썬에서 날짜 포맷 파싱 및 5일 차이 계산 -->
+                {% set p_date = post.created_at | as_datetime('%Y-%m-%d %H:%M:%S') %}
+                {% set is_new = false %}
+                {% if p_date and (now - p_date).days <= 5 %}
+                    {% set is_new = true %}
+                {% endif %}
+
+                <!-- 공지글(is_notice=1)일 경우 배경색 강조 클래스 부여 -->
+                <tr class="{% if post.is_notice %}notice-row{% endif %}">
+                    <td>
+                        {% if post.is_notice %}
+                            <i class="fa-solid fa-bullhorn" style="color: #ef4444;"></i>
+                        {% else %}
+                            {{ post.id }}
+                        {% endif %}
+                    </td>
+<td class="td-title" onclick="location.href='/board/{{ board.name_en }}/read/{{ post.id }}'">
+                        {% if post.is_notice %}<span class="notice-badge">공지</span>{% endif %}
+                        
+                        {% if is_new %}<span class="new-badge">New</span>{% endif %}
+                        
+                        {{ post.title }}
+
+                        {% if post.file_count > 0 %}
+                        <span title="첨부파일" style="margin-left:5px;"><i class="fa-solid fa-paperclip" style="color:#94a3b8; font-size:0.75rem;"></i> <span style="font-size:0.7rem; color:#64748b;">{{ post.file_count }}</span></span>
+                        {% endif %}
+                        {% if post.comment_count > 0 %}
+                        <span title="댓글" style="margin-left:5px;"><i class="fa-solid fa-comment-dots" style="color:#2563eb; font-size:0.75rem;"></i> <span style="font-size:0.7rem; color:#2563eb; font-weight:700;">{{ post.comment_count }}</span></span>
+                        {% endif %}
+                    </td>
+                    <td>{{ post.author }}</td>
+                    <td>{{ post.date }}</td>
+                    <td>{{ post.views }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" style="padding:40px; color:#94a3b8;">등록된 게시글이 없습니다.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="position: relative; display: flex; justify-content: center; align-items: center; height: 34px; margin-top: auto; padding-top: 15px; border-top: 1px solid transparent;">
+        
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="?page={{ page - 1 }}" class="page-link"><i class="fa-solid fa-chevron-left"></i></a>
+            {% endif %}
+            
+            {% set start_page = page - 4 %}
+            {% set end_page = page + 4 %}
+            {% if start_page < 1 %}{% set start_page = 1 %}{% endif %}
+            {% if end_page > total_pages %}{% set end_page = total_pages %}{% endif %}
+
+            {% for p in range(start_page, end_page + 1) %}
+            <a href="?page={{ p }}" class="page-link {% if p == page %}active{% endif %}">{{ p }}</a>
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}" class="page-link"><i class="fa-solid fa-chevron-right"></i></a>
+            {% endif %}
+        </div>
+
+        <div style="position: absolute; right: 0;">
+            {% if session.get('user_level', 99) <= board.lvl_write %}
+            <button class="btn-write" onclick="location.href='/board/{{ board.name_en }}/write'">
+                <i class="fa-solid fa-pen"></i> 글쓰기
+            </button>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}

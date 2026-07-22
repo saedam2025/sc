@@ -1,0 +1,89 @@
+<style>
+    /* 쪽지 위젯 전용 모듈 스타일 */
+    .pill-tabs { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; background: #f8fafc; padding: 4px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .pill-btn { padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .blue-pill-active { background: #ffffff; color: #004ea2; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .blue-pill-inactive { background: transparent; color: #475569; border: 1px solid transparent; }
+    .blue-pill-inactive:hover { color: #0f172a; }
+
+    .widget-icons { display: flex; gap: 12px; color: #94a3b8; font-size: 1.05rem; }
+    .widget-icons i { cursor: pointer; transition: color 0.2s; }
+    .widget-icons i:hover { color: #004ea2; }
+
+    .list-item-common { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9rem; cursor: pointer; transition: all 0.2s ease; border-left: 3px solid transparent; }
+    .list-item-common:hover { background: #eff6ff; border-left: 3px solid #004ea2; padding-left: 14px; }
+    
+    .msg-list-name { color: #0f172a; font-weight: 600; font-size: 0.9rem; }
+    .msg-list-date { color: #94a3b8; font-size: 0.75rem; }
+    .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
+
+    .scroll-area { overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+    .scroll-area::-webkit-scrollbar { width: 4px; }
+    .scroll-area::-webkit-scrollbar-track { background: transparent; }
+    .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>
+
+<!-- 이 아래부터는 기존에 있던 <div class="widget-card"...> 등 HTML 코드 유지 -->
+
+
+<div class="widget-card" style="display: flex; flex-direction: column; height: 100%;">
+    <div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
+        <div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1;">
+            <div id="tab-partners" class="pill-btn blue-pill-active" onclick="switchMsgTab('partners')" style="padding: 5px 8px; font-size: 0.75rem;">대화 상대</div>
+            <div id="tab-recv" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('recv')" style="padding: 5px 8px; font-size: 0.75rem;">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></div>
+            <div id="tab-sent" class="pill-btn blue-pill-inactive" onclick="switchMsgTab('sent')" style="padding: 5px 8px; font-size: 0.75rem;">보낸 쪽지</div>
+        </div>
+        <div class="widget-icons" style="flex-shrink: 0; gap: 14px; align-items: center;">
+            <div style="position: relative; display: flex; align-items: center; cursor: pointer;" onclick="document.getElementById('unreadMsgModal').style.display='block'" title="미확인 쪽지 보기">
+                <i class="fa-regular fa-envelope"></i>
+                <span id="left-unread-badge" style="position: absolute; top: -6px; right: -8px; background: #ef4444; color: white; font-size: 0.6rem; padding: 2px 5px; border-radius: 10px; font-weight: bold; display: none; pointer-events: none;">0</span>
+            </div>
+            <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기"></i>
+            <i class="fa-solid fa-pen-to-square" onclick="document.getElementById('msgModal').style.display='block'" title="새 쪽지 쓰기"></i>
+        </div>
+    </div>
+
+    <!-- 대화 상대 탭 (chat_partners -> widget_chat_partners 로 변경) -->
+    <div id="list-partners" class="scroll-area msg-tab-content" style="flex: 1; padding: 8px 10px;">
+        {% for partner in widget_chat_partners %}
+        <div class="list-item-common" onclick="openChat('{{ partner.name }}')">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size:1.1rem; color: #475569;">
+                    {% if partner.profile_path %}<img src="{{ partner.profile_path }}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
+                    {% else %}{{ chat_user_icons.get(partner.name, '👤') if chat_user_icons else '👤' }}{% endif %}
+                </span>
+                <span class="msg-list-name">{{ partner.name }} 
+                    <span class="unread-badge partner-badge" data-partner="{{ partner.name }}" style="{% if partner.unread == 0 %}display:none;{% endif %}">{{ partner.unread }}</span>
+                </span>
+            </div>
+            <span class="msg-list-date">채팅하기 <i class="fa-solid fa-chevron-right" style="font-size:0.7rem; margin-left:4px;"></i></span>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">대화 기록이 없습니다.</div>
+        {% endfor %}
+    </div>
+
+    <!-- 받은 쪽지 탭 (received_messages -> widget_recv_msgs 로 변경) -->
+    <div id="list-recv" class="scroll-area msg-tab-content" style="flex: 1; display: none; padding: 8px 10px;">
+        {% for msg in widget_recv_msgs %}
+        <div class="list-item-common {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')">
+            <span class="msg-list-name">{{ msg.sender }}님이 보낸 쪽지 {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted);"></i>{% endif %}</span>
+            <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">도착한 쪽지가 없습니다.</div>
+        {% endfor %}
+    </div>
+
+    <!-- 보낸 쪽지 탭 (sent_messages -> widget_sent_msgs 로 변경) -->
+    <div id="list-sent" class="scroll-area msg-tab-content" style="flex: 1; display: none; padding: 8px 10px;">
+        {% for msg in widget_sent_msgs %}
+        <div class="list-item-common" onclick="openChat('{{ msg.receiver }}')">
+            <span class="msg-list-name">To. {{ msg.receiver }} {% if msg.filename %}<i class="fa-solid fa-paperclip" style="color:var(--text-muted);"></i>{% endif %}</span>
+            <span class="msg-list-date">{{ msg.sent_at[5:16] }}</span>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:30px 0; color:#94a3b8; font-size:0.85rem;">보낸 쪽지가 없습니다.</div>
+        {% endfor %}
+    </div>
+</div>

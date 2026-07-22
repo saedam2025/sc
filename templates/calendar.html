@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<style>
+    .dashboard-wrapper { display: flex; gap: 25px; margin-top: 10px; height: calc(100vh - 150px); }
+    .calendar-container { flex: 7; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .today-sidebar { flex: 3; display: flex; flex-direction: column; gap: 20px; }
+    .today-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); flex: 1; overflow-y: auto; }
+    .event-item { background: #f8fafc; padding: 15px; margin-bottom: 12px; border-radius: 8px; transition: 0.2s; cursor: pointer; border: 1px solid #e2e8f0; border-left-width: 5px; }
+    .event-item:hover { background: #eff6ff; transform: translateX(5px); }
+    .btn-add { width: 100%; padding: 15px; background: #004ea2; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.3s; font-size: 1.05rem; }
+    .btn-add:hover { background: #003a7a; box-shadow: 0 5px 15px rgba(0,78,162,0.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <section class="calendar-container">
+        <div id='calendar'></div>
+    </section>
+
+    <aside class="today-sidebar">
+        <button class="btn-add" onclick="openTaskModal()">
+            <i class="fa-solid fa-plus"></i> 일반 업무 등록
+        </button>
+        
+        <div class="today-card">
+            <h3 style="margin-top:0; color:#1e293b; font-size:1.2rem;"><i class="fa-solid fa-clock" style="color:#004ea2;"></i> 주간 통합 일정</h3>
+            <p id="current-date" style="font-size: 0.9em; color: #64748b; margin-bottom: 20px;"></p>
+            <div id="weekly-list">
+                <p style="text-align:center; color:#94a3b8; margin-top:50px;">이번 주에 등록된 업무가 없습니다.</p>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(3px);">
+    <div class="modal-content" style="background:white; margin:8% auto; padding:35px; width:480px; border-radius:20px; position:relative; box-shadow:0 15px 35px rgba(0,0,0,0.1);">
+        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color:#94a3b8;">&times;</span>
+        <h2 id="modalTitle" style="margin-top:0; color:#1e293b; border-bottom:2px solid #004ea2; padding-bottom:12px; margin-bottom:20px;"><i class="fa-solid fa-calendar-plus" style="color:#004ea2;"></i> 일반 업무 등록</h2>
+        
+        <form id="taskForm">
+            <input type="text" id="taskTitle" placeholder="일정 제목" required style="width:100%; padding:12px 15px; margin-bottom:15px; border:1px solid #cbd5e1; border-radius:8px; font-weight:bold; color:#1e293b; box-sizing:border-box;">
+            
+            <select id="taskOwner" required style="width:100%; padding:12px 15px; margin-bottom:20px; border:1px solid #cbd5e1; border-radius:8px; color:#1e293b; box-sizing:border-box;">
+                <option value="">담당자 선택</option>
+                {% for u in user_list %}
+                <option value="{{ u }}">{{ u }}</option>
+                {% endfor %}
+            </select>
+            
+            <div style="display:flex; gap:15px; margin-bottom:20px; background:#f8fafc; padding:15px; border:1px solid #e2e8f0; border-radius:10px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.85em; color:#475569; font-weight:800; display:block; margin-bottom:6px;">시작 일시</label>
+                    <input type="date" id="startDate" required style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:8px; box-sizing:border-box;">
+                    <input type="time" id="startTime" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.85em; color:#475569; font-weight:800; display:block; margin-bottom:6px;">종료 일시</label>
+                    <input type="date" id="endDate" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:8px; box-sizing:border-box;">
+                    <input type="time" id="endTime" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; box-sizing:border-box;">
+                </div>
+            </div>
+            
+            <textarea id="taskNote" placeholder="비고 및 메모사항" style="width:100%; height:90px; padding:15px; border:1px solid #cbd5e1; border-radius:10px; margin-bottom:25px; resize:none; font-family:inherit; box-sizing:border-box;"></textarea>
+            
+            <button type="button" onclick="saveTask()" style="width:100%; background:#004ea2; color:white; border:none; padding:16px; border-radius:10px; font-weight:800; cursor:pointer; font-size:1.05rem; transition:0.2s;">저장하기</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const calendarEl = document.getElementById('calendar');
+        
+        const now = new Date();
+        const nextWeek = new Date(now);
+        nextWeek.setDate(now.getDate() + 7);
+        const dateRangeStr = `${now.toLocaleDateString('ko-KR')} ~ ${nextWeek.toLocaleDateString('ko-KR')}`;
+        document.getElementById('current-date').innerText = dateRangeStr;
+
+        const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek'
+            },
+            events: '/get_tasks',
+            eventClick: function(info) {
+                const props = info.event.extendedProps;
+                alert(`담당자: ${props.owner}\n일정: ${props.title}\n메모: ${props.note || '없음'}`);
+            },
+            dateClick: function(info) {
+                openTaskModal(info.dateStr);
+            }
+        });
+        calendar.render();
+        loadWeeklyList();
+    });
+
+    function openTaskModal(date = '') {
+        document.getElementById('taskModal').style.display = 'block';
+        if(date) {
+            document.getElementById('startDate').value = date;
+            document.getElementById('endDate').value = date;
+        }
+    }
+
+    function closeTaskModal() {
+        document.getElementById('taskModal').style.display = 'none';
+        document.getElementById('taskForm').reset();
+    }
+
+    // 🚀 주간 일정 필터링 및 출력
+    async function loadWeeklyList() {
+        const res = await fetch('/get_tasks');
+        const tasks = await res.json();
+        
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
+        const nextWeek = new Date(now);
+        nextWeek.setDate(now.getDate() + 7);
+        const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+        const listEl = document.getElementById('weekly-list');
+        
+        const weeklyTasks = tasks.filter(t => {
+            const start = t.start.split('T')[0];
+            let end = t.end ? t.end.split('T')[0] : start;
+            if (t.end && !t.end.includes('T')) {
+                const ed = new Date(end);
+                ed.setDate(ed.getDate() - 1);
+                end = ed.toISOString().split('T')[0];
+            }
+            return start <= nextWeekStr && end >= todayStr;
+        });
+
+        if(weeklyTasks.length > 0) {
+            weeklyTasks.sort((a,b) => a.start.localeCompare(b.start));
+            listEl.innerHTML = '';
+            
+            weeklyTasks.forEach(t => {
+                const typeColor = t.color || '#004ea2';
+                const startDisp = t.start.split('T')[0];
+                const endDisp = t.end ? (t.end.includes('T') ? t.end.split('T')[0] : new Date(new Date(t.end).setDate(new Date(t.end).getDate()-1)).toISOString().split('T')[0]) : startDisp;
+                const dateDisp = startDisp === endDisp ? startDisp : `${startDisp} ~ ${endDisp}`;
+
+                listEl.innerHTML += `
+                    <div class="event-item" style="border-left-color: ${typeColor}; border-color: ${typeColor}40;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong style="color:${typeColor}; font-size:0.95rem;">${t.extendedProps.owner}</strong>
+                            <span style="font-size:0.75rem; color:#64748b; font-weight:600;">${dateDisp}</span>
+                        </div>
+                        <div style="font-size:1.05rem; margin-top:6px; font-weight:700; color:#1e293b;">${t.extendedProps.title}</div>
+                        <div style="font-size:0.85em; color:#64748b; margin-top:6px; background:#fff; padding:6px; border-radius:4px;">${t.extendedProps.note || '메모 없음'}</div>
+                    </div>
+                `;
+            });
+        }
+    }
+
+    async function saveTask() {
+        const title = document.getElementById('taskTitle').value;
+        const owner = document.getElementById('taskOwner').value;
+        const startDate = document.getElementById('startDate').value;
+        
+        if(!title || !owner || !startDate) return alert("제목, 담당자, 시작일을 모두 입력하세요.");
+
+        const data = {
+            title: title,
+            owner: owner,
+            start_date: startDate,
+            start_time: document.getElementById('startTime').value,
+            end_date: document.getElementById('endDate').value || startDate,
+            end_time: document.getElementById('endTime').value,
+            note: document.getElementById('taskNote').value
+        };
+
+        const res = await fetch('/save_calendar_task', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        if(res.ok) {
+            alert("업무가 캘린더에 정상적으로 등록되었습니다.");
+            location.reload();
+        } else {
+            alert("업무 등록에 실패했습니다.");
+        }
+    }
+</script>
+{% endblock %}

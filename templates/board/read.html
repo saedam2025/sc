@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    .read-box { max-width: 1000px; margin: 0 auto; background: #fff; padding: 40px; border: none solid #e2e8f0; border-radius: 12px; }
+    
+    .post-header { border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 30px; }
+    .post-title { font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 15px; letter-spacing: -0.5px; }
+    .post-meta { display: flex; justify-content: space-between; font-size: 0.95rem; color: #64748b; }
+    .meta-left span { margin-right: 15px; }
+    
+    .post-content { min-height: 300px; font-size: 1.05rem; line-height: 1.7; color: #1e293b; white-space: pre-wrap; margin-bottom: 40px; }
+    
+    .file-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 20px; margin-bottom: 30px; }
+    .file-box-title { font-size: 0.9rem; font-weight: 700; color: #475569; margin-bottom: 10px; }
+    .file-item { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; margin-bottom: 5px; }
+    .file-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .file-link:hover { text-decoration: underline; }
+    .file-size { color: #94a3b8; font-size: 0.8rem; }
+
+    .comment-section { border-top: 1px solid #e2e8f0; padding-top: 30px; }
+    .comment-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 20px; }
+    .comment-list { margin-bottom: 30px; }
+    .comment-item { border-bottom: 1px solid #f1f5f9; padding: 15px 0; }
+    .comment-author { font-weight: 700; color: #1e293b; font-size: 0.95rem; margin-bottom: 5px; }
+    .comment-date { font-size: 0.8rem; color: #94a3b8; margin-left: 10px; font-weight: 400; }
+    .comment-text { font-size: 0.95rem; color: #475569; white-space: pre-wrap; }
+
+    .comment-form { display: flex; gap: 10px; }
+    .comment-input { flex: 1; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; resize: none; font-family: inherit; }
+    .comment-input:focus { outline: none; border-color: #2563eb; }
+    .btn-comment { background: #1e3a8a; color: white; border: none; padding: 0 25px; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    
+    .btn-wrap { display: flex; justify-content: space-between; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 30px; }
+    .btn-basic { padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-list { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .btn-delete { background: #ffffff; color: #ef4444; border: 1px solid #fca5a5; }
+
+/* 기존 스타일 그대로 두고, 💡 댓글 부가 기능 디자인 추가 */
+    .reply-item { margin-left: 30px; border-left: 3px solid #cbd5e1; padding-left: 15px; margin-top: 10px; background: #f8fafc; border-radius: 0 8px 8px 0; padding: 12px 15px; }
+    .comment-actions { margin-top: 6px; display: flex; gap: 12px; font-size: 0.8rem; }
+    .action-btn { color: #64748b; cursor: pointer; text-decoration: none; font-weight: 600; transition: 0.2s; }
+    .action-btn:hover { color: #2563eb; }
+    .action-delete { color: #ef4444; }
+    .action-delete:hover { color: #dc2626; text-decoration: underline; }
+    .reply-input-box { margin-left: 30px; margin-top: 10px; display: flex; gap: 10px; }
+</style>
+
+<div class="read-box">
+    <div class="post-header">
+        <div class="post-title">{{ post.title }}</div>
+        <div class="post-meta">
+            <div class="meta-left">
+                <span><i class="fa-solid fa-user"></i> {{ post.author }}</span>
+                <span><i class="fa-regular fa-clock"></i> {{ post.created_at[:16] }}</span>
+            </div>
+            <div>조회수 {{ post.views }}</div>
+        </div>
+    </div>
+
+    {% if files %}
+    <div class="file-box">
+        <div class="file-box-title"><i class="fa-solid fa-paperclip"></i> 첨부파일 ({{ files|length }}개)</div>
+        {% for f in files %}
+        <div class="file-item">
+            <i class="fa-regular fa-file-lines" style="color: #94a3b8;"></i>
+            <a href="/board/download/{{ f.saved_name }}" class="file-link" download="{{ f.original_name }}">{{ f.original_name }}</a>
+            <span class="file-size">({{ (f.file_size / 1024 / 1024)|round(2) }} MB)</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="post-content">{{ post.content }}</div>
+
+<div class="comment-section">
+        <div class="comment-title"><i class="fa-regular fa-comments"></i> 댓글 {{ comments|length }}</div>
+        
+        <div class="comment-list">
+            {% for c in comments %}
+            <div class="comment-item">
+                <div class="comment-author">{{ c.author }} <span class="comment-date">{{ c.created_at[:16] }}</span></div>
+                <div class="comment-text">{{ c.content }}</div>
+                
+                <div class="comment-actions">
+                    <span class="action-btn" onclick="toggleReplyForm({{ c.id }})">답글 달기</span>
+                    {% if session.get('user_name') == c.author or session.get('user_level', 99) <= 3 %}
+                    <span class="action-btn action-delete" onclick="deleteComment({{ c.id }})">삭제</span>
+                    {% endif %}
+                </div>
+
+                <div id="reply-form-{{ c.id }}" class="reply-input-box" style="display: none;">
+                    <textarea id="replyText-{{ c.id }}" class="comment-input" rows="1" placeholder="대댓글을 남겨보세요."></textarea>
+                    <button class="btn-comment" style="padding: 0 15px; font-size: 0.85rem;" onclick="submitComment({{ c.id }})">등록</button>
+                </div>
+                
+                {% if c.replies %}
+                <div style="margin-top: 10px;">
+                    {% for r in c.replies %}
+                    <div class="reply-item">
+                        <div class="comment-author">{{ r.author }} <span class="comment-date">{{ r.created_at[:16] }}</span></div>
+                        <div class="comment-text">{{ r.content }}</div>
+                        <div class="comment-actions">
+                            {% if session.get('user_name') == r.author or session.get('user_level', 99) <= 3 %}
+                            <span class="action-btn action-delete" onclick="deleteComment({{ r.id }})">삭제</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div style="color: #94a3b8; font-size: 0.9rem; padding: 10px 0;">등록된 댓글이 없습니다.</div>
+            {% endfor %}
+        </div>
+
+        <div class="comment-form">
+            <textarea id="commentText-0" class="comment-input" rows="2" placeholder="댓글을 남겨보세요."></textarea>
+            <button class="btn-comment" onclick="submitComment(0)">등록</button>
+        </div>
+    </div>
+
+
+<!-- 버튼 영역 수정 -->
+<div class="btn-wrap">
+    <div>
+        {% if session.get('user_name') == post.author or session.get('user_level', 99) <= 3 %}
+        <a href="/board/{{ board.name_en }}/edit/{{ post.id }}" class="btn-basic" style="background: #ffffff; color: #2563eb; border: 1px solid #bfdbfe; margin-right: 5px;"><i class="fa-solid fa-pen"></i> 수정</a>
+        <button class="btn-basic btn-delete" onclick="deletePost()"><i class="fa-solid fa-trash"></i> 삭제</button>
+        {% endif %}
+    </div>
+    <div>
+        <a href="/board/{{ board.name_en }}" class="btn-basic btn-list"><i class="fa-solid fa-list"></i> 목록으로</a>
+    </div>
+</div>
+</div>
+
+
+<script>
+    // 💡 대댓글 폼 보이기/숨기기
+    function toggleReplyForm(commentId) {
+        const form = document.getElementById(`reply-form-${commentId}`);
+        form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    // 💡 댓글 & 대댓글 등록 통합 함수
+    async function submitComment(parentId) {
+        // parentId가 0이면 원본 댓글 창, 그 외에는 대댓글 창에서 텍스트를 가져옴
+        const textInput = document.getElementById(`commentText-${parentId}`) || document.getElementById(`replyText-${parentId}`);
+        const text = textInput.value.trim();
+        
+        if (!text) return alert("댓글 내용을 입력하세요.");
+
+        try {
+            const res = await fetch(`/board/{{ board.name_en }}/comment/{{ post.id }}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: text, parent_id: parentId }) // parent_id 전송
+            });
+            const result = await res.json();
+            
+            if (res.ok) location.reload();
+            else alert(result.message || "댓글 등록 실패");
+        } catch (e) {
+            alert("통신 오류가 발생했습니다.");
+        }
+    }
+
+    // 💡 댓글 삭제 함수
+    async function deleteComment(commentId) {
+        if (!confirm("이 댓글을 삭제하시겠습니까?\n(답글이 있다면 함께 삭제됩니다.)")) return;
+
+        try {
+            const res = await fetch(`/board/{{ board.name_en }}/comment_delete/${commentId}`, { method: 'POST' });
+            const result = await res.json();
+            
+            if (res.ok) location.reload();
+            else alert(result.message || "삭제 권한이 없거나 실패했습니다.");
+        } catch (e) {
+            alert("통신 오류가 발생했습니다.");
+        }
+    }
+
+    async function deletePost() {
+        if (!confirm("정말 이 게시글을 삭제하시겠습니까?\n(첨부파일 및 댓글도 함께 삭제됩니다.)")) return;
+
+        try {
+            const res = await fetch(`/board/{{ board.name_en }}/delete/{{ post.id }}`, { method: 'POST' });
+            const result = await res.json();
+            
+            if (res.ok) {
+                alert("삭제되었습니다.");
+                location.href = "/board/{{ board.name_en }}";
+            } else {
+                alert(result.message || "삭제 실패");
+            }
+        } catch (e) {
+            alert("통신 오류가 발생했습니다.");
+        }
+    }
+</script>
+{% endblock %}

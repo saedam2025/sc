@@ -1,0 +1,633 @@
+{% extends 'base.html' %}
+{% block content %}
+{% raw %}
+<style>
+    .pm-page, .pm-modal-backdrop, .pm-toast-region {
+        --pm-primary: var(--primary-color, #2563eb);
+        --pm-primary-soft: color-mix(in srgb, var(--pm-primary) 10%, #fff);
+        --pm-card: var(--card-bg, #fff);
+        --pm-border: var(--card-border, var(--border-color, #dbe3ef));
+        --pm-text: var(--text-color, #172033);
+        --pm-muted: var(--text-gray, #64748b);
+        --pm-surface: var(--widget-bg, #f7f9fc);
+        --pm-hover: var(--widget-hover, #edf3fb);
+        color: var(--pm-text);
+    }
+    .pm-page { min-height: calc(100vh - 112px); }
+    .pm-page *, .pm-page *::before, .pm-page *::after,
+    .pm-modal-backdrop *, .pm-modal-backdrop *::before, .pm-modal-backdrop *::after { box-sizing: border-box; }
+    .pm-page button, .pm-page input, .pm-page select, .pm-page textarea,
+    .pm-modal-backdrop button, .pm-modal-backdrop input, .pm-modal-backdrop select, .pm-modal-backdrop textarea { font: inherit; }
+    .pm-page [hidden], .pm-modal-backdrop [hidden] { display: none !important; }
+    .pm-page .sr-only { position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important; }
+
+    .pm-hero { display:flex;align-items:center;justify-content:space-between;gap:18px;margin:4px 0 18px;padding:20px 24px;border:1px solid var(--pm-border);border-radius:20px;background:radial-gradient(circle at 85% 10%,color-mix(in srgb,var(--pm-primary) 17%,transparent),transparent 32%),var(--pm-card);box-shadow:var(--card-shadow,0 10px 35px rgba(15,23,42,.07)); }
+    .pm-hero-copy { display:flex;align-items:center;gap:15px;min-width:0; }
+    .pm-hero-icon { width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;border-radius:16px;background:var(--pm-primary);color:#fff;font-size:1.35rem;box-shadow:0 10px 22px color-mix(in srgb,var(--pm-primary) 28%,transparent); }
+    .pm-hero h1 { margin:0;font-size:clamp(1.35rem,2vw,1.75rem);letter-spacing:-.035em; }
+    .pm-hero p { margin:6px 0 0;color:var(--pm-muted);font-size:.92rem;line-height:1.5; }
+    .pm-system-state { display:inline-flex;align-items:center;gap:8px;color:var(--pm-muted);font-size:.82rem;white-space:nowrap; }
+    .pm-system-dot { width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#f59e0b;box-shadow:0 0 0 5px rgba(245,158,11,.12); }
+    .pm-system-state.ready .pm-system-dot { background:#16a34a;box-shadow:0 0 0 5px rgba(22,163,74,.12); }
+    .pm-system-state.error .pm-system-dot { background:#dc2626;box-shadow:0 0 0 5px rgba(220,38,38,.12); }
+
+    .pm-layout { display:grid;grid-template-columns:292px minmax(0,1fr);gap:18px;align-items:start; }
+    .pm-card { background:var(--pm-card);border:1px solid var(--pm-border);border-radius:18px;box-shadow:var(--card-shadow,0 8px 28px rgba(15,23,42,.055)); }
+    .pm-sidebar { position:sticky;top:88px;overflow:hidden; }
+    .pm-sidebar-head { padding:18px;border-bottom:1px solid var(--pm-border); }
+    .pm-sidebar-title { display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:13px; }
+    .pm-sidebar-title h2 { margin:0;font-size:1.02rem; }
+    .pm-count-badge { min-width:27px;height:27px;display:inline-grid;place-items:center;padding:0 8px;border-radius:999px;background:var(--pm-primary-soft);color:var(--pm-primary);font-weight:800;font-size:.78rem; }
+    .pm-group-list { display:grid;gap:6px;max-height:500px;overflow:auto;padding:10px; }
+    .pm-group-item { width:100%;display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px;border:1px solid transparent;border-radius:13px;padding:10px;background:transparent;text-align:left;cursor:pointer;transition:.18s ease;color:var(--pm-text); }
+    .pm-group-item:hover { background:var(--pm-hover); }
+    .pm-group-item.active { background:var(--pm-primary-soft);border-color:color-mix(in srgb,var(--pm-primary) 33%,var(--pm-border)); }
+    .pm-group-symbol { width:38px;height:38px;display:grid;place-items:center;border-radius:11px;background:var(--pm-surface);color:var(--pm-primary); }
+    .pm-group-item.active .pm-group-symbol { background:var(--pm-primary);color:#fff; }
+    .pm-group-name { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem;font-weight:800; }
+    .pm-group-meta { display:block;margin-top:3px;color:var(--pm-muted);font-size:.72rem; }
+    .pm-sidebar-empty { padding:32px 18px;color:var(--pm-muted);text-align:center;font-size:.84rem;line-height:1.55; }
+    .pm-sidebar-actions { display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:18px;border-top:1px solid var(--pm-border); }
+
+    .pm-main { min-width:0;overflow:hidden;position:relative; }
+    .pm-tabs { display:flex;gap:5px;padding:10px;overflow-x:auto;border-bottom:1px solid var(--pm-border); }
+    .pm-tab { min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:10px 16px;background:transparent;color:var(--pm-muted);font-weight:800;font-size:.84rem;cursor:pointer;white-space:nowrap; }
+    .pm-tab:hover { background:var(--pm-hover);color:var(--pm-text); }
+    .pm-tab.active { background:var(--pm-primary-soft);color:var(--pm-primary); }
+    .pm-tab-badge { min-width:20px;height:20px;display:inline-grid;place-items:center;padding:0 6px;border-radius:999px;background:var(--pm-surface);font-size:.65rem; }
+    .pm-panel { display:none;padding:22px; }
+    .pm-panel.active { display:block;animation:pmFade .18s ease-out; }
+    @keyframes pmFade { from { opacity:.25;transform:translateY(4px); } to { opacity:1;transform:none; } }
+    .pm-panel-head { display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px; }
+    .pm-panel-head h2 { margin:0;font-size:1.16rem; }
+    .pm-panel-head p { margin:5px 0 0;color:var(--pm-muted);font-size:.82rem;line-height:1.5; }
+    .pm-actions { display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px; }
+
+    .pm-btn { min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--pm-border);border-radius:11px;padding:9px 14px;background:var(--pm-card);color:var(--pm-text);font-weight:750;font-size:.84rem;cursor:pointer;transition:.17s ease;text-decoration:none;white-space:nowrap; }
+    .pm-btn:hover:not(:disabled) { border-color:color-mix(in srgb,var(--pm-primary) 55%,var(--pm-border));color:var(--pm-primary);transform:translateY(-1px); }
+    .pm-btn:disabled { opacity:.48;cursor:not-allowed; }
+    .pm-btn.primary { background:var(--pm-primary);border-color:var(--pm-primary);color:#fff;box-shadow:0 7px 15px color-mix(in srgb,var(--pm-primary) 22%,transparent); }
+    .pm-btn.primary:hover:not(:disabled) { color:#fff;filter:brightness(.97); }
+    .pm-btn.danger { color:#dc2626; }
+    .pm-btn.small { min-height:34px;padding:7px 10px;font-size:.77rem;border-radius:9px; }
+    .pm-icon-btn { width:34px;height:34px;display:inline-grid;place-items:center;border:1px solid var(--pm-border);border-radius:9px;background:var(--pm-card);color:var(--pm-text);cursor:pointer; }
+    .pm-icon-btn:hover { color:var(--pm-primary);border-color:var(--pm-primary); }
+
+    .pm-compose-grid { display:grid;grid-template-columns:minmax(0,1.2fr) minmax(320px,.8fr);gap:18px;align-items:start; }
+    .pm-compose-section { padding:17px;border:1px solid var(--pm-border);border-radius:15px;background:var(--pm-card);margin-bottom:14px; }
+    .pm-subtitle { display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:.93rem; }
+    .pm-subtitle i { color:var(--pm-primary); }
+    .pm-form-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px; }
+    .pm-field { min-width:0; }
+    .pm-field.full { grid-column:1/-1; }
+    .pm-label { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;color:var(--pm-text);font-size:.82rem;font-weight:800; }
+    .pm-label small { color:var(--pm-muted);font-weight:600; }
+    .pm-input, .pm-select, .pm-textarea { width:100%;border:1px solid var(--pm-border);border-radius:11px;padding:10px 12px;background:#fff;color:#172033;outline:none; }
+    .pm-input, .pm-select { min-height:43px; }
+    .pm-body-mode { margin-bottom:9px; }
+    .pm-textarea { min-height:110px;resize:vertical;line-height:1.55; }
+    .pm-input:focus, .pm-select:focus, .pm-textarea:focus { border-color:var(--pm-primary);box-shadow:0 0 0 3px var(--pm-primary-soft); }
+    .pm-help { margin:6px 0 0;color:var(--pm-muted);font-size:.72rem;line-height:1.5; }
+
+    .pm-dropzone { display:grid;place-items:center;min-height:132px;padding:18px;border:2px dashed var(--pm-border);border-radius:13px;background:var(--pm-surface);color:var(--pm-muted);text-align:center;cursor:pointer;transition:.18s ease; }
+    .pm-dropzone:hover, .pm-dropzone.dragover { border-color:var(--pm-primary);background:var(--pm-primary-soft);color:var(--pm-primary); }
+    .pm-dropzone i { font-size:1.7rem;margin-bottom:8px; }
+    .pm-dropzone strong { display:block;color:var(--pm-text);font-size:.82rem; }
+    .pm-dropzone small { display:block;margin-top:4px;font-size:.7rem; }
+    .pm-file-list { display:grid;gap:7px;margin-top:10px; }
+    .pm-file-item { display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;padding:9px;border:1px solid var(--pm-border);border-radius:10px;background:var(--pm-card); }
+    .pm-file-icon { width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:var(--pm-primary-soft);color:var(--pm-primary); }
+    .pm-file-name { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.77rem;font-weight:800; }
+    .pm-file-size { display:block;margin-top:2px;color:var(--pm-muted);font-size:.66rem; }
+
+    .pm-send-summary { display:grid;gap:9px;padding:15px;border:1px solid var(--pm-border);border-radius:13px;background:var(--pm-surface); }
+
+    .pm-summary-row { display:flex;align-items:flex-start;justify-content:flex-start;gap:6px;font-size:.76rem;color:var(--pm-muted); }
+    .pm-summary-row span::after { content:':'; }
+    .pm-summary-row strong { color:var(--pm-text);text-align:left;word-break:keep-all; }
+
+    .pm-banner-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px; }
+    .pm-banner-preview { min-height:185px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px dashed var(--pm-border);border-radius:11px;background:var(--pm-surface);color:var(--pm-muted);font-size:.72rem;text-align:center; }
+    .pm-banner-preview img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover; /* 비율 유지하며 빈 공간 없이 꽉 채움 */
+}
+
+    .pm-resource-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px; }
+    .pm-resource-card { display:flex;flex-direction:column;min-height:160px;padding:16px;border:1px solid var(--pm-border);border-radius:14px;background:var(--pm-card); }
+    .pm-resource-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px; }
+    .pm-resource-icon { width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:var(--pm-primary-soft);color:var(--pm-primary); }
+    .pm-resource-card h3 { margin:11px 0 4px;font-size:.92rem; }
+    .pm-resource-card p { margin:0;color:var(--pm-muted);font-size:.74rem;line-height:1.5;word-break:break-all; }
+    .pm-resource-card footer { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:14px; }
+    .pm-asset-section + .pm-asset-section { margin-top:24px;padding-top:24px;border-top:1px solid var(--pm-border); }
+    .pm-asset-section-head { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px; }
+    .pm-asset-section-head h3 { margin:0;font-size:1rem; }
+    #bannerAssetGrid, #logoAssetGrid { grid-template-columns:repeat(5,minmax(0,1fr));gap:10px; }
+    .pm-asset-card { min-height:260px;padding:10px; }
+    .pm-asset-thumb { height:190px;display:grid;place-items:center;overflow:hidden;margin-bottom:8px;border:1px solid var(--pm-border);border-radius:11px;background:var(--pm-surface); }
+    .pm-asset-thumb img { display:block;width:100%;height:100%;object-fit:contain; }
+    .pm-asset-bottom { min-width:0;display:flex;align-items:center;gap:6px;margin-top:auto; }
+    .pm-asset-title { min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.72rem; }
+    .pm-asset-note { max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pm-muted);font-size:.61rem; }
+    .pm-asset-note.url { color:#c2410c; }
+    .pm-asset-actions { flex:0 0 auto;display:flex;align-items:center;gap:4px; }
+    .pm-asset-actions .pm-icon-btn { width:30px;height:30px;border-radius:8px; }
+    .pm-group-slot-grid { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px; }
+    .pm-group-slot { min-width:0;display:flex;flex-direction:column;overflow:hidden;padding:0;border:1px solid var(--pm-border);border-radius:12px;background:#fff;color:var(--pm-text);text-align:left;cursor:pointer;transition:.18s ease; }
+    .pm-group-slot:hover { border-color:var(--pm-primary);transform:translateY(-1px);box-shadow:0 7px 18px rgba(15,23,42,.08); }
+    .pm-group-slot.selected { border-color:var(--pm-primary);box-shadow:0 0 0 2px var(--pm-primary-soft); }
+    .pm-group-slot-head { display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 9px;border-bottom:1px solid var(--pm-border);font-size:.7rem;font-weight:850; }
+    .pm-group-slot-head i { color:var(--pm-primary); }
+    .pm-group-slot-state { color:var(--pm-muted);font-size:.6rem; }
+    .pm-group-slot.selected .pm-group-slot-state { color:var(--pm-primary); }
+    .pm-group-slot-preview { height:112px;display:grid;place-items:center;overflow:hidden;padding:7px;background:var(--pm-surface); }
+    .pm-group-slot-preview img { display:block;width:100%;height:100%;object-fit:contain;object-position:center; }
+    .pm-group-slot-empty { display:grid;place-items:center;gap:5px;color:var(--pm-muted);font-size:.66rem;text-align:center; }
+    .pm-group-slot-empty i { font-size:1.35rem; }
+    .pm-group-slot-foot { display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 9px; }
+    .pm-group-slot-name { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.68rem;font-weight:800; }
+    .pm-group-slot-change { flex:0 0 auto;color:var(--pm-primary);font-size:.6rem;font-weight:800; }
+    .pm-group-asset-grid { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px; }
+    .pm-group-asset-option { position:relative;min-width:0;display:flex;flex-direction:column;padding:8px;border:1px solid var(--pm-border);border-radius:12px;background:#fff;transition:.18s ease; }
+    .pm-group-asset-option.selected { border:2px solid var(--pm-primary);padding:7px;background:var(--pm-primary-soft);box-shadow:0 8px 22px color-mix(in srgb,var(--pm-primary) 16%,transparent); }
+    .pm-group-asset-option.selected::after { content:'\f00c';position:absolute;right:7px;top:7px;z-index:2;width:25px;height:25px;display:grid;place-items:center;border-radius:50%;background:var(--pm-primary);color:#fff;font:900 .7rem/1 "Font Awesome 6 Free";box-shadow:0 3px 9px rgba(15,23,42,.22); }
+    .pm-group-asset-image { position:relative;width:100%;height:145px;display:block;overflow:hidden;padding:5px;border:0;border-radius:9px;background:var(--pm-surface);cursor:zoom-in; }
+    .pm-group-asset-image img { display:block;width:100%;height:100%;object-fit:contain;object-position:center; }
+    .pm-group-asset-image::after { content:'\f00e';position:absolute;right:7px;bottom:7px;width:27px;height:27px;display:grid;place-items:center;border-radius:8px;background:rgba(15,23,42,.74);color:#fff;font:900 .72rem/1 "Font Awesome 6 Free"; }
+    .pm-group-asset-option-foot { min-width:0;display:flex;align-items:center;gap:6px;margin-top:7px; }
+    .pm-group-asset-option-name { min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.69rem;font-weight:800; }
+    .pm-group-asset-select { flex:0 0 auto;min-height:30px;padding:5px 8px;border:1px solid var(--pm-border);border-radius:8px;background:#fff;color:var(--pm-text);font-size:.65rem;font-weight:850;cursor:pointer; }
+    .pm-group-asset-option.selected .pm-group-asset-select { border-color:var(--pm-primary);background:var(--pm-primary);color:#fff; }
+    .pm-group-asset-none { min-height:196px;display:grid;place-items:center;align-content:center;gap:10px;color:var(--pm-muted);text-align:center; }
+    .pm-group-asset-none i { font-size:1.7rem; }
+    .pm-asset-input-panel { margin-top:10px;padding:12px;border:1px solid var(--pm-border);border-radius:11px;background:var(--pm-surface); }
+    .pm-asset-preview { width:min(280px,100%);height:300px;display:grid;place-items:center;overflow:hidden;margin:10px auto 0;border:1px solid var(--pm-border);border-radius:11px;background:#fff; }
+    .pm-asset-preview img { display:block;width:100%;height:100%;object-fit:contain;object-position:center; }
+    #imagePreviewModal .pm-modal { height:min(90vh,820px); }
+    #imagePreviewModal .pm-modal-body { min-height:0;display:flex;flex:1;overflow:hidden;padding:14px; }
+    .pm-picker-preview-stage { min-width:0;min-height:0;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:16px;border:1px solid var(--pm-border);border-radius:13px;background:var(--pm-surface); }
+    .pm-picker-preview-stage img { display:block;width:auto!important;height:auto!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center; }
+    .pm-status-pill { display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 8px;background:#ecfdf5;color:#047857;font-size:.66rem;font-weight:850; }
+    .pm-status-pill.unverified { background:#fff7ed;color:#c2410c; }
+    .pm-template-preview { max-height:70px;margin-top:9px;overflow:hidden;color:var(--pm-muted);font-size:.72rem;line-height:1.55;mask-image:linear-gradient(#000 50%,transparent); }
+    .pm-empty { padding:54px 20px;text-align:center;color:var(--pm-muted); }
+    .pm-empty i { display:block;margin-bottom:12px;color:color-mix(in srgb,var(--pm-primary) 50%,#94a3b8);font-size:2.1rem; }
+    .pm-empty strong { display:block;margin-bottom:5px;color:var(--pm-text); }
+
+    .pm-history-list { display:grid;gap:8px; }
+    .pm-history-item { width:100%;display:grid;grid-template-columns:minmax(0,1.4fr) .7fr .7fr auto;align-items:center;gap:13px;padding:14px;border:1px solid var(--pm-border);border-radius:13px;background:var(--pm-card);color:var(--pm-text);text-align:left;cursor:pointer;transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease; }
+    .pm-history-item:hover { transform:translateY(-1px);border-color:color-mix(in srgb,var(--pm-primary) 38%,var(--pm-border));box-shadow:0 8px 22px rgba(15,23,42,.07); }
+    .pm-history-title strong { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.84rem; }
+    .pm-history-title small, .pm-history-stat small { display:block;margin-top:4px;color:var(--pm-muted);font-size:.68rem; }
+    .pm-history-stat { font-size:.77rem; }
+    .pm-job-pill { display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:6px 9px;background:var(--pm-surface);color:var(--pm-muted);font-size:.7rem;font-weight:850;white-space:nowrap; }
+    .pm-job-pill.completed { background:#ecfdf5;color:#047857; }
+    .pm-job-pill.running, .pm-job-pill.queued { background:#eff6ff;color:#1d4ed8; }
+    .pm-job-pill.failed, .pm-job-pill.completed_with_errors { background:#fef2f2;color:#b91c1c; }
+    .pm-job-pill.cancelled { background:#fff7ed;color:#c2410c; }
+    .pm-pagination { display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px; }
+    .pm-page-btn { min-width:36px;height:36px;border:1px solid var(--pm-border);border-radius:9px;background:var(--pm-card);color:var(--pm-text);cursor:pointer; }
+    .pm-page-btn:hover:not(:disabled), .pm-page-btn.active { border-color:var(--pm-primary);background:var(--pm-primary);color:#fff; }
+    .pm-page-btn:disabled { opacity:.38;cursor:not-allowed; }
+
+    .pm-progress { position:fixed;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);z-index:2147483200;width:min(480px,calc(100vw - 30px));padding:18px;border:1px solid #cbd5e1;border-radius:16px;background:#fff;color:#172033;opacity:1;backdrop-filter:none;box-shadow:0 0 0 100vmax rgba(15,23,42,.58),0 24px 75px rgba(15,23,42,.32); }
+    .pm-progress-heading { display:flex;align-items:center;gap:9px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid #cbd5e1;color:#172033;font-size:1.15rem;font-weight:850;letter-spacing:.04em; }
+    .pm-progress-heading::before { content:'';width:31px;height:3px;border-radius:999px;background:linear-gradient(90deg,var(--pm-primary),#06b6d4); }
+    .pm-progress-head { display:flex;align-items:center;justify-content:space-between;gap:10px; }
+    .pm-progress-title { display:flex;align-items:center;gap:9px;font-weight:850;font-size:.86rem; }
+    .pm-progress-targets { margin-top:13px;height:259px;overflow:hidden;border:1px solid #dbe3ef;border-radius:11px;background:#fff;position:relative; }
+    .pm-progress-target-list { display:flex;flex-direction:column;width:100%; }
+    .pm-progress-target-row { height:37px;min-height:37px;display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:10px;padding:0 11px;border-bottom:1px solid #e7edf4; transition: background-color 0.4s ease; }
+    .pm-progress-target-row:last-child { border-bottom:0; }
+    .pm-progress-target-row span { font-size:.66rem;font-weight:850; }
+    .pm-progress-target-row strong { display:block;overflow:hidden;color:var(--pm-text);font-size:.75rem;line-height:1.45;text-overflow:ellipsis;white-space:nowrap; }
+    .pm-progress-target-row.completed span { color:#047857; }
+    .pm-progress-target-row.current { background:#eff6ff; }
+    .pm-progress-target-row.current span { color:#1d4ed8; }
+    .pm-progress-target-row.next span { color:#64748b; }
+    .pm-progress-target-row.empty span { color:transparent; }
+    .pm-progress-track { height:9px;margin:13px 0 9px;overflow:hidden;border-radius:999px;background:#e8edf4; }
+    .pm-progress-bar { height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--pm-primary),#06b6d4);transition:width .3s ease; }
+    .pm-progress-meta { display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--pm-muted);font-size:.7rem; }
+    .pm-progress-stats { display:flex;gap:10px;margin-top:11px; }
+    .pm-progress-stat { flex:1;padding:8px;border:1px solid #e2e8f0;border-radius:9px;background:#f7f9fc;text-align:center; }
+    .pm-progress-stat strong { display:block;font-size:.87rem; }
+    .pm-progress-stat span { color:var(--pm-muted);font-size:.64rem; }
+
+    .pm-toast-region { position:fixed;top:86px;right:18px;z-index:2147483600;display:grid;gap:8px;width:min(370px,calc(100vw - 36px));pointer-events:none; }
+    .pm-toast { display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:9px;padding:12px;border:1px solid var(--pm-border);border-radius:12px;background:#fff;color:#172033;box-shadow:0 16px 40px rgba(15,23,42,.17);animation:pmToast .22s ease-out;pointer-events:auto; }
+    @keyframes pmToast { from { opacity:0;transform:translateX(12px); } to { opacity:1;transform:none; } }
+    .pm-toast.success>i { color:#16a34a; }.pm-toast.error>i { color:#dc2626; }.pm-toast.warning>i { color:#d97706; }.pm-toast.info>i { color:#2563eb; }
+    .pm-toast span { font-size:.79rem;line-height:1.4; }.pm-toast button { border:0;background:transparent;color:#64748b;cursor:pointer; }
+
+    body.pm-modal-open { overflow:hidden; }
+    .pm-modal-backdrop { position:fixed;inset:0;z-index:2147483000;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.62);backdrop-filter:blur(4px);--pm-text:#172033;--pm-muted:#64748b;--pm-surface:#f7f9fc; }
+    .pm-modal-backdrop.open { display:flex; }
+    .pm-modal { width:min(620px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--pm-border);border-radius:18px;background:#fff;color:#172033;box-shadow:0 28px 90px rgba(15,23,42,.3); }
+    .pm-modal.wide { width:min(920px,100%); }
+    .pm-modal.xwide { width:min(1120px,100%); }
+    .pm-modal-head, .pm-modal-foot { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 19px;background:#fff; }
+    .pm-modal-head { border-bottom:1px solid var(--pm-border); }.pm-modal-foot { justify-content:flex-end;border-top:1px solid var(--pm-border); }
+    .pm-modal-head h2 { margin:0;font-size:1.15rem; }.pm-modal-body { overflow:auto;padding:19px;background:#fff; }
+    .pm-modal .pm-label { font-size:.9rem; }.pm-modal .pm-input,.pm-modal .pm-select,.pm-modal .pm-textarea { background:#fff;color:#172033;font-size:1rem; }
+    .pm-modal-note { margin:0 0 15px;padding:11px 12px;border-radius:10px;background:var(--pm-primary-soft);color:color-mix(in srgb,var(--pm-primary) 82%,#111827);font-size:.875rem;line-height:1.5; }
+    .pm-editor-shell { overflow:hidden;border:1px solid var(--pm-border);border-radius:12px;background:#fff; }
+    .pm-editor-toolbar { display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:8px;border-bottom:1px solid var(--pm-border);background:var(--pm-surface); }
+    .pm-editor-tool { width:34px;height:32px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;cursor:pointer; }
+    .pm-editor-tool:hover { background:var(--pm-hover);color:var(--pm-primary); }
+    .pm-editor { min-height:180px;max-height:380px;overflow:auto;padding:16px;background:#fff;color:#172033;outline:none;line-height:1.65; }
+    .pm-editor:empty::before { content:attr(data-placeholder);color:#94a3b8;pointer-events:none; }
+    .pm-editor img { max-width:100%;height:auto; }
+    .pm-form-source { min-height:430px;font-family:Consolas,'Courier New',monospace;font-size:.82rem;line-height:1.55;tab-size:2;white-space:pre; }
+    .pm-variables { display:flex;flex-wrap:wrap;gap:7px;margin-top:9px; }
+    .pm-variable { border:1px solid color-mix(in srgb,var(--pm-primary) 30%,var(--pm-border));border-radius:999px;padding:6px 9px;background:var(--pm-primary-soft);color:var(--pm-primary);font-size:.72rem;font-weight:800;cursor:pointer; }
+    .pm-secret-wrap { position:relative; }.pm-secret-wrap .pm-input { padding-right:45px; }.pm-secret-toggle { position:absolute;right:6px;top:50%;transform:translateY(-50%);width:33px;height:33px;border:0;border-radius:8px;background:transparent;cursor:pointer; }
+    .pm-banner-drop { width:100%;height:145px;min-height:145px;position:relative;overflow:hidden;padding:10px; }.pm-banner-drop .pm-icon-btn { position:absolute;right:7px;top:7px;background:#fff; }
+    .pm-banner-drop > img { display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;border-radius:8px; }
+    #groupModal .pm-modal { width:min(800px,100%);border-radius:14px; }
+    #groupModal .pm-modal-head, #groupModal .pm-modal-foot { padding:10px 14px;gap:8px; }
+    #groupModal .pm-modal-head h2 { font-size:.96rem; }
+    #groupModal .pm-modal-body { padding:13px 14px; }
+    #groupModal .pm-form-grid { gap:9px 11px; }
+    #groupModal .pm-label { margin-bottom:4px;font-size:.74rem; }
+    #groupModal .pm-input, #groupModal .pm-select, #groupModal .pm-textarea { min-height:34px;padding:6px 9px;border-radius:8px;font-size:.8rem; }
+    #groupModal .pm-textarea { min-height:64px;line-height:1.4; }
+    #groupModal .pm-help { margin-top:4px;font-size:.66rem;line-height:1.35; }
+    #groupModal .pm-editor-toolbar { min-height:34px;padding:4px 6px;gap:4px; }
+    #groupModal .pm-editor-tool { width:28px;height:28px;border-radius:6px; }
+    #groupModal .pm-editor { min-height:88px;padding:9px;font-size:.78rem;line-height:1.45; }
+    #groupModal .pm-variable { padding:4px 7px;font-size:.66rem; }
+    #groupModal .pm-btn { min-height:32px;padding:6px 10px;font-size:.73rem; }
+    #groupModal .pm-banner-drop { height:88px;min-height:88px;padding:7px;border-width:1px;border-radius:10px; }
+    #groupModal .pm-banner-drop i { font-size:1.15rem;margin-bottom:3px; }
+    #groupModal .pm-banner-drop strong { font-size:.7rem; }
+    #groupModal .pm-banner-drop > img { width:auto !important;height:auto !important;max-width:calc(100% - 12px) !important;max-height:66px !important;margin:auto;object-fit:scale-down !important;object-position:center;border-radius:6px; }
+    .pm-template-keywords { margin-top:8px;padding:7px 9px;border-radius:8px;background:var(--pm-surface);color:var(--pm-muted);font-size:.7rem;line-height:1.45; }
+    .pm-template-keywords strong { color:var(--pm-text); }
+    .pm-preflight-summary { display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:15px; }
+    .pm-preflight-stat { padding:12px 8px;border:1px solid var(--pm-border);border-radius:11px;background:var(--pm-surface);text-align:center; }.pm-preflight-stat strong { display:block;font-size:1.12rem; }.pm-preflight-stat span { color:var(--pm-muted);font-size:.67rem; }
+    .pm-issue-list { display:grid;gap:8px;margin-bottom:14px; }.pm-issue { display:grid;grid-template-columns:26px 1fr;gap:9px;padding:10px;border-radius:10px;background:var(--pm-surface);font-size:.76rem;line-height:1.45; }.pm-issue.error { background:#fef2f2;color:#991b1b; }.pm-issue.warning { background:#fff7ed;color:#9a3412; }.pm-issue.ok { background:#ecfdf5;color:#065f46; }.pm-issue.info { background:#eff6ff;color:#1d4ed8; }
+    .pm-preview-frame { width:100%;height:520px;border:1px solid var(--pm-border);border-radius:12px;background:#fff; }
+    .pm-table-wrap { max-height:300px;overflow:auto;border:1px solid var(--pm-border);border-radius:11px; }.pm-table { width:100%;border-collapse:collapse;font-size:.75rem; }.pm-table th,.pm-table td { padding:10px;border-bottom:1px solid var(--pm-border);text-align:left; }.pm-table th { position:sticky;top:0;background:var(--pm-surface); }
+    .pm-history-summary { display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px; }
+    .pm-history-summary .pm-preflight-stat { text-align:left;padding:13px; }
+    .pm-history-meta { display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;margin-bottom:14px;padding:13px;border:1px solid var(--pm-border);border-radius:11px;background:var(--pm-surface); }
+    .pm-history-meta div { min-width:0; }.pm-history-meta span { display:block;color:var(--pm-muted);font-size:.68rem; }.pm-history-meta strong { display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem; }
+    .pm-recipient-status { display:inline-flex;border-radius:999px;padding:4px 7px;background:var(--pm-surface);font-size:.66rem;font-weight:800;white-space:nowrap; }
+    .pm-recipient-status.sent { background:#ecfdf5;color:#047857; }.pm-recipient-status.failed { background:#fef2f2;color:#b91c1c; }.pm-recipient-status.cancelled { background:#fff7ed;color:#c2410c; }.pm-recipient-status.running,.pm-recipient-status.queued { background:#eff6ff;color:#1d4ed8; }
+    .pm-loading { position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:color-mix(in srgb,var(--pm-card) 86%,transparent);backdrop-filter:blur(3px); }.pm-loading-box { display:flex;align-items:center;gap:10px;padding:13px 17px;border:1px solid var(--pm-border);border-radius:12px;background:var(--pm-card);color:var(--pm-muted);font-size:.8rem; }
+
+    @media(max-width:1100px){.pm-layout{grid-template-columns:245px minmax(0,1fr)}.pm-compose-grid{grid-template-columns:1fr}.pm-resource-grid{grid-template-columns:1fr}#bannerAssetGrid,#logoAssetGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:820px){.pm-system-state{display:none}.pm-layout{grid-template-columns:1fr}.pm-sidebar{position:static}.pm-group-list{max-height:220px}.pm-panel{padding:16px}.pm-form-grid{grid-template-columns:1fr}.pm-field.full{grid-column:auto}.pm-history-item{grid-template-columns:minmax(0,1fr) auto}.pm-history-stat{display:none}#bannerAssetGrid,#logoAssetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:720px){.pm-group-asset-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:560px){.pm-hero{padding:16px}.pm-panel-head{flex-direction:column}.pm-actions{width:100%;justify-content:flex-start}.pm-preflight-summary,.pm-history-summary{grid-template-columns:1fr 1fr}.pm-history-meta{grid-template-columns:1fr}.pm-modal-backdrop{padding:8px}.pm-modal{max-height:calc(100vh - 16px)}.pm-banner-grid{grid-template-columns:1fr 1fr}.pm-group-slot-grid{grid-template-columns:1fr}.pm-group-asset-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#bannerAssetGrid,#logoAssetGrid{grid-template-columns:1fr}}
+
+
+    /* 광고/로고 썸네일: 원본 가로세로 비율 유지 + 이미지 잘림 방지 */
+    #summaryBanner1,
+    #summaryBanner2,
+    #summaryLogo,
+    #groupModal .pm-group-slot-preview,
+    #bannerAssetGrid .pm-asset-thumb,
+    #logoAssetGrid .pm-asset-thumb {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    #summaryBanner1 img,
+    #summaryBanner2 img,
+    #summaryLogo img,
+    #groupModal .pm-group-slot-preview img,
+    #bannerAssetGrid .pm-asset-thumb img,
+    #logoAssetGrid .pm-asset-thumb img {
+        display: block !important;
+        width: auto !important;
+        height: auto !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        object-position: center center !important;
+        flex: 0 0 auto;
+    }
+
+
+</style>
+
+<div class="pm-page" id="payrollApp">
+    <header class="pm-hero">
+        <div class="pm-hero-copy"><div class="pm-hero-icon"><i class="fa-solid fa-envelope-open-text"></i></div><div><h1>스마트 명세서 발송</h1><p>작업그룹, 발송계정, 명세서 HTML 폼을 저장하고 사전 오류점검 후 안전하게 발송합니다.</p></div></div>
+        <div class="pm-system-state" id="systemState"><span class="pm-system-dot"></span><span>메일 시스템 준비 중</span></div>
+    </header>
+
+    <div class="pm-layout">
+        <aside class="pm-card pm-sidebar" aria-label="작업그룹">
+            <div class="pm-sidebar-head"><div class="pm-sidebar-title"><h2>작업그룹</h2><span class="pm-count-badge" id="groupCount">0</span></div><button class="pm-btn primary" id="createGroupBtn" style="width:100%"><i class="fa-solid fa-plus"></i> 새 작업그룹</button></div>
+            <div class="pm-group-list" id="groupList"></div>
+            <div class="pm-sidebar-actions" id="groupActions" hidden><button class="pm-btn small" id="editGroupBtn"><i class="fa-regular fa-pen-to-square"></i> 수정</button><button class="pm-btn small danger" id="deleteGroupBtn"><i class="fa-regular fa-trash-can"></i> 삭제</button></div>
+        </aside>
+
+        <main class="pm-card pm-main">
+            <nav class="pm-tabs" role="tablist">
+                <button class="pm-tab active" data-tab="send"><i class="fa-solid fa-paper-plane"></i> 명세서 발송</button>
+                <button class="pm-tab" data-tab="senders"><i class="fa-solid fa-at"></i> 발송계정 <span class="pm-tab-badge" id="senderTabCount">0</span></button>
+                <button class="pm-tab" data-tab="templates"><i class="fa-solid fa-file-code"></i> 명세서 HTML 폼 <span class="pm-tab-badge" id="templateTabCount">0</span></button>
+                <button class="pm-tab" data-tab="assets"><i class="fa-regular fa-images"></i> 이미지 보관함 <span class="pm-tab-badge" id="assetTabCount">0</span></button>
+                <button class="pm-tab" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> 발송이력</button>
+            </nav>
+
+            <section class="pm-panel active" data-panel="send">
+                <div class="pm-panel-head"><div><h2>명세서 발송</h2><p>엑셀과 작업그룹을 선택한 뒤 발송 전 오류점검을 먼저 실행합니다.</p></div><div class="pm-actions"><button class="pm-btn" id="previewGroupBtn"><i class="fa-regular fa-eye"></i> 메일 미리보기</button></div></div>
+                <div class="pm-compose-grid">
+
+
+                    <div>
+                        <div class="pm-compose-section"><h3 class="pm-subtitle"><i class="fa-solid fa-circle-check"></i> 작업그룹 설정 요약</h3><div class="pm-send-summary"><div class="pm-summary-row"><span>선택 그룹명</span><strong id="summaryGroupName" style="font-size: 0.98rem; font-weight: 700; color: var(--pm-text);">선택 안 됨</strong></div><div class="pm-summary-row"><span>명세서 폼</span><strong id="summaryFormType">-</strong></div><div class="pm-summary-row"><span>메일 제목</span><strong id="summarySubject">-</strong></div><div class="pm-summary-row"><span>메일 내용</span><strong id="summaryBody">-</strong></div><div class="pm-summary-row"><span>그룹 메모</span><strong id="summaryMemo">-</strong></div></div><div class="pm-group-slot-grid" style="margin-top:10px;"><div class="pm-group-slot" style="cursor:default; pointer-events:none;"><span class="pm-group-slot-head"><span><i class="fa-solid fa-rectangle-ad"></i> 광고 이미지 1</span><span class="pm-group-slot-state" id="summaryBanner1State">미선택</span></span><span class="pm-group-slot-preview" id="summaryBanner1" style="height:335px;"></span></div><div class="pm-group-slot" style="cursor:default; pointer-events:none;"><span class="pm-group-slot-head"><span><i class="fa-solid fa-rectangle-ad"></i> 광고 이미지 2</span><span class="pm-group-slot-state" id="summaryBanner2State">미선택</span></span><span class="pm-group-slot-preview" id="summaryBanner2" style="height:335px;"></span></div><div class="pm-group-slot" style="cursor:default; pointer-events:none;"><span class="pm-group-slot-head"><span><i class="fa-solid fa-building"></i> 회사 로고</span><span class="pm-group-slot-state" id="summaryLogoState">기본 로고</span></span><span class="pm-group-slot-preview" id="summaryLogo" style="height:335px;"></span></div></div><button class="pm-btn primary" id="preflightBtn" style="width:100%;margin-top:15px;min-height:48px" disabled><i class="fa-solid fa-shield-halved"></i> 발송 전 오류 점검</button></div>
+                    </div>
+
+                    <div>
+                        <div class="pm-compose-section"><h3 class="pm-subtitle"><i class="fa-solid fa-file-excel"></i> 대상자 엑셀 업로드</h3><label class="pm-dropzone" id="excelDropzone" for="excelInput"><span><i class="fa-solid fa-cloud-arrow-up"></i><strong>엑셀 파일 여러 개를 끌어놓거나 눌러 선택</strong><small>각 시트의 1행 구분을 읽어 폼을 자동 분류하고, 3행 제목·4행 이후 대상자를 확인합니다.</small></span><input id="excelInput" type="file" accept=".xlsx" multiple hidden></label><div class="pm-file-list" id="excelFileList"></div></div>
+                        <div class="pm-compose-section"><h3 class="pm-subtitle"><i class="fa-solid fa-sliders"></i> 발송 옵션</h3><div class="pm-form-grid"><div class="pm-field"><label class="pm-label" for="sendDate">지급 기준일</label><input class="pm-input" id="sendDate" type="date"></div><div class="pm-field"><label class="pm-label" for="sendInterval">발송 간격 <small>초</small></label><input class="pm-input" id="sendInterval" type="number" min="0.5" max="60" step="0.5" value="2"></div><div class="pm-field full"><label class="pm-label" for="composeSender">발송계정</label><select class="pm-select" id="composeSender"><option value="">발송계정을 선택하세요</option></select></div></div></div>
+                    </div>
+
+
+                </div>
+            </section>
+
+            <section class="pm-panel" data-panel="senders">
+                <div class="pm-panel-head"><div><h2>메일 발송계정</h2><p>구글 계정과 구글 앱 비밀번호를 등록하고 연결 상태를 확인합니다.</p></div><div class="pm-actions"><button class="pm-btn primary" id="addSenderBtn"><i class="fa-solid fa-plus"></i> 발송계정 등록</button></div></div>
+                <div class="pm-resource-grid" id="senderGrid"></div><div class="pm-empty" id="senderEmpty"><i class="fa-solid fa-at"></i><strong>등록된 발송계정이 없습니다</strong><span>구글 계정과 앱 비밀번호를 등록해주세요.</span></div>
+            </section>
+
+            <section class="pm-panel" data-panel="templates">
+                <div class="pm-panel-head"><div><h2>명세서 HTML 폼</h2><p>기존 templates/payroll 폴더의 기본 폼이 자동 등록됩니다. 작업그룹에서 선택할 실제 명세서 표 양식을 추가·수정할 수 있습니다.</p></div><div class="pm-actions"><button class="pm-btn primary" id="addTemplateBtn"><i class="fa-solid fa-plus"></i> 새 명세서 폼</button></div></div>
+                <p class="pm-modal-note"><i class="fa-solid fa-circle-info"></i> <strong>자동적용 기준:</strong> 각 엑셀 시트의 <strong>1행</strong>에서 <strong>강사구분:</strong> 또는 <strong>직원구분:</strong>을 찾고, 바로 다음 칸의 텍스트를 아래 각 폼의 <strong>1행 인식 텍스트</strong>와 비교합니다. 예: 선택형·맞춤형 → 방과후강사 폼, 직원근로자·근로자 → 근로자 폼, 직원사업자·사업자 → 사업소득 폼, 퇴직자 → 퇴직자 폼.</p>
+                <div class="pm-resource-grid" id="templateGrid"></div><div class="pm-empty" id="templateEmpty"><i class="fa-solid fa-file-code"></i><strong>등록된 명세서 폼이 없습니다</strong><span>새 명세서 HTML 폼을 추가해주세요.</span></div>
+            </section>
+
+            <section class="pm-panel" data-panel="assets">
+                <div class="pm-panel-head"><div><h2>명세서 이미지 보관함</h2><p>광고 이미지는 최대 10개, 회사 로고는 최대 5개까지 파일 또는 웹링크로 미리 등록할 수 있습니다.</p></div></div>
+                <div class="pm-asset-section"><div class="pm-asset-section-head"><h3>광고 이미지 <span class="pm-count-badge" id="bannerAssetCount">0/10</span></h3><button class="pm-btn primary" id="addBannerAssetBtn"><i class="fa-solid fa-plus"></i> 광고 이미지 등록</button></div><div class="pm-resource-grid" id="bannerAssetGrid"></div><div class="pm-empty" id="bannerAssetEmpty"><i class="fa-regular fa-images"></i><strong>등록된 광고 이미지가 없습니다</strong><span>작업그룹에서 선택할 이미지를 먼저 등록해주세요.</span></div></div>
+                <div class="pm-asset-section"><div class="pm-asset-section-head"><h3>회사 로고 <span class="pm-count-badge" id="logoAssetCount">0/5</span></h3><button class="pm-btn primary" id="addLogoAssetBtn"><i class="fa-solid fa-plus"></i> 회사 로고 등록</button></div><div class="pm-resource-grid" id="logoAssetGrid"></div><div class="pm-empty" id="logoAssetEmpty"><i class="fa-regular fa-building"></i><strong>등록된 회사 로고가 없습니다</strong><span>선택하지 않은 작업그룹은 기존 새담 로고를 사용합니다.</span></div></div>
+            </section>
+
+            <section class="pm-panel" data-panel="history">
+                <div class="pm-panel-head"><div><h2>발송이력</h2><p>완료·실패·중단된 명세서 발송 결과를 확인합니다.</p></div><div class="pm-actions"><button class="pm-btn" id="refreshHistoryBtn"><i class="fa-solid fa-rotate"></i> 새로고침</button></div></div>
+                <div class="pm-history-list" id="historyList"></div><div class="pm-empty" id="historyEmpty"><i class="fa-solid fa-clock-rotate-left"></i><strong>발송이력이 없습니다</strong><span>명세서 발송을 시작하면 이곳에 기록됩니다.</span></div><nav class="pm-pagination" id="historyPagination" aria-label="발송이력 페이지"></nav>
+            </section>
+
+            <div class="pm-loading" id="appLoading"><div class="pm-loading-box"><i class="fa-solid fa-spinner fa-spin"></i><span>명세서 발송 시스템을 불러오는 중입니다.</span></div></div>
+        </main>
+    </div>
+
+    <section class="pm-progress" id="progressCard" role="dialog" aria-modal="true" aria-labelledby="progressTitle" hidden><div class="pm-progress-heading">스마트 명세서 발송 현황</div><div class="pm-progress-head"><div class="pm-progress-title"><i class="fa-solid fa-paper-plane"></i><span id="progressTitle">명세서 발송 진행 중</span></div><button class="pm-btn small danger" id="stopSendBtn"><i class="fa-solid fa-stop"></i> 발송중단</button></div><div class="pm-progress-targets"><div class="pm-progress-target-list" id="progressTargetList"></div></div><div class="pm-progress-track"><div class="pm-progress-bar" id="progressBar"></div></div><div class="pm-progress-meta"><span id="progressMessage">발송 준비 중</span><strong id="progressPercent">0%</strong></div><div class="pm-progress-stats"><div class="pm-progress-stat"><strong id="progressSuccess">0</strong><span>성공</span></div><div class="pm-progress-stat"><strong id="progressFailed">0</strong><span>실패</span></div><div class="pm-progress-stat"><strong id="progressRemaining">0</strong><span>남음</span></div></div></section>
+</div>
+
+<div class="pm-toast-region" id="toastRegion" aria-live="polite"></div>
+
+<div class="pm-modal-backdrop" id="groupModal"><form class="pm-modal wide" id="groupForm"><div class="pm-modal-head"><h2 id="groupModalTitle">새 작업그룹</h2><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><input id="groupId" type="hidden"><div class="pm-form-grid"><div class="pm-field full"><label class="pm-label" for="groupName">작업그룹명</label><input class="pm-input" id="groupName" maxlength="120" required placeholder="예: 방과후강사 월별 명세서"></div><div class="pm-field full"><label class="pm-label" for="groupFormType">적용할 명세서 HTML 폼</label><select class="pm-select" id="groupFormType" required></select><p class="pm-help">자동적용 또는 특정 명세서 폼을 선택합니다.</p></div><div class="pm-field full"><label class="pm-label" for="groupSubject">메일 제목</label><input class="pm-input" id="groupSubject" maxlength="300" required placeholder="예: [새담] {지급일} {이름}님 급여명세서 안내"></div><div class="pm-field full"><span class="pm-label">메일 안내 내용 <small>선택한 명세서 폼과 별도</small></span><div class="pm-editor-shell"><div class="pm-editor-toolbar"><button class="pm-editor-tool" type="button" data-group-command="bold"><i class="fa-solid fa-bold"></i></button><button class="pm-editor-tool" type="button" data-group-command="italic"><i class="fa-solid fa-italic"></i></button><button class="pm-editor-tool" type="button" data-group-command="insertUnorderedList"><i class="fa-solid fa-list-ul"></i></button><button class="pm-btn small" type="button" id="groupHtmlSourceBtn"><i class="fa-solid fa-code"></i> HTML 소스</button></div><div class="pm-editor" id="groupEditor" contenteditable="true" data-placeholder="명세서 위에 표시할 안내 내용을 입력하세요."></div><textarea class="pm-textarea" id="groupHtmlSource" hidden></textarea></div><div class="pm-variables"><button class="pm-variable" type="button" data-editor-target="groupEditor" data-value="{{이름}}">{{이름}}</button><button class="pm-variable" type="button" data-editor-target="groupEditor" data-value="{{지급일}}">{{지급일}}</button><button class="pm-variable" type="button" data-editor-target="groupEditor" data-value="{{명세서}}">{{명세서}}</button></div></div><div class="pm-field full"><span class="pm-label">명세서 이미지 선택 <small>각 버튼을 눌러 보관함에서 선택</small></span><div class="pm-group-slot-grid"><button class="pm-group-slot" id="groupBannerSlot1" type="button" data-open-group-asset-picker="banner1"><span class="pm-group-slot-empty"><i class="fa-regular fa-image"></i>광고 이미지 1 선택</span></button><button class="pm-group-slot" id="groupBannerSlot2" type="button" data-open-group-asset-picker="banner2"><span class="pm-group-slot-empty"><i class="fa-regular fa-image"></i>광고 이미지 2 선택</span></button><button class="pm-group-slot" id="groupLogoSlot" type="button" data-open-group-asset-picker="logo"><span class="pm-group-slot-empty"><i class="fa-regular fa-building"></i>회사 로고 선택</span></button></div></div><div class="pm-field full"><button class="pm-btn small" type="button" id="manageAssetsFromGroup"><i class="fa-regular fa-images"></i> 이미지 보관함 관리</button></div><div class="pm-field full"><label class="pm-label" for="groupMemo">그룹 메모</label><textarea class="pm-textarea" id="groupMemo" maxlength="1000" placeholder="발송 주기나 주의사항을 입력하세요."></textarea></div></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" id="previewGroupModalBtn"><i class="fa-regular fa-eye"></i> 전체 메일 미리보기</button><button class="pm-btn" type="button" data-close-modal>취소</button><button class="pm-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 저장</button></div></form></div>
+
+<div class="pm-modal-backdrop" id="senderModal"><form class="pm-modal" id="senderForm"><div class="pm-modal-head"><h2 id="senderModalTitle">발송계정 등록</h2><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><input id="senderId" type="hidden"><p class="pm-modal-note"><i class="fa-solid fa-shield-halved"></i> 구글 계정의 2단계 인증에서 발급한 16자리 앱 비밀번호를 사용하세요. 일반 로그인 비밀번호는 사용할 수 없습니다.</p><div class="pm-form-grid"><div class="pm-field full"><label class="pm-label" for="senderLabel">계정 이름</label><input class="pm-input" id="senderLabel" required maxlength="120" placeholder="예: 새담 대표메일"></div><div class="pm-field full"><label class="pm-label" for="senderEmail">구글 계정</label><input class="pm-input" id="senderEmail" type="email" required maxlength="254" placeholder="example@gmail.com"></div><div class="pm-field full"><label class="pm-label" for="senderPassword">구글 앱 비밀번호 <small id="senderPasswordHint"></small></label><div class="pm-secret-wrap"><input class="pm-input" id="senderPassword" type="password" autocomplete="new-password" placeholder="16자리 앱 비밀번호"><button class="pm-secret-toggle" id="senderPasswordToggle" type="button"><i class="fa-regular fa-eye"></i></button></div></div></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>취소</button><button class="pm-btn primary" type="submit"><i class="fa-solid fa-lock"></i> 안전하게 저장</button></div></form></div>
+
+<div class="pm-modal-backdrop" id="assetModal"><form class="pm-modal" id="assetForm"><div class="pm-modal-head"><h2 id="assetModalTitle">이미지 등록</h2><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><input id="assetId" type="hidden"><input id="assetKind" type="hidden"><div class="pm-form-grid"><div class="pm-field full"><label class="pm-label" for="assetName">표시 이름</label><input class="pm-input" id="assetName" maxlength="120" required placeholder="예: 7월 여름 광고 / 새담교육 로고"></div><div class="pm-field full"><label class="pm-label" for="assetSourceType">등록 방식</label><select class="pm-select" id="assetSourceType"><option value="file">이미지 파일</option><option value="url">웹 이미지 링크</option></select></div><div class="pm-field full pm-asset-input-panel" id="assetFilePanel"><label class="pm-dropzone" id="assetDropzone" for="assetFile"><span><i class="fa-solid fa-cloud-arrow-up"></i><strong>이미지를 끌어놓거나 눌러 선택</strong><small>PNG, JPG, GIF, WEBP · 4MB 이하</small></span><input id="assetFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label></div><div class="pm-field full pm-asset-input-panel" id="assetUrlPanel" hidden><label class="pm-label" for="assetUrl">웹 이미지 링크</label><input class="pm-input" id="assetUrl" type="url" maxlength="2048" placeholder="https://example.com/image.png"></div><div class="pm-field full"><div class="pm-asset-preview" id="assetPreview"><span class="pm-help">등록할 이미지 미리보기</span></div></div></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>취소</button><button class="pm-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 보관함에 저장</button></div></form></div>
+
+<div class="pm-modal-backdrop" id="templateModal"><form class="pm-modal wide" id="templateForm"><div class="pm-modal-head"><h2 id="templateModalTitle">새 명세서 HTML 폼</h2><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><input id="templateId" type="hidden"><p class="pm-modal-note"><i class="fa-solid fa-file-code"></i> 엑셀 한 행은 <strong>row</strong>로 전달됩니다. 기존 파일처럼 <strong>row.get('직원명')</strong>, <strong>safe_amount(row, '지급총액')</strong>, <strong>send_date</strong>, <strong>logo_url</strong>, <strong>ad1_url</strong>, <strong>ad2_url</strong>을 사용할 수 있습니다.</p><div class="pm-form-grid"><div class="pm-field"><label class="pm-label" for="templateName">폼 이름</label><input class="pm-input" id="templateName" required maxlength="120" placeholder="예: 시간강사 명세서"></div><div class="pm-field"><label class="pm-label" for="templateDescription">폼 설명</label><input class="pm-input" id="templateDescription" maxlength="500" placeholder="사용 대상과 특징을 입력하세요."></div><div class="pm-field full"><label class="pm-label" for="templateSource">HTML/Jinja 소스</label><textarea class="pm-textarea pm-form-source" id="templateSource" required spellcheck="false" placeholder="기존 payroll HTML 파일 내용을 복사하거나 새 HTML 폼을 작성하세요."></textarea><p class="pm-help">미리보기 저장 전에 문법과 위험 태그를 검사합니다. 기본 제공 폼 수정은 원본 파일이 아닌 사용자 등록본에 저장됩니다.</p></div></div></div><div class="pm-modal-foot"><button class="pm-btn" id="resetTemplateBtn" type="button" hidden><i class="fa-solid fa-rotate-left"></i> 기본 원본 복원</button><button class="pm-btn" id="previewTemplateModalBtn" type="button"><i class="fa-regular fa-eye"></i> 샘플 데이터 미리보기</button><button class="pm-btn" type="button" data-close-modal>취소</button><button class="pm-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 폼 저장</button></div></form></div>
+
+<div class="pm-modal-backdrop" id="previewModal"><div class="pm-modal wide"><div class="pm-modal-head"><div><h2 id="previewTitle">명세서 폼 미리보기</h2><p class="pm-help" id="previewSubject"></p></div><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><iframe class="pm-preview-frame" id="previewFrame" sandbox="allow-popups"></iframe></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>닫기</button></div></div></div>
+
+<div class="pm-modal-backdrop" id="groupAssetPickerModal"><div class="pm-modal xwide"><div class="pm-modal-head"><div><h2 id="groupAssetPickerTitle">이미지 선택</h2><p class="pm-help" id="groupAssetPickerSubtitle">이미지를 선택해주세요.</p></div><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><div class="pm-group-asset-grid" id="groupAssetPickerGrid"></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" id="manageAssetsFromPicker"><i class="fa-regular fa-images"></i> 이미지 보관함 관리</button><button class="pm-btn" type="button" data-close-modal>닫기</button></div></div></div>
+
+<div class="pm-modal-backdrop" id="imagePreviewModal"><div class="pm-modal wide"><div class="pm-modal-head"><div><h2 id="imagePreviewTitle">이미지 미리보기</h2><p class="pm-help" id="imagePreviewType"></p></div><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><div class="pm-picker-preview-stage"><img id="imagePreviewImage" src="" alt="선택 이미지 미리보기"></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>닫기</button></div></div></div>
+
+<div class="pm-modal-backdrop" id="preflightModal"><div class="pm-modal xwide"><div class="pm-modal-head"><h2>발송 전 오류 점검</h2><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><div class="pm-preflight-summary"><div class="pm-preflight-stat"><strong id="pfTotal">0</strong><span>전체 대상</span></div><div class="pm-preflight-stat"><strong id="pfReady">0</strong><span>발송 준비</span></div><div class="pm-preflight-stat"><strong id="pfSkipped">0</strong><span>제외(정상)</span></div><div class="pm-preflight-stat"><strong id="pfWarnings">0</strong><span>주의</span></div><div class="pm-preflight-stat"><strong id="pfErrors">0</strong><span>오류</span></div></div><div class="pm-issue-list" id="preflightIssues"></div><div class="pm-table-wrap"><table class="pm-table"><thead><tr><th>파일·시트</th><th>엑셀 행</th><th>대상자</th><th>구분</th><th>적용 폼</th><th>이메일</th><th>상태</th></tr></thead><tbody id="preflightRows"></tbody></table></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>돌아가서 수정</button><button class="pm-btn primary" id="startSendBtn" type="button" disabled><i class="fa-solid fa-paper-plane"></i> 점검 완료 후 발송</button></div></div></div>
+
+<div class="pm-modal-backdrop" id="historyDetailModal"><div class="pm-modal xwide"><div class="pm-modal-head"><div><h2 id="historyDetailTitle">발송이력 상세</h2><p class="pm-help" id="historyDetailSubtitle"></p></div><button class="pm-icon-btn" type="button" data-close-modal><i class="fa-solid fa-xmark"></i></button></div><div class="pm-modal-body"><div class="pm-history-summary"><div class="pm-preflight-stat"><strong id="hdTotal">0</strong><span>전체 발송 건수</span></div><div class="pm-preflight-stat"><strong id="hdSent">0</strong><span>성공</span></div><div class="pm-preflight-stat"><strong id="hdFailed">0</strong><span>실패·중단</span></div><div class="pm-preflight-stat"><strong id="hdDuration">0초</strong><span>전체 발송 시간</span></div><div class="pm-preflight-stat"><strong id="hdAverage">0초</strong><span>1건당 평균</span></div></div><div class="pm-history-meta"><div><span>작업그룹</span><strong id="hdGroup">-</strong></div><div><span>발송계정</span><strong id="hdSender">-</strong></div><div><span>메일 제목</span><strong id="hdSubject">-</strong></div><div><span>원본 엑셀</span><strong id="hdSource">-</strong></div><div><span>발송 시작</span><strong id="hdStarted">-</strong></div><div><span>발송 종료</span><strong id="hdFinished">-</strong></div></div><div class="pm-table-wrap" style="max-height:420px"><table class="pm-table"><thead><tr><th>구분</th><th>학교명</th><th>이름</th><th>이메일</th><th>시트·행</th><th>발송 결과</th><th>건별 처리시간</th></tr></thead><tbody id="historyRecipientRows"></tbody></table></div><div class="pm-empty" id="historyRecipientEmpty" hidden><i class="fa-solid fa-circle-info"></i><strong>개별 발송자 기록이 없습니다</strong><span>이 기능 추가 전에 생성된 발송이력은 전체 집계만 확인할 수 있습니다.</span></div></div><div class="pm-modal-foot"><button class="pm-btn" type="button" data-close-modal>닫기</button></div></div></div>
+
+<script>
+(() => {
+    'use strict';
+    const API_ROOT = '/payroll/api';
+    const AUTO_FORM_KEY = 'auto';
+    const state = {csrf:'', groups:[], senders:[], templates:[], assets:[], history:[], historyPagination:{page:1,page_size:10,total_items:0,total_pages:1}, forms:[], activeGroupId:null, excels:[], preflight:null, timer:null, assetDataUri:'', groupAssetPicker:null, lastCurrentEmail:''};
+    const $ = (selector, root=document) => root.querySelector(selector);
+    const $$ = (selector, root=document) => Array.from(root.querySelectorAll(selector));
+    const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+    const activeGroup = () => state.groups.find(item => String(item.id) === String(state.activeGroupId));
+    const formatBytes = size => Number(size||0) < 1048576 ? `${(Number(size||0)/1024).toFixed(1)} KB` : `${(Number(size||0)/1048576).toFixed(1)} MB`;
+    const htmlText = html => { const node=document.createElement('div');node.innerHTML=html||'';return node.textContent||''; };
+    const formatDate = value => value ? new Intl.DateTimeFormat('ko-KR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(String(value).replace(' ','T')+'Z')) : '-';
+    const formatDuration = value => {const seconds=Math.max(0,Number(value||0));if(seconds<60)return `${seconds<10?seconds.toFixed(2):seconds.toFixed(1)}초`;const minutes=Math.floor(seconds/60),remain=seconds-minutes*60;if(minutes<60)return `${minutes}분 ${remain.toFixed(1)}초`;const hours=Math.floor(minutes/60);return `${hours}시간 ${minutes%60}분 ${remain.toFixed(0)}초`;};
+
+    async function api(path, options={}) {
+        const url = path.startsWith('/') ? path : `${API_ROOT}/${path.replace(/^\//,'')}`;
+        const opts = {...options, headers:{...(options.headers||{})}};
+        if(state.csrf && !['GET','HEAD'].includes((opts.method||'GET').toUpperCase())) opts.headers['X-CSRF-Token']=state.csrf;
+        if(opts.body && !(opts.body instanceof FormData) && typeof opts.body !== 'string') { opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(opts.body); }
+        const response = await fetch(url,opts); const data = await response.json().catch(()=>({message:`요청 처리 실패 (${response.status})`}));
+        if(!response.ok){const error=new Error(data.message||'요청 처리에 실패했습니다.');error.data=data;throw error;}
+        return data;
+    }
+    function toast(message,type='success',timeout=4300){const icons={success:'fa-circle-check',error:'fa-circle-exclamation',warning:'fa-triangle-exclamation',info:'fa-circle-info'};const node=document.createElement('div');node.className=`pm-toast ${type}`;node.innerHTML=`<i class="fa-solid ${icons[type]||icons.info}"></i><span>${esc(message)}</span><button type="button" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>`;$('#toastRegion').appendChild(node);const remove=()=>node.remove();$('button',node).addEventListener('click',remove);setTimeout(remove,timeout);}
+    function syncModalLock(){document.body.classList.toggle('pm-modal-open',$$('.pm-modal-backdrop.open').length>0);}
+    function mountModals(){$$('.pm-modal-backdrop').forEach(backdrop=>document.body.appendChild(backdrop));const toastRegion=$('#toastRegion');if(toastRegion)document.body.appendChild(toastRegion);}
+    function openModal(id){$(`#${id}`)?.classList.add('open');syncModalLock();}
+    function closeModal(node){(typeof node==='string'?$(`#${node}`):node)?.classList.remove('open');syncModalLock();}
+    function switchTab(name){$$('.pm-tab').forEach(tab=>tab.classList.toggle('active',tab.dataset.tab===name));$$('.pm-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.panel===name));}
+    function systemState(text,type='ready'){const node=$('#systemState');node.className=`pm-system-state ${type}`;$('span:last-child',node).textContent=text;}
+    function setLoading(show){$('#appLoading').hidden=!show;}
+
+    async function bootstrap(showToast=true){setLoading(true);try{const data=await api('bootstrap');state.csrf=data.csrf_token||'';state.groups=data.groups||[];state.senders=data.senders||[];state.templates=data.templates||[];state.assets=data.assets||[];state.history=data.history||[];state.historyPagination=data.history_pagination||state.historyPagination;state.forms=data.forms||[];const saved=sessionStorage.getItem('payrollGroupId');state.activeGroupId=state.groups.some(g=>String(g.id)===String(saved))?saved:(state.groups[0]?.id??null);renderAll();systemState('메일 시스템 준비 완료','ready');const resumed=await resumeActiveSend();if(showToast&&!resumed)toast('명세서 메일 시스템 준비가 완료되었습니다.','success');}catch(error){systemState('메일 시스템 연결 확인 필요','error');toast(error.message,'error',7000);renderAll();}finally{setLoading(false);}}
+    function renderAll(){renderGroups();renderSummary();renderSenders();renderTemplates();renderAssets();renderHistory();renderSelects();validateReady();}
+    function renderGroups(){$('#groupCount').textContent=state.groups.length;$('#groupList').innerHTML=state.groups.map(g=>`<button class="pm-group-item ${String(g.id)===String(state.activeGroupId)?'active':''}" data-group-id="${g.id}" type="button"><span class="pm-group-symbol"><i class="fa-solid fa-folder-open"></i></span><span><span class="pm-group-name">${esc(g.name)}</span><span class="pm-group-meta">${esc(g.form_name||g.form_type)}</span></span><i class="fa-solid fa-chevron-right" style="font-size:.68rem;color:var(--pm-muted)"></i></button>`).join('')||'<div class="pm-sidebar-empty">새 작업그룹을 만들어 시작하세요.</div>';$('#groupActions').hidden=!activeGroup();}
+    function selectGroup(id){state.activeGroupId=id;sessionStorage.setItem('payrollGroupId',id);state.preflight=null;renderGroups();renderSummary();validateReady();}
+    function renderSummary(){
+        const g=activeGroup();
+        $('#summaryGroupName').textContent=g?.name||'선택 안 됨';
+        $('#summaryFormType').textContent=g?.form_name||'-';
+        $('#summarySubject').textContent=g?.subject||'-';
+        const body=htmlText(g?.body_html||'').trim();
+        $('#summaryBody').textContent=body?(body.length>45?body.slice(0,45)+'…':body):'내용 없음';
+        $('#summaryMemo').textContent=g?.memo||'없음';
+        
+        function updateSlot(id, stateId, val, emptyTxt, isSel, icon) {
+            const node = $(`#${id}`);
+            const stateNode = $(`#${stateId}`);
+            node.innerHTML = val ? `<img src="${val}" alt="미리보기">` : `<span class="pm-group-slot-empty"><i class="${icon}"></i>${esc(emptyTxt)}</span>`;
+            stateNode.textContent = isSel ? '선택됨' : (id === 'summaryLogo' ? '기본 로고' : '미선택');
+            node.parentElement.classList.toggle('selected', isSel);
+        }
+        
+        updateSlot('summaryBanner1', 'summaryBanner1State', g?.banner1_preview, '선택 안 함', !!g?.banner1_preview, 'fa-regular fa-image');
+        updateSlot('summaryBanner2', 'summaryBanner2State', g?.banner2_preview, '선택 안 함', !!g?.banner2_preview, 'fa-regular fa-image');
+        updateSlot('summaryLogo', 'summaryLogoState', g?.logo_preview||'/static/logo01.jpg', '기본 로고', !!g?.logo_asset_id, 'fa-regular fa-building');
+    }
+    function renderSelects(){const senderValue=$('#composeSender').value;$('#composeSender').innerHTML='<option value="">발송계정을 선택하세요</option>'+state.senders.map(s=>`<option value="${s.id}">${esc(s.label)} · ${esc(s.email)}${s.last_test_status==='success'?' (연결완료)':' (테스트필요)'}</option>`).join('');if(state.senders.some(s=>String(s.id)===String(senderValue)))$('#composeSender').value=senderValue;$('#senderTabCount').textContent=state.senders.length;$('#templateTabCount').textContent=state.templates.length;$('#assetTabCount').textContent=state.assets.length;$('#groupFormType').innerHTML='<option value="auto">자동적용 · 엑셀 1행 구분 기준</option>'+state.forms.map(f=>`<option value="${esc(f.value)}">${esc(f.label)}${f.is_system?' · 기본':''}</option>`).join('');const help=$('#groupFormType')?.nextElementSibling;if(help?.classList.contains('pm-help'))help.textContent='자동적용은 각 시트 1행의 강사구분: 또는 직원구분: 다음 칸을 읽고, 명세서 HTML 폼에 등록된 1행 인식 텍스트와 비교합니다.';}
+    function renderSenders(){$('#senderGrid').innerHTML=state.senders.map(s=>`<article class="pm-resource-card" data-sender-id="${s.id}"><div class="pm-resource-head"><span class="pm-resource-icon"><i class="fa-solid fa-at"></i></span><span class="pm-status-pill ${s.last_test_status==='success'?'':'unverified'}"><i class="fa-solid ${s.last_test_status==='success'?'fa-circle-check':'fa-triangle-exclamation'}"></i>${s.last_test_status==='success'?'연결 완료':'테스트 필요'}</span></div><h3>${esc(s.label)}</h3><p>${esc(s.email)}</p><footer><button class="pm-btn small" data-action="test-sender"><i class="fa-solid fa-plug-circle-check"></i> 연결 테스트</button><button class="pm-btn small" data-action="edit-sender"><i class="fa-regular fa-pen-to-square"></i> 수정</button></footer></article>`).join('');$('#senderEmpty').hidden=state.senders.length>0;}
+    function renderTemplates(){$('#templateGrid').innerHTML=state.templates.map(t=>`<article class="pm-resource-card" data-template-id="${t.id}"><div class="pm-resource-head"><span class="pm-resource-icon"><i class="fa-solid fa-file-code"></i></span><span class="pm-status-pill ${t.is_system?'':'unverified'}">${t.is_system?'기본 제공':'추가 폼'}</span></div><h3>${esc(t.name)}</h3><p>${esc(t.description||'')}</p><div class="pm-template-preview">${esc(t.source_filename||t.template_key||'사용자 등록 HTML')}</div><div class="pm-template-keywords"><strong>1행 인식 텍스트</strong><br>${esc(t.match_keywords||'미등록 · 자동적용 제외')}</div><footer><button class="pm-btn small" data-action="preview-template"><i class="fa-regular fa-eye"></i> 샘플 미리보기</button><span><button class="pm-icon-btn" data-action="edit-template" title="수정"><i class="fa-regular fa-pen-to-square"></i></button>${t.is_system?'':` <button class="pm-icon-btn" data-action="delete-template" title="삭제"><i class="fa-regular fa-trash-can"></i></button>`}</span></footer></article>`).join('');$('#templateEmpty').hidden=state.templates.length>0;}
+    function renderAssets(){for(const kind of ['banner','logo']){const items=state.assets.filter(asset=>asset.asset_kind===kind),prefix=kind==='banner'?'banner':'logo',limit=kind==='banner'?10:5;const grid=$(`#${prefix}AssetGrid`);grid.innerHTML=items.map(asset=>{const note=asset.source_type==='url'?'웹링크':'업로드 파일',noteTitle=asset.source_type==='url'?asset.source_url:'업로드 이미지 파일';return `<article class="pm-resource-card pm-asset-card" data-asset-id="${asset.id}"><div class="pm-asset-thumb"><img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}"></div><div class="pm-asset-bottom"><strong class="pm-asset-title" title="${esc(asset.name)}">${esc(asset.name)}</strong><span class="pm-asset-note ${asset.source_type==='url'?'url':''}" title="${esc(noteTitle)}">${note}</span><span class="pm-asset-actions"><button class="pm-icon-btn" data-action="edit-asset" title="수정"><i class="fa-regular fa-pen-to-square"></i></button><button class="pm-icon-btn" data-action="delete-asset" title="삭제"><i class="fa-regular fa-trash-can"></i></button></span></div></article>`}).join('');$(`#${prefix}AssetEmpty`).hidden=items.length>0;$(`#${prefix}AssetCount`).textContent=`${items.length}/${limit}`;$(`#add${kind==='banner'?'Banner':'Logo'}AssetBtn`).disabled=items.length>=limit;}}
+    function statusLabel(status){return({queued:'대기',running:'진행 중',completed:'완료',completed_with_errors:'일부 실패',cancelled:'중단',failed:'실패'})[status]||status||'대기';}
+    function renderHistoryPagination(){const p=state.historyPagination||{};const total=Number(p.total_pages||1),current=Number(p.page||1),node=$('#historyPagination');if(total<=1){node.innerHTML='';node.hidden=true;return;}node.hidden=false;const start=Math.max(1,Math.min(current-2,total-4)),end=Math.min(total,start+4);let pages='';for(let page=start;page<=end;page++)pages+=`<button class="pm-page-btn ${page===current?'active':''}" type="button" data-history-page="${page}" ${page===current?'aria-current="page"':''}>${page}</button>`;node.innerHTML=`<button class="pm-page-btn" type="button" data-history-page="1" ${current===1?'disabled':''} title="첫 페이지"><i class="fa-solid fa-angles-left"></i></button><button class="pm-page-btn" type="button" data-history-page="${current-1}" ${current===1?'disabled':''} title="이전 페이지"><i class="fa-solid fa-angle-left"></i></button>${pages}<button class="pm-page-btn" type="button" data-history-page="${current+1}" ${current===total?'disabled':''} title="다음 페이지"><i class="fa-solid fa-angle-right"></i></button><button class="pm-page-btn" type="button" data-history-page="${total}" ${current===total?'disabled':''} title="마지막 페이지"><i class="fa-solid fa-angles-right"></i></button>`;}
+    function renderHistory(){$('#historyList').innerHTML=state.history.map(h=>`<button class="pm-history-item" data-history-id="${h.id}" type="button"><span class="pm-history-title"><strong>${esc(h.subject||'(제목 없음)')}</strong><small>${esc(h.group_name||'작업그룹')} · ${formatDate(h.created_at)} · ${formatDuration(h.duration_seconds)}</small></span><span class="pm-history-stat"><strong>${Number(h.sent_count||0)}/${Number(h.total_count||0)}건</strong><small>성공 / 전체</small></span><span class="pm-history-stat"><strong style="color:${Number(h.failed_count||0)?'#dc2626':'inherit'}">${Number(h.failed_count||0)}건</strong><small>실패</small></span><span class="pm-job-pill ${esc(h.status)}"><i class="fa-solid fa-circle"></i>${esc(statusLabel(h.status))}</span></button>`).join('');$('#historyEmpty').hidden=state.history.length>0;renderHistoryPagination();}
+    function validateReady(){$('#preflightBtn').disabled=!(activeGroup()&&state.excels.length&&$('#composeSender').value);state.preflight=null;}
+
+    const GROUP_ASSET_SLOTS={banner1:{elementId:'groupBannerSlot1',kind:'banner',label:'광고 이미지 1',emptyLabel:'선택 안 함',field:'banner1_asset_id'},banner2:{elementId:'groupBannerSlot2',kind:'banner',label:'광고 이미지 2',emptyLabel:'선택 안 함',field:'banner2_asset_id'},logo:{elementId:'groupLogoSlot',kind:'logo',label:'회사 로고',emptyLabel:'기존 새담 로고',field:'logo_asset_id'}};
+    function setGroupAssetSlot(slotKey,value){const config=GROUP_ASSET_SLOTS[slotKey],node=$(`#${config.elementId}`),asset=state.assets.find(item=>String(item.id)===String(value));node.dataset.value=asset?.id||'';node.classList.toggle('selected',!!asset);const emptyImage=config.kind==='logo'?'<img src="/static/logo01.jpg" alt="기존 새담 로고">':`<span class="pm-group-slot-empty"><i class="fa-regular fa-image"></i>${esc(config.emptyLabel)}</span>`;node.innerHTML=`<span class="pm-group-slot-head"><span><i class="fa-solid ${config.kind==='logo'?'fa-building':'fa-rectangle-ad'}"></i> ${esc(config.label)}</span><span class="pm-group-slot-state">${asset?'선택됨':'미선택'}</span></span><span class="pm-group-slot-preview">${asset?`<img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}">`:emptyImage}</span><span class="pm-group-slot-foot"><strong class="pm-group-slot-name">${esc(asset?.name||config.emptyLabel)}</strong><span class="pm-group-slot-change">${asset?'변경':'선택'} <i class="fa-solid fa-chevron-right"></i></span></span>`;}
+    function renderGroupAssetSlots(group={}){for(const [slotKey,config] of Object.entries(GROUP_ASSET_SLOTS))setGroupAssetSlot(slotKey,group[config.field]);}
+    function openGroupAssetPicker(slotKey){const config=GROUP_ASSET_SLOTS[slotKey];if(!config)return;state.groupAssetPicker={slotKey,...config};$('#groupAssetPickerTitle').textContent=`${config.label} 선택`;$('#groupAssetPickerSubtitle').textContent='이미지를 누르면 원본 비율로 크게 보고, 선택 버튼을 누르면 작업그룹에 적용합니다.';renderGroupAssetPicker();openModal('groupAssetPickerModal');}
+    function renderGroupAssetPicker(){const picker=state.groupAssetPicker;if(!picker)return;const selectedValue=$(`#${picker.elementId}`).dataset.value||'',items=state.assets.filter(asset=>asset.asset_kind===picker.kind),emptySelected=!selectedValue;const emptyCard=`<article class="pm-group-asset-option pm-group-asset-none ${emptySelected?'selected':''}"><i class="fa-solid ${picker.kind==='logo'?'fa-building-circle-xmark':'fa-ban'}"></i><strong>${esc(picker.emptyLabel)}</strong><button class="pm-group-asset-select" type="button" data-group-asset-select="">${emptySelected?'현재 선택됨':'선택'}</button></article>`;const cards=items.map(asset=>{const selected=String(asset.id)===String(selectedValue),note=asset.source_type==='url'?'웹링크':'업로드 파일',noteTitle=asset.source_type==='url'?asset.source_url:'업로드 이미지 파일';return `<article class="pm-group-asset-option ${selected?'selected':''}"><button class="pm-group-asset-image" type="button" data-group-asset-preview="${asset.id}" title="${esc(asset.name)} 크게 보기"><img src="${esc(asset.preview_url)}" alt="${esc(asset.name)}"></button><div class="pm-group-asset-option-foot"><strong class="pm-group-asset-option-name" title="${esc(asset.name)}">${esc(asset.name)}</strong><span class="pm-asset-note ${asset.source_type==='url'?'url':''}" title="${esc(noteTitle)}">${note}</span><button class="pm-group-asset-select" type="button" data-group-asset-select="${asset.id}">${selected?'현재 선택됨':'선택'}</button></div></article>`}).join('');$('#groupAssetPickerGrid').innerHTML=emptyCard+cards;}
+    function chooseGroupAsset(value){const picker=state.groupAssetPicker;if(!picker)return;const normalized=value||'';if(picker.kind==='banner'&&normalized){const otherSlot=picker.slotKey==='banner1'?'banner2':'banner1',otherConfig=GROUP_ASSET_SLOTS[otherSlot];if(String($(`#${otherConfig.elementId}`).dataset.value||'')===String(normalized))return toast('광고 이미지 1과 2는 서로 다른 이미지를 선택해주세요.','warning');}setGroupAssetSlot(picker.slotKey,normalized);closeModal('groupAssetPickerModal');toast(`${picker.label} 선택을 변경했습니다. 작업그룹 저장 버튼을 눌러 확정해주세요.`,'info');}
+    function openPickerPreview(assetId){const asset=state.assets.find(item=>String(item.id)===String(assetId));if(!asset)return toast('미리볼 이미지를 찾을 수 없습니다.','warning');$('#imagePreviewTitle').textContent=asset.name||'이미지 미리보기';$('#imagePreviewType').textContent=asset.source_type==='url'?'웹링크 이미지 · 원본 비율 유지':'업로드 이미지 파일 · 원본 비율 유지';const image=$('#imagePreviewImage');image.src=asset.preview_url;image.alt=`${asset.name||'선택 이미지'} 미리보기`;openModal('imagePreviewModal');}
+    function readAssetFile(file){if(!file)return;if(!/^image\/(png|jpeg|gif|webp)$/.test(file.type)||file.size>4*1024*1024)return toast('이미지는 4MB 이하 PNG, JPG, GIF, WEBP 파일만 가능합니다.','error');const reader=new FileReader();reader.onload=()=>{state.assetDataUri=reader.result;showAssetPreview(reader.result);};reader.readAsDataURL(file);}
+    function showAssetPreview(value){$('#assetPreview').innerHTML=value?`<img src="${esc(value)}" alt="이미지 미리보기">`:'<span class="pm-help">등록할 이미지 미리보기</span>';}
+    function setupDropzone(node,onFiles){['dragenter','dragover'].forEach(name=>node.addEventListener(name,event=>{event.preventDefault();node.classList.add('dragover');}));['dragleave','drop'].forEach(name=>node.addEventListener(name,event=>{event.preventDefault();node.classList.remove('dragover');}));node.addEventListener('drop',event=>onFiles(Array.from(event.dataTransfer.files||[])));}
+    function renderExcelFiles(){$('#excelFileList').innerHTML=state.excels.map((file,index)=>`<div class="pm-file-item"><span class="pm-file-icon"><i class="fa-solid fa-file-excel"></i></span><span><span class="pm-file-name">${esc(file.name)}</span><span class="pm-file-size">${formatBytes(file.size)}</span></span><button class="pm-icon-btn" type="button" data-remove-excel="${index}" aria-label="${esc(file.name)} 제거"><i class="fa-solid fa-xmark"></i></button></div>`).join('');}
+    function addExcels(files){const valid=Array.from(files||[]).filter(file=>{if(file.name.toLowerCase().endsWith('.xlsx'))return true;toast(`${file.name}: .xlsx 엑셀 파일만 등록할 수 있습니다.`,'error');return false;});for(const file of valid){if(!state.excels.some(item=>item.name===file.name&&item.size===file.size&&item.lastModified===file.lastModified))state.excels.push(file);}$('#excelInput').value='';renderExcelFiles();validateReady();if(valid.length)toast(`엑셀 파일 ${state.excels.length}개를 등록했습니다. 발송 전 오류점검을 실행해주세요.`,'info');}
+
+    function ensureBodyModeControl(){if($('#groupBodyMode'))return;const field=$('#groupEditor').closest('.pm-field'),label=$('.pm-label',field),select=document.createElement('select');select.className='pm-select pm-body-mode';select.id='groupBodyMode';select.innerHTML='<option value="custom">직접 입력</option><option value="none">내용없음</option>';label.after(select);select.addEventListener('change',()=>setBodyMode(select.value));}
+    function setBodyMode(mode){const none=mode==='none',field=$('#groupEditor').closest('.pm-field');$('#groupBodyMode').value=none?'none':'custom';$('.pm-editor-shell',field).hidden=none;$('.pm-variables',field).hidden=none;}
+    function ensureTemplateMatchField(){if($('#templateMatchKeywords'))return;const sourceField=$('#templateSource').closest('.pm-field'),field=document.createElement('div');field.className='pm-field full';field.innerHTML='<label class="pm-label" for="templateMatchKeywords">엑셀 1행 인식 텍스트 <small>쉼표로 구분</small></label><input class="pm-input" id="templateMatchKeywords" maxlength="1000" placeholder="예: 선택형, 맞춤형, 방과후강사"><p class="pm-help">엑셀 1행의 강사구분: 또는 직원구분: 다음 칸에 이 텍스트가 있으면 이 HTML 폼을 자동 적용합니다. 비워두면 자동적용 대상에서 제외됩니다.</p>';sourceField.before(field);}
+
+    function editorHtml(prefix){const source=$(`#${prefix}HtmlSource`);return source.hidden?$(`#${prefix}Editor`).innerHTML:source.value;}
+    function toggleSource(prefix){const editor=$(`#${prefix}Editor`),source=$(`#${prefix}HtmlSource`);if(source.hidden){source.value=editor.innerHTML;source.hidden=false;editor.hidden=true;}else{editor.innerHTML=source.value;source.hidden=true;editor.hidden=false;}}
+    function insertEditorValue(target,value){const editor=$(`#${target}`);editor.focus();document.execCommand('insertText',false,value);}
+    function showPreview(title,subtitle,html){$('#previewTitle').textContent=title;$('#previewSubject').textContent=subtitle||'';$('#previewFrame').srcdoc=html||'';openModal('previewModal');}
+    async function renderFormSource(title,source){try{const data=await api('templates/preview',{method:'POST',body:{body_html:source,send_date:$('#sendDate').value}});showPreview(title,'샘플 엑셀 데이터가 적용된 미리보기',data.rendered_html);return data.rendered_html;}catch(error){toast(error.message,'error',7000);return null;}}
+    async function previewGroupMail(title,subject,mailHtml,formKey,selections={}){const automatic=formKey===AUTO_FORM_KEY,form=automatic?(state.forms.find(item=>item.value==='form_instructor')||state.forms[0]):state.forms.find(item=>item.value===formKey);if(!form)return toast('적용할 명세서 폼을 선택해주세요.','warning');try{const data=await api('templates/preview',{method:'POST',body:{body_html:form.body_html,send_date:$('#sendDate').value,banner1_asset_id:selections.banner1_asset_id||null,banner2_asset_id:selections.banner2_asset_id||null,logo_asset_id:selections.logo_asset_id||null}});const body=String(mailHtml||'').replaceAll('{{이름}}','홍길동').replaceAll('{{수신자명}}','홍길동').replaceAll('{{지급일}}',$('#sendDate').value||'2026-07-14');const combined=body.includes('{{명세서}}')?body.replaceAll('{{명세서}}',data.rendered_html):body+data.rendered_html;const formLabel=automatic?`자동적용 예시 (${form.name})`:form.name;showPreview(title,`메일 제목: ${subject||'(제목 없음)'} · 적용 폼: ${formLabel}`,combined);}catch(error){toast(error.message,'error',7000);}}
+
+    function openGroup(group=null){$('#groupForm').reset();ensureBodyModeControl();$('#groupId').value=group?.id||'';$('#groupModalTitle').textContent=group?'작업그룹 수정':'새 작업그룹';$('#groupName').value=group?.name||'';$('#groupFormType').value=group?.form_type||AUTO_FORM_KEY;$('#groupSubject').value=group?.subject||'[새담] {지급일} {이름}님 급여명세서 안내';$('#groupMemo').value=group?.memo||'';$('#groupEditor').innerHTML=group?.body_html||'<p>안녕하세요. {{이름}}님</p><p>{{지급일}} 급여명세서를 보내드립니다.</p><p>감사합니다.</p>{{명세서}}';$('#groupEditor').hidden=false;$('#groupHtmlSource').hidden=true;setBodyMode(group&&!(group.body_html||'').trim()?'none':'custom');renderGroupAssetSlots(group||{});openModal('groupModal');}
+    function groupAssetSelections(){return{banner1_asset_id:$('#groupBannerSlot1').dataset.value||null,banner2_asset_id:$('#groupBannerSlot2').dataset.value||null,logo_asset_id:$('#groupLogoSlot').dataset.value||null};}
+    async function saveGroup(event){event.preventDefault();const id=$('#groupId').value,payload={name:$('#groupName').value.trim(),form_type:$('#groupFormType').value,subject:$('#groupSubject').value.trim(),body_html:$('#groupBodyMode').value==='none'?'':editorHtml('group'),memo:$('#groupMemo').value.trim(),...groupAssetSelections()};if(payload.banner1_asset_id&&payload.banner1_asset_id===payload.banner2_asset_id)return toast('광고 이미지 1과 2는 서로 다른 이미지를 선택해주세요.','warning');try{const data=await api(id?`groups/${id}`:'groups',{method:id?'PATCH':'POST',body:payload});if(id)state.groups=state.groups.map(g=>String(g.id)===String(id)?data.group:g);else{state.groups.unshift(data.group);state.activeGroupId=data.group.id;sessionStorage.setItem('payrollGroupId',data.group.id);}closeModal('groupModal');renderAll();toast(id?'작업그룹의 이미지 선택과 수정 내용을 저장했습니다.':'새 작업그룹을 저장했습니다.');}catch(error){toast(error.message,'error',6500);}}
+
+    function openAsset(kind,asset=null){$('#assetForm').reset();state.assetDataUri='';$('#assetForm').dataset.originalSourceType=asset?.source_type||'';$('#assetId').value=asset?.id||'';$('#assetKind').value=kind;$('#assetName').value=asset?.name||'';$('#assetModalTitle').textContent=asset?`${kind==='banner'?'광고 이미지':'회사 로고'} 수정`:`${kind==='banner'?'광고 이미지':'회사 로고'} 등록`;$('#assetSourceType').value=asset?.source_type||'file';$('#assetUrl').value=asset?.source_url||'';showAssetPreview(asset?.preview_url||'');toggleAssetSource();openModal('assetModal');}
+    function toggleAssetSource(){const isUrl=$('#assetSourceType').value==='url';$('#assetFilePanel').hidden=isUrl;$('#assetUrlPanel').hidden=!isUrl;if(isUrl&&$('#assetUrl').value)showAssetPreview($('#assetUrl').value);}
+    async function saveAsset(event){event.preventDefault();const id=$('#assetId').value,sourceType=$('#assetSourceType').value,sourceValue=sourceType==='url'?$('#assetUrl').value.trim():state.assetDataUri;const payload={asset_kind:$('#assetKind').value,name:$('#assetName').value.trim()};if(sourceValue)payload.source_value=sourceValue;if((!id||($('#assetForm').dataset.originalSourceType&&$('#assetForm').dataset.originalSourceType!==sourceType))&&!sourceValue)return toast('변경할 이미지 파일 또는 웹링크를 등록해주세요.','warning');try{const data=await api(id?`assets/${id}`:'assets',{method:id?'PATCH':'POST',body:payload});if(id)state.assets=state.assets.map(asset=>String(asset.id)===String(id)?data.asset:asset);else state.assets.unshift(data.asset);closeModal('assetModal');renderAssets();renderSelects();renderSummary();toast(data.message||'이미지 보관함에 저장했습니다.');}catch(error){toast(error.message,'error',6500);}}
+    async function deleteAsset(asset){if(!confirm(`'${asset.name}' 이미지를 보관함에서 삭제하시겠습니까?`))return;try{await api(`assets/${asset.id}`,{method:'DELETE'});state.assets=state.assets.filter(item=>String(item.id)!==String(asset.id));renderAssets();renderSelects();toast('보관함에서 이미지를 삭제했습니다.');}catch(error){toast(error.message,'error',6500);}}
+
+    function openSender(sender=null){$('#senderForm').reset();$('#senderId').value=sender?.id||'';$('#senderModalTitle').textContent=sender?'발송계정 수정':'발송계정 등록';$('#senderLabel').value=sender?.label||'';$('#senderEmail').value=sender?.email||'';$('#senderPassword').required=!sender;$('#senderPasswordHint').textContent=sender?'변경할 때만 입력':'';openModal('senderModal');}
+    async function saveSender(event){event.preventDefault();const id=$('#senderId').value;const payload={label:$('#senderLabel').value.trim(),email:$('#senderEmail').value.trim(),app_password:$('#senderPassword').value};try{const data=await api(id?`senders/${id}`:'senders',{method:id?'PATCH':'POST',body:payload});if(id)state.senders=state.senders.map(s=>String(s.id)===String(id)?data.sender:s);else state.senders.unshift(data.sender);closeModal('senderModal');renderSenders();renderSelects();toast(id?'발송계정을 수정했습니다. 연결 테스트를 다시 해주세요.':'발송계정을 안전하게 저장했습니다. 연결 테스트를 진행해주세요.','success',6500);}catch(error){toast(error.message,'error',7000);}}
+    async function testSender(id){toast('구글 SMTP 연결을 확인하고 있습니다.','info');try{const data=await api(`senders/${id}/test`,{method:'POST'});state.senders=state.senders.map(s=>String(s.id)===String(id)?data.sender:s);renderSenders();renderSelects();toast(data.message||'구글 SMTP 인증에 성공했습니다.');}catch(error){if(error.data?.sender)state.senders=state.senders.map(s=>String(s.id)===String(id)?error.data.sender:s);renderSenders();renderSelects();toast(error.message,'error',8000);}}
+
+    function syncForms(){state.forms=state.templates.map(item=>({...item,value:item.template_key,label:item.name}));}
+    function openTemplate(template=null){$('#templateForm').reset();ensureTemplateMatchField();$('#templateId').value=template?.id||'';$('#templateModalTitle').textContent=template?'명세서 HTML 폼 수정':'새 명세서 HTML 폼';$('#templateName').value=template?.name||'';$('#templateDescription').value=template?.description||'';$('#templateMatchKeywords').value=template?.match_keywords||'';$('#templateSource').value=template?.body_html||'<!DOCTYPE html>\n<html>\n<body>\n  <h2>급여 명세서</h2>\n  <p>성명: {{ row.get(\'직원명\', row.get(\'강사명\', \'\')) }}</p>\n  <p>지급일: {{ send_date }}</p>\n  <p>지급총액: {{ safe_amount(row, \'지급총액\') }}원</p>\n</body>\n</html>';$('#resetTemplateBtn').hidden=!template?.is_system;openModal('templateModal');}
+    async function saveTemplate(event){event.preventDefault();const id=$('#templateId').value,payload={name:$('#templateName').value.trim(),description:$('#templateDescription').value.trim(),match_keywords:$('#templateMatchKeywords').value.trim(),body_html:$('#templateSource').value};try{const data=await api(id?`templates/${id}`:'templates',{method:id?'PATCH':'POST',body:payload});if(id)state.templates=state.templates.map(t=>String(t.id)===String(id)?data.template:t);else state.templates.push(data.template);syncForms();closeModal('templateModal');renderTemplates();renderSelects();toast(id?'명세서 HTML 폼과 1행 인식 텍스트를 수정했습니다.':'새 명세서 HTML 폼을 등록했습니다.');}catch(error){toast(error.message,'error',6500);}}
+    async function deleteTemplate(id){if(!confirm('이 명세서 HTML 폼을 삭제하시겠습니까?'))return;try{await api(`templates/${id}`,{method:'DELETE'});state.templates=state.templates.filter(t=>String(t.id)!==String(id));syncForms();renderTemplates();renderSelects();toast('명세서 HTML 폼을 삭제했습니다.');}catch(error){toast(error.message,'error',6500);}}
+    async function resetTemplate(){const id=$('#templateId').value;if(!id||!confirm('현재 수정 내용을 버리고 기본 HTML 및 1행 인식 텍스트로 복원하시겠습니까?'))return;try{const data=await api(`templates/${id}/reset`,{method:'POST'});state.templates=state.templates.map(t=>String(t.id)===String(id)?data.template:t);syncForms();$('#templateName').value=data.template.name;$('#templateDescription').value=data.template.description;$('#templateMatchKeywords').value=data.template.match_keywords||'';$('#templateSource').value=data.template.body_html;renderTemplates();renderSelects();toast('기본 HTML과 1행 인식 텍스트로 복원했습니다.');}catch(error){toast(error.message,'error',6500);}}
+
+    function showPreflight(report){state.preflight=report;$('#pfTotal').textContent=report.total||0;$('#pfReady').textContent=report.ready||0;$('#pfSkipped').textContent=report.skipped_count||0;$('#pfWarnings').textContent=report.warning_count||0;$('#pfErrors').textContent=report.error_count||0;const issues=[...(report.errors||[]).map(text=>({type:'error',text})),...(report.warnings||[]).map(text=>({type:'warning',text})),...(report.infos||[]).map(text=>({type:'info',text}))];if(!issues.length)issues.push({type:'ok',text:'메일계정, 작업그룹, 엑셀 수신자 정보를 모두 확인했습니다. 발송 준비가 완료되었습니다.'});$('#preflightIssues').innerHTML=issues.map(issue=>`<div class="pm-issue ${issue.type}"><i class="fa-solid ${issue.type==='error'?'fa-circle-xmark':issue.type==='warning'?'fa-triangle-exclamation':issue.type==='info'?'fa-circle-info':'fa-circle-check'}"></i><span>${esc(issue.text)}</span></div>`).join('');$('#preflightRows').innerHTML=(report.rows||[]).map(row=>`<tr><td>${esc([row.source_file,row.sheet].filter(Boolean).join(' / ')||'-')}</td><td>${esc(row.excel_row||'-')}행</td><td>${esc(row.name)}</td><td>${esc(row.detected_type||'-')}</td><td>${esc(row.form_name||'-')}</td><td>${esc(row.email||'(비어 있음)')}</td><td style="color:${row.status==='ready'?'#047857':'#b91c1c'}">${esc(row.message)}</td></tr>`).join('');$('#startSendBtn').disabled=!report.ok;openModal('preflightModal');}
+    function recipientStatusLabel(status){return({queued:'대기',running:'처리 중',sent:'성공',failed:'실패',cancelled:'중단'})[status]||status||'-';}
+    async function openHistoryDetail(id){try{const data=await api(`history/${id}`),campaign=data.campaign||{},recipients=data.recipients||[],counts=campaign.recipient_counts||{};$('#historyDetailTitle').textContent=campaign.subject||'발송이력 상세';$('#historyDetailSubtitle').textContent=`${statusLabel(campaign.status)} · ${formatDate(campaign.created_at)}`;$('#hdTotal').textContent=`${Number(campaign.total_count||0)}건`;$('#hdSent').textContent=`${Number(campaign.sent_count||0)}건`;$('#hdFailed').textContent=`${Number(counts.failed||campaign.failed_count||0)+Number(counts.cancelled||0)}건`;$('#hdDuration').textContent=formatDuration(campaign.duration_seconds);$('#hdAverage').textContent=formatDuration(campaign.average_seconds);$('#hdGroup').textContent=campaign.group_name||'-';$('#hdSender').textContent=campaign.sender_email||'-';$('#hdSubject').textContent=campaign.subject||'-';$('#hdSource').textContent=campaign.source_filename||'-';$('#hdStarted').textContent=formatDate(campaign.started_at);$('#hdFinished').textContent=formatDate(campaign.finished_at);$('#historyRecipientRows').innerHTML=recipients.map(row=>`<tr><td>${esc(row.recipient_type||'-')}</td><td>${esc(row.school_name||'-')}</td><td>${esc(row.recipient_name||'-')}</td><td>${esc(row.email||'-')}</td><td>${esc(row.sheet_name||'-')} ${row.excel_row?`${esc(row.excel_row)}행`:''}</td><td><span class="pm-recipient-status ${esc(row.status)}">${esc(recipientStatusLabel(row.status))}</span>${row.error_message?`<small style="display:block;margin-top:4px;color:#b91c1c">${esc(row.error_message)}</small>`:''}</td><td>${formatDuration(row.elapsed_seconds)}</td></tr>`).join('');$('#historyRecipientEmpty').hidden=recipients.length>0;openModal('historyDetailModal');}catch(error){toast(error.message,'error',6500);}}
+    function sendFormData(){const form=new FormData();form.append('group_id',state.activeGroupId||'');form.append('sender_id',$('#composeSender').value);state.excels.forEach(file=>form.append('excel',file,file.name));form.append('send_date',$('#sendDate').value);form.append('interval',$('#sendInterval').value);return form;}
+    async function runPreflight(){if(!activeGroup()||!state.excels.length||!$('#composeSender').value)return toast('작업그룹, 엑셀 파일, 발송계정을 모두 선택해주세요.','warning');toast(`엑셀 ${state.excels.length}개와 메일 설정 오류를 점검하고 있습니다.`,'info');try{const data=await api('preflight',{method:'POST',body:sendFormData()});showPreflight(data.preflight);toast('발송 전 오류점검을 통과했습니다.');}catch(error){if(error.data?.preflight)showPreflight(error.data.preflight);toast(error.message,'error',7000);}}
+    
+    function showProgress(){
+        $('#progressCard').hidden=false;
+        $('#progressTitle').textContent='명세서 발송 진행 중';
+        $('#progressTargetList').innerHTML='';
+        state.lastCurrentEmail='';
+        $('#progressBar').style.width='0%';
+        $('#progressBar').style.background='';
+        $('#progressPercent').textContent='0%';
+        $('#progressSuccess').textContent='0';
+        $('#progressFailed').textContent='0';
+        $('#progressRemaining').textContent='-';
+        $('#stopSendBtn').disabled=false;
+    }
+    
+    function progressRecipientText(item, emptyText){
+        if (!item || (!item.type && !item.name && !item.email)) return emptyText;
+        return [item.type?`구분: ${item.type}`:'', item.name?`이름: ${item.name}`:'', item.email?`이메일: ${item.email}`:''].filter(Boolean).join(' · ') || emptyText;
+    }
+    
+    function applyProgressStatus(data){
+        const total=Number(data.total_count||0), processed=Number(data.processed_count||0), percent=total?Math.round(processed/total*100):0;
+        
+        const completed = data.recent_completed || [];
+        const current = data.current_recipient || null;
+        const upcoming = data.upcoming_scheduled || [];
+        
+        const rowsData = [];
+        for (let i=0; i < 3 - completed.length; i++) rowsData.push({ type: 'empty', label: '-', text: '' });
+        completed.forEach(item => rowsData.push({ type: 'completed', label: '발송완료', text: progressRecipientText(item, '정보 없음') }));
+        
+        if (current && (current.name || current.email)) {
+            rowsData.push({ type: 'current', label: '현재발송', text: progressRecipientText(current, '발송 준비 중') });
+        } else {
+            rowsData.push({ type: 'current', label: '현재발송', text: data.is_running ? '발송 준비 중' : '처리 완료' });
+        }
+        
+        upcoming.forEach(item => rowsData.push({ type: 'next', label: '발송예정', text: progressRecipientText(item, '확인 중') }));
+        for (let i=0; i < 3 - upcoming.length; i++) rowsData.push({ type: 'empty', label: '-', text: '' });
+
+        const list = $('#progressTargetList');
+        if (list.children.length !== 7) {
+            list.innerHTML = Array(7).fill('<div class="pm-progress-target-row empty"><span>-</span><strong></strong></div>').join('');
+        }
+
+        const newCurrentEmail = current ? current.email : '';
+        
+        if (state.lastCurrentEmail && state.lastCurrentEmail !== newCurrentEmail) {
+            const newRow = document.createElement('div');
+            newRow.className = `pm-progress-target-row ${rowsData[6].type}`;
+            newRow.innerHTML = `<span>${rowsData[6].label}</span><strong>${rowsData[6].text}</strong>`;
+            list.appendChild(newRow);
+            
+            list.animate([
+                { transform: 'translateY(0)' },
+                { transform: 'translateY(-37px)' }
+            ], { 
+                duration: 400, 
+                easing: 'cubic-bezier(0.25, 1, 0.5, 1)' 
+            }).onfinish = () => {
+                if (list.children.length > 7) list.removeChild(list.firstChild);
+                for (let i = 0; i < 7; i++) {
+                    const node = list.children[i];
+                    const rowData = rowsData[i];
+                    if (node.className !== `pm-progress-target-row ${rowData.type}`) {
+                        node.className = `pm-progress-target-row ${rowData.type}`;
+                    }
+                    node.innerHTML = `<span>${rowData.label}</span><strong>${rowData.text}</strong>`;
+                }
+            };
+        } else {
+            for (let i = 0; i < 7; i++) {
+                const node = list.children[i];
+                const rowData = rowsData[i];
+                if (node.className !== `pm-progress-target-row ${rowData.type}`) {
+                    node.className = `pm-progress-target-row ${rowData.type}`;
+                }
+                node.innerHTML = `<span>${rowData.label}</span><strong>${rowData.text}</strong>`;
+            }
+        }
+        
+        state.lastCurrentEmail = newCurrentEmail;
+
+        $('#progressBar').style.width=`${percent}%`;$('#progressPercent').textContent=`${percent}%`;$('#progressSuccess').textContent=data.sent_count||0;$('#progressFailed').textContent=Number(data.failed_count??(data.errors||[]).length);$('#progressRemaining').textContent=Math.max(0,total-processed);$('#progressMessage').textContent=`${processed}/${total}명 처리 완료`;
+    }
+
+    async function startSend(){if(!state.preflight?.ok)return;$('#startSendBtn').disabled=true;try{const data=await api('/payroll/send',{method:'POST',body:sendFormData()});closeModal('preflightModal');showProgress();toast(data.message||'명세서 발송을 시작했습니다.','success');if(state.timer)clearInterval(state.timer);state.timer=setInterval(pollStatus,1500);await pollStatus();}catch(error){$('#startSendBtn').disabled=false;toast(error.message,'error',7000);}}
+    async function resumeActiveSend(){try{const data=await api('/payroll/status');if(!data.is_running||!data.campaign_id)return false;showProgress();applyProgressStatus(data);if(state.timer)clearInterval(state.timer);state.timer=setInterval(pollStatus,1500);toast('진행 중인 명세서 발송 상태를 다시 불러왔습니다.','info',6000);return true;}catch(error){console.error(error);return false;}}
+    async function pollStatus(){try{const data=await api('/payroll/status');applyProgressStatus(data);if(!data.is_running&&data.campaign_id){clearInterval(state.timer);state.timer=null;$('#stopSendBtn').disabled=true;$('#progressTitle').textContent=data.campaign_status==='completed'?'모든 명세서 발송 완료':data.campaign_status==='cancelled'?'명세서 발송 중단됨':'명세서 발송 완료 (일부 확인 필요)';$('#progressBar').style.background=data.campaign_status==='completed'?'#10b981':'#f59e0b';toast($('#progressTitle').textContent,data.campaign_status==='completed'?'success':'warning',7000);await refreshHistory(1);setTimeout(()=>{$('#progressCard').hidden=true;},8000);}}catch(error){console.error(error);}}
+    async function refreshHistory(page=state.historyPagination.page||1){try{const data=await api(`history?page=${Math.max(1,Number(page||1))}`);state.history=data.history||[];state.historyPagination=data.pagination||state.historyPagination;renderHistory();}catch(error){toast(error.message,'error');}}
+
+    function setupEvents(){
+        $$('.pm-tab').forEach(tab=>tab.addEventListener('click',()=>switchTab(tab.dataset.tab)));$$('[data-close-modal]').forEach(button=>button.addEventListener('click',event=>closeModal(event.target.closest('.pm-modal-backdrop'))));$$('.pm-modal-backdrop').forEach(backdrop=>backdrop.addEventListener('click',event=>{if(event.target===backdrop)closeModal(backdrop);}));
+        $('#groupList').addEventListener('click',event=>{const button=event.target.closest('[data-group-id]');if(button)selectGroup(button.dataset.groupId);});$('#createGroupBtn').addEventListener('click',()=>openGroup());$('#editGroupBtn').addEventListener('click',()=>openGroup(activeGroup()));$('#groupForm').addEventListener('submit',saveGroup);
+        $('#deleteGroupBtn').addEventListener('click',async()=>{const group=activeGroup();if(!group||!confirm(`'${group.name}' 작업그룹을 삭제하시겠습니까?`))return;try{await api(`groups/${group.id}`,{method:'DELETE'});state.groups=state.groups.filter(g=>String(g.id)!==String(group.id));state.activeGroupId=state.groups[0]?.id||null;renderAll();toast('작업그룹을 삭제했습니다.');}catch(error){toast(error.message,'error');}});
+        $$('[data-group-command]').forEach(button=>button.addEventListener('click',()=>{document.execCommand(button.dataset.groupCommand,false);$('#groupEditor').focus();}));$$('.pm-variable').forEach(button=>button.addEventListener('click',()=>insertEditorValue(button.dataset.editorTarget,button.dataset.value)));$('#groupHtmlSourceBtn').addEventListener('click',()=>toggleSource('group'));
+        $('#previewGroupBtn').addEventListener('click',()=>{const g=activeGroup();if(g)previewGroupMail(g.name,g.subject,g.body_html,g.form_type,g);else toast('먼저 작업그룹을 선택해주세요.','warning');});$('#previewGroupModalBtn').addEventListener('click',()=>previewGroupMail($('#groupName').value||'작업그룹 미리보기',$('#groupSubject').value,$('#groupBodyMode').value==='none'?'':editorHtml('group'),$('#groupFormType').value,groupAssetSelections()));$('#previewTemplateModalBtn').addEventListener('click',()=>renderFormSource($('#templateName').value||'명세서 폼 미리보기',$('#templateSource').value));$('#resetTemplateBtn').addEventListener('click',resetTemplate);
+        $('#excelInput').addEventListener('change',event=>addExcels(event.target.files));setupDropzone($('#excelDropzone'),addExcels);$('#excelFileList').addEventListener('click',event=>{const button=event.target.closest('[data-remove-excel]');if(!button)return;state.excels.splice(Number(button.dataset.removeExcel),1);renderExcelFiles();validateReady();});$('#composeSender').addEventListener('change',validateReady);$('#preflightBtn').addEventListener('click',runPreflight);$('#startSendBtn').addEventListener('click',startSend);
+        $$('[data-open-group-asset-picker]').forEach(button=>button.addEventListener('click',()=>openGroupAssetPicker(button.dataset.openGroupAssetPicker)));$('#groupAssetPickerGrid').addEventListener('click',event=>{const preview=event.target.closest('[data-group-asset-preview]');if(preview){openPickerPreview(preview.dataset.groupAssetPreview);return;}const select=event.target.closest('[data-group-asset-select]');if(select)chooseGroupAsset(select.dataset.groupAssetSelect);});const openAssetLibrary=()=>{closeModal('groupAssetPickerModal');closeModal('groupModal');switchTab('assets');toast('이미지를 등록한 뒤 작업그룹을 다시 열어 선택해주세요.','info');};$('#manageAssetsFromGroup').addEventListener('click',openAssetLibrary);$('#manageAssetsFromPicker').addEventListener('click',openAssetLibrary);
+        $('#addSenderBtn').addEventListener('click',()=>openSender());$('#senderForm').addEventListener('submit',saveSender);$('#senderGrid').addEventListener('click',event=>{const card=event.target.closest('[data-sender-id]'),action=event.target.closest('[data-action]')?.dataset.action;if(!card||!action)return;const sender=state.senders.find(s=>String(s.id)===card.dataset.senderId);if(action==='edit-sender')openSender(sender);if(action==='test-sender')testSender(sender.id);});$('#senderPasswordToggle').addEventListener('click',()=>{$('#senderPassword').type=$('#senderPassword').type==='password'?'text':'password';});
+        $('#addTemplateBtn').addEventListener('click',()=>openTemplate());$('#templateForm').addEventListener('submit',saveTemplate);$('#templateGrid').addEventListener('click',event=>{const card=event.target.closest('[data-template-id]'),action=event.target.closest('[data-action]')?.dataset.action;if(!card||!action)return;const template=state.templates.find(t=>String(t.id)===card.dataset.templateId);if(action==='preview-template')renderFormSource(template.name,template.body_html);if(action==='edit-template')openTemplate(template);if(action==='delete-template')deleteTemplate(template.id);});
+        $('#addBannerAssetBtn').addEventListener('click',()=>openAsset('banner'));$('#addLogoAssetBtn').addEventListener('click',()=>openAsset('logo'));$('#assetForm').addEventListener('submit',saveAsset);$('#assetSourceType').addEventListener('change',toggleAssetSource);$('#assetUrl').addEventListener('input',()=>showAssetPreview($('#assetUrl').value.trim()));$('#assetFile').addEventListener('change',event=>readAssetFile(event.target.files[0]));setupDropzone($('#assetDropzone'),files=>readAssetFile(files[0]));['bannerAssetGrid','logoAssetGrid'].forEach(id=>$(`#${id}`).addEventListener('click',event=>{const card=event.target.closest('[data-asset-id]'),action=event.target.closest('[data-action]')?.dataset.action;if(!card||!action)return;const asset=state.assets.find(item=>String(item.id)===card.dataset.assetId);if(action==='edit-asset')openAsset(asset.asset_kind,asset);if(action==='delete-asset')deleteAsset(asset);}));
+        $('#historyList').addEventListener('click',event=>{const item=event.target.closest('[data-history-id]');if(item)openHistoryDetail(item.dataset.historyId);});$('#historyPagination').addEventListener('click',event=>{const button=event.target.closest('[data-history-page]');if(button&&!button.disabled)refreshHistory(button.dataset.historyPage);});$('#refreshHistoryBtn').addEventListener('click',()=>refreshHistory(state.historyPagination.page||1));$('#stopSendBtn').addEventListener('click',async()=>{if(!confirm('발송을 중단하시겠습니까? 이미 전송된 메일은 취소되지 않습니다.'))return;try{await api('/payroll/stop',{method:'POST'});toast('발송 중단을 요청했습니다.','warning');$('#stopSendBtn').disabled=true;}catch(error){toast(error.message,'error');}});
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{mountModals();ensureBodyModeControl();ensureTemplateMatchField();$('#sendDate').value=new Date().toISOString().slice(0,10);setupEvents();bootstrap();});
+})();
+</script>
+{% endraw %}
+{% endblock %}

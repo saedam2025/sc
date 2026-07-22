@@ -1,0 +1,2811 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* =====================================================
+       개인 화이트보드 - 새담 인트라넷 테마 연동 디자인
+       기존 크기 / 메뉴 / 기능은 유지하고 화면 디자인만 변경
+       ===================================================== */
+    .memo-page {
+        --memo-primary: var(--primary-color, #2563eb);
+        --memo-primary-dark: var(--primary-dark, #1d4ed8);
+        --memo-primary-soft: var(--primary-light, #eff6ff);
+        --memo-text: var(--text-dark, #0f172a);
+        --memo-muted: var(--text-gray, #64748b);
+        --memo-card: var(--card-bg, #ffffff);
+        --memo-border: var(--card-border, var(--border-color, #e2e8f0));
+        --memo-widget: var(--widget-bg, #f8fafc);
+        --memo-hover: var(--widget-hover, #f1f5f9);
+        --memo-input: var(--input-bg, #ffffff);
+        --memo-shadow: var(--card-shadow, 0 12px 35px rgba(15, 23, 42, 0.08));
+        --memo-backdrop: var(--card-backdrop, none);
+        width: 100%;
+        color: var(--memo-text);
+        font-family: 'Pretendard', sans-serif;
+    }
+
+    .memo-page *,
+    .memo-page *::before,
+    .memo-page *::after {
+        box-sizing: border-box;
+    }
+
+    /* === 상단 화이트보드 도구 영역 === */
+    .memo-toolbar {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+        margin: 4px 0 16px;
+        padding: 18px 20px;
+        overflow: hidden;
+        border: 1px solid var(--memo-border);
+        border-radius: 18px;
+        background:
+            radial-gradient(circle at 93% 10%, color-mix(in srgb, var(--memo-primary) 14%, transparent), transparent 30%),
+            var(--memo-card);
+        box-shadow: var(--memo-shadow);
+        backdrop-filter: var(--memo-backdrop);
+        -webkit-backdrop-filter: var(--memo-backdrop);
+    }
+
+    .memo-toolbar::before {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 5px;
+        background: linear-gradient(180deg, var(--memo-primary), var(--memo-primary-dark));
+    }
+
+    .toolbar-brand {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 245px;
+        flex: 0 0 auto;
+    }
+
+    .toolbar-brand-icon {
+        width: 46px;
+        height: 46px;
+        flex: 0 0 46px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        color: #ffffff;
+        font-size: 1.15rem;
+        background: linear-gradient(145deg, var(--memo-primary), var(--memo-primary-dark));
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--memo-primary) 27%, transparent);
+    }
+
+    .toolbar-title {
+        margin: 0;
+        color: var(--memo-text);
+        font-size: 1.22rem;
+        font-weight: 800;
+        line-height: 1.25;
+        letter-spacing: -0.04em;
+    }
+
+    .toolbar-subtitle {
+        margin-top: 5px;
+        color: var(--memo-muted);
+        font-size: 0.78rem;
+        font-weight: 600;
+        line-height: 1.4;
+        letter-spacing: -0.015em;
+    }
+
+    .toolbar-actions {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-height: 44px;
+        padding: 7px 10px 7px 13px;
+        border: 1px solid var(--memo-border);
+        border-radius: 13px;
+        background: color-mix(in srgb, var(--memo-widget) 82%, transparent);
+    }
+
+    .toolbar-group-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: var(--memo-muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .toolbar-group-label i {
+        color: var(--memo-primary);
+    }
+
+    .color-palette {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+
+    .postit-shape-select {
+        min-width: 118px;
+        height: 31px;
+        padding: 0 30px 0 10px;
+        border: 1px solid var(--memo-border);
+        border-radius: 9px;
+        color: var(--memo-text);
+        background: var(--memo-input);
+        font: inherit;
+        font-size: 0.76rem;
+        font-weight: 800;
+        cursor: pointer;
+        outline: none;
+    }
+
+    .postit-shape-select:hover,
+    .postit-shape-select:focus {
+        border-color: color-mix(in srgb, var(--memo-primary) 55%, var(--memo-border));
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--memo-primary) 12%, transparent);
+    }
+
+    .color-btn {
+        position: relative;
+        width: 27px;
+        height: 27px;
+        padding: 0;
+        border: 2px solid color-mix(in srgb, var(--memo-card) 80%, #ffffff);
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--memo-text) 13%, transparent),
+            0 3px 8px rgba(15, 23, 42, 0.10);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .color-btn::after {
+        content: '';
+        position: absolute;
+        right: 3px;
+        bottom: 3px;
+        width: 5px;
+        height: 5px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.75);
+    }
+
+    .color-btn:hover {
+        z-index: 2;
+        transform: translateY(-2px) scale(1.08);
+        box-shadow:
+            0 0 0 2px color-mix(in srgb, var(--memo-primary) 25%, transparent),
+            0 7px 14px rgba(15, 23, 42, 0.14);
+    }
+
+    .color-btn:focus-visible,
+    .tool-btn:focus-visible,
+    .btn-delete-memo:focus-visible,
+    .btn-stop-alarm:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--memo-primary) 30%, transparent);
+        outline-offset: 2px;
+    }
+
+    .toolbar-divider {
+        width: 1px;
+        height: 34px;
+        background: var(--memo-border);
+        flex: 0 0 1px;
+    }
+
+    .toolbar-buttons {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+    }
+
+    .tool-btn {
+        min-height: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border: 1px solid transparent;
+        border-radius: 11px;
+        color: #ffffff;
+        background: var(--memo-primary);
+        box-shadow: 0 6px 14px color-mix(in srgb, var(--memo-primary) 20%, transparent);
+        font: inherit;
+        font-size: 0.84rem;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .tool-btn:hover {
+        color: #ffffff;
+        background: var(--memo-primary-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 9px 18px color-mix(in srgb, var(--memo-primary) 25%, transparent);
+    }
+
+    .tool-btn-secondary {
+        color: var(--memo-text);
+        border-color: var(--memo-border);
+        background: var(--memo-card);
+        box-shadow: 0 3px 9px rgba(15, 23, 42, 0.06);
+    }
+
+    .tool-btn-secondary i {
+        color: var(--memo-primary);
+    }
+
+    .tool-btn-secondary:hover {
+        color: var(--memo-primary);
+        border-color: color-mix(in srgb, var(--memo-primary) 48%, var(--memo-border));
+        background: var(--memo-hover);
+        box-shadow: 0 7px 15px rgba(15, 23, 42, 0.09);
+    }
+
+    .tool-btn-muted {
+        color: var(--memo-muted);
+        border-color: var(--memo-border);
+        background: var(--memo-widget);
+        box-shadow: none;
+    }
+
+    .tool-btn-muted:hover {
+        color: var(--memo-text);
+        background: var(--memo-hover);
+        box-shadow: none;
+    }
+
+    .tool-btn-meditation {
+        color: #ffffff;
+        border-color: #15803d;
+        background: linear-gradient(135deg, #16a34a, #047857);
+        box-shadow: 0 7px 16px rgba(5, 150, 105, 0.22);
+    }
+
+    .tool-btn-meditation:hover,
+    .tool-btn-meditation.is-active {
+        color: #ffffff;
+        border-color: #065f46;
+        background: linear-gradient(135deg, #15803d, #065f46);
+        box-shadow: 0 10px 22px rgba(5, 150, 105, 0.30);
+    }
+
+    /* === 화이트보드 외곽 프레임 === */
+    .whiteboard-shell {
+        position: relative;
+        padding: 7px;
+        border: 1px solid var(--memo-border);
+        border-radius: 22px;
+        background: color-mix(in srgb, var(--memo-card) 88%, var(--memo-widget));
+        box-shadow: var(--memo-shadow);
+        backdrop-filter: var(--memo-backdrop);
+        -webkit-backdrop-filter: var(--memo-backdrop);
+    }
+
+    .whiteboard-shell::before {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 50%;
+        z-index: 2;
+        width: 72px;
+        height: 4px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--memo-primary) 30%, transparent);
+        transform: translateX(-50%);
+        pointer-events: none;
+    }
+
+    /* === 화이트보드 영역: 기존 크기 그대로 유지 === */
+    #whiteboard {
+        position: relative;
+        width: 100%;
+        height: 72vh;
+        min-height: 630px;
+        overflow: hidden;
+        isolation: isolate;
+        border: 1px solid color-mix(in srgb, var(--memo-border) 88%, transparent);
+        border-radius: 16px;
+        background-color: color-mix(in srgb, var(--memo-card) 92%, #ffffff);
+        background-image:
+            linear-gradient(to right, color-mix(in srgb, var(--memo-text) 8%, transparent) 1px, transparent 1px),
+            linear-gradient(to bottom, color-mix(in srgb, var(--memo-text) 8%, transparent) 1px, transparent 1px),
+            radial-gradient(circle at 16% 12%, color-mix(in srgb, var(--memo-primary) 6%, transparent), transparent 28%);
+        background-size: 25px 25px, 25px 25px, 100% 100%;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    /* === 드래그 가능한 아이템 공통 === */
+    .draggable-item {
+        position: absolute;
+        border-radius: 8px;
+        box-shadow: 0 9px 22px rgba(15, 23, 42, 0.15);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .draggable-item:hover {
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.21);
+    }
+
+    .drag-handle {
+        height: 24px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        border-radius: 8px 8px 0 0;
+        background: rgba(255, 255, 255, 0.24);
+        cursor: grab;
+        user-select: none;
+    }
+
+    .drag-handle i {
+        color: rgba(15, 23, 42, 0.23) !important;
+        font-size: 0.78rem;
+    }
+
+    .drag-handle:active {
+        cursor: grabbing;
+    }
+
+    /* === 포스트잇 / 이미지 / 파일 공통 최소 크기 === */
+    .postit,
+    .image-card,
+    .file-icon-card {
+        min-width: 125px;
+        min-height: 125px;
+        overflow: hidden;
+    }
+
+    /* 포스트잇과 파일은 브라우저 기본 양방향 리사이즈를 사용합니다. */
+    .postit,
+    .file-icon-card {
+        resize: both;
+    }
+
+    /* 이미지는 전용 핸들로만 조절하여 원본 비율이 절대 깨지지 않게 합니다. */
+    .image-card {
+        resize: none !important;
+    }
+
+    /* === 포스트잇 === */
+    .postit {
+        width: 220px;
+        height: 220px;
+        display: flex;
+        flex-direction: column;
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        border-radius: 6px 6px 14px 6px;
+    }
+
+    .postit::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+        background: linear-gradient(135deg, rgba(255,255,255,0) 48%, rgba(255,255,255,0.62) 50%);
+        filter: drop-shadow(-2px -2px 2px rgba(15, 23, 42, 0.06));
+    }
+
+    .postit textarea {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+        padding: 13px 15px 17px;
+        border: 0;
+        outline: 0;
+        resize: none;
+        color: #243043;
+        background: transparent;
+        font-family: 'Pretendard', sans-serif;
+        font-size: 1.02rem;
+        font-weight: 600;
+        line-height: 1.58;
+        box-sizing: border-box;
+    }
+
+    .postit textarea::selection {
+        background: color-mix(in srgb, var(--memo-primary) 20%, transparent);
+    }
+
+    /* === 포스트잇 모양 선택 === */
+    .postit {
+        --postit-color: #fff9b1;
+    }
+
+    .postit.shape-rounded {
+        border-radius: 26px;
+    }
+
+    .postit.shape-rounded::after {
+        display: none;
+    }
+
+    .postit.shape-heart,
+    .postit.shape-star,
+    .postit.shape-moon,
+    .postit.shape-rabbit,
+    .postit.shape-circle,
+    .postit.shape-cloud,
+    .postit.shape-speech,
+    .postit.shape-leaf,
+    .postit.shape-hexagon {
+        border-color: transparent;
+        background: transparent !important;
+        box-shadow: none;
+        filter: drop-shadow(0 9px 11px rgba(15, 23, 42, 0.16));
+    }
+
+    .postit.shape-heart:hover,
+    .postit.shape-star:hover,
+    .postit.shape-moon:hover,
+    .postit.shape-rabbit:hover,
+    .postit.shape-circle:hover,
+    .postit.shape-cloud:hover,
+    .postit.shape-speech:hover,
+    .postit.shape-leaf:hover,
+    .postit.shape-hexagon:hover {
+        box-shadow: none;
+        filter: drop-shadow(0 13px 16px rgba(15, 23, 42, 0.22));
+    }
+
+    .postit.shape-heart::before,
+    .postit.shape-star::before,
+    .postit.shape-moon::before,
+    .postit.shape-rabbit::before,
+    .postit.shape-circle::before,
+    .postit.shape-cloud::before,
+    .postit.shape-speech::before,
+    .postit.shape-leaf::before,
+    .postit.shape-hexagon::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background: var(--postit-color);
+    }
+
+    .postit.shape-heart::after,
+    .postit.shape-star::after,
+    .postit.shape-moon::after,
+    .postit.shape-rabbit::after,
+    .postit.shape-circle::after,
+    .postit.shape-cloud::after,
+    .postit.shape-speech::after,
+    .postit.shape-leaf::after,
+    .postit.shape-hexagon::after {
+        display: none;
+    }
+
+    .postit.shape-heart::before {
+        /* 다각형 clip-path 대신 베지어 곡선 SVG 마스크를 사용해 매끄러운 하트 라인을 유지 */
+        clip-path: none;
+        -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 94 C44 87 8 64 8 36 C8 18 19 7 34 7 C42 7 48 12 50 20 C52 12 58 7 66 7 C81 7 92 18 92 36 C92 64 56 87 50 94 Z'/%3E%3C/svg%3E");
+        mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath fill='black' d='M50 94 C44 87 8 64 8 36 C8 18 19 7 34 7 C42 7 48 12 50 20 C52 12 58 7 66 7 C81 7 92 18 92 36 C92 64 56 87 50 94 Z'/%3E%3C/svg%3E");
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        -webkit-mask-size: 100% 100%;
+        mask-size: 100% 100%;
+    }
+
+    .postit.shape-star::before {
+        clip-path: polygon(50% 2%, 61% 35%, 96% 35%, 68% 56%, 79% 92%, 50% 70%, 21% 92%, 32% 56%, 4% 35%, 39% 35%);
+    }
+
+    .postit.shape-moon::before {
+        border-radius: 50%;
+        -webkit-mask: radial-gradient(circle at 69% 39%, transparent 0 31%, #000 32%);
+        mask: radial-gradient(circle at 69% 39%, transparent 0 31%, #000 32%);
+    }
+
+    .postit.shape-rabbit::before {
+        clip-path: polygon(31% 23%, 24% 1%, 38% 17%, 50% 12%, 62% 17%, 76% 1%, 69% 23%, 84% 32%, 94% 52%, 88% 76%, 70% 94%, 50% 99%, 30% 94%, 12% 76%, 6% 52%, 16% 32%);
+    }
+
+    .postit.shape-circle::before {
+        border-radius: 50%;
+    }
+
+    .postit.shape-cloud::before {
+        background:
+            radial-gradient(circle at 23% 62%, var(--postit-color) 0 24%, transparent 25%),
+            radial-gradient(circle at 43% 43%, var(--postit-color) 0 31%, transparent 32%),
+            radial-gradient(circle at 68% 48%, var(--postit-color) 0 29%, transparent 30%),
+            radial-gradient(circle at 82% 66%, var(--postit-color) 0 22%, transparent 23%),
+            linear-gradient(var(--postit-color), var(--postit-color)) center 69% / 72% 42% no-repeat;
+    }
+
+    .postit.shape-speech::before {
+        clip-path: polygon(7% 5%, 93% 5%, 93% 78%, 64% 78%, 48% 97%, 50% 78%, 7% 78%);
+        border-radius: 20px;
+    }
+
+    .postit.shape-leaf::before {
+        border-radius: 78% 8% 78% 8%;
+        transform: rotate(-2deg) scale(0.95);
+    }
+
+    .postit.shape-hexagon::before {
+        clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
+    }
+
+    .postit.shape-heart .drag-handle,
+    .postit.shape-star .drag-handle,
+    .postit.shape-moon .drag-handle,
+    .postit.shape-rabbit .drag-handle,
+    .postit.shape-circle .drag-handle,
+    .postit.shape-cloud .drag-handle,
+    .postit.shape-speech .drag-handle,
+    .postit.shape-leaf .drag-handle,
+    .postit.shape-hexagon .drag-handle {
+        position: relative;
+        z-index: 2;
+        border-bottom: 0;
+        background: transparent;
+    }
+
+    .postit.shape-heart textarea,
+    .postit.shape-heart .locked-placeholder { padding: 48px 34px 43px; }
+    .postit.shape-star textarea,
+    .postit.shape-star .locked-placeholder { padding: 57px 43px 54px; font-size: 0.9rem; }
+    .postit.shape-moon textarea,
+    .postit.shape-moon .locked-placeholder { width: 63%; align-self: flex-start; padding: 42px 10px 42px 25px; }
+    .postit.shape-rabbit textarea,
+    .postit.shape-rabbit .locked-placeholder { padding: 57px 30px 38px; }
+    .postit.shape-circle textarea,
+    .postit.shape-circle .locked-placeholder { padding: 43px 31px 42px; }
+    .postit.shape-cloud textarea,
+    .postit.shape-cloud .locked-placeholder { padding: 48px 31px 39px; }
+    .postit.shape-speech textarea,
+    .postit.shape-speech .locked-placeholder { padding: 36px 27px 56px; }
+    .postit.shape-leaf textarea,
+    .postit.shape-leaf .locked-placeholder { padding: 45px 38px 42px; }
+    .postit.shape-hexagon textarea,
+    .postit.shape-hexagon .locked-placeholder { padding: 42px 39px; }
+
+    .postit.shape-heart textarea,
+    .postit.shape-star textarea,
+    .postit.shape-moon textarea,
+    .postit.shape-rabbit textarea,
+    .postit.shape-circle textarea,
+    .postit.shape-cloud textarea,
+    .postit.shape-speech textarea,
+    .postit.shape-leaf textarea,
+    .postit.shape-hexagon textarea,
+    .postit.shape-heart .locked-placeholder,
+    .postit.shape-star .locked-placeholder,
+    .postit.shape-moon .locked-placeholder,
+    .postit.shape-rabbit .locked-placeholder,
+    .postit.shape-circle .locked-placeholder,
+    .postit.shape-cloud .locked-placeholder,
+    .postit.shape-speech .locked-placeholder,
+    .postit.shape-leaf .locked-placeholder,
+    .postit.shape-hexagon .locked-placeholder {
+        position: relative;
+        z-index: 1;
+        background: transparent;
+    }
+
+    /* === 이미지 카드 === */
+    .image-card {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--memo-border);
+        border-radius: 11px;
+        background: var(--memo-card);
+    }
+
+    .image-card .drag-handle {
+        background: var(--memo-widget) !important;
+        border-bottom-color: var(--memo-border);
+    }
+
+    .image-wrapper {
+        position: relative;
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+        overflow: hidden;
+        background: var(--memo-card);
+    }
+
+    .image-wrapper img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+
+    .image-resize-handle {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        z-index: 40;
+        width: 22px;
+        height: 22px;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        cursor: nwse-resize;
+        touch-action: none;
+    }
+
+    .image-resize-handle::before,
+    .image-resize-handle::after {
+        content: '';
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid color-mix(in srgb, var(--memo-text) 45%, transparent);
+        border-bottom: 2px solid color-mix(in srgb, var(--memo-text) 45%, transparent);
+        border-radius: 1px;
+        pointer-events: none;
+    }
+
+    .image-resize-handle::after {
+        right: 8px;
+        bottom: 8px;
+        width: 5px;
+        height: 5px;
+        opacity: 0.7;
+    }
+
+    .image-card.locked-card .image-resize-handle {
+        display: none;
+    }
+
+    body.image-ratio-resizing,
+    body.image-ratio-resizing * {
+        cursor: nwse-resize !important;
+        user-select: none !important;
+    }
+
+    /* === 문서 / 파일 아이콘 카드 === */
+    .file-icon-card {
+        width: 140px;
+        height: 140px;
+        display: flex;
+        flex-direction: column;
+        padding: 4px 8px 10px;
+        text-align: center;
+        border: 1px solid transparent;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .file-icon-card:hover {
+        border-color: color-mix(in srgb, var(--memo-primary) 18%, transparent);
+        background: color-mix(in srgb, var(--memo-card) 72%, transparent) !important;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10) !important;
+        backdrop-filter: blur(8px);
+    }
+
+    .file-icon-card .drag-handle {
+        height: 20px;
+        border: 0;
+        background: transparent;
+    }
+
+    .file-icon-card .file-icon {
+        margin: 5px 0 8px;
+        color: #4a90e2;
+        font-size: 4rem;
+        filter: drop-shadow(0 7px 8px rgba(15, 23, 42, 0.16));
+    }
+
+    .file-icon-card .file-link {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0 5px;
+        overflow: hidden;
+        color: var(--memo-text);
+        font-weight: 800;
+        line-height: 1.35;
+        text-decoration: none;
+        word-break: break-all;
+        text-shadow: 0 1px 3px color-mix(in srgb, var(--memo-card) 92%, transparent);
+    }
+
+    .file-icon-card .file-link > div {
+        width: 100%;
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    /* === GIF 타이머 === */
+    .timer-gif-card {
+        width: 140px;
+        padding: 4px 5px 9px;
+        text-align: center;
+        border: 1px solid transparent;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .timer-gif-card:hover {
+        border-color: color-mix(in srgb, var(--memo-primary) 18%, transparent);
+        background: color-mix(in srgb, var(--memo-card) 72%, transparent) !important;
+        box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10) !important;
+        backdrop-filter: blur(8px);
+    }
+
+    .timer-gif-card .drag-handle {
+        height: 20px;
+        border: 0;
+        background: transparent;
+    }
+
+    .timer-gif-img {
+        width: 130px;
+        height: 130px;
+        margin-bottom: 5px;
+        object-fit: contain;
+        filter: drop-shadow(0 8px 9px rgba(15, 23, 42, 0.16));
+    }
+
+    .timer-gif-card.ringing .timer-gif-img {
+        animation: shake 0.5s infinite;
+    }
+
+    @keyframes shake {
+        0% { transform: translate(1px, 1px) rotate(0deg); }
+        10% { transform: translate(-1px, -2px) rotate(-1deg); }
+        20% { transform: translate(-3px, 0) rotate(1deg); }
+        30% { transform: translate(3px, 2px) rotate(0deg); }
+        40% { transform: translate(1px, -1px) rotate(1deg); }
+        50% { transform: translate(-1px, 2px) rotate(-1deg); }
+        60% { transform: translate(-3px, 1px) rotate(0deg); }
+        70% { transform: translate(3px, 1px) rotate(-1deg); }
+        80% { transform: translate(-1px, -1px) rotate(1deg); }
+        90% { transform: translate(1px, 2px) rotate(0deg); }
+        100% { transform: translate(1px, -2px) rotate(-1deg); }
+    }
+
+    .timer-title {
+        color: var(--memo-muted);
+        font-size: 0.84rem;
+        font-weight: 800;
+        text-shadow: 0 1px 3px color-mix(in srgb, var(--memo-card) 92%, transparent);
+    }
+
+    .timer-time {
+        display: inline-block;
+        min-width: 76px;
+        margin-top: 6px;
+        padding: 5px 10px;
+        border: 1px solid var(--memo-border);
+        border-radius: 9px;
+        color: var(--memo-text);
+        background: color-mix(in srgb, var(--memo-card) 88%, transparent);
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.07);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 1.16rem;
+        font-weight: 900;
+    }
+
+    .btn-stop-alarm {
+        margin-top: 8px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 7px;
+        color: #ffffff;
+        background: #e74c3c;
+        box-shadow: 0 5px 11px rgba(231, 76, 60, 0.24);
+        font-size: 0.78rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    /* === 삭제 버튼 === */
+    .btn-delete-memo {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        z-index: 20;
+        width: 25px;
+        height: 25px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 2px solid rgba(255, 255, 255, 0.86);
+        border-radius: 8px;
+        color: #ffffff;
+        background: rgba(225, 60, 60, 0.94);
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.20);
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .draggable-item:hover .btn-delete-memo {
+        display: flex;
+    }
+
+    /* === 이미지 확대 모달 === */
+    #imageModal {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        display: none;
+        padding: 34px;
+        background: rgba(8, 15, 30, 0.84);
+        backdrop-filter: blur(8px);
+    }
+
+    #imageModalContent {
+        display: block;
+        max-width: 90%;
+        max-height: calc(100vh - 68px);
+        margin: 0 auto;
+        border: 1px solid rgba(255,255,255,0.20);
+        border-radius: 14px;
+        box-shadow: 0 24px 70px rgba(0,0,0,0.42);
+    }
+
+    .image-modal-close {
+        position: absolute;
+        top: 18px;
+        right: 28px;
+        color: #ffffff;
+        font-size: 40px;
+        font-weight: 300;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    /* === 타이머 설정 모달 === */
+    #timerModal {
+        position: fixed;
+        inset: 0;
+        z-index: 4000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.48);
+        backdrop-filter: blur(7px);
+    }
+
+    .timer-modal-content {
+        width: min(360px, 100%);
+        padding: 25px;
+        border: 1px solid var(--memo-border);
+        border-radius: 18px;
+        color: var(--memo-text);
+        background: var(--memo-card);
+        box-shadow: 0 24px 65px rgba(15, 23, 42, 0.24);
+        text-align: center;
+        backdrop-filter: var(--memo-backdrop);
+        -webkit-backdrop-filter: var(--memo-backdrop);
+    }
+
+    .timer-modal-title {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin: 0 0 14px;
+        color: var(--memo-text);
+        font-size: 1.1rem;
+        font-weight: 800;
+    }
+
+    .timer-modal-title i {
+        color: var(--memo-primary);
+    }
+
+    .timer-modal-content input {
+        width: 100%;
+        margin: 6px 0;
+        padding: 11px 12px;
+        border: 1px solid var(--memo-border);
+        border-radius: 10px;
+        outline: 0;
+        color: var(--input-text, var(--memo-text));
+        background: var(--memo-input);
+        font: inherit;
+        box-sizing: border-box;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .timer-modal-content input:focus {
+        border-color: var(--memo-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--memo-primary) 13%, transparent);
+    }
+
+    .timer-modal-content .time-inputs {
+        display: flex;
+        gap: 10px;
+    }
+
+    .timer-modal-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .timer-modal-actions .tool-btn {
+        flex: 1;
+    }
+
+    /* === 반응형: 기능은 유지하고 줄바꿈만 허용 === */
+    @media (max-width: 1120px) {
+        .memo-toolbar {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .toolbar-actions {
+            width: 100%;
+            justify-content: space-between;
+        }
+    }
+
+    @media (max-width: 760px) {
+        .memo-toolbar {
+            padding: 16px;
+            border-radius: 16px;
+        }
+
+        .toolbar-brand {
+            min-width: 0;
+        }
+
+        .toolbar-actions {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .toolbar-group,
+        .toolbar-buttons {
+            width: 100%;
+        }
+
+        .toolbar-group {
+            justify-content: space-between;
+        }
+
+        .toolbar-buttons .tool-btn {
+            flex: 1;
+        }
+
+        .toolbar-divider {
+            display: none;
+        }
+
+        .whiteboard-shell {
+            padding: 5px;
+            border-radius: 18px;
+        }
+
+        #whiteboard {
+            border-radius: 13px;
+        }
+    }
+
+
+    /* === 명상 풍경 전체 화면 === */
+    .meditation-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 1000000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        border-radius: inherit;
+        background: #0f172a;
+    }
+
+    .meditation-layer.is-active {
+        display: flex;
+    }
+
+    /* 브라우저 전체화면 및 전체화면 API 미지원 환경의 대체 모드 */
+    .meditation-layer:fullscreen,
+    .meditation-layer:-webkit-full-screen,
+    .meditation-layer.is-fallback-fullscreen {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 0;
+        z-index: 2147483647;
+        background: #0f172a;
+    }
+
+    .meditation-layer:fullscreen,
+    .meditation-layer:-webkit-full-screen {
+        display: flex;
+    }
+
+    body.meditation-fallback-active {
+        overflow: hidden !important;
+    }
+
+    .meditation-scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        opacity: 0;
+        transform: scale(1.025);
+        transition: opacity 0.8s ease, transform 7s ease;
+    }
+
+    .meditation-layer.is-active .meditation-scene.is-visible {
+        opacity: 1;
+        transform: scale(1.08);
+    }
+
+    .meditation-shade {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.14), rgba(2, 6, 23, 0.38));
+        pointer-events: none;
+    }
+
+    .meditation-center {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 13px;
+        padding: 26px 30px;
+        color: #ffffff;
+        text-align: center;
+        text-shadow: 0 2px 12px rgba(2, 6, 23, 0.55);
+    }
+
+    .breathing-orb {
+        width: 86px;
+        height: 86px;
+        display: grid;
+        place-items: center;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        background: #0f766e;
+        box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.18), 0 12px 35px rgba(2, 6, 23, 0.35);
+        animation: meditationBreath 8s ease-in-out infinite;
+    }
+
+    .breathing-orb i {
+        font-size: 1.55rem;
+    }
+
+    @keyframes meditationBreath {
+        0%, 100% { transform: scale(0.82); }
+        50% { transform: scale(1.18); }
+    }
+
+    .meditation-title {
+        font-size: 1.55rem;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+    }
+
+    .meditation-guide {
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+
+    .meditation-scene-name {
+        min-height: 20px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        opacity: 0.92;
+    }
+
+    .meditation-controls {
+        position: absolute;
+        right: 18px;
+        bottom: 18px;
+        z-index: 3;
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .meditation-control-btn {
+        min-height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 8px 13px;
+        border: 1px solid #ffffff;
+        border-radius: 10px;
+        color: #ffffff;
+        background: #0f172a;
+        box-shadow: 0 8px 20px rgba(2, 6, 23, 0.30);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 850;
+        cursor: pointer;
+    }
+
+    .meditation-control-btn:hover {
+        background: #1e293b;
+    }
+
+    .meditation-sound-panel {
+        position: absolute;
+        left: 18px;
+        bottom: 18px;
+        z-index: 3;
+        min-width: 310px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 11px;
+        border: 1px solid #ffffff;
+        border-radius: 12px;
+        color: #ffffff;
+        background: #0f172a;
+        box-shadow: 0 8px 20px rgba(2, 6, 23, 0.30);
+    }
+
+    .meditation-sound-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+        font-size: 0.76rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .meditation-sound-select {
+        min-width: 112px;
+        height: 32px;
+        padding: 0 28px 0 9px;
+        border: 1px solid #94a3b8;
+        border-radius: 8px;
+        color: #0f172a;
+        background: #ffffff;
+        font: inherit;
+        font-size: 0.76rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .meditation-volume-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 104px;
+    }
+
+    .meditation-volume-wrap i {
+        width: 14px;
+        text-align: center;
+        font-size: 0.72rem;
+    }
+
+    .meditation-volume {
+        width: 86px;
+        accent-color: #22c55e;
+        cursor: pointer;
+    }
+
+    .meditation-volume:disabled {
+        cursor: not-allowed;
+        opacity: 0.42;
+    }
+
+    .meditation-sound-status {
+        position: absolute;
+        left: 18px;
+        bottom: 68px;
+        z-index: 3;
+        min-height: 20px;
+        padding: 4px 8px;
+        border-radius: 7px;
+        color: #ffffff;
+        background: #0f172a;
+        font-size: 0.7rem;
+        font-weight: 750;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+        pointer-events: none;
+    }
+
+    .meditation-sound-status.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    @media (max-width: 760px) {
+        .meditation-controls {
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+        }
+
+        .meditation-sound-panel {
+            left: 10px;
+            right: 10px;
+            bottom: 58px;
+            min-width: 0;
+            flex-wrap: wrap;
+        }
+
+        .meditation-sound-status {
+            left: 10px;
+            bottom: 114px;
+        }
+    }
+
+    /* =====================================================
+       기한 알림 / 비밀번호 보호 / 불투명 모달
+       ===================================================== */
+    .item-actions {
+        position: absolute;
+        top: 5px;
+        right: 36px;
+        z-index: 24;
+        display: none;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .draggable-item:hover .item-actions,
+    .draggable-item:focus-within .item-actions {
+        display: flex;
+    }
+
+    .item-action-btn {
+        width: 25px;
+        height: 25px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid var(--memo-border);
+        border-radius: 8px;
+        color: var(--memo-muted);
+        background: var(--memo-card);
+        box-shadow: 0 4px 10px #94a3b833;
+        cursor: pointer;
+        font-size: 0.72rem;
+    }
+
+    .item-action-btn:hover {
+        color: var(--memo-primary);
+        border-color: var(--memo-primary);
+        background: var(--memo-primary-soft);
+    }
+
+    .item-action-btn.is-secure {
+        color: #7c3aed;
+    }
+
+    .deadline-badge {
+        position: absolute;
+        left: 8px;
+        bottom: 7px;
+        z-index: 18;
+        display: none;
+        max-width: calc(100% - 16px);
+        padding: 4px 8px;
+        overflow: hidden;
+        border: 1px solid #f59e0b;
+        border-radius: 999px;
+        color: #92400e;
+        background: #fffbeb;
+        box-shadow: 0 4px 10px #78350f1f;
+        font-size: 0.68rem;
+        font-weight: 900;
+        line-height: 1;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+
+    .deadline-badge.visible {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .file-icon-card .deadline-badge,
+    .image-card .deadline-badge {
+        bottom: 5px;
+    }
+
+    @keyframes deadlineGlowNear {
+        0%, 100% {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px #f59e0b, 0 0 12px 3px #f59e0b66, 0 12px 28px #0f172a2b;
+        }
+        50% {
+            border-color: #fbbf24;
+            box-shadow: 0 0 0 4px #fbbf24, 0 0 30px 10px #fbbf2499, 0 16px 36px #0f172a33;
+        }
+    }
+
+    @keyframes deadlineGlowOverdue {
+        0%, 100% {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 2px #dc2626, 0 0 13px 4px #ef444466, 0 12px 28px #0f172a2b;
+        }
+        50% {
+            border-color: #f87171;
+            box-shadow: 0 0 0 4px #ef4444, 0 0 34px 11px #ef4444a6, 0 16px 36px #0f172a33;
+        }
+    }
+
+    .draggable-item.deadline-near {
+        z-index: 50;
+        border-width: 2px !important;
+        animation: deadlineGlowNear 0.88s ease-in-out infinite;
+    }
+
+    .draggable-item.deadline-overdue {
+        z-index: 51;
+        border-width: 2px !important;
+        animation: deadlineGlowOverdue 0.68s ease-in-out infinite;
+    }
+
+    .draggable-item.deadline-overdue .deadline-badge {
+        color: #991b1b;
+        border-color: #ef4444;
+        background: #fef2f2;
+    }
+
+    .locked-placeholder {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 18px;
+        border: 0;
+        color: var(--memo-text);
+        background: var(--memo-card);
+        cursor: pointer;
+        text-align: center;
+    }
+
+    .postit .locked-placeholder {
+        background: inherit;
+    }
+
+    .locked-placeholder i {
+        color: #7c3aed;
+        font-size: 2rem;
+        filter: drop-shadow(0 5px 8px #4c1d9529);
+    }
+
+    .locked-placeholder strong {
+        font-size: 0.88rem;
+        font-weight: 900;
+    }
+
+    .locked-placeholder span {
+        color: var(--memo-muted);
+        font-size: 0.72rem;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+
+    .locked-card:not(.postit)::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        border-radius: inherit;
+        background: var(--memo-card);
+    }
+
+    .secret-mark {
+        position: absolute;
+        left: 7px;
+        top: 6px;
+        z-index: 25;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 7px;
+        border: 1px solid #8b5cf6;
+        border-radius: 999px;
+        color: #6d28d9;
+        background: #f5f3ff;
+        font-size: 0.63rem;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    /* 모달 오버레이와 카드 모두 완전 불투명 처리 */
+    .memo-modal-overlay,
+    #timerModal,
+    #imageModal {
+        position: fixed;
+        inset: 0;
+        z-index: 4100;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: color-mix(in srgb, var(--memo-text) 34%, var(--memo-card));
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    #imageModal {
+        z-index: 4300;
+        background: #0f172a;
+    }
+
+    .memo-modal-card,
+    .timer-modal-content {
+        position: relative;
+        width: min(430px, 100%);
+        max-height: calc(100vh - 40px);
+        padding: 25px;
+        overflow-y: auto;
+        border: 1px solid var(--memo-border);
+        border-radius: 18px;
+        color: var(--memo-text);
+        background-color: #ffffff !important;
+        background-image: linear-gradient(var(--memo-card), var(--memo-card)) !important;
+        box-shadow: 0 24px 65px #0f172a3d;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    .memo-modal-card h3,
+    .timer-modal-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0 34px 18px 0;
+        color: var(--memo-text);
+        font-size: 1.1rem;
+        font-weight: 900;
+        text-align: left;
+    }
+
+    .memo-modal-card h3 i,
+    .timer-modal-title i {
+        color: var(--memo-primary);
+    }
+
+    .memo-modal-close {
+        position: absolute;
+        top: 15px;
+        right: 17px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 1px solid var(--memo-border);
+        border-radius: 10px;
+        color: var(--memo-muted);
+        background: var(--memo-widget);
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .memo-field {
+        margin-bottom: 14px;
+        text-align: left;
+    }
+
+    .memo-field label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--memo-text);
+        font-size: 0.78rem;
+        font-weight: 900;
+    }
+
+    .memo-field input,
+    .memo-field select,
+    .timer-modal-content input {
+        width: 100%;
+        min-height: 43px;
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--memo-border);
+        border-radius: 10px;
+        outline: 0;
+        color: var(--input-text, var(--memo-text));
+        background-color: #ffffff !important;
+        background-image: linear-gradient(var(--memo-input), var(--memo-input)) !important;
+        font: inherit;
+    }
+
+    .memo-field input:focus,
+    .memo-field select:focus,
+    .timer-modal-content input:focus {
+        border-color: var(--memo-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--memo-primary) 18%, var(--memo-card));
+    }
+
+    .memo-help {
+        margin-top: 6px;
+        color: var(--memo-muted);
+        font-size: 0.7rem;
+        font-weight: 650;
+        line-height: 1.5;
+    }
+
+    .memo-modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 20px;
+    }
+
+    .memo-modal-actions .tool-btn {
+        min-width: 95px;
+    }
+
+    .tool-btn-danger {
+        color: #ffffff;
+        background: #dc2626;
+        box-shadow: 0 6px 14px #dc262633;
+    }
+
+    .tool-btn-danger:hover {
+        background: #b91c1c;
+    }
+
+    .upload-file-name {
+        margin-bottom: 15px;
+        padding: 11px 12px;
+        border: 1px solid var(--memo-border);
+        border-radius: 10px;
+        color: var(--memo-text);
+        background: var(--memo-widget);
+        font-size: 0.78rem;
+        font-weight: 800;
+        word-break: break-all;
+    }
+
+    #imageModalContent {
+        max-width: min(94vw, 1400px);
+        max-height: calc(100vh - 80px);
+        border: 2px solid #ffffff;
+        background: #ffffff;
+    }
+
+    @media (max-width: 760px) {
+        .item-actions {
+            display: flex;
+        }
+        .deadline-badge {
+            font-size: 0.62rem;
+        }
+    }
+
+</style>
+
+<div class="memo-page">
+    <div class="memo-toolbar">
+        <div class="toolbar-brand">
+            <span class="toolbar-brand-icon"><i class="fa-solid fa-chalkboard"></i></span>
+            <div>
+                <div class="toolbar-title">개인 화이트보드</div>
+                <div class="toolbar-subtitle">메모와 자료를 자유롭게 붙여 업무를 한눈에 정리하세요.</div>
+            </div>
+        </div>
+
+        <div class="toolbar-actions">
+            <div class="toolbar-group">
+                <span class="toolbar-group-label"><i class="fa-solid fa-note-sticky"></i> 포스트잇 추가</span>
+                <select id="postitShapeSelect" class="postit-shape-select" title="포스트잇 모양 선택" aria-label="포스트잇 모양 선택">
+                    <option value="square">기본 사각형</option>
+                    <option value="rounded">둥근 사각형</option>
+                    <option value="heart">하트</option>
+                    <option value="star">별</option>
+                    <option value="moon">반달</option>
+                    <option value="circle">원형</option>
+                    <option value="speech">말풍선</option>
+                    <option value="leaf">나뭇잎</option>
+                </select>
+                <div class="color-palette">
+                    <button type="button" class="color-btn" style="background:#fff9b1;" onclick="addPostit('#fff9b1', document.getElementById('postitShapeSelect').value)" title="노란색 포스트잇"></button>
+                    <button type="button" class="color-btn" style="background:#ffd6e0;" onclick="addPostit('#ffd6e0', document.getElementById('postitShapeSelect').value)" title="분홍색 포스트잇"></button>
+                    <button type="button" class="color-btn" style="background:#bbf0f3;" onclick="addPostit('#bbf0f3', document.getElementById('postitShapeSelect').value)" title="하늘색 포스트잇"></button>
+                    <button type="button" class="color-btn" style="background:#d4f0c0;" onclick="addPostit('#d4f0c0', document.getElementById('postitShapeSelect').value)" title="연두색 포스트잇"></button>
+                </div>
+            </div>
+
+            <div class="toolbar-divider" aria-hidden="true"></div>
+
+            <div class="toolbar-buttons">
+                <label for="memoUpload" class="tool-btn tool-btn-secondary">
+                    <i class="fa-solid fa-paperclip"></i> 그림 / 파일 보드에 붙이기
+                </label>
+                <input type="file" id="memoUpload" style="display:none;" onchange="uploadMemoFile(this)">
+
+                <button type="button" class="tool-btn" onclick="openMemoModal('timerModal')">
+                    <i class="fa-solid fa-stopwatch"></i> 타이머 추가
+                </button>
+
+                <button type="button" id="meditationToggleBtn" class="tool-btn tool-btn-meditation" onclick="toggleMeditation()">
+                    <i class="fa-solid fa-leaf"></i> 명상 풍경
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="whiteboard-shell">
+        <div id="whiteboard">
+            {% for memo in memos %}
+                {% if memo.type == 'postit' %}
+                {% set postit_shape = memo.shape or 'square' %}
+                <div class="draggable-item postit shape-{{ postit_shape }} deadline-track {% if memo.is_locked and not memo.is_unlocked %}locked-card{% endif %}"
+                     id="memo_{{ memo.id }}"
+                     data-memo-id="{{ memo.id }}"
+                     data-shape="{{ postit_shape }}"
+                     data-has-password="{{ 1 if memo.is_locked else 0 }}"
+                     data-is-unlocked="{{ 1 if memo.is_unlocked else 0 }}"
+                     data-due-at="{{ memo.due_at or '' }}"
+                     data-reminder-minutes="{{ memo.reminder_minutes or 60 }}"
+                     style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }}; --postit-color:{{ memo.color }}; background-color:{{ memo.color }};
+                            {% if memo.width %}width:{{ memo.width }}px;{% endif %}
+                            {% if memo.height %}height:{{ memo.height }}px;{% endif %}">
+                    {% if memo.is_locked %}<span class="secret-mark"><i class="fa-solid fa-lock"></i> 비밀</span>{% endif %}
+                    <div class="item-actions">
+                        <button type="button" class="item-action-btn" onclick="openDeadlineModal({{ memo.id }})" title="기한·알림 설정"><i class="fa-regular fa-bell"></i></button>
+                        {% if memo.is_locked and memo.is_unlocked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 변경"><i class="fa-solid fa-key"></i></button>
+                        <button type="button" class="item-action-btn is-secure" onclick="lockNow({{ memo.id }})" title="지금 잠그기"><i class="fa-solid fa-lock"></i></button>
+                        {% elif memo.is_locked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openUnlockModal({{ memo.id }})" title="잠금 해제"><i class="fa-solid fa-unlock-keyhole"></i></button>
+                        {% else %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 설정"><i class="fa-solid fa-lock"></i></button>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="drag-handle"><i class="fa-solid fa-grip-lines"></i></div>
+                    {% if memo.is_locked and not memo.is_unlocked %}
+                    <button type="button" class="locked-placeholder" onclick="openUnlockModal({{ memo.id }})">
+                        <i class="fa-solid fa-lock"></i>
+                        <strong>비밀 포스트잇</strong>
+                        <span>비밀번호를 입력해야 내용을 볼 수 있습니다.</span>
+                    </button>
+                    {% else %}
+                    <textarea onblur="updateMemoContent({{ memo.id }}, this.value)">{{ memo.content }}</textarea>
+                    {% endif %}
+                    <span class="deadline-badge"><i class="fa-regular fa-clock"></i><span class="deadline-text"></span></span>
+                </div>
+
+                {% elif memo.type == 'image' %}
+                <div class="draggable-item image-card deadline-track {% if memo.is_locked and not memo.is_unlocked %}locked-card{% endif %}"
+                     id="memo_{{ memo.id }}"
+                     data-memo-id="{{ memo.id }}"
+                     data-has-password="{{ 1 if memo.is_locked else 0 }}"
+                     data-is-unlocked="{{ 1 if memo.is_unlocked else 0 }}"
+                     data-due-at="{{ memo.due_at or '' }}"
+                     data-reminder-minutes="{{ memo.reminder_minutes or 60 }}"
+                     style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};
+                            {% if memo.width %}width:{{ memo.width }}px;{% else %}width:250px;{% endif %}
+                            {% if memo.height %}height:{{ memo.height }}px;{% else %}height:200px;{% endif %}">
+                    {% if memo.is_locked %}<span class="secret-mark"><i class="fa-solid fa-lock"></i> 비밀</span>{% endif %}
+                    <div class="item-actions">
+                        <button type="button" class="item-action-btn" onclick="openDeadlineModal({{ memo.id }})" title="기한·알림 설정"><i class="fa-regular fa-bell"></i></button>
+                        {% if memo.is_locked and memo.is_unlocked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 변경"><i class="fa-solid fa-key"></i></button>
+                        <button type="button" class="item-action-btn is-secure" onclick="lockNow({{ memo.id }})" title="지금 잠그기"><i class="fa-solid fa-lock"></i></button>
+                        {% elif memo.is_locked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openUnlockModal({{ memo.id }})" title="잠금 해제"><i class="fa-solid fa-unlock-keyhole"></i></button>
+                        {% else %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 설정"><i class="fa-solid fa-lock"></i></button>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="drag-handle"><i class="fa-solid fa-grip-lines"></i></div>
+                    {% if memo.is_locked and not memo.is_unlocked %}
+                    <button type="button" class="locked-placeholder" onclick="openUnlockModal({{ memo.id }})">
+                        <i class="fa-solid fa-image"></i>
+                        <strong>비밀 이미지</strong>
+                        <span>비밀번호를 입력해야 이미지를 볼 수 있습니다.</span>
+                    </button>
+                    {% else %}
+                    <div class="image-wrapper">
+                        <img src="{{ url_for('memo.memo_file', memo_id=memo.id, inline=1) }}" onclick="openImageModal(this.src)" title="클릭하여 확대" alt="화이트보드 이미지">
+                    </div>
+                    {% endif %}
+                    <span class="deadline-badge"><i class="fa-regular fa-clock"></i><span class="deadline-text"></span></span>
+                    <button type="button" class="image-resize-handle" aria-label="이미지 크기 조절" title="비율을 유지하며 크기 조절"></button>
+                </div>
+
+                {% elif memo.type == 'file' %}
+                <div class="draggable-item file-icon-card deadline-track {% if memo.is_locked and not memo.is_unlocked %}locked-card{% endif %}"
+                     id="memo_{{ memo.id }}"
+                     data-memo-id="{{ memo.id }}"
+                     data-has-password="{{ 1 if memo.is_locked else 0 }}"
+                     data-is-unlocked="{{ 1 if memo.is_unlocked else 0 }}"
+                     data-due-at="{{ memo.due_at or '' }}"
+                     data-reminder-minutes="{{ memo.reminder_minutes or 60 }}"
+                     style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};
+                            {% if memo.width %}width:{{ memo.width }}px;{% else %}width:140px;{% endif %}
+                            {% if memo.height %}height:{{ memo.height }}px;{% else %}height:140px;{% endif %}">
+                    {% if memo.is_locked %}<span class="secret-mark"><i class="fa-solid fa-lock"></i> 비밀</span>{% endif %}
+                    <div class="item-actions">
+                        <button type="button" class="item-action-btn" onclick="openDeadlineModal({{ memo.id }})" title="기한·알림 설정"><i class="fa-regular fa-bell"></i></button>
+                        {% if memo.is_locked and memo.is_unlocked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 변경"><i class="fa-solid fa-key"></i></button>
+                        <button type="button" class="item-action-btn is-secure" onclick="lockNow({{ memo.id }})" title="지금 잠그기"><i class="fa-solid fa-lock"></i></button>
+                        {% elif memo.is_locked %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openUnlockModal({{ memo.id }})" title="잠금 해제"><i class="fa-solid fa-unlock-keyhole"></i></button>
+                        {% else %}
+                        <button type="button" class="item-action-btn is-secure" onclick="openPasswordModal({{ memo.id }})" title="비밀번호 설정"><i class="fa-solid fa-lock"></i></button>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="drag-handle"><i class="fa-solid fa-grip-lines"></i></div>
+                    {% if memo.is_locked and not memo.is_unlocked %}
+                    <button type="button" class="locked-placeholder" onclick="openUnlockModal({{ memo.id }})">
+                        <i class="fa-solid fa-file-shield"></i>
+                        <strong>비밀 파일</strong>
+                        <span>비밀번호를 입력해야 파일명 확인과 다운로드가 가능합니다.</span>
+                    </button>
+                    {% else %}
+                    <a href="{{ url_for('memo.memo_file', memo_id=memo.id) }}" class="file-link">
+                        <i class="fa-solid fa-file-arrow-down file-icon"></i>
+                        <div style="font-size:0.82rem; padding-bottom:5px;">{{ memo.content }}</div>
+                    </a>
+                    {% endif %}
+                    <span class="deadline-badge"><i class="fa-regular fa-clock"></i><span class="deadline-text"></span></span>
+                </div>
+
+                {% elif memo.type == 'timer' %}
+                {% set t_data = memo.content.split('|') %}
+                <div class="draggable-item timer-gif-card" id="memo_{{ memo.id }}"
+                     style="left:{{ memo.pos_x }}px; top:{{ memo.pos_y }}px; z-index:{{ memo.z_index }};"
+                     data-endtime="{{ t_data[1] if t_data|length > 1 else 0 }}">
+                    <button type="button" class="btn-delete-memo" onclick="deleteMemo({{ memo.id }})"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="drag-handle"><i class="fa-solid fa-grip-lines"></i></div>
+                    <img src="/static/timer.gif" class="timer-gif-img" alt="Timer">
+                    <div class="timer-title">{{ t_data[0] }}</div>
+                    <div class="timer-time">--:--</div>
+                    <button type="button" class="btn-stop-alarm" style="display:none;" onclick="stopAlarm({{ memo.id }})">알람 끄기</button>
+                </div>
+                {% endif %}
+            {% endfor %}
+
+            <div id="meditationLayer" class="meditation-layer" aria-hidden="true">
+                <img id="meditationScene" class="meditation-scene" alt="명상 풍경">
+                <div class="meditation-shade"></div>
+                <div class="meditation-center">
+                    <div class="breathing-orb"><i class="fa-solid fa-wind"></i></div>
+                    <div class="meditation-title">잠시 쉬어가세요</div>
+                    <div class="meditation-guide">천천히 숨을 들이마시고, 길게 내쉬어 보세요.</div>
+                    <div id="meditationSceneName" class="meditation-scene-name"></div>
+                </div>
+                <div id="meditationSoundStatus" class="meditation-sound-status" aria-live="polite"></div>
+                <div class="meditation-sound-panel">
+                    <label class="meditation-sound-label" for="meditationSoundSelect">
+                        <i class="fa-solid fa-music"></i> 배경음
+                    </label>
+                    <select id="meditationSoundSelect" class="meditation-sound-select" onchange="changeMeditationSound(this.value)">
+                        <option value="" selected>무음</option>
+                        <option value="ocean">잔잔한 파도</option>
+                        <option value="rain">부드러운 빗소리</option>
+                        <option value="forest">숲속 바람</option>
+                        <option value="stream">계곡물 소리</option>
+                    </select>
+                    <div class="meditation-volume-wrap">
+                        <i class="fa-solid fa-volume-low"></i>
+                        <input id="meditationVolume" class="meditation-volume" type="range" min="0" max="100" value="38" disabled oninput="changeMeditationVolume(this.value)" aria-label="명상 배경음 음량">
+                    </div>
+                </div>
+                <div class="meditation-controls">
+                    <button type="button" class="meditation-control-btn" onclick="showNextMeditationScene()"><i class="fa-solid fa-shuffle"></i> 다른 풍경</button>
+                    <button type="button" id="meditationFullscreenBtn" class="meditation-control-btn" onclick="toggleMeditationFullscreen()" aria-pressed="false" title="명상 화면 전체화면 전환"><i class="fa-solid fa-expand"></i> 전체화면</button>
+                    <button type="button" class="meditation-control-btn" onclick="stopMeditation()"><i class="fa-solid fa-xmark"></i> 명상 종료</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="mainAlarmSound" src="/static/alarm.mp3" loop preload="auto" style="display:none;"></audio>
+    <audio id="meditationAudio" loop preload="none" style="display:none;"></audio>
+
+    <div id="timerModal" class="memo-modal-overlay" role="dialog" aria-modal="true">
+        <div class="timer-modal-content">
+            <button type="button" class="memo-modal-close" onclick="closeMemoModal('timerModal')"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="timer-modal-title"><i class="fa-solid fa-clock"></i> 타이머 설정</h3>
+            <div class="memo-field"><label for="t_title">타이머 제목</label><input type="text" id="t_title" placeholder="예: 회의시간"></div>
+            <div class="time-inputs">
+                <div class="memo-field" style="flex:1;"><label for="t_min">분</label><input type="number" id="t_min" min="0" value="5"></div>
+                <div class="memo-field" style="flex:1;"><label for="t_sec">초</label><input type="number" id="t_sec" min="0" max="59" value="0"></div>
+            </div>
+            <div class="memo-modal-actions">
+                <button type="button" class="tool-btn tool-btn-muted" onclick="closeMemoModal('timerModal')">취소</button>
+                <button type="button" class="tool-btn" onclick="submitTimer()">보드에 추가</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deadlineModal" class="memo-modal-overlay" role="dialog" aria-modal="true">
+        <div class="memo-modal-card">
+            <button type="button" class="memo-modal-close" onclick="closeMemoModal('deadlineModal')"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i class="fa-regular fa-bell"></i> 기한·간단 알림 설정</h3>
+            <div class="memo-field">
+                <label for="deadlineDueAt">기한 날짜와 시간</label>
+                <input type="datetime-local" id="deadlineDueAt">
+            </div>
+            <div class="memo-field">
+                <label for="deadlineReminderMinutes">테두리 점멸 시작 시점</label>
+                <select id="deadlineReminderMinutes">
+                    <option value="10">10분 전</option><option value="30">30분 전</option><option value="60">1시간 전</option>
+                    <option value="180">3시간 전</option><option value="1440">1일 전</option><option value="4320">3일 전</option>
+                </select>
+                <div class="memo-help">설정한 시점부터 주황색으로 번쩍이며, 기한이 지나면 빨간색으로 더 빠르게 점멸합니다.</div>
+            </div>
+            <div class="memo-modal-actions">
+                <button type="button" class="tool-btn tool-btn-danger" onclick="clearDeadline()">기한 삭제</button>
+                <button type="button" class="tool-btn tool-btn-muted" onclick="closeMemoModal('deadlineModal')">취소</button>
+                <button type="button" class="tool-btn" onclick="saveDeadline()">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="passwordModal" class="memo-modal-overlay" role="dialog" aria-modal="true">
+        <div class="memo-modal-card">
+            <button type="button" class="memo-modal-close" onclick="closeMemoModal('passwordModal')"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i class="fa-solid fa-shield-halved"></i> 비밀번호 잠금 설정</h3>
+            <div class="memo-field">
+                <label for="secretPassword">새 비밀번호</label>
+                <input type="password" id="secretPassword" minlength="4" maxlength="100" autocomplete="new-password" placeholder="4자 이상">
+            </div>
+            <div class="memo-field">
+                <label for="secretPasswordConfirm">비밀번호 확인</label>
+                <input type="password" id="secretPasswordConfirm" minlength="4" maxlength="100" autocomplete="new-password" placeholder="비밀번호를 한 번 더 입력">
+                <div class="memo-help">설정 즉시 항목이 잠기며, 다시 열려면 비밀번호가 필요합니다.</div>
+            </div>
+            <div class="memo-modal-actions">
+                <button type="button" id="removePasswordBtn" class="tool-btn tool-btn-danger" onclick="removePassword()" style="display:none;">비밀번호 제거</button>
+                <button type="button" class="tool-btn tool-btn-muted" onclick="closeMemoModal('passwordModal')">취소</button>
+                <button type="button" class="tool-btn" onclick="savePassword()">잠금 설정</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="unlockModal" class="memo-modal-overlay" role="dialog" aria-modal="true">
+        <div class="memo-modal-card">
+            <button type="button" class="memo-modal-close" onclick="closeMemoModal('unlockModal')"><i class="fa-solid fa-xmark"></i></button>
+            <h3><i class="fa-solid fa-unlock-keyhole"></i> 비밀 항목 열기</h3>
+            <div class="memo-field">
+                <label for="unlockPassword">비밀번호</label>
+                <input type="password" id="unlockPassword" maxlength="100" autocomplete="current-password" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter') submitUnlock()">
+                <div class="memo-help">잠금 해제 상태는 현재 로그인 세션에서만 유지됩니다. 필요하면 자물쇠 버튼으로 즉시 다시 잠글 수 있습니다.</div>
+            </div>
+            <div class="memo-modal-actions">
+                <button type="button" class="tool-btn tool-btn-muted" onclick="closeMemoModal('unlockModal')">취소</button>
+                <button type="button" class="tool-btn" onclick="submitUnlock()">열기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="imageModal" onclick="closeImageModal(event)">
+        <button type="button" class="memo-modal-close" style="top:18px; right:22px; color:#ffffff; border-color:#ffffff; background:#1e293b;" onclick="forceCloseImageModal()"><i class="fa-solid fa-xmark"></i></button>
+        <img id="imageModalContent" alt="확대 이미지">
+    </div>
+</div>
+
+<script>
+    let highestZ = 100;
+    let draggedElement = null;
+    let offsetX = 0;
+    let offsetY = 0;
+    let deadlineTargetId = null;
+    let passwordTargetId = null;
+    let unlockTargetId = null;
+    let meditationTimer = null;
+    let meditationSceneIndex = -1;
+    let meditationSoundStatusTimer = null;
+
+    // 알람 재생 요청 세대값: 정지 후 늦게 완료되는 audio.play()를 무효화합니다.
+    let alarmPlayGeneration = 0;
+    let imageResizeState = null;
+
+    const whiteboard = document.getElementById('whiteboard');
+    const meditationSounds = {
+        ocean: {name: '잔잔한 파도', src: '/static/meditation/ocean.mp3'},
+        rain: {name: '부드러운 빗소리', src: '/static/meditation/rain.mp3'},
+        forest: {name: '숲속 바람', src: '/static/meditation/forest.mp3'},
+        stream: {name: '계곡물 소리', src: '/static/meditation/stream.mp3'}
+    };
+    const meditationScenes = [
+        {name: '햇살이 스미는 숲', url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1800&q=84'},
+        {name: '고요한 초록 숲길', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1800&q=84'},
+        {name: '깊은 숲의 숨결', url: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1800&q=84'},
+        {name: '푸른 바다와 모래사장', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=84'},
+        {name: '잔잔한 바다의 수평선', url: 'https://images.unsplash.com/photo-1471922694854-ff1b63b20054?auto=format&fit=crop&w=1800&q=84'},
+        {name: '노을이 번지는 해변', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=84'},
+        {name: '평온한 산과 호수', url: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=84'},
+        {name: '구름 사이의 산봉우리', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1800&q=84'},
+        {name: '광활한 산악 풍경', url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=84'},
+        {name: '숲속의 시원한 폭포', url: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1800&q=84'},
+        {name: '한적한 들판과 하늘', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1800&q=84'},
+        {name: '파리의 아름다운 풍경', url: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=1800&q=84'},
+        {name: '고요한 도시의 야경', url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1800&q=84'},
+        {name: '평화로운 자연 풍경', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1800&q=84'}
+    ];
+
+    function openMemoModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeMemoModal(id) {
+        const modal = document.getElementById(id);
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function readJsonResponse(response) {
+        let data = {};
+        try { data = await response.json(); } catch (_) {}
+        if (!response.ok || data.ok === false) {
+            throw new Error(data.message || '처리 중 오류가 발생했습니다.');
+        }
+        return data;
+    }
+
+    document.querySelectorAll('.draggable-item').forEach(item => {
+        const z = parseInt(item.style.zIndex, 10);
+        if (!Number.isNaN(z) && z > highestZ) highestZ = z;
+    });
+
+    function getImageCardMetrics(card) {
+        if (!card || !card.classList.contains('image-card')) return null;
+        const wrapper = card.querySelector('.image-wrapper');
+        const img = wrapper ? wrapper.querySelector('img') : null;
+        if (!wrapper || !img || !img.naturalWidth || !img.naturalHeight) return null;
+
+        const ratio = img.naturalWidth / img.naturalHeight;
+        const cardRect = card.getBoundingClientRect();
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const chromeHeight = Math.max(0, cardRect.height - wrapperRect.height);
+        return {wrapper, img, ratio, chromeHeight};
+    }
+
+    function getImageWidthLimits(card, ratio, chromeHeight) {
+        const boardWidth = whiteboard.clientWidth;
+        const boardHeight = whiteboard.clientHeight;
+        const left = Math.max(0, card.offsetLeft);
+        const top = Math.max(0, card.offsetTop);
+
+        const minWidthByHeight = Math.ceil(Math.max(1, 125 - chromeHeight) * ratio);
+        const minWidth = Math.max(125, minWidthByHeight);
+        const maxWidthByBoard = Math.max(minWidth, boardWidth - left);
+        const availableContentHeight = Math.max(1, boardHeight - top - chromeHeight);
+        const maxWidthByHeight = Math.max(minWidth, Math.floor(availableContentHeight * ratio));
+        const maxWidth = Math.max(minWidth, Math.min(maxWidthByBoard, maxWidthByHeight));
+        return {minWidth, maxWidth};
+    }
+
+    function applyImageCardWidth(card, requestedWidth, metrics = null) {
+        metrics = metrics || getImageCardMetrics(card);
+        if (!metrics) return null;
+
+        const {ratio, chromeHeight} = metrics;
+        const {minWidth, maxWidth} = getImageWidthLimits(card, ratio, chromeHeight);
+        const width = Math.max(minWidth, Math.min(Math.round(requestedWidth), maxWidth));
+        const height = Math.max(125, Math.round(width / ratio + chromeHeight));
+
+        card.style.width = `${width}px`;
+        card.style.height = `${height}px`;
+        card.dataset.imageRatio = String(ratio);
+        card.dataset.imageChromeHeight = String(chromeHeight);
+        return {width, height};
+    }
+
+    async function saveMemoSize(card) {
+        if (!card || !card.id) return;
+        const id = card.id.replace('memo_', '');
+        const width = card.offsetWidth;
+        const height = card.offsetHeight;
+        card.dataset.w = String(width);
+        card.dataset.h = String(height);
+        try {
+            await fetch('/memo/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id, width, height})
+            });
+        } catch (_) {}
+    }
+
+    function normalizeImageCard(card, saveAfter = false) {
+        const metrics = getImageCardMetrics(card);
+        if (!metrics) return;
+        const result = applyImageCardWidth(card, card.offsetWidth, metrics);
+        if (result && saveAfter) saveMemoSize(card);
+    }
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const el = entry.target;
+            if (!el.matches('.postit, .file-icon-card')) continue;
+
+            const id = el.id.replace('memo_', '');
+            clearTimeout(el.resizeTimeout);
+            el.resizeTimeout = setTimeout(async () => {
+                const newWidth = el.offsetWidth;
+                const newHeight = el.offsetHeight;
+                if (el.dataset.w == newWidth && el.dataset.h == newHeight) return;
+                el.dataset.w = newWidth;
+                el.dataset.h = newHeight;
+                try {
+                    await fetch('/memo/update', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({id, width: newWidth, height: newHeight})
+                    });
+                } catch (_) {}
+            }, 500);
+        }
+    });
+
+    document.querySelectorAll('.postit, .file-icon-card').forEach(card => {
+        resizeObserver.observe(card);
+    });
+
+    document.querySelectorAll('.image-card').forEach(card => {
+        const img = card.querySelector('.image-wrapper img');
+        if (!img) return;
+        const onReady = () => normalizeImageCard(card, true);
+        if (img.complete && img.naturalWidth) onReady();
+        else img.addEventListener('load', onReady, {once: true});
+    });
+
+    document.querySelectorAll('.image-resize-handle').forEach(handle => {
+        handle.addEventListener('pointerdown', event => {
+            const card = handle.closest('.image-card');
+            const metrics = getImageCardMetrics(card);
+            if (!card || !metrics) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            highestZ += 1;
+            card.style.zIndex = highestZ;
+
+            imageResizeState = {
+                card,
+                handle,
+                pointerId: event.pointerId,
+                startX: event.clientX,
+                startY: event.clientY,
+                startWidth: card.offsetWidth,
+                startHeight: card.offsetHeight,
+                metrics
+            };
+            handle.setPointerCapture(event.pointerId);
+            document.body.classList.add('image-ratio-resizing');
+        });
+    });
+
+    document.addEventListener('pointermove', event => {
+        if (!imageResizeState || event.pointerId !== imageResizeState.pointerId) return;
+        event.preventDefault();
+
+        const state = imageResizeState;
+        const deltaX = event.clientX - state.startX;
+        const deltaYAsWidth = (event.clientY - state.startY) * state.metrics.ratio;
+        const requestedWidth = Math.abs(deltaX) >= Math.abs(deltaYAsWidth)
+            ? state.startWidth + deltaX
+            : state.startWidth + deltaYAsWidth;
+
+        applyImageCardWidth(state.card, requestedWidth, state.metrics);
+    }, {passive: false});
+
+    async function finishImageResize(event) {
+        if (!imageResizeState || event.pointerId !== imageResizeState.pointerId) return;
+        const state = imageResizeState;
+        imageResizeState = null;
+        document.body.classList.remove('image-ratio-resizing');
+        try {
+            if (state.handle.hasPointerCapture(event.pointerId)) {
+                state.handle.releasePointerCapture(event.pointerId);
+            }
+        } catch (_) {}
+        normalizeImageCard(state.card, false);
+        await saveMemoSize(state.card);
+    }
+
+    document.addEventListener('pointerup', finishImageResize);
+    document.addEventListener('pointercancel', finishImageResize);
+
+    function showMeditationSoundStatus(message) {
+        const status = document.getElementById('meditationSoundStatus');
+        if (!status) return;
+        clearTimeout(meditationSoundStatusTimer);
+        status.textContent = message || '';
+        status.classList.toggle('is-visible', Boolean(message));
+        if (message) {
+            meditationSoundStatusTimer = setTimeout(() => {
+                status.classList.remove('is-visible');
+            }, 2500);
+        }
+    }
+
+    function stopMeditationSound(resetSelection = false) {
+        const audio = document.getElementById('meditationAudio');
+        const select = document.getElementById('meditationSoundSelect');
+        const volume = document.getElementById('meditationVolume');
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.removeAttribute('src');
+            audio.load();
+        }
+        if (resetSelection && select) select.value = '';
+        if (volume) volume.disabled = true;
+        if (resetSelection) showMeditationSoundStatus('배경음 없음');
+    }
+
+    async function changeMeditationSound(soundKey) {
+        const audio = document.getElementById('meditationAudio');
+        const volume = document.getElementById('meditationVolume');
+        const sound = meditationSounds[soundKey];
+        if (!audio || !volume) return;
+
+        if (!sound) {
+            stopMeditationSound(false);
+            showMeditationSoundStatus('배경음 없음');
+            return;
+        }
+
+        audio.pause();
+        audio.src = sound.src;
+        audio.volume = Math.max(0, Math.min(1, Number(volume.value || 38) / 100));
+        audio.currentTime = 0;
+        volume.disabled = false;
+
+        try {
+            await audio.play();
+            showMeditationSoundStatus(`${sound.name} 재생 중`);
+        } catch (_) {
+            showMeditationSoundStatus('브라우저에서 재생이 차단되었습니다. 배경음을 다시 선택해주세요.');
+        }
+    }
+
+    function changeMeditationVolume(value) {
+        const audio = document.getElementById('meditationAudio');
+        if (!audio) return;
+        audio.volume = Math.max(0, Math.min(1, Number(value || 0) / 100));
+        if (audio.volume === 0) showMeditationSoundStatus('배경음 음소거');
+    }
+
+    function getRandomMeditationIndex() {
+        if (meditationScenes.length <= 1) return 0;
+        let nextIndex = meditationSceneIndex;
+        while (nextIndex === meditationSceneIndex) {
+            nextIndex = Math.floor(Math.random() * meditationScenes.length);
+        }
+        return nextIndex;
+    }
+
+    function showNextMeditationScene() {
+        const layer = document.getElementById('meditationLayer');
+        const sceneImage = document.getElementById('meditationScene');
+        const sceneName = document.getElementById('meditationSceneName');
+        if (!layer || !sceneImage || !sceneName) return;
+
+        const nextIndex = getRandomMeditationIndex();
+        const scene = meditationScenes[nextIndex];
+        const preload = new Image();
+
+        sceneImage.classList.remove('is-visible');
+        preload.onload = () => {
+            meditationSceneIndex = nextIndex;
+            sceneImage.src = scene.url;
+            sceneImage.alt = scene.name;
+            sceneName.textContent = scene.name;
+            requestAnimationFrame(() => sceneImage.classList.add('is-visible'));
+        };
+        preload.onerror = () => {
+            sceneName.textContent = '풍경을 불러오지 못했습니다. 다른 풍경을 선택해주세요.';
+        };
+        preload.src = scene.url;
+    }
+
+    function getActiveFullscreenElement() {
+        return document.fullscreenElement || document.webkitFullscreenElement || null;
+    }
+
+    function isMeditationFullscreen() {
+        const layer = document.getElementById('meditationLayer');
+        if (!layer) return false;
+        return getActiveFullscreenElement() === layer || layer.classList.contains('is-fallback-fullscreen');
+    }
+
+    function updateMeditationFullscreenButton() {
+        const button = document.getElementById('meditationFullscreenBtn');
+        if (!button) return;
+        const isFullscreen = isMeditationFullscreen();
+        button.setAttribute('aria-pressed', isFullscreen ? 'true' : 'false');
+        button.title = isFullscreen ? '전체화면 해제' : '명상 화면 전체화면 전환';
+        button.innerHTML = isFullscreen
+            ? '<i class="fa-solid fa-compress"></i> 전체화면 해제'
+            : '<i class="fa-solid fa-expand"></i> 전체화면';
+    }
+
+    async function enterMeditationFullscreen() {
+        const layer = document.getElementById('meditationLayer');
+        if (!layer || !layer.classList.contains('is-active')) return;
+
+        try {
+            if (layer.requestFullscreen) {
+                await layer.requestFullscreen();
+            } else if (layer.webkitRequestFullscreen) {
+                layer.webkitRequestFullscreen();
+            } else {
+                throw new Error('fullscreen-not-supported');
+            }
+        } catch (_) {
+            layer.classList.add('is-fallback-fullscreen');
+            document.body.classList.add('meditation-fallback-active');
+        }
+        updateMeditationFullscreenButton();
+    }
+
+    async function leaveMeditationFullscreen() {
+        const layer = document.getElementById('meditationLayer');
+        if (!layer) return;
+
+        layer.classList.remove('is-fallback-fullscreen');
+        document.body.classList.remove('meditation-fallback-active');
+
+        try {
+            if (getActiveFullscreenElement() === layer) {
+                if (document.exitFullscreen) await document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+        } catch (_) {}
+        updateMeditationFullscreenButton();
+    }
+
+    async function toggleMeditationFullscreen() {
+        if (isMeditationFullscreen()) await leaveMeditationFullscreen();
+        else await enterMeditationFullscreen();
+    }
+
+    function startMeditation() {
+        const layer = document.getElementById('meditationLayer');
+        const button = document.getElementById('meditationToggleBtn');
+        const select = document.getElementById('meditationSoundSelect');
+        const volume = document.getElementById('meditationVolume');
+        if (!layer) return;
+
+        /* 명상 시작 기본값은 항상 무음입니다. */
+        if (select) select.value = '';
+        if (volume) volume.disabled = true;
+        stopMeditationSound(false);
+
+        layer.classList.add('is-active');
+        layer.setAttribute('aria-hidden', 'false');
+        if (button) {
+            button.classList.add('is-active');
+            button.innerHTML = '<i class="fa-solid fa-leaf"></i> 명상 종료';
+        }
+        showNextMeditationScene();
+        clearInterval(meditationTimer);
+        meditationTimer = setInterval(showNextMeditationScene, 12000);
+    }
+
+    async function stopMeditation() {
+        const layer = document.getElementById('meditationLayer');
+        const button = document.getElementById('meditationToggleBtn');
+        clearInterval(meditationTimer);
+        meditationTimer = null;
+        stopMeditationSound(true);
+        await leaveMeditationFullscreen();
+        if (layer) {
+            layer.classList.remove('is-active');
+            layer.setAttribute('aria-hidden', 'true');
+        }
+        if (button) {
+            button.classList.remove('is-active');
+            button.innerHTML = '<i class="fa-solid fa-leaf"></i> 명상 풍경';
+        }
+    }
+
+    function toggleMeditation() {
+        const layer = document.getElementById('meditationLayer');
+        if (layer && layer.classList.contains('is-active')) stopMeditation();
+        else startMeditation();
+    }
+
+    const POSTIT_SHAPES = ['square', 'rounded', 'heart', 'star', 'moon', 'rabbit', 'circle', 'cloud', 'speech', 'leaf', 'hexagon'];
+
+    function normalizePostitShape(value) {
+        const shape = String(value || 'square').trim().toLowerCase();
+        return POSTIT_SHAPES.includes(shape) ? shape : 'square';
+    }
+
+    function applySavedPostitShapes() {
+        document.querySelectorAll('.postit[data-shape]').forEach(postit => {
+            const shape = normalizePostitShape(postit.dataset.shape);
+            POSTIT_SHAPES.forEach(name => postit.classList.remove(`shape-${name}`));
+            postit.classList.add(`shape-${shape}`);
+            postit.dataset.shape = shape;
+        });
+    }
+
+    async function addPostit(color, selectedShape = null) {
+        const shapeSelect = document.getElementById('postitShapeSelect');
+        const shape = normalizePostitShape(selectedShape || (shapeSelect ? shapeSelect.value : 'square'));
+
+        try {
+            const params = new URLSearchParams({shape, color});
+            const response = await fetch(`/memo/add_postit?${params.toString()}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                cache: 'no-store',
+                body: JSON.stringify({
+                    color: color,
+                    shape: shape,
+                    postit_shape: shape
+                })
+            });
+            const result = await readJsonResponse(response);
+            const savedShape = normalizePostitShape(result.shape);
+            if (savedShape !== shape) {
+                throw new Error(`선택한 모양(${shape})이 서버에 저장되지 않았습니다. memo.py도 함께 교체해주세요.`);
+            }
+            window.location.replace(`/memo/?refresh=${Date.now()}`);
+        } catch (error) {
+            alert(error.message || '포스트잇 생성 중 오류가 발생했습니다.');
+        }
+    }
+
+    async function uploadMemoFile(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('5MB 이하의 파일만 보드에 붙일 수 있습니다.');
+            input.value = '';
+            return;
+        }
+
+        const uploadButton = document.querySelector('label[for="memoUpload"]');
+        const originalButtonHtml = uploadButton ? uploadButton.innerHTML : '';
+        if (uploadButton) {
+            uploadButton.style.pointerEvents = 'none';
+            uploadButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 붙이는 중';
+        }
+        input.disabled = true;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/memo/upload_file', {method: 'POST', body: formData});
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) {
+            alert(error.message);
+            input.value = '';
+            input.disabled = false;
+            if (uploadButton) {
+                uploadButton.style.pointerEvents = '';
+                uploadButton.innerHTML = originalButtonHtml;
+            }
+        }
+    }
+
+    async function updateMemoContent(id, content) {
+        try {
+            const response = await fetch('/memo/update', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, content})
+            });
+            await readJsonResponse(response);
+        } catch (error) { alert(error.message); }
+    }
+
+    async function deleteMemo(id) {
+        if (!confirm('이 항목을 화이트보드에서 떼어낼까요?')) return;
+        try {
+            const response = await fetch(`/memo/delete/${id}`, {method: 'DELETE'});
+            await readJsonResponse(response);
+            const element = document.getElementById(`memo_${id}`);
+            if (element) element.remove();
+        } catch (error) { alert(error.message); }
+    }
+
+    function openDeadlineModal(id) {
+        const item = document.getElementById(`memo_${id}`);
+        if (!item) return;
+        deadlineTargetId = id;
+        document.getElementById('deadlineDueAt').value = item.dataset.dueAt || '';
+        document.getElementById('deadlineReminderMinutes').value = item.dataset.reminderMinutes || '60';
+        openMemoModal('deadlineModal');
+    }
+
+    async function saveDeadline() {
+        if (!deadlineTargetId) return;
+        const dueAt = document.getElementById('deadlineDueAt').value;
+        if (!dueAt) return alert('기한 날짜와 시간을 입력해주세요.');
+        await submitDeadline(dueAt);
+    }
+
+    async function clearDeadline() {
+        if (!deadlineTargetId) return;
+        if (!confirm('이 항목의 기한과 알림을 삭제할까요?')) return;
+        await submitDeadline('');
+    }
+
+    async function submitDeadline(dueAt) {
+        try {
+            const response = await fetch(`/memo/deadline/${deadlineTargetId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    due_at: dueAt,
+                    reminder_minutes: document.getElementById('deadlineReminderMinutes').value
+                })
+            });
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    function openPasswordModal(id) {
+        const item = document.getElementById(`memo_${id}`);
+        passwordTargetId = id;
+        document.getElementById('secretPassword').value = '';
+        document.getElementById('secretPasswordConfirm').value = '';
+        document.getElementById('removePasswordBtn').style.display = item && item.dataset.hasPassword === '1' ? 'inline-flex' : 'none';
+        openMemoModal('passwordModal');
+        setTimeout(() => document.getElementById('secretPassword').focus(), 50);
+    }
+
+    async function savePassword() {
+        if (!passwordTargetId) return;
+        const password = document.getElementById('secretPassword').value;
+        const passwordConfirm = document.getElementById('secretPasswordConfirm').value;
+        if (password.length < 4) return alert('비밀번호는 4자 이상 입력해주세요.');
+        if (password !== passwordConfirm) return alert('비밀번호 확인이 일치하지 않습니다.');
+        try {
+            const response = await fetch(`/memo/password/${passwordTargetId}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({password, password_confirm: passwordConfirm})
+            });
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    async function removePassword() {
+        if (!passwordTargetId || !confirm('비밀번호를 제거하고 일반 항목으로 바꿀까요?')) return;
+        try {
+            const response = await fetch(`/memo/password/${passwordTargetId}`, {method: 'DELETE'});
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    function openUnlockModal(id) {
+        unlockTargetId = id;
+        document.getElementById('unlockPassword').value = '';
+        openMemoModal('unlockModal');
+        setTimeout(() => document.getElementById('unlockPassword').focus(), 50);
+    }
+
+    async function submitUnlock() {
+        if (!unlockTargetId) return;
+        const password = document.getElementById('unlockPassword').value;
+        if (!password) return alert('비밀번호를 입력해주세요.');
+        try {
+            const response = await fetch(`/memo/unlock/${unlockTargetId}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({password})
+            });
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    async function lockNow(id) {
+        try {
+            const response = await fetch(`/memo/lock/${id}`, {method: 'POST'});
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    function openImageModal(src) {
+        document.getElementById('imageModalContent').src = src;
+        openMemoModal('imageModal');
+    }
+
+    function closeImageModal(event) {
+        if (event.target.id === 'imageModal') forceCloseImageModal();
+    }
+
+    function forceCloseImageModal() {
+        closeMemoModal('imageModal');
+        document.getElementById('imageModalContent').src = '';
+    }
+
+    whiteboard.addEventListener('mousedown', event => {
+        if (!event.target.closest('.drag-handle')) return;
+        draggedElement = event.target.closest('.draggable-item');
+        highestZ += 1;
+        draggedElement.style.zIndex = highestZ;
+        const rect = draggedElement.getBoundingClientRect();
+        offsetX = event.clientX - rect.left;
+        offsetY = event.clientY - rect.top;
+        draggedElement.style.cursor = 'grabbing';
+        event.preventDefault();
+    });
+
+    document.addEventListener('mousemove', event => {
+        if (!draggedElement) return;
+        const boardRect = whiteboard.getBoundingClientRect();
+        let newX = event.clientX - boardRect.left - offsetX;
+        let newY = event.clientY - boardRect.top - offsetY;
+        newX = Math.max(0, Math.min(newX, boardRect.width - draggedElement.offsetWidth));
+        newY = Math.max(0, Math.min(newY, boardRect.height - draggedElement.offsetHeight));
+        draggedElement.style.left = `${newX}px`;
+        draggedElement.style.top = `${newY}px`;
+    });
+
+    document.addEventListener('mouseup', async () => {
+        if (!draggedElement) return;
+        const moving = draggedElement;
+        moving.style.cursor = 'default';
+        draggedElement = null;
+        try {
+            await fetch('/memo/update', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: moving.id.replace('memo_', ''),
+                    pos_x: parseInt(moving.style.left, 10),
+                    pos_y: parseInt(moving.style.top, 10),
+                    z_index: parseInt(moving.style.zIndex, 10)
+                })
+            });
+        } catch (_) {}
+    });
+
+    async function submitTimer() {
+        const title = document.getElementById('t_title').value || '타이머';
+        const minutes = document.getElementById('t_min').value || 0;
+        const seconds = document.getElementById('t_sec').value || 0;
+        if (Number(minutes) === 0 && Number(seconds) === 0) return alert('시간을 설정해주세요.');
+        try {
+            const response = await fetch('/memo/add_timer', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, minutes, seconds})
+            });
+            await readJsonResponse(response);
+            location.reload();
+        } catch (error) { alert(error.message); }
+    }
+
+    function forceStopAlarmSound() {
+        const audio = document.getElementById('mainAlarmSound');
+        alarmPlayGeneration += 1;
+        if (!audio) return;
+
+        try {
+            audio.pause();
+            audio.currentTime = 0;
+            // 대기 중인 재생 버퍼까지 초기화해 정지 후 다시 소리가 나는 현상을 차단합니다.
+            audio.load();
+        } catch (_) {}
+    }
+
+    async function stopAlarm(id) {
+        const card = document.getElementById(`memo_${id}`);
+
+        // 서버 응답을 기다리는 동안 타이머 검사 루프가 다시 재생하지 못하도록 즉시 중지·제거합니다.
+        if (card) {
+            card.classList.add('stopped');
+            card.classList.remove('ringing');
+            const button = card.querySelector('.btn-stop-alarm');
+            if (button) button.style.display = 'none';
+            card.remove();
+        }
+        forceStopAlarmSound();
+
+        try {
+            const response = await fetch(`/memo/delete/${id}`, {method: 'DELETE'});
+            await readJsonResponse(response);
+        } catch (error) {
+            console.error('알람 삭제 오류:', error);
+            // 삭제 실패 시 새로고침하면 서버에 남은 타이머를 다시 확인할 수 있습니다.
+        }
+    }
+
+    function updateTimers() {
+        const now = Date.now();
+        let anyRinging = false;
+
+        document.querySelectorAll('.timer-gif-card').forEach(card => {
+            if (card.classList.contains('stopped')) return;
+
+            const endtime = parseInt(card.dataset.endtime || '0', 10);
+            const timeLeft = endtime - now;
+            const display = card.querySelector('.timer-time');
+            if (!display) return;
+
+            if (timeLeft <= 0) {
+                display.textContent = '00:00';
+                card.classList.add('ringing');
+                const button = card.querySelector('.btn-stop-alarm');
+                if (button) button.style.display = 'inline-block';
+                anyRinging = true;
+            } else {
+                card.classList.remove('ringing');
+                const button = card.querySelector('.btn-stop-alarm');
+                if (button) button.style.display = 'none';
+
+                const minutes = Math.floor(timeLeft / 60000);
+                const seconds = Math.floor((timeLeft % 60000) / 1000);
+                display.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+        });
+
+        const audio = document.getElementById('mainAlarmSound');
+        if (!audio) return;
+
+        if (!anyRinging) {
+            if (!audio.paused || audio.currentTime > 0) forceStopAlarmSound();
+            return;
+        }
+
+        if (audio.paused) {
+            const requestedGeneration = alarmPlayGeneration;
+            const playPromise = audio.play();
+
+            if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.then(() => {
+                    // 정지 버튼이 먼저 눌렸거나 울리는 카드가 사라졌다면 뒤늦은 재생을 즉시 취소합니다.
+                    const stillRinging = document.querySelector('.timer-gif-card.ringing:not(.stopped)');
+                    if (requestedGeneration !== alarmPlayGeneration || !stillRinging) {
+                        forceStopAlarmSound();
+                    }
+                }).catch(() => {});
+            }
+        }
+    }
+
+    function formatDeadline(dueDate, remainingMs) {
+        const month = String(dueDate.getMonth() + 1).padStart(2, '0');
+        const day = String(dueDate.getDate()).padStart(2, '0');
+        const hour = String(dueDate.getHours()).padStart(2, '0');
+        const minute = String(dueDate.getMinutes()).padStart(2, '0');
+        if (remainingMs <= 0) return `기한 지남 · ${month}.${day} ${hour}:${minute}`;
+        const totalMinutes = Math.ceil(remainingMs / 60000);
+        if (totalMinutes < 60) return `${totalMinutes}분 남음 · ${hour}:${minute}`;
+        const totalHours = Math.ceil(totalMinutes / 60);
+        if (totalHours < 24) return `${totalHours}시간 남음 · ${month}.${day} ${hour}:${minute}`;
+        const totalDays = Math.ceil(totalHours / 24);
+        return `${totalDays}일 남음 · ${month}.${day} ${hour}:${minute}`;
+    }
+
+    function updateDeadlineEffects() {
+        const now = Date.now();
+        document.querySelectorAll('.deadline-track').forEach(item => {
+            item.classList.remove('deadline-near', 'deadline-overdue');
+            const badge = item.querySelector('.deadline-badge');
+            const text = item.querySelector('.deadline-text');
+            const dueAt = item.dataset.dueAt;
+            if (!badge || !text || !dueAt) {
+                if (badge) badge.classList.remove('visible');
+                return;
+            }
+            const dueDate = new Date(dueAt);
+            if (Number.isNaN(dueDate.getTime())) {
+                badge.classList.remove('visible');
+                return;
+            }
+            const remainingMs = dueDate.getTime() - now;
+            const reminderMs = Math.max(1, Number(item.dataset.reminderMinutes || 60)) * 60000;
+            text.textContent = formatDeadline(dueDate, remainingMs);
+            badge.classList.add('visible');
+            if (remainingMs <= 0) item.classList.add('deadline-overdue');
+            else if (remainingMs <= reminderMs) item.classList.add('deadline-near');
+        });
+    }
+
+    document.addEventListener('fullscreenchange', updateMeditationFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateMeditationFullscreenButton);
+
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        const meditationLayer = document.getElementById('meditationLayer');
+        if (meditationLayer && meditationLayer.classList.contains('is-fallback-fullscreen')) {
+            leaveMeditationFullscreen();
+            return;
+        }
+        ['timerModal', 'deadlineModal', 'passwordModal', 'unlockModal'].forEach(closeMemoModal);
+        forceCloseImageModal();
+    });
+
+    document.querySelectorAll('.memo-modal-overlay').forEach(modal => {
+        modal.addEventListener('mousedown', event => {
+            if (event.target === modal) closeMemoModal(modal.id);
+        });
+    });
+
+    applySavedPostitShapes();
+
+    const postitShapeSelect = document.getElementById('postitShapeSelect');
+    if (postitShapeSelect) {
+        const savedSelection = normalizePostitShape(localStorage.getItem('memoPostitShape'));
+        postitShapeSelect.value = savedSelection;
+        postitShapeSelect.addEventListener('change', () => {
+            postitShapeSelect.value = normalizePostitShape(postitShapeSelect.value);
+            localStorage.setItem('memoPostitShape', postitShapeSelect.value);
+        });
+    }
+
+    updateTimers();
+    updateDeadlineEffects();
+    setInterval(updateTimers, 1000);
+    setInterval(updateDeadlineEffects, 30000);
+</script>
+{% endblock %}

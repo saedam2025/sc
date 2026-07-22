@@ -1,0 +1,515 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .deg-page {
+        --deg-primary: var(--primary-color, #2563eb);
+        --deg-primary-soft: color-mix(in srgb, var(--deg-primary) 10%, transparent);
+        --deg-card: var(--card-bg, #ffffff);
+        --deg-border: var(--card-border, var(--border-color, #dbe3ef));
+        --deg-text: var(--text-color, #172033);
+        --deg-muted: var(--text-gray, #64748b);
+        --deg-surface: var(--widget-bg, #f7f9fc);
+        --deg-hover: var(--widget-hover, #edf3fb);
+        min-height: calc(100vh - 112px);
+        color: var(--deg-text);
+    }
+    .deg-page *, .deg-page *::before, .deg-page *::after { box-sizing: border-box; }
+    .deg-page button, .deg-page input { font: inherit; }
+    .deg-page [hidden] { display: none !important; }
+
+    .deg-hero {
+        display: flex; align-items: center; justify-content: space-between; gap: 18px;
+        margin: 4px 0 18px; padding: 20px 24px; border: 1px solid var(--deg-border);
+        border-radius: 20px; background:
+            radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--deg-primary) 17%, transparent), transparent 32%),
+            var(--deg-card); box-shadow: var(--card-shadow, 0 10px 35px rgba(15, 23, 42, .07));
+    }
+    .deg-hero-copy { display: flex; align-items: center; gap: 15px; min-width: 0; }
+    .deg-hero-icon { width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center; border-radius: 16px; background: #168451; color: #fff; font-size: 1.4rem; box-shadow: 0 10px 22px rgba(22, 132, 81, .24); }
+    .deg-hero h1 { margin: 0; font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.035em; }
+    .deg-hero p { margin: 6px 0 0; color: var(--deg-muted); font-size: .92rem; line-height: 1.5; }
+    .deg-system-state { display: flex; align-items: center; gap: 8px; color: var(--deg-muted); font-size: .82rem; white-space: nowrap; }
+    .deg-system-dot { width: 9px; height: 9px; border-radius: 50%; background: #94a3b8; box-shadow: 0 0 0 5px rgba(148, 163, 184, .13); }
+    .deg-system-state.loading .deg-system-dot { background: #f59e0b; box-shadow: 0 0 0 5px rgba(245, 158, 11, .13); }
+    .deg-system-state.ready .deg-system-dot { background: #22c55e; box-shadow: 0 0 0 5px rgba(34, 197, 94, .13); }
+    .deg-system-state.error .deg-system-dot { background: #ef4444; box-shadow: 0 0 0 5px rgba(239, 68, 68, .13); }
+
+    .deg-card { background: var(--deg-card); border: 1px solid var(--deg-border); border-radius: 18px; box-shadow: var(--card-shadow, 0 8px 28px rgba(15,23,42,.055)); }
+    .deg-card-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 17px 20px; border-bottom: 1px solid var(--deg-border); }
+    .deg-card-title { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 1rem; font-weight: 850; }
+    .deg-step { min-width: 25px; height: 25px; display: inline-grid; place-items: center; border-radius: 8px; background: var(--deg-primary-soft); color: var(--deg-primary); font-size: .75rem; font-weight: 900; }
+
+    .deg-upload-card { margin-bottom: 18px; overflow: hidden; }
+    .deg-upload-body { padding: 20px; }
+    .deg-drop-zone { min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 25px; border: 2px dashed color-mix(in srgb, var(--deg-primary) 38%, var(--deg-border)); border-radius: 15px; background: var(--deg-surface); text-align: center; cursor: pointer; transition: .18s ease; outline: none; }
+    .deg-drop-zone:hover, .deg-drop-zone.dragover, .deg-drop-zone:focus-visible { border-color: var(--deg-primary); background: var(--deg-primary-soft); box-shadow: 0 0 0 4px var(--deg-primary-soft); }
+    .deg-drop-zone.processing { pointer-events: none; opacity: .72; }
+    .deg-drop-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: var(--deg-primary); color: #fff; font-size: 1.2rem; }
+    .deg-drop-title { font-size: 1rem; font-weight: 850; }
+    .deg-drop-help { color: var(--deg-muted); font-size: .82rem; line-height: 1.5; }
+    .deg-file-meta { display: none; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--deg-border); border-radius: 11px; background: var(--deg-card); font-size: .82rem; }
+    .deg-file-meta.visible { display: flex; }
+    .deg-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
+    .deg-file-size { color: var(--deg-muted); white-space: nowrap; }
+    .deg-rule-strip { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+    .deg-rule-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 999px; background: var(--deg-surface); color: var(--deg-muted); font-size: .72rem; font-weight: 750; }
+
+    .deg-summary-card { margin-bottom: 18px; overflow: hidden; }
+    .deg-summary-body { padding: 18px 20px 20px; }
+    .deg-stats { display: grid; grid-template-columns: repeat(5, minmax(105px, 1fr)); gap: 10px; }
+    .deg-stat { padding: 13px 14px; border: 1px solid var(--deg-border); border-radius: 12px; background: var(--deg-surface); }
+    .deg-stat-label { color: var(--deg-muted); font-size: .72rem; font-weight: 800; }
+    .deg-stat-value { display: block; margin-top: 5px; font-size: 1.2rem; font-weight: 900; }
+    .deg-stat.ok .deg-stat-value { color: #15803d; }
+    .deg-stat.restored .deg-stat-value { color: #7c3aed; }
+    .deg-stat.warning .deg-stat-value { color: #b45309; }
+    .deg-stat.error .deg-stat-value { color: #b91c1c; }
+
+    .deg-total-compare { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-top: 12px; }
+    .deg-total-box { padding: 14px 16px; border: 1px solid var(--deg-border); border-radius: 12px; background: var(--deg-card); }
+    .deg-total-box span { color: var(--deg-muted); font-size: .75rem; font-weight: 800; }
+    .deg-total-box strong { display: block; margin-top: 5px; font-size: 1.15rem; }
+    .deg-total-arrow { color: var(--deg-primary); }
+
+    .deg-result-message { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: .83rem; font-weight: 750; line-height: 1.5; }
+    .deg-result-message.ok { background: #f0fdf4; color: #166534; }
+    .deg-result-message.warning { background: #fffbeb; color: #92400e; }
+    .deg-result-message.error { background: #fef2f2; color: #991b1b; }
+
+    .deg-sheet-title { margin: 17px 0 8px; font-size: .82rem; font-weight: 850; }
+    .deg-sheet-wrap { overflow-x: auto; border: 1px solid var(--deg-border); border-radius: 11px; }
+    .deg-sheet-table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: .78rem; }
+    .deg-sheet-table th, .deg-sheet-table td { padding: 9px 10px; border-bottom: 1px solid var(--deg-border); text-align: center; }
+    .deg-sheet-table th { background: var(--deg-surface); color: var(--deg-muted); font-weight: 850; }
+    .deg-sheet-table tbody tr:last-child td { border-bottom: 0; }
+    .deg-sheet-table td:first-child { text-align: left; font-weight: 800; }
+    .deg-sheet-table .money { text-align: right; font-variant-numeric: tabular-nums; }
+    .deg-sheet-table tfoot td { background: var(--deg-primary-soft); color: var(--deg-text); font-weight: 900; border-top: 2px solid color-mix(in srgb, var(--deg-primary) 38%, var(--deg-border)); border-bottom: 0; }
+
+    .deg-warning-confirm { display: none; align-items: flex-start; gap: 8px; margin-top: 13px; padding: 11px 12px; border: 1px solid #fbbf24; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: .82rem; font-weight: 750; cursor: pointer; }
+    .deg-warning-confirm.visible { display: flex; }
+    .deg-warning-confirm input { margin-top: 2px; }
+
+    .deg-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+    .deg-btn { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--deg-border); border-radius: 11px; padding: 9px 16px; background: var(--deg-card); color: var(--deg-text); font-weight: 800; font-size: .84rem; cursor: pointer; transition: .17s ease; }
+    .deg-btn.primary { background: var(--deg-primary); border-color: var(--deg-primary); color: #fff; box-shadow: 0 7px 15px color-mix(in srgb, var(--deg-primary) 22%, transparent); }
+    .deg-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(.98); }
+    .deg-btn:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+
+    .deg-compare-card { overflow: hidden; }
+    .deg-compare-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px; background: var(--deg-border); }
+    .deg-list-panel { min-width: 0; background: var(--deg-card); }
+    .deg-list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 15px; border-bottom: 1px solid var(--deg-border); }
+    .deg-list-head strong { font-size: .88rem; }
+    .deg-list-head span { color: var(--deg-muted); font-size: .72rem; }
+    .deg-table-scroll { max-height: 610px; overflow: auto; }
+    .deg-data-table { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 0; font-size: .76rem; }
+    .deg-data-table th { position: sticky; top: 0; z-index: 2; padding: 8px 7px; background: var(--deg-surface); color: var(--deg-muted); border-right: 1px solid var(--deg-border); border-bottom: 1px solid var(--deg-border); text-align: center; white-space: nowrap; }
+    .deg-data-table td { height: 45px; padding: 7px; border-right: 1px solid color-mix(in srgb, var(--deg-border) 70%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--deg-border) 70%, transparent); white-space: nowrap; color: var(--deg-muted); }
+    .deg-data-table tbody tr:hover td { background: var(--deg-hover); }
+    .deg-data-table .amount { text-align: right; font-variant-numeric: tabular-nums; }
+    .deg-data-table .account { font-family: Consolas, monospace; font-weight: 750; color: var(--deg-text); }
+    .deg-data-table .mismatch { background: #fff1f2; color: #be123c; font-weight: 850; }
+    .deg-data-table .attention { background: #fffbeb; color: #92400e; }
+    .deg-status { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 4px 7px; border-radius: 999px; font-size: .68rem; font-weight: 900; white-space: nowrap; }
+    .deg-status.ok { background: #dcfce7; color: #15803d; }
+    .deg-status.restored { background: #ede9fe; color: #6d28d9; }
+    .deg-status.warning { background: #fef3c7; color: #b45309; }
+    .deg-status.error { background: #fee2e2; color: #b91c1c; }
+    .deg-message { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+
+    @media (max-width: 1000px) {
+        .deg-compare-grid { grid-template-columns: 1fr; gap: 12px; background: transparent; }
+        .deg-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+        .deg-hero { align-items: flex-start; padding: 17px; }
+        .deg-system-state { display: none; }
+        .deg-stats { grid-template-columns: 1fr 1fr; }
+        .deg-total-compare { grid-template-columns: 1fr; }
+        .deg-total-arrow { transform: rotate(90deg); justify-self: center; }
+        .deg-actions .deg-btn { width: 100%; }
+    }
+</style>
+
+<div class="deg-page">
+    <section class="deg-hero">
+        <div class="deg-hero-copy">
+            <div class="deg-hero-icon"><i class="fa-solid fa-file-excel"></i></div>
+            <div>
+                <h1>입금용 엑셀 생성기</h1>
+                <p>원본과 실제 변환 파일을 행별로 대조한 뒤 안전하게 다운로드합니다.</p>
+            </div>
+        </div>
+        <div class="deg-system-state" id="systemState"><span class="deg-system-dot"></span><span id="systemStateText">엑셀 업로드 대기</span></div>
+    </section>
+
+    <form method="post" action="{{ url_for('excel_generator.deposit_process') }}" enctype="multipart/form-data" id="excelForm">
+        <input id="file" name="file" type="file" accept=".xlsx" hidden required>
+        <input type="hidden" name="warning_confirmed" id="warningConfirmed" value="0">
+
+        <section class="deg-card deg-upload-card">
+            <div class="deg-card-head">
+                <h2 class="deg-card-title"><span class="deg-step">1</span> 원본 엑셀 업로드</h2>
+                <span style="color:var(--deg-muted); font-size:.76rem;">헤더 기준: 3번째 행</span>
+            </div>
+            <div class="deg-upload-body">
+                <div class="deg-drop-zone" id="dropZone" role="button" tabindex="0" aria-label="엑셀 파일 선택 또는 드래그 앤 드롭">
+                    <div class="deg-drop-icon" id="dropIcon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <div class="deg-drop-title" id="dropTitle">엑셀 파일을 여기에 끌어놓거나 클릭하세요</div>
+                    <div class="deg-drop-help" id="dropHelp">.xlsx 파일을 올리면 즉시 원본·변환 내역과 합계를 검증합니다.</div>
+                </div>
+                <div class="deg-file-meta" id="fileMeta">
+                    <span class="deg-file-name" id="fileName"></span>
+                    <span class="deg-file-size" id="fileSize"></span>
+                </div>
+                <div class="deg-rule-strip">
+                    <span class="deg-rule-chip"><i class="fa-solid fa-table-columns"></i> 은행·계좌번호·예금주·입금액 추출</span>
+                    <span class="deg-rule-chip"><i class="fa-solid fa-shield-halved"></i> 선행 0 보존 검증</span>
+                    <span class="deg-rule-chip"><i class="fa-solid fa-layer-group"></i> {{ chunk_size }}명 기준 시트 경계 분할</span>
+                    <span class="deg-rule-chip"><i class="fa-solid fa-calculator"></i> 합계는 검증 화면에서만 표시</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="deg-card deg-summary-card" id="summaryCard" hidden>
+            <div class="deg-card-head">
+                <h2 class="deg-card-title"><span class="deg-step">2</span> 변환 검증 요약</h2>
+                <span style="color:var(--deg-muted); font-size:.76rem;" id="summaryFileName"></span>
+            </div>
+            <div class="deg-summary-body">
+                <div class="deg-stats">
+                    <div class="deg-stat"><span class="deg-stat-label">전체 내역</span><strong class="deg-stat-value" id="statTotal">0</strong></div>
+                    <div class="deg-stat ok"><span class="deg-stat-label">정상 일치</span><strong class="deg-stat-value" id="statOk">0</strong></div>
+                    <div class="deg-stat error"><span class="deg-stat-label">불일치</span><strong class="deg-stat-value" id="statError">0</strong></div>
+                    <div class="deg-stat restored"><span class="deg-stat-label">자동 복원</span><strong class="deg-stat-value" id="statRestored">0</strong></div>
+                    <div class="deg-stat warning"><span class="deg-stat-label">확인 주의</span><strong class="deg-stat-value" id="statWarning">0</strong></div>
+                </div>
+
+                <div class="deg-total-compare">
+                    <div class="deg-total-box"><span>업로드 원본 총금액</span><strong id="beforeTotal">0원</strong></div>
+                    <i class="fa-solid fa-arrow-right deg-total-arrow"></i>
+                    <div class="deg-total-box"><span>변환 후 총금액</span><strong id="afterTotal">0원</strong></div>
+                </div>
+                <div class="deg-result-message" id="resultMessage"></div>
+
+                <div class="deg-sheet-title"><i class="fa-solid fa-table-list" style="color:var(--deg-primary);"></i> 탭별 인원·금액 검증</div>
+                <div class="deg-sheet-wrap">
+                    <table class="deg-sheet-table">
+                        <thead><tr><th>원본 탭</th><th>인원</th><th>원본 합계</th><th>변환 합계</th><th>정상</th><th>불일치</th><th>자동복원</th><th>확인주의</th></tr></thead>
+                        <tbody id="sheetSummaryBody"></tbody>
+                        <tfoot id="sheetSummaryFoot"></tfoot>
+                    </table>
+                </div>
+
+                <label class="deg-warning-confirm" id="warningConfirmBox">
+                    <input type="checkbox" id="warningConfirmCheck">
+                    <span>불일치나 주의항목을 원본과 대조 확인 하였으므로 변환 된 입금용엑셀파일을 다운받겠습니다.</span>
+                </label>
+
+                <div class="deg-actions">
+                    <button class="deg-btn primary" type="submit" id="submitBtn" disabled><i class="fa-solid fa-download"></i> 검증 완료 파일 다운로드</button>
+                </div>
+            </div>
+        </section>
+    </form>
+
+    <section class="deg-card deg-compare-card" id="compareCard" hidden>
+        <div class="deg-card-head">
+            <h2 class="deg-card-title"><span class="deg-step">3</span> 업로드·변환 상세 대조</h2>
+            <span style="color:var(--deg-muted); font-size:.76rem;">양쪽 목록은 같은 순서이며 세로 스크롤이 함께 움직입니다.</span>
+        </div>
+        <div class="deg-compare-grid">
+            <article class="deg-list-panel">
+                <div class="deg-list-head"><strong><i class="fa-solid fa-file-arrow-up" style="color:#64748b;"></i> 업로드 원본 내역</strong><span id="sourceCount">0건</span></div>
+                <div class="deg-table-scroll" id="sourceScroll">
+                    <table class="deg-data-table">
+                        <thead><tr><th>No.</th><th>탭/행</th><th>학교명</th><th>사람(예금주)</th><th>입금액</th><th>통장번호</th></tr></thead>
+                        <tbody id="sourceBody"></tbody>
+                    </table>
+                </div>
+            </article>
+            <article class="deg-list-panel">
+                <div class="deg-list-head"><strong><i class="fa-solid fa-file-circle-check" style="color:#168451;"></i> 변환 후 내역</strong><span id="convertedCount">0건</span></div>
+                <div class="deg-table-scroll" id="convertedScroll">
+                    <table class="deg-data-table">
+                        <thead><tr><th>No.</th><th>검증</th><th>학교명</th><th>사람(예금주)</th><th>입금액</th><th>통장번호</th><th>검증 메시지</th></tr></thead>
+                        <tbody id="convertedBody"></tbody>
+                    </table>
+                </div>
+            </article>
+        </div>
+    </section>
+</div>
+
+<script>
+(() => {
+    const form = document.getElementById('excelForm');
+    const fileInput = document.getElementById('file');
+    const dropZone = document.getElementById('dropZone');
+    const dropIcon = document.getElementById('dropIcon');
+    const dropTitle = document.getElementById('dropTitle');
+    const dropHelp = document.getElementById('dropHelp');
+    const fileMeta = document.getElementById('fileMeta');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const systemState = document.getElementById('systemState');
+    const systemStateText = document.getElementById('systemStateText');
+    const summaryCard = document.getElementById('summaryCard');
+    const compareCard = document.getElementById('compareCard');
+    const submitBtn = document.getElementById('submitBtn');
+    const warningConfirmBox = document.getElementById('warningConfirmBox');
+    const warningConfirmCheck = document.getElementById('warningConfirmCheck');
+    const warningConfirmed = document.getElementById('warningConfirmed');
+    const sourceScroll = document.getElementById('sourceScroll');
+    const convertedScroll = document.getElementById('convertedScroll');
+    let verifiedFileSignature = '';
+    let lastVerification = null;
+    let isSyncingScroll = false;
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        })[char]);
+    }
+
+    function fileSignature(file) {
+        return file ? `${file.name}:${file.size}:${file.lastModified}` : '';
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function setSystemState(type, text) {
+        systemState.className = `deg-system-state ${type || ''}`;
+        systemStateText.textContent = text;
+    }
+
+    function resetResults() {
+        verifiedFileSignature = '';
+        lastVerification = null;
+        summaryCard.hidden = true;
+        compareCard.hidden = true;
+        warningConfirmBox.classList.remove('visible');
+        warningConfirmCheck.checked = false;
+        warningConfirmed.value = '0';
+        submitBtn.disabled = true;
+    }
+
+    function setProcessing(processing) {
+        dropZone.classList.toggle('processing', processing);
+        if (processing) {
+            dropIcon.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            dropTitle.textContent = '원본과 변환 파일을 대조하는 중입니다';
+            dropHelp.textContent = '행별 값과 전체·탭별 합계를 확인하고 있습니다.';
+            setSystemState('loading', '변환 검증 중');
+        } else {
+            dropIcon.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i>';
+            dropTitle.textContent = '다른 엑셀을 끌어놓거나 클릭해서 교체할 수 있습니다';
+            dropHelp.textContent = '.xlsx 파일을 올리면 즉시 다시 검증합니다.';
+        }
+    }
+
+    function fieldClass(row, field) {
+        if (!row.fields[field]) return 'mismatch';
+        if (field === 'account' && row.status === 'warning') return 'attention';
+        return '';
+    }
+
+    function updateDownloadState() {
+        const selected = fileInput.files[0];
+        const sameFile = selected && fileSignature(selected) === verifiedFileSignature;
+        const hasWarnings = Boolean(lastVerification && lastVerification.summary.warning);
+        const accepted = !hasWarnings || warningConfirmCheck.checked;
+        submitBtn.disabled = !(lastVerification && lastVerification.can_download && sameFile && accepted);
+        warningConfirmed.value = hasWarnings && warningConfirmCheck.checked ? '1' : '0';
+
+        if (lastVerification && lastVerification.summary.error) {
+            submitBtn.innerHTML = '<i class="fa-solid fa-ban"></i> 불일치 수정 후 다시 업로드';
+        } else if (hasWarnings && !warningConfirmCheck.checked) {
+            submitBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 주의 항목 확인 필요';
+        } else {
+            submitBtn.innerHTML = '<i class="fa-solid fa-download"></i> 검증 완료 파일 다운로드';
+        }
+    }
+
+    function renderVerification(data, file) {
+        lastVerification = data;
+        const summary = data.summary;
+        document.getElementById('summaryFileName').textContent = file.name;
+        document.getElementById('statTotal').textContent = `${summary.total}건`;
+        document.getElementById('statOk').textContent = `${summary.ok}건`;
+        document.getElementById('statError').textContent = `${summary.error}건`;
+        document.getElementById('statRestored').textContent = `${summary.restored}건`;
+        document.getElementById('statWarning').textContent = `${summary.warning}건`;
+        document.getElementById('beforeTotal').textContent = `${summary.before_total}원`;
+        document.getElementById('afterTotal').textContent = `${summary.after_total}원`;
+        document.getElementById('sourceCount').textContent = `${summary.total}건`;
+        document.getElementById('convertedCount').textContent = `${summary.total}건`;
+
+        const resultMessage = document.getElementById('resultMessage');
+        if (summary.error) {
+            resultMessage.className = 'deg-result-message error';
+            resultMessage.textContent = `불일치 ${summary.error}건이 발견되어 다운로드가 차단되었습니다. 붉게 표시된 원본 값을 수정한 뒤 다시 업로드해주세요.`;
+            setSystemState('error', `불일치 ${summary.error}건 발견`);
+        } else if (summary.warning) {
+            resultMessage.className = 'deg-result-message warning';
+            resultMessage.textContent = `값과 합계는 일치합니다. 숫자형 통장번호 ${summary.warning}건은 맨 앞 0 존재 여부를 원본 자료와 확인해주세요.`;
+            setSystemState('ready', `일치 · 주의 ${summary.warning}건`);
+        } else if (summary.restored) {
+            resultMessage.className = 'deg-result-message ok';
+            resultMessage.textContent = `모든 행과 합계가 일치하며, 통장번호 선행 0 ${summary.restored}건을 엑셀 숫자 서식에서 자동 복원했습니다.`;
+            setSystemState('ready', `정상 · 자동복원 ${summary.restored}건`);
+        } else {
+            resultMessage.className = 'deg-result-message ok';
+            resultMessage.textContent = '모든 행과 전체·탭별 금액이 실제 변환 파일과 일치합니다.';
+            setSystemState('ready', '전체 검증 정상');
+        }
+
+        document.getElementById('sheetSummaryBody').innerHTML = (data.sheets || []).map(sheet => `
+            <tr>
+                <td>${escapeHtml(sheet.sheet)}</td>
+                <td>${sheet.rows}명</td>
+                <td class="money">${escapeHtml(sheet.before_total)}원</td>
+                <td class="money">${escapeHtml(sheet.after_total)}원</td>
+                <td style="color:#15803d; font-weight:800;">${sheet.ok}</td>
+                <td style="color:#b91c1c; font-weight:800;">${sheet.error}</td>
+                <td style="color:#6d28d9; font-weight:800;">${sheet.restored}</td>
+                <td style="color:#b45309; font-weight:800;">${sheet.warning}</td>
+            </tr>
+        `).join('');
+        document.getElementById('sheetSummaryFoot').innerHTML = `
+            <tr>
+                <td>전체 합계</td>
+                <td>${summary.total}명</td>
+                <td class="money">${escapeHtml(summary.before_total)}원</td>
+                <td class="money">${escapeHtml(summary.after_total)}원</td>
+                <td>${summary.ok}</td>
+                <td>${summary.error}</td>
+                <td>${summary.restored}</td>
+                <td>${summary.warning}</td>
+            </tr>
+        `;
+
+        document.getElementById('sourceBody').innerHTML = data.rows.map(row => `
+            <tr>
+                <td style="text-align:center;">${row.no}</td>
+                <td>${escapeHtml(row.before.school)} / ${row.source_row}행</td>
+                <td class="${fieldClass(row, 'school')}">${escapeHtml(row.before.school)}</td>
+                <td class="${fieldClass(row, 'person')}">${escapeHtml(row.before.person)}</td>
+                <td class="amount ${fieldClass(row, 'amount')}">${escapeHtml(row.before.amount)}</td>
+                <td class="account ${fieldClass(row, 'account')}">${escapeHtml(row.before.account)}</td>
+            </tr>
+        `).join('');
+
+        const statusLabel = { ok: '정상', restored: '자동복원', warning: '주의', error: '불일치' };
+        document.getElementById('convertedBody').innerHTML = data.rows.map(row => `
+            <tr>
+                <td style="text-align:center;">${row.no}</td>
+                <td style="text-align:center;"><span class="deg-status ${row.status}">${statusLabel[row.status]}</span></td>
+                <td class="${fieldClass(row, 'school')}">${escapeHtml(row.after.school)}</td>
+                <td class="${fieldClass(row, 'person')}">${escapeHtml(row.after.person)}</td>
+                <td class="amount ${fieldClass(row, 'amount')}">${escapeHtml(row.after.amount)}</td>
+                <td class="account ${fieldClass(row, 'account')}">${escapeHtml(row.after.account)}</td>
+                <td class="deg-message" title="${escapeHtml(row.message)}">${escapeHtml(row.message)}</td>
+            </tr>
+        `).join('');
+
+        warningConfirmBox.classList.toggle('visible', Boolean(summary.warning && !summary.error));
+        warningConfirmCheck.checked = false;
+        warningConfirmed.value = '0';
+        summaryCard.hidden = false;
+        compareCard.hidden = false;
+        updateDownloadState();
+    }
+
+    async function analyzeFile(file) {
+        if (!file || !file.name.toLowerCase().endsWith('.xlsx')) {
+            alert('xlsx 형식의 엑셀 파일만 업로드할 수 있습니다.');
+            return;
+        }
+
+        resetResults();
+        fileMeta.classList.add('visible');
+        fileName.textContent = file.name;
+        fileSize.textContent = formatBytes(file.size);
+        setProcessing(true);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch("{{ url_for('excel_generator.deposit_preview') }}", { method: 'POST', body: formData });
+            const data = await response.json().catch(() => ({ ok: false, message: '서버 응답을 확인할 수 없습니다.' }));
+            if (!response.ok || !data.ok) throw new Error(data.message || '엑셀 검증에 실패했습니다.');
+            verifiedFileSignature = fileSignature(file);
+            renderVerification(data, file);
+        } catch (error) {
+            resetResults();
+            setSystemState('error', '업로드 검증 실패');
+            alert(error.message);
+        } finally {
+            setProcessing(false);
+        }
+    }
+
+    function selectDroppedFile(file) {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        analyzeFile(file);
+    }
+
+    dropZone.addEventListener('click', () => {
+        if (dropZone.classList.contains('processing')) return;
+        fileInput.value = '';
+        fileInput.click();
+    });
+    dropZone.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            dropZone.click();
+        }
+    });
+    ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, event => {
+        event.preventDefault();
+        dropZone.classList.remove('dragover');
+    }));
+    dropZone.addEventListener('drop', event => {
+        const file = event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) selectDroppedFile(file);
+    });
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (file) analyzeFile(file);
+    });
+    warningConfirmCheck.addEventListener('change', updateDownloadState);
+
+    function syncScroll(source, target) {
+        if (isSyncingScroll) return;
+        isSyncingScroll = true;
+        target.scrollTop = source.scrollTop;
+        requestAnimationFrame(() => { isSyncingScroll = false; });
+    }
+    sourceScroll.addEventListener('scroll', () => syncScroll(sourceScroll, convertedScroll));
+    convertedScroll.addEventListener('scroll', () => syncScroll(convertedScroll, sourceScroll));
+
+    form.addEventListener('submit', event => {
+        if (!fileInput.files.length || submitBtn.disabled) {
+            event.preventDefault();
+            return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 파일 생성 중...';
+        setTimeout(updateDownloadState, 3000);
+    });
+})();
+</script>
+{% endblock %}

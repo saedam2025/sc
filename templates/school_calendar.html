@@ -1,0 +1,875 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* === 다이나믹 테마 변수 매핑 === */
+    :root {
+        --cal-blue: var(--primary-color, #004ea2);
+        --cal-navy: var(--primary-dark, #002c63);
+        --cal-blue-light: var(--widget-hover, #e1f0fa);
+        --cal-border: var(--card-border, #e2e8f0);
+        --cal-soft: var(--widget-bg, #f8fafc);
+        --cal-text: var(--text-dark, #1e293b);
+        --cal-gray: var(--text-gray, #64748b);
+        --cal-card-bg: var(--card-bg, #ffffff);
+        --cal-input-bg: var(--input-bg, #ffffff);
+    }
+
+    /* 1) 캘린더 컨테이너 테마 적용 및 유리효과 X */
+    .calendar-container { 
+        width: 100%; max-width: none; min-height: 80vh; margin: 0 auto; padding: 30px; 
+        
+        background: var(--cal-card-bg); 
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: 1px solid var(--cal-border);
+        border-radius: 20px; 
+        box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.03)); 
+        font-family: 'Pretendard', sans-serif; box-sizing: border-box;
+        position: relative; z-index: 2;
+    }
+    
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    
+    /* 2) 달력 상단 여백 추가 */
+    .calendar-layout { display: flex; gap: 25px; align-items: flex-start; margin-top: 20px; }
+    
+    .big-cal-section { flex: 7; background: var(--cal-input-bg); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--cal-border); min-width: 0; }
+    .cal-header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .cal-nav-btn { background: var(--cal-soft); border: 1px solid var(--cal-border); padding: 8px 16px; border-radius: 8px; cursor: pointer; color: var(--cal-gray); font-weight: bold; transition: 0.2s; }
+    .cal-nav-btn:hover { background: var(--cal-blue-light); color: var(--cal-blue); border-color: var(--cal-blue); }
+    .cal-month-title { font-size: 1.8em; font-weight: 800; color: var(--cal-text); }
+    
+    .side-nav-btn {
+        width: 100%; background: var(--cal-soft); border: 1px solid var(--cal-border); border-radius: 12px;
+        color: var(--cal-gray); font-size: 1.4rem; cursor: pointer; transition: all 0.2s;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .side-nav-btn:hover { background: var(--cal-blue-light); color: var(--cal-blue); border-color: var(--cal-blue); transform: scale(1.02); }
+    .side-nav-btn-today {
+        font-size: 1.2rem; color: var(--cal-blue); background: var(--cal-blue-light); border-color: var(--cal-blue);
+    }
+    .side-nav-btn-today:hover { background: var(--cal-blue-light); color: var(--cal-navy); border-color: var(--cal-navy); }
+
+    .big-cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; }
+    .big-cal-table th { background: rgba(0,0,0,0.02); padding: 12px 0; border-bottom: 1px solid var(--cal-border); border-right: 1px solid var(--cal-border); font-weight: 700; text-align: center; font-size: 0.95rem; color: var(--cal-gray); }
+    .big-cal-table th:last-child { border-right: none; }
+    .color-holiday { color: #ef4444 !important; }
+    
+    .week-cell { padding: 0 !important; border-bottom: 1px solid var(--cal-border); }
+    .week-container { position: relative; height: 220px; display: flex; flex-direction: column; }
+    
+    .week-bg { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    .day-col { flex: 1; border-right: 1px solid var(--cal-border); padding: 8px 5px; cursor: pointer; transition: background 0.2s; box-sizing: border-box; }
+    .day-col:last-child { border-right: none; }
+    .day-col:hover { background: rgba(0,0,0,0.02); }
+    .day-col.other-month { background: rgba(0,0,0,0.05); opacity: 0.6; }
+    .day-col.td-today { background: var(--cal-blue-light); }
+    .cal-date-num { font-weight: bold; color: var(--cal-text); margin-bottom: 8px; display: inline-block; padding: 0 5px; }
+    .td-today .cal-date-num { background: var(--cal-blue); color: white; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 26px; padding: 0; }
+    
+    .week-events-scroll { 
+        position: absolute; top: 32px; left: 0; width: 100%; height: calc(100% - 32px); 
+        z-index: 2; overflow-y: auto; overflow-x: hidden; cursor: pointer; 
+    }
+    .week-events-scroll::-webkit-scrollbar { width: 8px; }
+    .week-events-scroll::-webkit-scrollbar-track { background: transparent; }
+    .week-events-scroll::-webkit-scrollbar-thumb { background: var(--cal-border); border-radius: 4px; border: 2px solid var(--cal-input-bg); }
+    
+    .task-bar-container { position: absolute; height: 36px; padding: 0; box-sizing: border-box; pointer-events: auto; }
+    
+    .task-arrow {
+        position: absolute; bottom: 0px; left: 13px; right: 4px; height: 2px; background: var(--task-color); z-index: -1;
+    }
+    .task-arrow::after {
+        content: ''; position: absolute; right: -2px; top: -3.5px;
+        border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid var(--task-color);
+    }
+
+    .weekly-section { flex: 3; background: var(--cal-input-bg); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--cal-border); min-width: 320px; }
+    .weekly-title { font-size: 1.3em; font-weight: 800; color: var(--cal-text); margin-bottom: 15px; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; }
+    .weekly-list { max-height: 700px; overflow-y: auto; padding-right: 5px; }
+
+    .clean-weekly-card {
+        margin-bottom: 10px; padding: 14px 16px; background: var(--cal-soft); border-radius: 10px; 
+        border: 1px solid var(--cal-border); box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        transition: 0.2s;
+    }
+    .clean-weekly-card:hover { border-color: var(--cal-blue); transform: translateY(-1px); }
+    .cwc-header { font-size: 0.95rem; font-weight: 700; color: var(--cal-text); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+    .cwc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+    .cwc-body { font-size: 0.85rem; color: var(--cal-gray); line-height: 1.5; word-break: keep-all; padding-left: 18px; font-weight: 500; }
+    .cwc-schedule-item { padding: 7px 0; border-top: 1px dashed var(--cal-border); }
+    .cwc-schedule-item:first-child { border-top: 0; padding-top: 2px; }
+    .cwc-schedule-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+    .cwc-school-date { color: var(--cal-gray); }
+    .cwc-time { color: var(--cal-text); font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+    .cwc-time i { margin-right: 4px; color: var(--cal-gray); }
+    .cwc-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; padding: 7px 9px; border-radius: 6px; background: rgba(0,0,0,0.035); color: var(--cal-gray); font-size: 0.8rem; font-weight: 500; line-height: 1.45; word-break: break-word; }
+    .cwc-note i { margin-top: 3px; flex: 0 0 auto; color: var(--cal-gray); }
+    
+    /* 버튼 테마 적용 */
+    .btn-primary { background: var(--cal-blue); border-color: var(--cal-blue); color: #ffffff; }
+    .btn-primary:hover { filter: brightness(0.9); }
+
+    /* 3) 모달창 유리효과 제거 및 테마 적용 */
+    .sd-modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
+    .sd-modal-content { 
+        background: #ffffff !important; 
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        width: 500px; margin: 140px auto; padding: 25px 30px; border-radius: 16px; 
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+        color: var(--cal-text); 
+        border: 1px solid var(--cal-border);
+    }
+    
+    #editTaskModal .sd-modal-content, #addTaskModal .sd-modal-content { width: 450px; margin: 150px auto; padding: 30px; }
+    
+    .sd-modal-content input, .sd-modal-content select, .sd-modal-content textarea {
+        background: var(--cal-soft);
+        color: var(--cal-text);
+        border: 1px solid var(--cal-border);
+        transition: border-color 0.2s;
+    }
+    .sd-modal-content input:focus, .sd-modal-content select:focus, .sd-modal-content textarea:focus {
+        outline: none;
+        border-color: var(--cal-blue);
+    }
+</style>
+
+<div class="calendar-container">
+    <div class="page-header">
+        <h1 style="margin:0; color:var(--cal-text);"><i class="fas fa-calendar-alt" style="color:var(--cal-blue);"></i> 전사 통합 캘린더</h1>
+        <button class="btn btn-primary" style="padding: 10px 20px; border-radius:8px; cursor: pointer;" onclick="window.history.back()"><i class="fas fa-arrow-left"></i> 업무공간으로</button>
+    </div>
+
+    <!-- 💡 calendar-layout의 top margin(여백)이 적용된 컨테이너 -->
+    <div class="calendar-layout">
+        <div class="big-cal-section">
+            <div class="cal-header-controls">
+                <button class="cal-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i> 이전달</button>
+                <div class="cal-month-title" id="bigCalTitle"></div>
+                <button class="cal-nav-btn" onclick="changeMonth(1)">다음달 <i class="fas fa-chevron-right"></i></button>
+            </div>
+            
+            <div style="display: flex; align-items: stretch; gap: 15px;">
+                <div style="flex-grow: 1; overflow: hidden; border-radius: 12px; border: 1px solid var(--cal-border); box-sizing: border-box; min-width: 0;">
+                    <table class="big-cal-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">월</th>
+                                <th style="width: 20%;">화</th>
+                                <th style="width: 20%;">수</th>
+                                <th style="width: 20%;">목</th>
+                                <th style="width: 20%;">금</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bigCalBody"></tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; justify-content: center; width: 48px; flex-shrink: 0;">
+                    <button class="side-nav-btn" style="flex: 1; min-height: 48px;" onclick="scrollWeeks(-1)" title="이전 주">
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                    <button class="side-nav-btn side-nav-btn-today" style="flex: 1; min-height: 48px;" onclick="goToThisWeek()" title="오늘(이번 주)">
+                        <i class="fas fa-calendar-day"></i>
+                    </button>
+                    <button class="side-nav-btn" style="flex: 1; min-height: 48px;" onclick="scrollWeeks(1)" title="다음 주">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="weekly-section">
+            <div class="weekly-title"><i class="fas fa-list-check" style="color:var(--cal-blue);"></i> 주간 스케줄 상세</div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: rgba(0,0,0,0.03); padding: 6px; border-radius: 8px;">
+                <button class="btn" style="padding: 4px 10px; font-size: 0.85rem; background: var(--cal-input-bg); border: 1px solid var(--cal-border); color: var(--cal-gray); cursor: pointer;" onclick="scrollWeeks(-1)"><i class="fas fa-chevron-left"></i> 전주</button>
+                <div id="weeklyDateRange" style="font-size: 0.9rem; color:var(--cal-gray); font-weight:700; text-align: center; flex-grow: 1;"></div>
+                <button class="btn" style="padding: 4px 10px; font-size: 0.85rem; background: var(--cal-input-bg); border: 1px solid var(--cal-border); color: var(--cal-gray); cursor: pointer;" onclick="scrollWeeks(1)">다음주 <i class="fas fa-chevron-right"></i></button>
+            </div>
+            
+            <div class="weekly-list" id="weeklyList"></div>
+        </div>
+    </div>
+</div>
+
+<div id="dayModal" class="sd-modal">
+    <div class="sd-modal-content" style="display: flex; flex-direction: column; min-height: 480px;">
+        <h2 id="dayModalTitle" style="margin-top: 0; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; color: var(--cal-navy); font-size:1.3rem;">일정 상세</h2>
+        <div id="dayModalList" style="flex-grow: 1; max-height: 550px; overflow-y: auto; margin-top: 15px; padding-right: 5px;"></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 25px;">
+            <button id="btnAddEvent" class="btn btn-primary" style="padding:8px 20px; border-radius:8px;"><i class="fas fa-plus"></i> 일정 추가</button>
+            <button class="btn" style="background:var(--cal-soft); color:var(--cal-gray); border:1px solid var(--cal-border); padding:8px 20px; cursor: pointer; border-radius: 8px;" onclick="closeModal('dayModal')">닫기</button>
+        </div>
+    </div>
+</div>
+
+<div id="editTaskModal" class="sd-modal">
+    <div class="sd-modal-content">
+        <h2 style="margin-top: 0; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; color: var(--cal-navy); font-size:1.2rem;">일정 수정</h2>
+        <form id="editTaskForm">
+            <input type="hidden" id="editTaskId">
+            <div style="margin-bottom: 15px;">
+                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">일정 분류</label>
+                <select id="editTaskTitle" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                    <option value="수강생모집">수강생모집</option>
+                    <option value="추가모집">추가모집</option>
+                    <option value="학교결재">학교결재</option>
+                    <option value="공개수업">공개수업</option>
+                    <option value="체험부스">체험부스</option>
+                    <option value="발표회">발표회</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">시작</label>
+                    <input type="date" id="editStartDate" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                    <input type="time" id="editStartTime" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">종료</label>
+                    <input type="date" id="editEndDate" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                    <input type="time" id="editEndTime" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">메모</label>
+                <textarea id="editTaskNote" style="width:100%; padding:8px; border-radius:6px; margin-top:5px; height:60px; resize:none;"></textarea>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" style="background:var(--cal-soft); color:var(--cal-gray); border:1px solid var(--cal-border); padding:8px 16px; margin-right:5px; border-radius: 6px; cursor: pointer;" onclick="closeModal('editTaskModal')">취소</button>
+                <button type="button" class="btn btn-primary" style="border:none; padding:8px 16px; border-radius:6px; cursor: pointer;" onclick="submitEditTask()">수정완료</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="addTaskModal" class="sd-modal">
+    <div class="sd-modal-content">
+        <h2 style="margin-top: 0; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; color: var(--cal-navy); font-size:1.2rem;">일정 추가</h2>
+        <form id="addTaskForm">
+            <div style="margin-bottom: 15px;">
+                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">학교 선택</label>
+                <select id="addSchoolId" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;" required>
+                    </select>
+                <div style="font-size:0.75rem; color:var(--cal-gray); margin-top:4px;">* 기존 일정이 1건 이상 등록된 학교만 조회됩니다. 신규 학교 일정은 개별 업무공간에서 작성해 주세요.</div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">일정 분류</label>
+                <select id="addTaskTitle" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;" required>
+                    <option value="" disabled selected>일정 분류를 선택하세요</option>
+                    <option value="수강생모집">수강생모집</option>
+                    <option value="추가모집">추가모집</option>
+                    <option value="학교결재">학교결재</option>
+                    <option value="공개수업">공개수업</option>
+                    <option value="체험부스">체험부스</option>
+                    <option value="발표회">발표회</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:15px;">
+                <div style="flex:1;">
+                    <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">시작</label>
+                    <input type="date" id="addStartDate" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;" required>
+                    <input type="time" id="addStartTime" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">종료</label>
+                    <input type="date" id="addEndDate" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                    <input type="time" id="addEndTime" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;">
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">메모</label>
+                <textarea id="addTaskNote" style="width:100%; padding:8px; border-radius:6px; margin-top:5px; height:60px; resize:none;"></textarea>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" class="btn" style="background:var(--cal-soft); color:var(--cal-gray); border:1px solid var(--cal-border); padding:8px 16px; margin-right:5px; border-radius: 6px; cursor: pointer;" onclick="closeModal('addTaskModal')">취소</button>
+                <button type="button" class="btn btn-primary" style="border:none; padding:8px 16px; border-radius:6px; cursor: pointer;" onclick="submitAddTask()">등록완료</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const currentUser = "{{ session.get('user_name', '') }}";
+    const currentUserLevel = parseInt("{{ session.get('user_level', 99) }}");
+
+    const rawTasks = {{ all_tasks | tojson | safe }};
+    const holidays = [
+        '2026-01-01', '2026-03-01', '2026-05-05', '2026-06-03', '2026-06-06', 
+        '2026-07-17', '2026-08-15', '2026-10-03', '2026-10-09', '2026-12-25'
+    ]; 
+    
+    const tasks = rawTasks.map(t => {
+        let shortName = t.school_name.replace('초등학교', '초').replace('중학교', '중').replace('고등학교', '고');
+        return { ...t, start: t.start_date, end: t.end_date || t.start_date, shortSchool: shortName };
+    });
+
+    let groupedMap = {};
+    tasks.forEach(t => {
+        let key = `${t.title}_${t.start}_${t.end}`;
+        if (!groupedMap[key]) {
+            groupedMap[key] = { id: key, title: t.title, start: t.start, end: t.end, schools: [t.shortSchool] };
+        } else {
+            if(!groupedMap[key].schools.includes(t.shortSchool)) {
+                groupedMap[key].schools.push(t.shortSchool);
+            }
+        }
+    });
+    
+    const groupedTasks = Object.values(groupedMap).sort((a, b) => {
+        if(a.start !== b.start) return a.start.localeCompare(b.start);
+        if(a.title !== b.title) return a.title.localeCompare(b.title);
+        return a.end.localeCompare(b.end);
+    });
+
+    let currentDate = new Date();
+    let currentWeeklyDate = new Date();
+    let currentYear = currentDate.getFullYear();
+    let currentMonth = currentDate.getMonth();
+
+    let currentMonthGrid = [];
+    let currentMonthSlots = [];
+    let currentVisibleWeekIndex = 0;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        initBigCalendar();
+    });
+
+    function initBigCalendar() {
+        renderCalendar(currentYear, currentMonth);
+        renderWeeklySchedule(currentDate);
+    }
+
+    function changeMonth(delta) {
+        currentMonth += delta;
+        if (currentMonth < 0) { currentMonth = 11; currentYear--; } 
+        else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+        
+        currentDate = new Date(currentYear, currentMonth, 1);
+        renderCalendar(currentYear, currentMonth);
+        renderWeeklySchedule(currentDate);
+    }
+
+    function getFormattedDate(y, m, d) {
+        return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    }
+
+    function handleDayClick(dateStr) {
+        currentWeeklyDate = new Date(dateStr);
+        renderWeeklySchedule(currentWeeklyDate);
+        openDayModal(dateStr);
+    }
+
+    function goToThisWeek() {
+        currentWeeklyDate = new Date();
+        let targetMonth = currentWeeklyDate.getMonth();
+        let targetYear = currentWeeklyDate.getFullYear();
+
+        if (targetMonth !== currentMonth || targetYear !== currentYear) {
+            currentMonth = targetMonth;
+            currentYear = targetYear;
+            renderCalendar(currentYear, currentMonth);
+        } else {
+            let targetDateStr = getFormattedDate(currentWeeklyDate.getFullYear(), currentWeeklyDate.getMonth() + 1, currentWeeklyDate.getDate());
+            let foundIdx = 0;
+            currentMonthGrid.forEach((w, idx) => {
+                if(w.some(d => d.dateStr === targetDateStr)) foundIdx = idx;
+            });
+            currentVisibleWeekIndex = foundIdx;
+            
+            if(currentVisibleWeekIndex > currentMonthGrid.length - 3) {
+                currentVisibleWeekIndex = currentMonthGrid.length - 3;
+            }
+            drawVisibleWeeks();
+        }
+        renderWeeklySchedule(currentWeeklyDate);
+    }
+
+    function scrollWeeks(delta) {
+        currentWeeklyDate.setDate(currentWeeklyDate.getDate() + (delta * 7));
+        
+        let targetMonth = currentWeeklyDate.getMonth();
+        let targetYear = currentWeeklyDate.getFullYear();
+
+        if (targetMonth !== currentMonth || targetYear !== currentYear) {
+            currentMonth = targetMonth;
+            currentYear = targetYear;
+            renderCalendar(currentYear, currentMonth);
+        } else {
+            let targetDateStr = getFormattedDate(currentWeeklyDate.getFullYear(), currentWeeklyDate.getMonth() + 1, currentWeeklyDate.getDate());
+            let foundIdx = 0;
+            currentMonthGrid.forEach((w, idx) => {
+                if(w.some(d => d.dateStr === targetDateStr)) foundIdx = idx;
+            });
+            currentVisibleWeekIndex = foundIdx;
+            
+            if(currentVisibleWeekIndex > currentMonthGrid.length - 3) {
+                currentVisibleWeekIndex = currentMonthGrid.length - 3;
+            }
+            drawVisibleWeeks();
+        }
+        renderWeeklySchedule(currentWeeklyDate);
+    }
+
+    function handleScrollClick(e, weekDatesStrList) {
+        let scrollArea = e.currentTarget;
+        let rect = scrollArea.getBoundingClientRect();
+        let clickX = e.clientX - rect.left;
+        
+        if (clickX > scrollArea.clientWidth) return; 
+        
+        let colIdx = Math.floor(clickX / (scrollArea.clientWidth / 5));
+        if(colIdx > 4) colIdx = 4;
+        if(colIdx < 0) colIdx = 0;
+        
+        handleDayClick(weekDatesStrList[colIdx + 1]);
+    }
+
+    function renderCalendar(year, month) {
+        document.getElementById('bigCalTitle').innerText = `${year}. ${String(month + 1).padStart(2, '0')}`;
+        
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+        const prevLastDate = new Date(year, month, 0).getDate();
+        
+        let gridDates = [];
+        let pDate = prevLastDate - firstDay + 1;
+        let cDate = 1, nDate = 1;
+        
+        for (let i = 0; i < 6; i++) {
+            let week = [];
+            for (let j = 0; j < 7; j++) {
+                let cellData = { isCurrent: true, dateNum: 0, dateStr: '' };
+                if (i === 0 && j < firstDay) {
+                    cellData.isCurrent = false; cellData.dateNum = pDate;
+                    cellData.dateStr = getFormattedDate(month === 0 ? year-1 : year, month === 0 ? 12 : month, pDate);
+                    pDate++;
+                } else if (cDate > lastDate) {
+                    cellData.isCurrent = false; cellData.dateNum = nDate;
+                    cellData.dateStr = getFormattedDate(month === 11 ? year+1 : year, month === 11 ? 1 : month+2, nDate);
+                    nDate++;
+                } else {
+                    cellData.dateNum = cDate;
+                    cellData.dateStr = getFormattedDate(year, month+1, cDate);
+                    cDate++;
+                }
+                week.push(cellData);
+            }
+            gridDates.push(week);
+        }
+
+        currentMonthGrid = gridDates;
+        currentMonthSlots = [];
+
+        gridDates.forEach(week => {
+            let weekStart = week[1].dateStr; 
+            let weekEnd = week[5].dateStr;   
+            
+            let weekTasks = groupedTasks.filter(t => t.start <= weekEnd && t.end >= weekStart);
+            let slots = [];
+            weekTasks.forEach(t => {
+                let sIdx = week.findIndex(d => d.dateStr === t.start);
+                if (sIdx === -1 || sIdx < 1) sIdx = 1; 
+                let eIdx = week.findIndex(d => d.dateStr === t.end);
+                if (eIdx === -1 || eIdx > 5) eIdx = 5; 
+                
+                let foundSlot = -1;
+                for(let s=0; s<50; s++) { 
+                    if(!slots[s]) slots[s] = Array(7).fill(false);
+                    let canFit = true;
+                    for(let d=sIdx; d<=eIdx; d++) { if(slots[s][d]) { canFit = false; break; } }
+                    if(canFit) {
+                        foundSlot = s;
+                        for(let d=sIdx; d<=eIdx; d++) slots[s][d] = t;
+                        break;
+                    }
+                }
+            });
+            currentMonthSlots.push(slots);
+        });
+
+        let targetDateStr = getFormattedDate(currentWeeklyDate.getFullYear(), currentWeeklyDate.getMonth() + 1, currentWeeklyDate.getDate());
+        let foundIdx = 0;
+        currentMonthGrid.forEach((w, idx) => {
+            if(w.some(d => d.dateStr === targetDateStr)) foundIdx = idx;
+        });
+        
+        currentVisibleWeekIndex = foundIdx;
+        
+        if(currentVisibleWeekIndex > currentMonthGrid.length - 3) {
+            currentVisibleWeekIndex = currentMonthGrid.length - 3;
+        }
+        
+        drawVisibleWeeks();
+    }
+
+    function drawVisibleWeeks() {
+        let tbodyHtml = '';
+        const todayStr = getFormattedDate(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate());
+
+        for (let i = currentVisibleWeekIndex; i < currentVisibleWeekIndex + 3; i++) {
+            if (i >= currentMonthGrid.length) break;
+            
+            let week = currentMonthGrid[i];
+            let slots = currentMonthSlots[i];
+            
+            let seenTitlesPerDay = {1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set()};
+            
+            let bgHtml = '';
+            for(let j = 1; j <= 5; j++) {
+                let day = week[j];
+                let colorClass = holidays.includes(day.dateStr) ? 'color-holiday' : '';
+                let classes = `day-col ${!day.isCurrent ? 'other-month' : ''} ${day.dateStr === todayStr ? 'td-today' : ''}`;
+                bgHtml += `<div class="${classes}" onclick="handleDayClick('${day.dateStr}')"><div class="cal-date-num ${colorClass}">${day.dateNum}</div></div>`;
+            }
+            
+            let eventsHtml = '';
+            for(let s=0; s<slots.length; s++) {
+                for(let d=1; d<=5; d++) {
+                    if(slots[s] && slots[s][d]) {
+                        let task = slots[s][d];
+                        if (task.start === week[d].dateStr || (d === 1 && task.start <= week[d].dateStr)) {
+                            let span = 1;
+                            for(let k=d+1; k<=5; k++) { if(slots[s][k] && slots[s][k].id === task.id) span++; else break; }
+                            
+                            let schoolsText = task.schools.join(', '); 
+                            
+                            let hideTitle = false;
+                            if (seenTitlesPerDay[d].has(task.title)) {
+                                hideTitle = true;
+                            } else {
+                                seenTitlesPerDay[d].add(task.title);
+                            }
+                            
+                            let dotHtml = hideTitle 
+                                ? `<span style="display:inline-block; width:8px; height:8px; margin-right:5px; flex-shrink:0;"></span>` 
+                                : `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:var(--task-color); flex-shrink:0; margin-right:5px;"></span>`;
+                            
+                            let titleHtml = hideTitle
+                                ? `<span style="visibility:hidden; font-size:0.85rem; font-weight:800; margin-right:6px;">${task.title}</span>`
+                                : `<span style="font-size:0.85rem; font-weight:800; color:var(--cal-text); margin-right:6px;">${task.title}</span>`;
+                                
+                            let arrowHtml = task.start !== task.end ? `
+                                <div style="flex-grow: 1; height: 2px; background-color: var(--task-color); position: relative; min-width: 15px; margin-left: 6px;">
+                                    <div style="position: absolute; right: -2px; top: -3.5px; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid var(--task-color);"></div>
+                                </div>
+                            ` : '';
+                            
+                            eventsHtml += `
+                                <div style="--task-color: ${getTaskColor(task.title)}; position: absolute; top: ${s * 26 + 4}px; left: calc(100% / 5 * ${d - 1}); width: calc(100% / 5 * ${span}); height: 26px; padding: 0 4px; box-sizing: border-box;">
+                                    <div style="display: flex; align-items: center; width: 100%; height: 100%;">
+                                        <div style="display: flex; align-items: center; white-space: nowrap; flex-shrink: 0;">
+                                            ${dotHtml}
+                                            ${titleHtml}
+                                            <span style="font-size: 0.85rem; color: var(--cal-gray); font-weight: 600;">${schoolsText}</span>
+                                        </div>
+                                        ${arrowHtml}
+                                    </div>
+                                </div>
+                            `;
+                            d += span - 1;
+                        }
+                    }
+                }
+            }
+            
+            let innerHeight = Math.max(188, slots.length * 26 + 10);
+            let weekDatesStrJson = JSON.stringify(week.map(w => w.dateStr)).replace(/"/g, "'");
+
+            tbodyHtml += `
+                <tr>
+                    <td colspan="5" class="week-cell" style="${i === currentVisibleWeekIndex + 2 ? 'border-bottom: none;' : ''}">
+                        <div class="week-container">
+                            <div class="week-bg">${bgHtml}</div>
+                            <div class="week-events-scroll" onclick="handleScrollClick(event, ${weekDatesStrJson})">
+                                <div style="height: ${innerHeight}px; position: relative;">
+                                    ${eventsHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        document.getElementById('bigCalBody').innerHTML = tbodyHtml;
+    }
+
+    function openDayModal(dateStr) {
+        document.getElementById('dayModalTitle').innerHTML = `<i class="fas fa-calendar-day" style="color:var(--cal-blue);"></i> ${dateStr} 일정 상세`;
+        
+        document.getElementById('btnAddEvent').setAttribute('onclick', `openAddTask('${dateStr}')`);
+        
+        const dayTasks = tasks.filter(t => t.start <= dateStr && t.end >= dateStr);
+        const listEl = document.getElementById('dayModalList');
+        
+        if(dayTasks.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--cal-gray); padding:30px; text-align:center; background:var(--cal-soft); border-radius:10px; border:1px solid var(--cal-border);">해당 일자에 등록된 일정이 없습니다.</div>';
+        } else {
+            let grouped = {};
+            dayTasks.forEach(t => {
+                if(!grouped[t.shortSchool]) grouped[t.shortSchool] = [];
+                grouped[t.shortSchool].push(t);
+            });
+            
+            let html = '';
+            for (const [school, groupTasks] of Object.entries(grouped)) {
+                html += `
+                    <div style="padding:16px; background:var(--cal-input-bg); border:1px solid var(--cal-border); margin-bottom:12px; border-radius:12px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                        <div style="font-weight:700; color:var(--cal-blue); font-size:0.95rem; margin-bottom:10px; display:flex; align-items:center; gap:6px; border-bottom:1px solid rgba(0,0,0,0.05); padding-bottom:8px;">
+                            <i class="fas fa-school"></i> ${school}
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            ${groupTasks.map(t => {
+                                let color = getTaskColor(t.title);
+                                let canManage = (currentUser === t.owner || currentUserLevel <= 7);
+                                
+                                return `
+                                <div style="display:flex; flex-direction:column; padding-left: 8px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                                        <div style="display:flex; align-items:center; gap:6px;">
+                                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:${color};"></span>
+                                            <span style="font-size:0.85rem; color:var(--cal-text); font-weight:600;">${t.title}</span>
+                                        </div>
+                                        <span style="font-size:0.8rem; color:var(--cal-gray); font-weight:500;"><i class="far fa-clock" style="margin-right:4px;"></i>${t.start_time || '종일'} ${t.end_time ? '~ ' + t.end_time : ''}</span>
+                                    </div>
+                                    ${t.note ? `<div style="font-size:0.8rem; color:var(--cal-gray); background:rgba(0,0,0,0.02); padding:8px 12px; border-radius:6px; margin-left:14px; margin-top:6px; line-height:1.4;">${t.note}</div>` : ''}
+                                    
+                                    ${canManage ? `
+                                        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px; border-top:1px dashed rgba(0,0,0,0.05); padding-top:6px; margin-left:14px;">
+                                            <button onclick="openEditTask(${t.id})" style="background:none; border:none; color:var(--cal-blue); font-size:0.75rem; font-weight:700; cursor:pointer;"><i class="fas fa-edit"></i> 수정</button>
+                                            <button onclick="deleteTask(${t.id})" style="background:none; border:none; color:#ef4444; font-size:0.75rem; font-weight:700; cursor:pointer;"><i class="fas fa-trash"></i> 삭제</button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `}).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            listEl.innerHTML = html;
+        }
+        document.getElementById('dayModal').style.display = 'block';
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    
+    function openAddTask(dateStr) {
+        const uniqueSchools = [];
+        const schoolSet = new Set();
+        rawTasks.forEach(t => {
+            if(!schoolSet.has(t.school_id)) {
+                schoolSet.add(t.school_id);
+                uniqueSchools.push({id: t.school_id, name: t.school_name});
+            }
+        });
+        
+        const schoolSelect = document.getElementById('addSchoolId');
+        if(uniqueSchools.length > 0) {
+            schoolSelect.innerHTML = uniqueSchools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        } else {
+            schoolSelect.innerHTML = `<option value="">업무공간에서 먼저 일정을 등록해주세요.</option>`;
+        }
+
+        document.getElementById('addStartDate').value = dateStr;
+        document.getElementById('addEndDate').value = dateStr;
+        document.getElementById('addTaskTitle').value = '';
+        document.getElementById('addStartTime').value = '';
+        document.getElementById('addEndTime').value = '';
+        document.getElementById('addTaskNote').value = '';
+        
+        closeModal('dayModal');
+        document.getElementById('addTaskModal').style.display = 'block';
+    }
+
+    async function submitAddTask() {
+        const schoolId = document.getElementById('addSchoolId').value;
+        const title = document.getElementById('addTaskTitle').value;
+        const startDate = document.getElementById('addStartDate').value;
+        
+        if(!schoolId) return alert("학교를 선택해주세요.");
+        if(!title || !startDate) return alert("일정 분류와 시작일을 입력하세요.");
+
+        const data = {
+            school_id: schoolId,
+            title: title,
+            start_date: startDate,
+            start_time: document.getElementById('addStartTime').value,
+            end_date: document.getElementById('addEndDate').value || startDate,
+            end_time: document.getElementById('addEndTime').value,
+            note: document.getElementById('addTaskNote').value
+        };
+
+        try {
+            const res = await fetch('/school/save_task', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify(data)
+            });
+            if(res.ok) {
+                alert("일정이 성공적으로 추가되었습니다.");
+                location.reload();
+            } else {
+                alert("권한이 없거나 등록에 실패했습니다.");
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function openEditTask(id) {
+        const task = tasks.find(t => t.id === id);
+        if(!task) return;
+        document.getElementById('editTaskId').value = task.id;
+        document.getElementById('editTaskTitle').value = task.title;
+        document.getElementById('editStartDate').value = task.start_date;
+        document.getElementById('editStartTime').value = task.start_time || '';
+        document.getElementById('editEndDate').value = task.end_date || task.start_date;
+        document.getElementById('editEndTime').value = task.end_time || '';
+        document.getElementById('editTaskNote').value = task.note || '';
+        
+        closeModal('dayModal');
+        document.getElementById('editTaskModal').style.display = 'block';
+    }
+    
+    async function submitEditTask() {
+        const id = document.getElementById('editTaskId').value;
+        const data = {
+            title: document.getElementById('editTaskTitle').value,
+            start_date: document.getElementById('editStartDate').value,
+            start_time: document.getElementById('editStartTime').value,
+            end_date: document.getElementById('editEndDate').value,
+            end_time: document.getElementById('editEndTime').value,
+            note: document.getElementById('editTaskNote').value
+        };
+        try {
+            const res = await fetch(`/school/edit_task/${id}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+            });
+            if(res.ok) {
+                alert("성공적으로 수정되었습니다.");
+                location.reload();
+            } else {
+                alert("권한이 없거나 수정에 실패했습니다.");
+            }
+        } catch(e) { console.error(e); }
+    }
+    
+    async function deleteTask(id) {
+        if(!confirm("이 일정을 정말 삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/school/delete_task/${id}`, { method: 'POST' });
+            if(res.ok) {
+                alert("정상적으로 삭제되었습니다.");
+                location.reload();
+            } else {
+                alert("권한이 없거나 삭제에 실패했습니다.");
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function getTaskColor(title) {
+        const colors = {
+            '수강생모집': '#059669', '추가모집': '#047857', '학교결재': '#d97706', 
+            '공개수업': '#7c3aed', '체험부스': '#db2777', '발표회': '#0284c7', '기타': '#475569'        
+        };
+        return colors[title] || 'var(--cal-blue)';
+    }
+
+    function escapeCalendarHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        })[char]);
+    }
+
+    function renderWeeklySchedule(baseDate) {
+        const dayOfWeek = baseDate.getDay();
+        const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; 
+        
+        const startDate = new Date(baseDate);
+        startDate.setDate(baseDate.getDate() - diff); 
+        
+        const endDate = new Date(startDate);
+        endDate.setDate(startDate.getDate() + 4); 
+        
+        const startStr = getFormattedDate(startDate.getFullYear(), startDate.getMonth()+1, startDate.getDate());
+        const endStr = getFormattedDate(endDate.getFullYear(), endDate.getMonth()+1, endDate.getDate());
+        
+        document.getElementById('weeklyDateRange').innerText = `${startStr} ~ ${endStr}`;
+        const weeklyListEl = document.getElementById('weeklyList');
+        weeklyListEl.innerHTML = '';
+        
+        const weekTasks = tasks.filter(t => t.start <= endStr && t.end >= startStr);
+        
+        if(weekTasks.length === 0) {
+            weeklyListEl.innerHTML = '<div style="text-align:center; padding: 40px 0; color:var(--cal-gray);">이번 주에 등록된 일정이 없습니다.</div>';
+            return;
+        }
+
+        let groupedByTitle = {};
+        
+        weekTasks.forEach(t => {
+            if (!groupedByTitle[t.title]) { groupedByTitle[t.title] = []; }
+            
+            let sDate = new Date(t.start);
+            let eDate = new Date(t.end);
+            let sStr = (sDate.getMonth() + 1) + '/' + sDate.getDate();
+            let eStr = (eDate.getMonth() + 1) + '/' + eDate.getDate();
+            
+            let dateRangeStr = (t.start === t.end) ? sStr : `${sStr}~${eStr}`;
+            let schoolInfo = `${t.shortSchool}(${dateRangeStr})`;
+
+            let startTime = String(t.start_time || '').trim();
+            let endTime = String(t.end_time || '').trim();
+            let timeLabel = '종일';
+            if (startTime && endTime) timeLabel = `${startTime} ~ ${endTime}`;
+            else if (startTime) timeLabel = startTime;
+            else if (endTime) timeLabel = `~ ${endTime}`;
+
+            let note = String(t.note || '').trim();
+            let detailKey = [schoolInfo, startTime, endTime, note].join('|');
+            if (!groupedByTitle[t.title].some(item => item.key === detailKey)) {
+                groupedByTitle[t.title].push({ key: detailKey, schoolInfo, timeLabel, note });
+            }
+        });
+
+        let html = '';
+        for (const [title, schedules] of Object.entries(groupedByTitle)) {
+            let color = getTaskColor(title);
+            let scheduleHtml = schedules.map(schedule => `
+                <div class="cwc-schedule-item">
+                    <div class="cwc-schedule-meta">
+                        <span class="cwc-school-date">${escapeCalendarHtml(schedule.schoolInfo)}</span>
+                        <span class="cwc-time"><i class="far fa-clock"></i>${escapeCalendarHtml(schedule.timeLabel)}</span>
+                    </div>
+                    ${schedule.note ? `
+                        <div class="cwc-note">
+                            <i class="far fa-note-sticky"></i>
+                            <span>${escapeCalendarHtml(schedule.note).replace(/\r?\n/g, '<br>')}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            html += `
+                <div class="clean-weekly-card">
+                    <div class="cwc-header">
+                        <span class="cwc-dot" style="background-color: ${color};"></span>
+                        <span style="color:var(--cal-text);">${escapeCalendarHtml(title)}</span>
+                    </div>
+                    <div class="cwc-body" style="color:var(--cal-gray);">
+                        ${scheduleHtml}
+                    </div>
+                </div>
+            `;
+        }
+        
+        weeklyListEl.innerHTML = html;
+    }
+</script>
+{% endblock %}

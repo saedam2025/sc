@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* 테두리(border)와 그림자(box-shadow) 제거 적용 */
+    .admin-box { max-width: 600px; margin: 40px auto; background: #fff; padding: 40px; border: none; border-radius: 16px; box-shadow: none; }
+    .admin-title { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+    
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-weight: 700; color: #475569; margin-bottom: 8px; font-size: 0.9rem; }
+    .form-input { width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.95rem; background: #f8fafc; transition: 0.2s; box-sizing: border-box; }
+    .form-input:focus { border-color: #3b82f6; background: #fff; outline: none; }
+    
+    .perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    
+    .btn-submit { width: 100%; background: #1e3a8a; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+    .btn-submit:hover { background: #1e40af; }
+</style>
+
+<div class="admin-box">
+    <div class="admin-title">
+        <i class="fa-solid fa-folder-plus" style="color: #3b82f6;"></i> 신규 게시판 생성
+    </div>
+
+    <form id="createBoardForm" onsubmit="event.preventDefault(); submitCreateBoard();">
+        <div class="form-group">
+            <label>게시판 영문 ID (URL 주소로 사용됨)</label>
+            <input type="text" id="name_en" class="form-input" placeholder="예: news, free, data" required>
+        </div>
+        
+        <div class="form-group">
+            <label>게시판 한글 이름</label>
+            <input type="text" id="name_kr" class="form-input" placeholder="예: 새담소식" required>
+        </div>
+        
+        <div class="form-group">
+            <label>게시판 설명 (타이틀 하단 표시)</label>
+            <input type="text" id="desc_text" class="form-input" placeholder="예: News & Notice">
+        </div>
+
+        <hr style="border: 0; border-top: 1px dashed #cbd5e1; margin: 30px 0;">
+        <h4 style="margin-top: 0; margin-bottom: 15px; color: #1e293b; font-weight: 700;">권한 설정 (레벨)</h4>
+        <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 20px;">* 숫자가 낮을수록 높은 권한입니다. (1:최고관리자, 10:일반사원 전체)</p>
+
+        <div class="perm-grid">
+            <div class="form-group">
+                <label>접근(목록 보기) 권한</label>
+                <input type="number" id="lvl_access" class="form-input" value="10" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label>게시글 읽기 권한</label>
+                <input type="number" id="lvl_read" class="form-input" value="10" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label>글쓰기 권한</label>
+                <input type="number" id="lvl_write" class="form-input" value="2" min="1" max="10">
+            </div>
+            <div class="form-group">
+                <label>게시글 삭제 권한</label>
+                <input type="number" id="lvl_delete" class="form-input" value="2" min="1" max="10">
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>댓글 쓰기 권한</label>
+                <input type="number" id="lvl_comment" class="form-input" value="10" min="1" max="10">
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">게시판 생성하기</button>
+    </form>
+</div>
+
+<script>
+    async function submitCreateBoard() {
+        const payload = {
+            name_en: document.getElementById('name_en').value.trim(),
+            name_kr: document.getElementById('name_kr').value.trim(),
+            desc_text: document.getElementById('desc_text').value.trim(),
+            lvl_access: parseInt(document.getElementById('lvl_access').value),
+            lvl_read: parseInt(document.getElementById('lvl_read').value),
+            lvl_write: parseInt(document.getElementById('lvl_write').value),
+            lvl_delete: parseInt(document.getElementById('lvl_delete').value),
+            lvl_comment: parseInt(document.getElementById('lvl_comment').value)
+        };
+
+        try {
+            // 우리가 미리 만들어둔 API로 POST 요청을 보냅니다.
+            const res = await fetch('/board/admin/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            
+            if (res.ok) {
+                alert(result.message); // 생성 완료 메시지
+                // 생성된 게시판으로 바로 이동
+                location.href = '/board/' + payload.name_en; 
+            } else {
+                alert(result.message || '생성 실패');
+            }
+        } catch (error) {
+            alert('서버 오류가 발생했습니다.');
+        }
+    }
+</script>
+{% endblock %}

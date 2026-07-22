@@ -1,0 +1,770 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    /* === 다이나믹 테마 변수 매핑 === */
+    :root {
+        --saedam-blue: var(--primary-color, #004ea2);
+        --saedam-blue-light: var(--widget-hover, rgba(0, 78, 162, 0.08));
+        --glass-bg: var(--card-bg, rgba(255, 255, 255, 0.85));
+        --shadow-md: var(--card-shadow, 0 10px 25px -5px rgba(0, 0, 0, 0.08));
+        --border-color: var(--card-border, #e2e8f0);
+        --border-light: rgba(0,0,0,0.05);
+        --text-dark: var(--text-dark, #1e293b);
+        --text-gray: var(--text-gray, #64748b);
+        --input-bg: var(--input-bg, #ffffff);
+    }
+
+    .school-container { 
+        width: 100%; 
+        max-width: none; 
+        min-height: 85vh; 
+        margin: 0 auto; 
+        padding: 30px; 
+        background: var(--glass-bg); 
+        /* 1) 유리 효과 제거 */
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border-radius: 20px; 
+        border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-md); 
+        font-family: 'Pretendard', sans-serif; 
+        box-sizing: border-box;
+        position: relative;
+        z-index: 2;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .page-title {
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0;
+        letter-spacing: -0.5px;
+    }
+
+    .dashboard-layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 25px;
+        align-items: start;
+    }
+
+    .category-sidebar {
+        background: var(--input-bg);
+        /* 1) 유리 효과 제거 */
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 20px 15px;
+        box-shadow: var(--shadow-md);
+        position: sticky;
+        top: 20px;
+    }
+
+    .category-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .category-list li {
+        margin-bottom: 6px;
+    }
+
+    .category-btn {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        padding: 12px 16px;
+        border-radius: 12px;
+        color: var(--text-gray);
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: all 0.3s;
+    }
+
+    .category-btn:hover {
+        background: var(--saedam-blue-light);
+        color: var(--saedam-blue);
+        transform: translateX(5px);
+    }
+
+    .category-btn.active {
+        background: var(--saedam-blue);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 78, 162, 0.3);
+    }
+
+    .task-content-area {
+        background: var(--input-bg);
+        border-radius: 20px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        overflow: hidden;
+        min-height: 500px;
+    }
+
+    .task-toolbar {
+        padding: 25px;
+        background: transparent;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .filter-area {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: nowrap;
+    }
+
+    .glass-input {
+        padding: 10px 15px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: var(--glass-bg);
+        color: var(--text-dark);
+        font-weight: 500;
+        outline: none;
+        transition: 0.2s;
+        cursor: pointer;
+        flex-shrink: 0; 
+    }
+
+    .glass-input:focus {
+        border-color: var(--saedam-blue);
+        box-shadow: 0 0 0 3px rgba(0, 78, 162, 0.1);
+    }
+
+    .search-box {
+        border: 1px solid var(--border-color);
+        padding: 10px 15px;
+        border-radius: 10px;
+        background: var(--glass-bg);
+        display: flex;
+        align-items: center;
+        transition: 0.2s;
+        flex-shrink: 0;
+    }
+
+    .search-box:focus-within {
+        border-color: var(--saedam-blue);
+        box-shadow: 0 0 0 3px rgba(0, 78, 162, 0.1);
+    }
+
+    .search-box input {
+        border: none;
+        outline: none;
+        margin-left: 10px;
+        width: 100%;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+        background: transparent;
+    }
+
+    .btn-action {
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-action:hover {
+        filter: brightness(0.95);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .btn-action.wait { background: #fef3c7; color: #d97706; }
+    .btn-action.process { background: #dbeafe; color: #2563eb; }
+    .btn-action.done { background: #dcfce3; color: #16a34a; }
+
+    .table-wrap {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .task-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 950px;
+    }
+
+    .task-table th {
+        background: rgba(0,0,0,0.02);
+        color: var(--text-gray);
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 16px 15px;
+        border-bottom: 1px solid var(--border-color);
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .task-table td {
+        padding: 16px 15px;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 0.95rem;
+        color: var(--text-dark);
+    }
+
+    .task-row:hover {
+        background-color: rgba(0,0,0,0.02);
+        cursor: pointer;
+    }
+
+    .chk-box {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--saedam-blue);
+        cursor: pointer;
+    }
+
+    /* 2) 둥근 뱃지 스타일 제거, 일반 텍스트 형태로 유지 */
+    .badge {
+        display: inline-block;
+        padding: 0;
+        border-radius: 0;
+        border: none;
+        background: transparent !important;
+        font-size: 0.9rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .badge-school { color: var(--text-dark); font-weight: 700; }
+    .badge-cat { color: var(--saedam-blue); }
+    .status-접수 { color: #d97706; }
+    .status-처리중 { color: #2563eb; }
+    .status-완료 { color: #16a34a; }
+
+    #emptyState {
+        display: none;
+        text-align: center;
+        padding: 50px;
+    }
+    #emptyState p { color: var(--text-gray); }
+
+    .pagination-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 20px 0;
+        border-top: 1px solid var(--border-color);
+        background: transparent;
+    }
+
+    .page-btn {
+        border: 1px solid var(--border-color);
+        background: var(--input-bg);
+        padding: 6px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: var(--text-gray);
+        font-weight: 600;
+        transition: all 0.2s;
+        font-size: 0.9rem;
+    }
+
+    .page-btn:hover:not(:disabled) {
+        background: var(--saedam-blue-light);
+        color: var(--saedam-blue);
+        border-color: var(--saedam-blue);
+    }
+
+    .page-btn.active {
+        background: var(--saedam-blue);
+        color: #ffffff;
+        border-color: var(--saedam-blue);
+    }
+
+    .page-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: rgba(0,0,0,0.02);
+    }
+
+    @media (max-width: 900px) {
+        .dashboard-layout { grid-template-columns: 1fr; }
+        .category-sidebar { position: static; }
+        .filter-area { flex-wrap: wrap; }
+        .glass-input, .search-box { width: 100% !important; flex: 1 1 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="school-container">
+    <div class="page-header">
+        <div>
+            <h2 class="page-title">
+                <i class="fa-solid fa-layer-group" style="color: var(--saedam-blue); margin-right: 10px;"></i>
+                학교업무 통합 처리
+            </h2>
+            <div style="color: var(--text-gray); margin-top:5px;">
+                전체 학교의 업무 게시물을 분류별로 한곳에서 관리하고 결재 상태를 업데이트합니다.
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-layout">
+        <aside class="category-sidebar">
+            <ul class="category-list">
+                <li>
+                    <button type="button" class="category-btn active" onclick="filterCategory('all', this)">
+                        <i class="fa-solid fa-list"></i> 전체
+                    </button>
+                </li>
+
+                {% for cat in categories %}
+                <li>
+                    <button type="button" class="category-btn" onclick="filterCategory('{{ cat.name }}', this)">
+                        <i class="fa-solid {{ cat.icon }}"></i> {{ cat.name }}
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <div class="task-content-area">
+            
+            <div id="taskListView">
+                
+                <div class="task-toolbar">
+                    <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        
+                        <div class="filter-area">
+                            <select class="glass-input" id="schoolFilter" style="width: 180px;">
+                                <option value="all">모든 학교 보기</option>
+                            </select>
+
+                            <select class="glass-input" id="statusFilter" style="width: 130px;">
+                                <option value="all">상태 전체</option>
+                                <option value="접수">접수</option>
+                                <option value="처리중">처리중</option>
+                                <option value="완료">완료</option>
+                            </select>
+
+                            <div class="search-box" style="width: 250px;">
+                                <i class="fa-solid fa-magnifying-glass" style="color:var(--text-gray);"></i>
+                                <input type="text" id="searchInput" placeholder="제목, 내용 검색...">
+                            </div>
+                            
+                            <button type="button" class="btn-action" style="background:rgba(0,0,0,0.03); color:var(--text-gray); border:1px solid var(--border-color);" onclick="resetFilters()">
+                                <i class="fa-solid fa-rotate-left"></i> 초기화
+                            </button>
+                        </div>
+
+                        <div style="margin-left: auto; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                            <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">
+                                상태 변경:
+                            </span>
+                            <button type="button" onclick="changeStatus('접수')" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeStatus('처리중')" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
+                            <button type="button" onclick="changeStatus('완료')" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.02); padding: 12px 20px; border-radius: 10px; border: 1px dashed var(--border-color);">
+                        <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-gray); display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-chart-pie" style="color: var(--saedam-blue);"></i> 현재 조건 상태 요약
+                        </div>
+                        <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
+                        <div style="display: flex; gap: 24px; font-size: 0.9rem; font-weight: 600;">
+                            <span style="color: var(--text-gray); display: flex; align-items: center; gap: 6px;">전체 <span id="count-all" style="color: var(--text-dark); font-size: 1rem;">0</span></span>
+                            <span style="color: #d97706; display: flex; align-items: center; gap: 6px;">접수 <span id="count-wait" style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
+                            <span style="color: #2563eb; display: flex; align-items: center; gap: 6px;">처리중 <span id="count-process" style="background: #dbeafe; color: #2563eb; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
+                            <span style="color: #16a34a; display: flex; align-items: center; gap: 6px;">완료 <span id="count-done" style="background: #dcfce3; color: #16a34a; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="task-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">
+                                    <input type="checkbox" id="checkAll" class="chk-box" onclick="toggleAll()">
+                                </th>
+                                <th style="width: 50px;">No.</th>
+                                <th style="width: 130px;">학교명</th>
+                                <th style="width: 100px;">분류</th>
+                                <th>게시물 제목</th>
+                                <th style="width: 80px;">작성자</th>
+                                <th style="width: 100px;">등록일자</th>
+                                <th style="width: 80px; text-align: center;">상태</th>
+                                <th style="width: 80px; text-align: center;">처리자</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="taskTableBody">
+                            {% for task in tasks %}
+                            <tr class="task-row"
+                                data-category="{{ task.cat_name }}"
+                                data-school="{{ task.school_name }}"
+                                data-status="{{ task.status }}"
+                                onclick="openTaskDetail({{ task.id }})">
+
+                                <td style="text-align: center;" onclick="event.stopPropagation()">
+                                    <input type="checkbox" class="chk-box chk-item" value="{{ task.id }}">
+                                </td>
+
+                                <td style="color:var(--text-gray);">{{ task.id }}</td>
+
+                                <td>
+                                    <span class="badge badge-school">{{ task.school_name }}</span>
+                                </td>
+
+                                <td>
+                                    <span class="badge badge-cat">{{ task.cat_name }}</span>
+                                </td>
+
+                                <td style="font-weight: 600; color: var(--text-dark);">
+                                    {{ task.title }}
+                                </td>
+
+                                <td>{{ task.author }}</td>
+
+                                <td style="color:var(--text-gray); font-size: 0.85rem;">
+                                    {{ task.date }}
+                                </td>
+
+                                <td style="text-align: center;">
+                                    <span class="badge status-{{ task.status }}">{{ task.status }}</span>
+                                </td>
+
+                                <td style="text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-gray);">
+                                    {{ task.processor }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div id="paginationContainer" class="pagination-container" style="display: none;"></div>
+
+                <div id="emptyState">
+                    <p>해당 조건의 게시물이 없습니다.</p>
+                </div>
+            </div>
+
+            <div id="taskReadView" style="display: none; padding: 40px 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--saedam-blue); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                    <h2 id="rTitle" style="margin:0; color:var(--text-dark); font-size: 1.6em; flex: 1;">제목이 로딩중입니다...</h2>
+                    
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <div style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">상태 변경:</span>
+                            <button type="button" onclick="changeSingleStatus('접수')" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeSingleStatus('처리중')" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
+                            <button type="button" onclick="changeSingleStatus('완료')" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
+                        </div>
+                        <button class="btn-action" style="background:rgba(0,0,0,0.03); color:var(--text-gray); border: 1px solid var(--border-color); font-size: 0.9em; padding: 8px 16px; height: 100%;" onclick="showView('taskListView')">
+                            <i class="fa-solid fa-list"></i> 목록으로
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 15px; margin-bottom: 20px; color: var(--text-gray); font-size: 0.95em;">
+                    <span class="badge badge-cat" id="rCategory">카테고리</span>
+                    <span class="badge" id="rStatus">상태</span>
+                    <span><i class="fa-solid fa-school"></i> <span id="rSchool" style="font-weight: 600; color: var(--text-dark);">학교명</span></span>
+                    <span><i class="fa-solid fa-user"></i> 작성: <span id="rAuthor">작성자</span></span>
+                    <span><i class="fa-solid fa-user-check"></i> 처리: <span id="rProcessor">처리자</span></span>
+                    <span><i class="fa-solid fa-calendar"></i> <span id="rDate">날짜</span></span>
+                </div>
+
+                <div id="rBody" style="min-height:300px; padding:10px; line-height:1.8; font-size:1.05em; color:var(--text-dark); white-space: normal;">내용이 로딩중입니다...</div>
+
+                <div id="rFiles" style="margin-top:40px; padding:20px; background:rgba(0,0,0,0.02); border-radius:12px; border: 1px dashed var(--border-color); display:none;"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCategory = 'all';
+    let currentPage = 1;
+    const itemsPerPage = 10;
+    let filteredRows = [];
+    let currentReadPostId = null;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initSchoolFilter();
+        bindFilterEvents();
+        applyFilters();
+    });
+
+    function resetFilters() {
+        document.getElementById('schoolFilter').value = 'all';
+        document.getElementById('statusFilter').value = 'all';
+        document.getElementById('searchInput').value = '';
+
+        const allBtn = document.querySelector('.category-btn[onclick*="all"]');
+        if (allBtn) {
+            filterCategory('all', allBtn);
+        } else {
+            currentPage = 1;
+            applyFilters();
+        }
+    }
+
+    function showView(viewId) {
+        document.getElementById('taskListView').style.display = (viewId === 'taskListView') ? 'block' : 'none';
+        document.getElementById('taskReadView').style.display = (viewId === 'taskReadView') ? 'block' : 'none';
+        if (viewId === 'taskListView') currentReadPostId = null;
+    }
+
+    function initSchoolFilter() {
+        const filter = document.getElementById('schoolFilter');
+        const rows = document.querySelectorAll('.task-row');
+        const schoolSet = new Set();
+        rows.forEach(row => {
+            const sName = row.dataset.school;
+            if (sName && sName.trim() !== '') schoolSet.add(sName);
+        });
+        Array.from(schoolSet).sort().forEach(sName => {
+            const opt = document.createElement('option');
+            opt.value = sName; opt.textContent = sName; filter.appendChild(opt);
+        });
+    }
+
+    function bindFilterEvents() {
+        const sf = document.getElementById('schoolFilter');
+        const stf = document.getElementById('statusFilter');
+        const si = document.getElementById('searchInput');
+        const onFilterChange = () => { currentPage = 1; applyFilters(); };
+        sf.addEventListener('change', onFilterChange);
+        stf.addEventListener('change', onFilterChange);
+        si.addEventListener('input', onFilterChange);
+    }
+
+    function toggleAll() {
+        const checkAll = document.getElementById('checkAll').checked;
+        const items = document.querySelectorAll('.chk-item');
+        items.forEach(item => {
+            const row = item.closest('tr');
+            if (row && row.style.display !== 'none') item.checked = checkAll;
+        });
+    }
+
+    function filterCategory(categoryName, btn) {
+        currentCategory = categoryName;
+        currentPage = 1; 
+        showView('taskListView');
+        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const school = document.getElementById('schoolFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchInput').value.toLowerCase().trim();
+        const allRows = document.querySelectorAll('.task-row');
+        filteredRows = []; 
+        let cWait = 0, cProcess = 0, cDone = 0, cTotal = 0;
+
+        allRows.forEach(row => {
+            const rowCategory = row.dataset.category || '';
+            const rowSchool = row.dataset.school || '';
+            const rowStatus = row.dataset.status || '';
+            const rowText = row.innerText.toLowerCase();
+            const matchCategory = currentCategory === 'all' || rowCategory === currentCategory;
+            const matchSchool = school === 'all' || rowSchool === school;
+            const matchSearch = search === '' || rowText.includes(search);
+
+            if (matchCategory && matchSchool && matchSearch) {
+                cTotal++;
+                if (rowStatus === '접수') cWait++;
+                else if (rowStatus === '처리중') cProcess++;
+                else if (rowStatus === '완료') cDone++;
+            }
+            const matchStatus = status === 'all' || rowStatus === status;
+            if (matchCategory && matchSchool && matchStatus && matchSearch) {
+                filteredRows.push(row);
+            } else {
+                row.style.display = 'none';
+                const checkbox = row.querySelector('.chk-item');
+                if (checkbox) checkbox.checked = false;
+            }
+        });
+        
+        document.getElementById('count-all').innerText = cTotal;
+        document.getElementById('count-wait').innerText = cWait;
+        document.getElementById('count-process').innerText = cProcess;
+        document.getElementById('count-done').innerText = cDone;
+
+        const totalPages = Math.ceil(filteredRows.length / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+
+        filteredRows.forEach((row, index) => {
+            if (index >= startIndex && index < endIndex) row.style.display = 'table-row';
+            else {
+                row.style.display = 'none';
+                const checkbox = row.querySelector('.chk-item');
+                if (checkbox) checkbox.checked = false;
+            }
+        });
+        document.getElementById('emptyState').style.display = filteredRows.length === 0 ? 'block' : 'none';
+        document.getElementById('checkAll').checked = false;
+        renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+        const container = document.getElementById('paginationContainer');
+        container.innerHTML = ''; 
+        if (filteredRows.length === 0) { container.style.display = 'none'; return; }
+        container.style.display = 'flex';
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'page-btn'; prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i> Prev';
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.onclick = () => { if (currentPage > 1) { currentPage--; applyFilters(); } };
+        container.appendChild(prevBtn);
+
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, currentPage + 2);
+        if (currentPage <= 3) endPage = Math.min(totalPages, 5);
+        if (currentPage >= totalPages - 2) startPage = Math.max(1, totalPages - 4);
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = 'page-btn';
+            if (i === currentPage) pageBtn.classList.add('active');
+            pageBtn.textContent = i;
+            pageBtn.onclick = () => { currentPage = i; applyFilters(); };
+            container.appendChild(pageBtn);
+        }
+
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'page-btn'; nextBtn.innerHTML = 'Next <i class="fa-solid fa-chevron-right"></i>';
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.onclick = () => { if (currentPage < totalPages) { currentPage++; applyFilters(); } };
+        container.appendChild(nextBtn);
+    }
+
+    async function changeStatus(newStatus) {
+        const checkedItems = document.querySelectorAll('.chk-item:checked');
+        const postIds = Array.from(checkedItems).map(cb => parseInt(cb.value, 10)).filter(id => !Number.isNaN(id));
+        if (postIds.length === 0) { alert('상태를 변경할 게시물을 체크박스로 선택해주세요.'); return; }
+        if (!confirm(`선택한 ${postIds.length}건의 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
+        await executeStatusUpdate(postIds, newStatus, false);
+    }
+
+    async function changeSingleStatus(newStatus) {
+        if (!currentReadPostId) return;
+        if (!confirm(`현재 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
+        await executeStatusUpdate([currentReadPostId], newStatus, true);
+    }
+
+    async function executeStatusUpdate(postIds, newStatus, isSingle) {
+        try {
+            const res = await fetch('/school/tasks/api/update_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ post_ids: postIds, status: newStatus })
+            });
+            let data = await res.json();
+            if (data.status === 'success') {
+                if (isSingle) {
+                    postIds.forEach(id => {
+                        const row = document.querySelector(`.chk-item[value="${id}"]`)?.closest('tr');
+                        if (row) {
+                            row.dataset.status = newStatus;
+                            const badge = row.querySelector('.badge[class*="status-"]');
+                            if (badge) {
+                                badge.textContent = newStatus;
+                                badge.className = `badge status-${newStatus}`;
+                            }
+                        }
+                    });
+                    applyFilters(); 
+                    await openTaskDetail(postIds[0]); 
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert(data.message || '업데이트에 실패했습니다.');
+            }
+        } catch (e) { alert('서버와 통신하는 중 오류가 발생했습니다.'); }
+    }
+
+    async function openTaskDetail(postId) {
+        try {
+            currentReadPostId = postId;
+            const res = await fetch(`/school/tasks/api/detail/${postId}`);
+            let post = await res.json();
+            if (!res.ok || post.error) { alert(post.message || '게시물을 불러올 수 없습니다.'); return; }
+
+            document.getElementById('rCategory').textContent = post.category || '';
+            document.getElementById('rTitle').textContent = post.title || '';
+            document.getElementById('rAuthor').textContent = post.author || '';
+            document.getElementById('rDate').textContent = post.created_at || '';
+            document.getElementById('rSchool').textContent = post.school_name || '';
+            document.getElementById('rProcessor').textContent = post.processor || '';
+            document.getElementById('rBody').innerHTML = post.content || '';
+
+            const statusBadge = document.getElementById('rStatus');
+            const statusText = post.status || '접수';
+            statusBadge.textContent = statusText;
+            statusBadge.className = 'badge status-' + statusText;
+
+            renderFiles(post);
+            showView('taskReadView');
+        } catch (e) { alert('내용을 불러오는 중 오류가 발생했습니다.'); }
+    }
+
+    function renderFiles(post) {
+        const fileArea = document.getElementById('rFiles');
+        fileArea.innerHTML = '';
+        if (!post.filename) { fileArea.style.display = 'none'; return; }
+        const names = String(post.filename).split(',').map(n => n.trim()).filter(n => n !== '');
+        const paths = post.filepath ? String(post.filepath).split(',').map(p => p.trim()) : [];
+        if (names.length === 0) { fileArea.style.display = 'none'; return; }
+        fileArea.style.display = 'block';
+        const title = document.createElement('strong');
+        title.innerHTML = '<i class="fa-solid fa-paperclip" style="color:var(--saedam-blue);"></i> 첨부파일';
+        fileArea.appendChild(title); fileArea.appendChild(document.createElement('br'));
+        names.forEach((name, index) => {
+            const href = paths[index] || '#';
+            const link = document.createElement('a');
+            link.href = href; link.target = '_blank'; link.style.color = 'var(--saedam-blue)';
+            link.style.textDecoration = 'none'; link.style.display = 'block';
+            link.style.marginTop = '8px'; link.style.fontWeight = '600';
+            link.innerHTML = '<i class="fa-solid fa-download"></i> ' + escapeHtml(name);
+            fileArea.appendChild(link);
+        });
+    }
+
+    function escapeHtml(v) {
+        return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+    }
+</script>
+{% endblock %}

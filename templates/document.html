@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="content-container">
+    <div class="mgmt-header">
+        <h2><i class="fa-solid fa-print"></i> 증명서 발급 서비스</h2>
+        <p>재직증명서, 경력증명서 등을 즉시 발급받으실 수 있습니다.</p>
+    </div>
+
+    <div class="mgmt-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="mgmt-card" style="text-align: center; padding: 40px;">
+            <i class="fa-solid fa-file-user" style="font-size: 3rem; color: #4a90e2; margin-bottom: 20px;"></i>
+            <h3>재직증명서</h3>
+            <button class="action-btn btn-edit" style="width: 100%; padding: 12px;">발급 신청</button>
+        </div>
+        <div class="mgmt-card" style="text-align: center; padding: 40px;">
+            <i class="fa-solid fa-file-invoice" style="font-size: 3rem; color: #4a90e2; margin-bottom: 20px;"></i>
+            <h3>경력증명서</h3>
+            <button class="action-btn btn-edit" style="width: 100%; padding: 12px;">발급 신청</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

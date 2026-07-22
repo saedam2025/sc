@@ -1,0 +1,817 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/user_mgmt.css') }}">
+<style>
+    /* 화면 양옆 여백을 대폭 줄이고 꽉 차게 변경 */
+    {% if mode != 'invite' and mode != 'admin_setup' %}
+    .user-mgmt-container { 
+        width: 100% !important; 
+        max-width: 98% !important; 
+        margin: 0 auto; 
+        padding: 0 10px;
+    }
+    {% else %}
+    /* 초대 폼이나 관리자 초기 설정일 때는 중앙에 배치 */
+    nav, .sidebar, header, footer, .navbar { display: none !important; }
+    body { background-color: #f8f9fa; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'Pretendard', sans-serif; }
+    /* 🚀 수정 포인트: 초대 폼일 때는 2단 그리드가 찌그러지지 않도록 넓이를 850px로 확장 */
+    .user-mgmt-container { width: 100%; max-width: {% if mode == 'invite' %}850px{% else %}480px{% endif %}; }
+    {% endif %}
+
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8em; font-weight: bold; }
+    .status-pending { background: #fff4e6; color: #d9480f; border: 1px solid #ffd8a8; }
+    .status-approved { background: #ebfbee; color: #2b8a3e; border: 1px solid #b2f2bb; }
+    
+    .action-btn { padding: 6px 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: 0.2s; }
+    .btn-edit { background: #e7f5ff; color: #1971c2; }
+    .btn-delete { background: #fff5f5; color: #c92a2a; }
+    .btn-retire { background: #f8f9fa; color: #495057; border: 1px solid #dee2e6; }
+    .btn-approve { background: #28a745; color: white; }
+    
+    .btn-top { padding: 12px 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: 0.3s; }
+    .btn-invite-top { background: #6741d9; color: white; }
+    .btn-direct-top { background: #0ca678; color: white; }
+    .btn-top:hover { transform: translateY(-2px); filter: brightness(1.1); }
+
+    .mgmt-card { background: white; padding: 30px; border-radius: 20px; border: 1px solid #e9ecef; box-shadow: 0 10px 25px rgba(0,0,0,0.02); margin-bottom: 30px; width: 100%; box-sizing: border-box;}
+    
+    /* 데이터가 구겨지지 않게 유지하되, 통장 아이콘화로 공간을 확보하여 100% 비율 사용 */
+    .table-container { overflow-x: auto; width: 100%; border: 1px solid #e9ecef; border-radius: 12px; }
+    .table-container::-webkit-scrollbar { height: 10px; }
+    .table-container::-webkit-scrollbar-thumb { background-color: #ced4da; border-radius: 5px; }
+    .table-container::-webkit-scrollbar-track { background-color: #f8f9fa; }
+    
+    .approve-table { width: 100%; border-collapse: collapse; min-width: 100%; }
+    .approve-table th { background: #f8f9fa; padding: 14px 10px; border-bottom: 2px solid #dee2e6; text-align: center; color: #495057; font-size: 0.85em; white-space: nowrap; font-weight: bold; }
+    .approve-table td { padding: 12px 10px; border-bottom: 1px solid #f1f3f5; color: #343a40; font-size: 0.9em; vertical-align: middle; }
+    
+    /* 테이블 데이터 정렬용 유틸리티 클래스 */
+    .td-center { text-align: center; white-space: nowrap; }
+    .td-left { text-align: left; }
+    .td-wrap { white-space: normal; word-break: keep-all; line-height: 1.4; min-width: 200px; font-size: 0.9em; }
+    .td-nowrap { white-space: nowrap; letter-spacing: -0.5px; font-size: 0.9em; }
+
+    /* 아이콘 호버 애니메이션 */
+    .copy-icon { transition: transform 0.2s ease; }
+    .copy-icon:hover { transform: scale(1.2); color: #0ca678 !important; }
+
+    /* 모달 UI 가로 배치 전면 개편 */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
+    .modal-content { background: white; margin: 6% auto; padding: 0; width: 850px; max-width: 95vw; border-radius: 24px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); max-height: 85vh; overflow-y: auto;}
+    .modal-header { padding: 20px 25px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+    .modal-header h3 { margin: 0; font-size: 1.25rem; color: #0f172a; }
+
+    /* 가로 2단 배치 폼 그리드 */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
+    .full-width { grid-column: 1 / -1; }
+    
+    .profile-setup-area { display: flex; gap: 20px; align-items: flex-start; background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 5px; }
+
+    .modal-field { margin-bottom: 5px; text-align: left; }
+    .modal-field label { display: block; margin-bottom: 8px; color: #64748b; font-size: 0.85rem; }
+    .readonly-field { background-color: #f1f5f9 !important; color: #64748b !important; cursor: not-allowed; border: 1px solid #e2e8f0 !important; }
+
+    .glass-input { width: 100%; padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 10px; box-sizing: border-box; background: #f8fafc; color: #0f172a; outline: none; transition: all 0.3s; font-family: inherit; font-size: 0.95rem; }
+    .glass-input:focus { border-color: #2563eb; background: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+    .btn-close-modal { background: #f1f5f9; color: #0f172a; border: 1px solid #e2e8f0; padding: 10px 30px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+    .btn-close-modal:hover { background: #e2e8f0; transform: translateY(-2px); }
+
+    .btn-primary-glass { background: #2563eb; color: #fff; border: none; padding: 12px; border-radius: 10px; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
+    .btn-primary-glass:hover { background: #1d4ed8; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.2); }
+
+    .invite-form-card { background: white; padding: 40px; border-radius: 28px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); border: 1px solid #eee; max-height: 95vh; overflow-y: auto;}
+    
+    .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
+    .profile-icon-option.selected { border-color: #4a90e2; background: #e7f5ff; }
+    .profile-icon-option:hover { background: #f8f9fa; }
+
+    .emoji-scroll-box {
+        display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px;
+        max-height: 130px; overflow-y: auto; border: 1px solid #dee2e6; 
+        padding: 10px; border-radius: 10px; background: #fff;
+    }
+    .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+    .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+    
+    .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid #dee2e6; margin-top: 10px; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="user-mgmt-container">
+    {% if mode == 'admin_setup' %}
+    <div class="invite-form-card" style="max-width: 480px; margin: 0 auto; margin-top: 5vh;">
+        <h2 style="text-align: center; color: #212529; margin-top:0;"><i class="fa-solid fa-user-shield" style="color:#d9480f;"></i> 최초 보안 설정</h2>
+        <p style="text-align: center; color: #868e96; font-size: 0.95em; margin-bottom: 25px;">인트라넷 최초 구동입니다.<br>최고관리자(admin)의 비밀번호를 설정해주세요.</p>
+        <hr style="border: 0; border-top: 1px solid #f1f3f5; margin-bottom: 25px;">
+        
+        <div style="padding: 0 25px;">
+            <div class="modal-field"><label>부여 사번</label><input type="text" value="admin" readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>계정명</label><input type="text" value="admin" readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>최고관리자 비밀번호 설정</label><input type="password" id="admin_setup_pw" class="glass-input" placeholder="사용할 비밀번호 입력" required></div>
+            <button type="button" onclick="setupAdmin()" class="btn-primary-glass" style="margin-top:15px; padding:16px;">관리자 생성 및 시작</button>
+        </div>
+    </div>
+
+    {% elif mode == 'invite' %}
+    <div class="invite-form-card" style="padding:0;">
+        <div class="modal-header" style="border-radius: 28px 28px 0 0;">
+            <h3 style="margin: 0 auto;"><i class="fa-solid fa-user-plus" style="color:#2563eb;"></i> 새담 인트라넷 가입 신청</h3>
+        </div>
+        
+        <div class="form-grid">
+            <div class="full-width" style="text-align: center; color: #64748b; font-size: 0.9em; margin-bottom: 10px;">정보를 입력하여 가입을 신청해 주세요.</div>
+            <div class="full-width profile-setup-area">
+                <div style="flex:1;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
+                    <input type="file" id="profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_invite')">
+                    <img id="preview_invite" class="profile-img-preview">
+                </div>
+                <div style="flex:2;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 아이콘 (사진 미등록 시 사용)</label>
+                    <div id="icon-container-invite" class="emoji-scroll-box"></div>
+                    <input type="hidden" id="profile_icon" value="🐶">
+                </div>
+            </div>
+
+            <div class="modal-field"><label>성명</label><input type="text" id="name" class="glass-input" placeholder="실명 입력" required></div>
+            <div class="modal-field"><label>주민등록번호</label><input type="text" id="rrn" class="glass-input" placeholder="000000-0000000" required></div>
+            <div class="modal-field"><label>비밀번호 (영문, 숫자, 특수문자 조합 10자 이내)</label><input type="password" id="password" class="glass-input" maxlength="10" placeholder="로그인 비밀번호" required></div>
+            <div class="modal-field"><label>비밀번호 확인</label><input type="password" id="password_confirm" class="glass-input" maxlength="10" placeholder="비밀번호 재입력" required></div>
+            <div class="modal-field"><label>연락처</label><input type="text" id="phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
+            <div class="modal-field"><label>이메일</label><input type="email" id="email" class="glass-input readonly-field" value="{{ invite_email }}" readonly></div>
+            <div class="modal-field full-width"><label>주소지</label><input type="text" id="address" class="glass-input" placeholder="전체 주소 입력"></div>
+            <div class="modal-field full-width"><label>급여통장번호</label><input type="text" id="bank_account" class="glass-input" placeholder="00은행 000-0000-0000"></div>
+        </div>
+        
+        <input type="hidden" id="department" value="">
+        <input type="hidden" id="position" value="미지정">
+        
+        <div style="padding: 20px 25px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 28px 28px;">
+            <button type="button" onclick="registerUser()" class="btn-primary-glass" style="padding:16px;">등록 신청 완료</button>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="mgmt-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h2 style="margin: 0; font-size: 1.8em;"><i class="fa-solid fa-users-gear" style="color: #4a90e2;"></i> 구성원 관리 시스템</h2>
+            <p style="color: #868e96; margin-top: 6px;">사용자 승인 및 구성원 인적사항을 통합 관리합니다.</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="btn-top btn-direct-top" onclick="openDirectRegisterModal()"><i class="fa-solid fa-user-plus"></i> 직접 신청 등록</button>
+            <button class="btn-top btn-invite-top" onclick="openInviteModal()"><i class="fa-solid fa-paper-plane"></i> 가입 초대 메일 발송</button>
+        </div>
+    </div>
+
+    <div class="mgmt-card">
+        <h3 style="margin-bottom: 20px;"><i class="fa-solid fa-user-clock" style="color: #f08c00;"></i> 가입 승인 대기 명단</h3>
+        <div class="table-container">
+            <table class="approve-table">
+                <thead><tr>
+                    <th style="width:40px;">No.</th>
+                    <th style="width:70px;">프로필</th>
+                    <th style="width:80px;">성명</th>
+                    <th style="width:130px;">주민번호</th>
+                    <th style="width:100px;">소속부서</th>
+                    <th style="width:80px;">신청직급</th>
+                    <th style="width:120px;">연락처</th>
+                    <th style="width:auto;">주소</th>
+                    <th style="width:70px;">급여통장</th>
+                    <th style="width:70px;">상태</th>
+                    <th style="width:80px;">작업</th>
+                </tr></thead>
+                <tbody id="pending-list-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mgmt-card">
+        <h3 style="margin-bottom: 20px;"><i class="fa-solid fa-address-book" style="color: #2b8a3e;"></i> 전체 구성원 인사 명단</h3>
+        <div class="table-container">
+            <table class="approve-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">No.</th>
+                        <th style="width:90px;">사번</th>
+                        <th style="width:70px;">프로필</th>
+                        <th style="width:80px;">성명</th>
+                        <th style="width:130px;">주민번호</th>
+                        <th style="width:100px;">소속부서</th>
+                        <th style="width:80px;">직급</th>
+                        <th style="width:50px;">레벨</th>
+                        <th style="width:120px;">연락처</th>
+                        <th style="width:auto;">주소</th>
+                        <th style="width:70px;">급여통장</th>
+                        <th style="width:90px;">입사일</th>
+                        <th style="width:90px;">퇴사일</th>
+                        <th style="width:80px;">관리</th>
+                    </tr>
+                </thead>
+                <tbody id="member-list-body"></tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle"><i class="fa-solid fa-user-pen" style="color:var(--primary-color);"></i> 관리</h3>
+            <span onclick="closeModal()" style="cursor: pointer; font-size: 1.8rem; color: #64748b; line-height: 1;">&times;</span>
+        </div>
+        
+        <div id="modalBody"></div>
+        
+        <div id="modalFooter" style="padding: 20px 25px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: right;">
+            <div id="adminArea" class="modal-field" style="text-align: left; margin-bottom: 15px;">
+                <label>관리자 보안 암호 확인</label>
+                <input type="password" id="adminPass" class="glass-input" placeholder="관리자 보안 암호 입력" style="margin-bottom: 0;">
+            </div>
+            <button class="btn-close-modal" onclick="closeModal()" style="padding: 12px 25px;">취소</button>
+            <button id="modalSubmitBtn" class="btn-primary-glass" style="width: auto; padding: 12px 25px; margin-left: 8px;">실행</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const LEVEL_MAP = {"대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5, "계약직": 6, "센터장(팀장)": 7, "센터장": 8, "전담코디": 9, "보조코디": 10, "안전코디": 11, "방과후강사": 12, "맞춤형강사": 13, "임시회원": 14};
+const avatarEmojis = [
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
+    '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
+    '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
+    '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
+];
+let currentUserData = [];
+
+function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert('계좌번호가 복사되었습니다:\n' + text);
+        });
+    } else {
+        let textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('계좌번호가 복사되었습니다:\n' + text);
+        } catch (err) {
+            alert('복사 실패');
+        }
+        textArea.remove();
+    }
+}
+
+function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.src = "";
+        preview.style.display = 'none';
+    }
+}
+
+function formatPhoneNumber(input) {
+    let val = input.value.replace(/[^0-9]/g, '');
+    if (val.length > 3 && val.length <= 7) {
+        val = val.slice(0, 3) + '-' + val.slice(3);
+    } else if (val.length > 7) {
+        val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+    }
+    input.value = val;
+}
+
+function validateInputs(password, email) {
+    const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{1,10}$/;
+    if (!pwRegex.test(password)) {
+        alert("비밀번호는 영문, 숫자, 특수문자를 포함하여 10자 이내로 입력해야 합니다.");
+        return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && !emailRegex.test(email)) {
+        alert("유효한 이메일 주소를 입력해주세요.");
+        return false;
+    }
+    return true;
+}
+
+function renderIcons(containerId, inputId) {
+    const container = document.getElementById(containerId);
+    if(!container) return;
+    container.innerHTML = avatarEmojis.map((e, i) => 
+        `<div class="profile-icon-option ${i===0?'selected':''}" onclick="selectIcon(this, '${inputId}', '${e}')">${e}</div>`
+    ).join('');
+}
+
+function selectIcon(el, inputId, emoji) {
+    document.querySelectorAll('#' + el.parentElement.id + ' .profile-icon-option').forEach(opt => opt.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById(inputId).value = emoji;
+}
+
+async function loadAllUsers() {
+    const pBody = document.getElementById('pending-list-body');
+    const mBody = document.getElementById('member-list-body');
+    if(!pBody || !mBody) return;
+
+    try {
+        const res = await fetch('/user/list');
+        currentUserData = await res.json();
+        
+        // 🚀 [해결1] 인사관리 접속 시 우측 상단 프로필 이미지 증발 방지
+        const currentEmpNo = "{{ session.get('emp_no', '') }}";
+        const currentName = "{{ session.get('user_name', '') }}";
+        const me = currentUserData.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+        
+        if (me) {
+            const headerProfileIcon = document.querySelector('.user-profile div');
+            if (headerProfileIcon) {
+                if (me.profile_path) {
+                    headerProfileIcon.innerHTML = `<img src="${me.profile_path}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                } else if (me.아이콘) {
+                    headerProfileIcon.innerHTML = me.아이콘;
+                }
+            }
+        }
+
+        pBody.innerHTML = ''; mBody.innerHTML = '';
+        
+        let pCount = 1, mCount = 1;
+
+        currentUserData.forEach((u, i) => {
+            const dbId = u.id; 
+            
+            const displayProfile = u.profile_path 
+                ? `<img src="${u.profile_path}" style="width:45px; height:45px; border-radius:50%; object-fit:contain; background-color:#fff; border:1px solid #dee2e6; margin:0 auto; display:block;">` 
+                : `<span style="font-size:1.8rem; display:block; text-align:center;">${u.아이콘 || '👤'}</span>`;
+
+            const bankDisplay = u.계좌 
+                ? `<i class="fa-solid fa-money-check-dollar copy-icon" style="color: #2b8a3e; cursor: pointer; font-size: 1.4em;" title="${u.계좌} (클릭하여 복사)" onclick="copyToClipboard('${u.계좌}')"></i>` 
+                : `<span style="color:#adb5bd;">-</span>`;
+
+            if(u.승인상태 === '대기') {
+                pBody.innerHTML += `<tr>
+                    <td class="td-center">${pCount++}</td>
+                    <td style="vertical-align: middle;">${displayProfile}</td>
+                    <td class="td-center">${u.이름}</td>
+                    <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
+                    <td class="td-center">${u.소속||'-'}</td>
+                    <td class="td-center">${u.직급}</td>
+                    <td class="td-center td-nowrap">${u.전화번호||'-'}</td>
+                    <td class="td-left td-wrap">${u.주소||'-'}</td>
+                    <td class="td-center">${bankDisplay}</td>
+                    <td class="td-center"><span class="status-badge status-pending">대기</span></td>
+                    <td class="td-center"><button onclick="openApproveModal(${i})" class="action-btn btn-approve">승인</button></td>
+                </tr>`;
+            } else {
+                mBody.innerHTML += `<tr>
+                    <td class="td-center">${mCount++}</td>
+                    <td class="td-center" style="color:#4a90e2;">${u.사번 || '-'}</td>
+                    <td style="vertical-align: middle;">${displayProfile}</td>
+                    <td class="td-center">${u.이름}</td>
+                    <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
+                    <td class="td-center">${u.소속||'-'}</td>
+                    <td class="td-center">${u.직급}</td>
+                    <td class="td-center">${u.레벨}</td>
+                    <td class="td-center td-nowrap">${u.전화번호||'-'}</td>
+                    <td class="td-left td-wrap">${u.주소||'-'}</td>
+                    <td class="td-center">${bankDisplay}</td>
+                    <td class="td-center td-nowrap" style="color:#666;">${u.입사일||'-'}</td>
+                    <td class="td-center td-nowrap" style="color:#e03131;">${u.퇴사일||'-'}</td>
+                    <td class="td-center">
+                        <button onclick="openEditModal(${i})" class="action-btn btn-edit">수정</button>
+                    </td>
+                </tr>`;
+            }
+        });
+    } catch(e) {}
+}
+
+async function setupAdmin() {
+    const pw = document.getElementById('admin_setup_pw').value;
+    if(!pw) return alert("비밀번호를 입력하세요.");
+    
+    const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setup_admin', password: pw })
+    });
+    
+    const d = await res.json();
+    alert(d.message);
+    if(res.ok) location.href = '/login'; 
+}
+
+function openDirectRegisterModal() {
+    document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-user-plus" style="color:var(--primary-color);"></i> 신규 구성원 직접 등록`;
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-grid">
+            <div class="full-width profile-setup-area">
+                <div style="flex:1;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
+                    <input type="file" id="reg_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_direct')">
+                    <img id="preview_direct" class="profile-img-preview">
+                </div>
+                <div style="flex:2;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">기본 프로필 아이콘</label>
+                    <div id="icon-container-direct" class="emoji-scroll-box"></div>
+                    <input type="hidden" id="reg_profile_icon" value="🐶">
+                </div>
+            </div>
+            
+            <div class="modal-field"><label>성명</label><input type="text" id="reg_name" class="glass-input"></div>
+            <div class="modal-field"><label>주민등록번호</label><input type="text" id="reg_rrn" class="glass-input" placeholder="000000-0000000"></div>
+            <div class="modal-field"><label>비밀번호</label><input type="password" id="reg_pass" class="glass-input" maxlength="10"></div>
+            <div class="modal-field"><label>비밀번호 확인</label><input type="password" id="reg_pass_confirm" class="glass-input" maxlength="10"></div>
+            <div class="modal-field"><label>연락처</label><input type="text" id="reg_phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
+            <div class="modal-field"><label>이메일</label><input type="email" id="reg_email" class="glass-input"></div>
+            <div class="modal-field full-width"><label>주소지</label><input type="text" id="reg_address" class="glass-input" placeholder="전체 주소 입력"></div>
+            <div class="modal-field"><label>소속부서</label><input type="text" id="reg_department" class="glass-input" placeholder="예: 운영팀"></div>
+            
+            <div class="modal-field"><label>직급</label>
+                <select id="reg_pos" class="glass-input">
+                    <option value="" disabled selected>직급 선택</option>
+                    ${Object.keys(LEVEL_MAP).map(p => `<option value="${p}">${p}</option>`).join('')}
+                </select>
+            </div>
+            
+            <div class="modal-field full-width"><label>급여통장번호</label><input type="text" id="reg_bank_account" class="glass-input" placeholder="00은행 000-0000-0000"></div>
+        </div>
+    `;
+    renderIcons('icon-container-direct', 'reg_profile_icon');
+    document.getElementById('adminArea').style.display = 'none';
+    document.getElementById('modalSubmitBtn').innerText = "등록 완료";
+    document.getElementById('modalSubmitBtn').onclick = submitDirectRegister;
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitDirectRegister() {
+    const password = document.getElementById('reg_pass').value;
+    const passwordConfirm = document.getElementById('reg_pass_confirm').value;
+    const email = document.getElementById('reg_email').value;
+    
+    if(!document.getElementById('reg_name').value || !password || !document.getElementById('reg_rrn').value) {
+        return alert("필수 정보를 입력하세요.");
+    }
+    if(password !== passwordConfirm) {
+        return alert("비밀번호가 일치하지 않습니다.");
+    }
+    if(!validateInputs(password, email)) return;
+
+    const formData = new FormData();
+    formData.append('name', document.getElementById('reg_name').value);
+    formData.append('password', password);
+    formData.append('password_confirm', passwordConfirm);
+    formData.append('rrn', document.getElementById('reg_rrn').value);
+    formData.append('email', email);
+    formData.append('position', document.getElementById('reg_pos').value);
+    formData.append('phone', document.getElementById('reg_phone').value);
+    formData.append('address', document.getElementById('reg_address').value);
+    formData.append('department', document.getElementById('reg_department').value);
+    formData.append('bank_account', document.getElementById('reg_bank_account').value);
+    formData.append('profile_icon', document.getElementById('reg_profile_icon').value);
+    
+    const imgFile = document.getElementById('reg_profile_image').files[0];
+    if(imgFile) formData.append('profile_image', imgFile);
+
+    const res = await fetch('/user/register', { method: 'POST', body: formData });
+    const d = await res.json();
+    alert(d.message);
+    if(res.ok) { closeModal(); loadAllUsers(); }
+}
+
+async function registerUser() {
+    const password = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('password_confirm').value;
+    const email = document.getElementById('email').value;
+
+    if(!document.getElementById('name').value || !password || !document.getElementById('rrn').value) {
+        return alert("필수 정보를 입력하세요.");
+    }
+    if(password !== passwordConfirm) {
+        return alert("비밀번호가 일치하지 않습니다.");
+    }
+    if(!validateInputs(password, email)) return;
+
+    const formData = new FormData();
+    formData.append('name', document.getElementById('name').value);
+    formData.append('password', password);
+    formData.append('password_confirm', passwordConfirm);
+    formData.append('rrn', document.getElementById('rrn').value);
+    formData.append('email', email);
+    
+    const deptInput = document.getElementById('department');
+    const posInput = document.getElementById('position');
+    formData.append('department', deptInput ? deptInput.value : '');
+    formData.append('position', posInput ? posInput.value : '미지정');
+    
+    formData.append('phone', document.getElementById('phone').value);
+    formData.append('address', document.getElementById('address').value);
+    formData.append('bank_account', document.getElementById('bank_account').value);
+    formData.append('profile_icon', document.getElementById('profile_icon').value);
+    
+    const imgFile = document.getElementById('profile_image').files[0];
+    if(imgFile) formData.append('profile_image', imgFile);
+
+    const res = await fetch('/user/register', { method: 'POST', body: formData });
+    const d = await res.json(); alert(d.message);
+    if(res.ok) { document.body.innerHTML = "<div style='text-align:center; padding:100px;'><h2>가입 신청이 완료되었습니다.</h2><p>창을 닫아주세요.</p></div>"; }
+}
+
+function openApproveModal(i) {
+    const u = currentUserData[i];
+    document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-user-check" style="color:var(--primary-color);"></i> 가입 승인 및 직급/소속 배정`;
+    
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-grid">
+            <div class="modal-field"><label>배정할 소속 부서</label><input type="text" id="approve_dept" class="glass-input" value="${u.소속 || ''}" placeholder="예: 운영팀"></div>
+            <div class="modal-field"><label>배정할 직급</label>
+                <select id="modal_pos" class="glass-input" onchange="document.getElementById('approve_level').value = LEVEL_MAP[this.value] != null ? LEVEL_MAP[this.value] : '';">
+                    <option value="" disabled ${LEVEL_MAP[u.직급] == null ? 'selected' : ''}>직급 선택</option>
+                    ${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}
+                </select>
+            </div>
+            <div class="modal-field full-width"><label>부여될 권한레벨</label><input type="text" id="approve_level" value="${LEVEL_MAP[u.직급] != null ? LEVEL_MAP[u.직급] : ''}" placeholder="직급을 선택하면 자동 배정됩니다." readonly class="glass-input readonly-field"></div>
+        </div>
+    `;
+    document.getElementById('adminArea').style.display = 'block';
+    document.getElementById('modalSubmitBtn').innerText = "승인 실행";
+    document.getElementById('modalSubmitBtn').onclick = () => submitApprove(u.id, i); 
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitApprove(dbId, idx) {
+    const adminPass = document.getElementById('adminPass').value;
+    if (adminPass !== "1900") {
+        return alert("관리자 보안 암호가 일치하지 않습니다.");
+    }
+
+    const approvedPos = document.getElementById('modal_pos').value;
+    const approvedDept = document.getElementById('approve_dept').value;
+    const approvedLevel = document.getElementById('approve_level').value;
+
+    if (!approvedPos) return alert("배정할 직급을 선택해주세요.");
+
+    const res = await fetch('/user/approve', { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify({ 
+            admin_pass: adminPass, 
+            user_idx: dbId, 
+            approved_position: approvedPos 
+        }) 
+    });
+    
+    const r = await res.json(); 
+    
+    if(res.ok && approvedDept) {
+        const u = currentUserData[idx]; 
+        const formData = new FormData();
+        formData.append('user_idx', dbId);
+        formData.append('department', approvedDept);
+        formData.append('position', approvedPos);
+        formData.append('level', approvedLevel); 
+        
+        formData.append('phone', u.전화번호 || '');
+        formData.append('email', u.이메일 || '');
+        formData.append('address', u.주소 || '');
+        formData.append('bank_account', u.계좌 || '');
+        formData.append('profile_icon', u.아이콘 || '👤');
+
+        await fetch('/user/update', { method: 'POST', body: formData });
+    }
+
+    alert(r.message); 
+    if(res.ok) { closeModal(); loadAllUsers(); }
+}
+
+async function processRetire(dbId) {
+    const adminPass = document.getElementById('adminPass').value;
+    if (adminPass !== "1900") {
+        return alert("관리자 보안 암호가 일치하지 않습니다.");
+    }
+
+    if(!confirm("퇴사 처리하시겠습니까?\n퇴사일이 오늘 날짜로 기록됩니다.")) return;
+    const res = await fetch('/user/retire', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ user_idx: dbId }) });
+    const r = await res.json(); alert(r.message); 
+    if(res.ok) { closeModal(); loadAllUsers(); }
+}
+
+async function deleteUser(dbId) {
+    const adminPass = document.getElementById('adminPass').value;
+    if (adminPass !== "1900") {
+        return alert("관리자 보안 암호가 일치하지 않습니다.");
+    }
+
+    if(!confirm("이 사용자를 완전히 영구 삭제하시겠습니까?")) return;
+    const res = await fetch('/user/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ admin_pass: adminPass, user_idx: dbId }) });
+    const r = await res.json(); alert(r.message); 
+    if(res.ok) { closeModal(); loadAllUsers(); }
+}
+
+function openEditModal(i) {
+    const u = currentUserData[i];
+    const isAdminAcc = (u.사번 === 'admin'); 
+    
+    document.getElementById('modalTitle').innerHTML = isAdminAcc ? `<i class="fa-solid fa-shield-halved" style="color:#d9480f;"></i> 최고관리자 보안 정보 수정` : `<i class="fa-solid fa-user-pen" style="color:var(--primary-color);"></i> 구성원 정보 수정`;
+    
+    let dangerZoneHTML = '';
+    if (!isAdminAcc) {
+        dangerZoneHTML = `
+        <div class="full-width" style="display:flex; justify-content:space-between; align-items:center; background:#fff5f5; padding:15px 20px; border-radius:12px; border:1px solid #ffc9c9;">
+            <div><span style="color:#c92a2a; font-size:0.9em;"><i class="fa-solid fa-triangle-exclamation"></i> 위험 작업</span></div>
+            <div>
+                <button onclick="processRetire(${u.id})" class="action-btn btn-retire" style="margin-right:5px;">퇴사 처리</button>
+                <button onclick="deleteUser(${u.id})" class="action-btn btn-delete">영구 삭제</button>
+            </div>
+        </div>`;
+    }
+
+    const readOnlyAttr = isAdminAcc ? 'readonly class="glass-input readonly-field"' : 'class="glass-input"';
+    const styleAttr = isAdminAcc ? 'class="glass-input readonly-field" style="pointer-events: none;"' : 'class="glass-input"';
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-grid">
+            ${dangerZoneHTML}
+            
+            <div class="full-width profile-setup-area" style="${isAdminAcc ? 'display:none;' : ''}">
+                <div style="flex:1;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진</label>
+                    <input type="file" id="edit_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_edit')">
+                    <img id="preview_edit" class="profile-img-preview" src="${u.profile_path || ''}" style="display:${u.profile_path ? 'block' : 'none'}; width:70px; height:70px;">
+                </div>
+                <div style="flex:2;">
+                    <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 아이콘</label>
+                    <div id="icon-container-edit" class="emoji-scroll-box"></div>
+                    <input type="hidden" id="edit_profile_icon" value="${u.아이콘}">
+                </div>
+            </div>
+
+            <div class="modal-field"><label>사번</label><input type="text" value="${u.사번||'-'}" readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>성명</label><input type="text" value="${u.이름}" readonly class="glass-input readonly-field"></div>
+            
+            <div class="modal-field"><label>새 비밀번호 ${isAdminAcc ? '<span style="color:#d9480f;">(수정 가능)</span>' : ''}</label><input type="password" id="modal_pass" class="glass-input" placeholder="*** (변경시에만 입력)" value=""></div>
+            <div class="modal-field"><label>새 비밀번호 확인</label><input type="password" id="modal_pass_confirm" class="glass-input" placeholder="새 비밀번호 재입력" value=""></div>
+            
+            <div class="modal-field"><label>주민등록번호</label><input type="text" value="${u.주민번호}" readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>직급</label><select id="modal_pos" ${styleAttr} onchange="document.getElementById('modal_level').value = LEVEL_MAP[this.value] != null ? LEVEL_MAP[this.value] : 14;">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}</select></div>
+            <div class="modal-field"><label>권한레벨</label><input type="number" id="modal_level" value="${u.레벨}" readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>연락처</label><input type="text" id="modal_phone" value="${u.전화번호||''}" oninput="formatPhoneNumber(this)" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>이메일</label><input type="email" id="modal_email" value="${u.이메일||''}" ${readOnlyAttr}></div>
+            <div class="modal-field full-width"><label>주소지</label><input type="text" id="modal_address" value="${u.주소||''}" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>소속부서</label><input type="text" id="modal_department" value="${u.소속||''}" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>급여통장</label><input type="text" id="modal_bank" value="${u.계좌||''}" ${readOnlyAttr}></div>
+        </div>
+    `;
+    
+    if(!isAdminAcc) {
+        renderIcons('icon-container-edit', 'edit_profile_icon', u.아이콘);
+    }
+    
+    document.getElementById('adminArea').style.display = 'block';
+    document.getElementById('modalSubmitBtn').innerText = "수정 적용";
+    document.getElementById('modalSubmitBtn').onclick = () => submitUpdate(u.id); 
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitUpdate(dbId) {
+    const adminPass = document.getElementById('adminPass').value;
+    
+    if (adminPass !== "1900") {
+        return alert("관리자 보안 암호가 일치하지 않습니다.");
+    }
+
+    const modalPass = document.getElementById('modal_pass').value;
+    const modalPassConfirm = document.getElementById('modal_pass_confirm').value;
+
+    // 🚀 비밀번호가 입력된 경우에만 이중 검증 및 정규식 검증
+    if (modalPass || modalPassConfirm) {
+        if (modalPass !== modalPassConfirm) {
+            return alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+        }
+        const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{6,}$/;
+        if (!pwRegex.test(modalPass)) {
+            return alert("새 비밀번호는 영문, 숫자, 특수문자를 포함하여 6자리 이상이어야 합니다.");
+        }
+    }
+
+    const formData = new FormData();
+    formData.append('user_idx', dbId);
+    formData.append('admin_pass', adminPass);
+    formData.append('password', modalPass); // 검증을 통과한 비밀번호만 전송
+    formData.append('position', document.getElementById('modal_pos').value);
+    formData.append('level', document.getElementById('modal_level').value);
+    formData.append('phone', document.getElementById('modal_phone').value);
+    formData.append('email', document.getElementById('modal_email').value);
+    formData.append('address', document.getElementById('modal_address').value);
+    formData.append('department', document.getElementById('modal_department').value);
+    formData.append('bank_account', document.getElementById('modal_bank').value);
+    
+    const editIconInput = document.getElementById('edit_profile_icon');
+    if(editIconInput) formData.append('profile_icon', editIconInput.value);
+    
+    const imgFile = document.getElementById('edit_profile_image') ? document.getElementById('edit_profile_image').files[0] : null;
+    if(imgFile) formData.append('profile_image', imgFile);
+
+    try {
+        // 🚀 [해결3] 서버 통신오류 방지: 정확히 일치하는 업데이트 라우트 사용
+        const res = await fetch('/user/update', { 
+            method: 'POST', 
+            body: formData 
+        });
+        const r = await res.json(); 
+        alert(r.message); 
+        if(res.ok) { closeModal(); loadAllUsers(); }
+    } catch (e) {
+        alert('서버와의 통신이 원활하지 않습니다. 잠시 후 다시 시도해주세요.');
+    }
+}
+
+function openInviteModal() {
+    document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-paper-plane" style="color:var(--primary-color);"></i> 가입 초대 메일 발송`;
+    
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-grid">
+            <div class="modal-field" style="display: flex; flex-direction: column; justify-content: center;">
+                <label style="font-size: 1.05em; color: #212529;">초대받을 대상의 이메일 주소 <span style="color:#e03131;">*</span></label>
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <input type="email" id="invite_email" class="glass-input" placeholder="example@email.com" style="flex:1; padding: 15px; font-size: 1.05em;">
+                </div>
+            </div>
+            
+            <div class="modal-field">
+                <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 12px; height: 100%; box-sizing: border-box; display: flex; align-items: center;">
+                    <p style="font-size:0.9em; color:#868e96; margin:0; line-height: 1.5;">
+                        <i class="fa-solid fa-circle-info" style="color: #4a90e2; margin-right: 5px;"></i> 입력하신 이메일로 인트라넷 전용 가입 링크가 전송됩니다.<br><br>
+                        수신자는 해당 링크를 통해 별도의 관리자 승인 없이 기초 정보를 직접 입력할 수 있습니다.
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('adminArea').style.display = 'none';
+    document.getElementById('modalSubmitBtn').innerText = "메일 발송";
+    document.getElementById('modalSubmitBtn').onclick = submitInvite;
+    document.getElementById('userModal').style.display = 'block';
+}
+
+async function submitInvite() {
+    const email = document.getElementById('invite_email').value;
+    if (!email) return alert("초대받을 이메일 주소를 필수로 입력해주세요.");
+
+    document.getElementById('modalSubmitBtn').innerText = "메일 발송 중...";
+    document.getElementById('modalSubmitBtn').disabled = true;
+
+    try {
+        const res = await fetch('/user/send_invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        const d = await res.json();
+        alert(d.message);
+        if (res.ok) closeModal();
+    } catch (e) {
+        alert("메일 발송 중 오류가 발생했습니다.");
+    } finally {
+        if(document.getElementById('modalSubmitBtn')){
+            document.getElementById('modalSubmitBtn').innerText = "메일 발송";
+            document.getElementById('modalSubmitBtn').disabled = false;
+        }
+    }
+}
+
+function closeModal() { 
+    document.getElementById('userModal').style.display = 'none'; 
+    document.getElementById('adminPass').value = ''; 
+    if(document.getElementById('modalSubmitBtn')) {
+        document.getElementById('modalSubmitBtn').disabled = false;
+    }
+}
+
+window.onload = () => {
+    {% if mode == 'invite' %}
+    renderIcons('icon-container-invite', 'profile_icon');
+    {% elif mode == 'admin_setup' %}
+    {% else %}
+    loadAllUsers();
+    {% endif %}
+};
+</script>
+{% endblock %}

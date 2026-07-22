@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    /* CSS 기존 유지 */
+    .write-box { max-width: 1000px; margin: 0 auto; background: #fff; padding: 40px; border: none solid #e2e8f0; border-radius: 12px; }
+    .w-input { width: 100%; padding: 15px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 20px; font-size: 1rem; }
+    .file-item { display: flex; justify-content: space-between; background: #f1f5f9; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 8px; }
+    .btn-wrap { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 10px; }
+    .btn-basic { padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.95rem; transition: 0.2s; }
+    .btn-cancel { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .btn-cancel:hover { background: #e2e8f0; }
+    .btn-submit { background: #1e3a8a; color: white; border: 1px solid #1e3a8a; }
+    .btn-submit:hover { background: #1e40af; border-color: #1e40af; }
+</style>
+
+<div class="write-box">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 30px;">
+        <h2 style="color: #1e293b; margin: 0;">{{ board.name_kr }} 글 수정</h2>
+        <!-- 💡 권한자(레벨 3 이하)에게만 공지 체크박스 노출 및 이전 상태 반영 -->
+        {% if session.get('user_level', 99) <= 3 %}
+        <label style="font-weight: 700; color: #ef4444; cursor: pointer;">
+            <input type="checkbox" id="isNotice" style="transform: scale(1.2); margin-right: 5px;" {% if post.is_notice %}checked{% endif %}> 상단 고정 (공지)
+        </label>
+        {% endif %}
+    </div>
+
+    <input type="text" id="title" class="w-input" value="{{ post.title }}" placeholder="제목을 입력하세요">
+    <textarea id="content" class="w-input" style="height: 400px; resize: none;" placeholder="내용을 입력하세요">{{ post.content }}</textarea>
+    
+    <div style="margin-bottom: 20px;">
+        <label style="font-weight: 700; color: #475569; display: block; margin-bottom: 10px;">기존 첨부파일 (삭제할 파일 선택)</label>
+        {% for f in files %}
+        <div class="file-item">
+            <span><i class="fa-solid fa-paperclip"></i> {{ f.original_name }}</span>
+            <label style="cursor:pointer; color:#ef4444; font-size:0.85rem; font-weight:700;">
+                <input type="checkbox" class="delete-file-cb" value="{{ f.id }}"> 삭제하기
+            </label>
+        </div>
+        {% else %}
+        <div style="font-size: 0.9rem; color: #94a3b8;">등록된 첨부파일이 없습니다.</div>
+        {% endfor %}
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <label style="font-weight: 700; color: #475569; display: block; margin-bottom: 10px;">새 첨부파일 추가 (최대 5개)</label>
+        <input type="file" id="newFiles" multiple class="w-input" style="padding: 10px; background: #f8fafc;">
+    </div>
+
+    <div class="btn-wrap">
+        <button class="btn-basic btn-cancel" onclick="history.back()"><i class="fa-solid fa-xmark"></i> 취소</button>
+        <button class="btn-basic btn-submit" onclick="submitEdit()"><i class="fa-solid fa-check"></i> 수정 완료</button>
+    </div>
+</div>
+
+<script>
+    async function submitEdit() {
+        const title = document.getElementById('title').value.trim();
+        const content = document.getElementById('content').value.trim();
+        const isNoticeCheckbox = document.getElementById('isNotice');
+        const isNotice = isNoticeCheckbox && isNoticeCheckbox.checked ? 1 : 0; // 공지 데이터 추출
+
+        if (!title || !content) return alert('제목과 내용을 모두 입력하세요.');
+
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('content', content);
+        formData.append('is_notice', isNotice); // 추가
+
+        document.querySelectorAll('.delete-file-cb:checked').forEach(cb => {
+            formData.append('deleted_files[]', cb.value);
+        });
+
+        const fileInput = document.getElementById('newFiles');
+        for(let i=0; i<fileInput.files.length; i++) {
+            formData.append('files[]', fileInput.files[i]);
+        }
+
+        try {
+            const res = await fetch('/board/{{ board.name_en }}/edit/{{ post.id }}', { method: 'POST', body: formData });
+            const result = await res.json();
+            
+            if (res.ok) location.href = result.url;
+            else alert(result.message || '수정 권한이 없거나 실패했습니다.');
+        } catch (e) {
+            alert('통신 오류가 발생했습니다.');
+        }
+    }
+</script>
+{% endblock %}

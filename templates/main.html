@@ -1,0 +1,1497 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    :root {
+        /* base.html 에서 불러온 다이나믹 테마 변수 매핑 */
+        --text-main: var(--text-dark, #0f172a);
+        --text-sub: var(--text-gray, #475569);
+        --text-muted: #94a3b8;    
+        --card-radius: 12px;
+        --blue-primary: var(--primary-color, #2563eb);
+        --blue-light: var(--primary-light, #eff6ff);
+        --widget-border-color: var(--border-color, #d9e2ef);
+        --hover-bg: var(--widget-hover, #f8fafc);
+        --new-widget-width: 240px; 
+        --dashboard-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
+        --dashboard-card-hover-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+        --dashboard-top-line: linear-gradient(90deg, var(--primary-color, #2563eb) 0%, #0f766e 52%, #d97706 100%);
+    }
+
+    /* 바탕을 투명하게 하여 base.html의 동적 테마 배경(gradient)이 표시되게 함 */
+    .main-content {
+        background: transparent !important;
+    }
+
+    .dashboard-wrapper {
+        width: 100%; 
+        box-sizing: border-box;
+        padding: 30px 0 4px 0;
+        font-family: 'Pretendard', sans-serif;
+    }
+
+    .ustra-grid {
+        display: grid;
+        grid-template-columns: 0.9fr 1.5fr 1.1fr var(--new-widget-width); 
+        grid-template-rows: 280px 260px 320px; 
+        gap: 20px;
+    }
+
+    /* 위젯 카드들에 테마 공통 배경(var(--card-bg)) 및 블러 필터 적용 */
+    .widget-card {
+        background: var(--dashboard-top-line) top left / 100% 4px no-repeat, var(--card-bg, #ffffff);
+        background-origin: border-box;
+        backdrop-filter: var(--card-backdrop, none);
+        -webkit-backdrop-filter: var(--card-backdrop, none);
+        position: relative;
+        border-radius: var(--card-radius);
+        border: 1px solid var(--widget-border-color); 
+        border-top: 4px solid transparent; 
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: var(--dashboard-card-shadow);
+        transition: all 0.2s ease;
+    }
+
+    .widget-card:hover {
+        border-color: var(--blue-primary);
+        box-shadow: var(--dashboard-card-hover-shadow);
+    }
+
+    .widget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--widget-border-color); /* <--- 메인화면 그리드 메뉴 제목아래 선. 제거하려면 이 한줄만 삭제 */
+    }
+    .widget-icons {
+        display: flex;
+        gap: 12px;
+        color: var(--text-muted);
+        font-size: 1.05rem;
+    }
+    .widget-icons i { cursor: pointer; transition: color 0.2s; }
+    .widget-icons i:hover { color: var(--blue-primary); }
+
+    .cal-title-area { 
+        font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0;
+        display: flex; gap: 8px; align-items: center; letter-spacing: -0.3px; transition: color 0.2s;
+    }
+    .cal-title-area.clickable:hover { color: var(--blue-primary); }
+
+    .company-gallery-card {
+        gap: 0;
+    }
+    .gallery-action-btn {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--widget-border-color);
+        border-radius: 8px;
+        background: var(--card-bg, #ffffff);
+        color: var(--text-main);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .gallery-action-btn:hover {
+        color: var(--blue-primary);
+        border-color: var(--blue-primary);
+        background: var(--blue-light);
+    }
+    .company-gallery-list {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .company-gallery-item {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--widget-border-color);
+        cursor: pointer;
+        min-height: 72px;
+    }
+    .company-gallery-item:hover .company-gallery-title {
+        color: var(--blue-primary);
+        text-decoration: underline;
+    }
+    .company-gallery-thumb {
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        background: #f1f5f9;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        object-fit: cover;
+        overflow: hidden;
+    }
+    .company-gallery-thumb.fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #0f766e;
+        background: #e8f7f0;
+        font-size: 1.15rem;
+    }
+    .company-gallery-title {
+        color: var(--text-main);
+        font-size: 0.86rem;
+        font-weight: 700;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .company-gallery-meta,
+    .company-gallery-time {
+        color: var(--text-muted);
+        font-size: 0.76rem;
+        line-height: 1.4;
+        white-space: nowrap;
+    }
+    .company-gallery-footer {
+        width: 100%;
+        margin-top: 12px;
+        border: 1px solid var(--widget-border-color);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-main);
+        font-size: 0.86rem;
+        font-weight: 600;
+        padding: 10px 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .company-gallery-footer:hover {
+        color: var(--blue-primary);
+        border-color: var(--blue-primary);
+        background: var(--blue-light);
+    }
+    .company-gallery-empty {
+        flex: 1;
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: var(--text-muted);
+        text-align: center;
+        font-size: 0.86rem;
+    }
+
+    .pill-tabs { 
+        display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; background: var(--hover-bg);
+        padding: 4px; border-radius: 8px; border: 1px solid var(--widget-border-color);
+    }
+    .pill-tabs::-webkit-scrollbar { display: none; }
+    .pill-btn {
+        padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600;
+        cursor: pointer; transition: all 0.2s; white-space: nowrap; 
+    }
+    .blue-pill-active, .white-pill-active { background: #ffffff; color: var(--blue-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .blue-pill-inactive, .white-pill-inactive { background: transparent; color: var(--text-sub); border: 1px solid transparent; }
+    .blue-pill-inactive:hover { color: var(--text-main); }
+
+    .list-item-common {
+        display: flex; justify-content: space-between; align-items: center; padding: 12px 10px;
+        border-bottom: 1px solid var(--widget-border-color); font-size: 0.9rem; cursor: pointer;
+        transition: all 0.2s ease; border-left: 3px solid transparent; 
+    }
+    .list-item-common:hover { background: var(--blue-light); border-left: 3px solid var(--blue-primary); padding-left: 14px; }
+    
+    .board-title { font-weight: 500; color: var(--text-main); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .board-info { color: var(--text-muted); font-size: 0.8rem; min-width: 140px; text-align: right; }
+    .msg-list-name { color: var(--text-main); font-weight: 600; font-size: 0.9rem; }
+    .msg-list-date { color: var(--text-muted); font-size: 0.75rem; }
+
+    .profile-card {
+        position: relative;
+        background: var(--dashboard-top-line) top left / 100% 4px no-repeat, var(--card-bg, #ffffff); 
+        background-origin: border-box; 
+        backdrop-filter: var(--card-backdrop, none);
+        -webkit-backdrop-filter: var(--card-backdrop, none);
+        border: 1px solid var(--widget-border-color);
+        border-top: 4px solid transparent; border-radius: var(--card-radius); padding: 24px;
+        display: flex; flex-direction: column; gap: 20px; transition: all 0.2s ease;
+        overflow: hidden;
+        box-shadow: var(--dashboard-card-shadow);
+    }
+    .profile-card:hover { border-color: var(--blue-primary); box-shadow: var(--dashboard-card-hover-shadow); }
+
+    .fc { font-size: 0.75rem; color: var(--text-main); }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--widget-border-color) !important; border-top: none !important; border-left: none !important; }
+    .fc-theme-standard .fc-scrollgrid { border: none !important; }
+    .fc .fc-toolbar-title { font-size: 1.1rem !important; font-weight: 700; letter-spacing: -0.5px; }
+    .fc-daygrid-day-frame { height: 45px !important; overflow: hidden !important; }
+    .fc-daygrid-day-number { padding: 4px 6px; border-radius: 4px; cursor: pointer; text-decoration: none !important; font-weight: 500; }
+    .fc-day-sun .fc-daygrid-day-number { color: #ef4444 !important; }
+    .fc-day-sat .fc-daygrid-day-number { color: var(--blue-primary) !important; }
+    .holiday-day .fc-daygrid-day-number { color: #ef4444 !important; }
+
+    .weather-weblink-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; margin-top: 5px; }
+    .weather-pill { background: var(--hover-bg); padding: 12px 6px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--widget-border-color); cursor: pointer; transition: all 0.2s ease; position: relative; }
+    .weather-pill:hover { border-color: var(--blue-primary); background: var(--card-bg, #ffffff); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
+    .weather-pill:hover .weblink-delete-btn { opacity: 1 !important; }
+    .weblink-delete-btn:hover { background: #dc2626 !important; transform: scale(1.1); }
+    .weather-pill-value { font-size: 0.75rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 5em; width: 100%; margin-top: 4px; }
+
+    .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
+    
+    .scroll-area { overflow-y: auto; overflow-x: hidden; padding-right: 5px; }
+    .scroll-area::-webkit-scrollbar { width: 4px; }
+    .scroll-area::-webkit-scrollbar-track { background: transparent; }
+    .scroll-area::-webkit-scrollbar-thumb { background: var(--widget-border-color); border-radius: 4px; }
+    .scroll-area::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .modal-content { background: var(--card-bg, #fff) !important; backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); border: 1px solid var(--widget-border-color) !important; border-radius: 12px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important; color: var(--text-main) !important; }
+    .modal-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--widget-border-color) !important; border-radius: 8px; background: var(--input-bg, #f8fafc) !important; color: var(--text-main) !important; transition: 0.2s; font-family: inherit;}
+    .modal-input:focus { border-color: var(--blue-primary) !important; outline: none; background: var(--card-bg, #fff) !important; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05); }
+    
+    .btn-primary { background: var(--blue-primary) !important; color: white !important; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 0.9rem; }
+    .btn-primary:hover { filter: brightness(0.9); }
+    .btn-action { background: var(--card-bg, #ffffff); color: var(--text-sub); border: 1px solid var(--widget-border-color); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; font-family: inherit; font-size: 0.9rem; }
+    .btn-action:hover { background: var(--hover-bg); color: var(--text-main); border-color: var(--blue-primary); }
+
+    .org-status-item { display: flex; align-items: center; padding: 6px 10px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+    .org-status-item:hover { background: var(--hover-bg); border-color: var(--widget-border-color); }
+    .org-avatar { width: 28px; height: 28px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 10px; font-size: 0.85rem; position: relative; }
+    .org-status-dot { position: absolute; bottom: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid #fff; }
+    .status-online { background: var(--blue-primary); box-shadow: 0 0 5px var(--blue-primary); animation: pulse-glow 1.5s infinite; }
+    .status-offline { background: #cbd5e1; }
+    @keyframes pulse-glow {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 var(--blue-primary); }
+        70% { transform: scale(1); box-shadow: 0 0 0 4px transparent; }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 transparent; }
+    }
+    .org-info { flex: 1; line-height: 1.2; }
+    .org-name { font-size: 0.8rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px; } 
+    .org-dept { font-size: 0.65rem; color: var(--text-muted); font-weight: 500; } 
+    .org-msg-icon { color: var(--text-muted); font-size: 0.75rem; transition: 0.2s; }
+    .org-status-item:hover .org-msg-icon { color: var(--blue-primary); transform: scale(1.1); }
+    .org-rank-header { font-size: 0.75rem; font-weight: 800; color: var(--blue-primary); padding: 12px 8px 6px 8px; margin-top: 5px; border-bottom: 1px solid var(--widget-border-color); margin-bottom: 8px; }
+
+    .tree-toggle-icon { transition: transform 0.2s ease; }
+    .tree-toggle-icon.expanded { transform: rotate(90deg); }
+
+    .weekly-schedule-widget {
+        position: relative;
+        display: flex; gap: 30px; background: var(--dashboard-top-line) top left / 100% 4px no-repeat, var(--card-bg, #ffffff); background-origin: border-box; backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); border-radius: var(--card-radius); border: 1px solid var(--widget-border-color);
+        border-top: 4px solid transparent; padding: 24px 30px; min-height: 220px; overflow: hidden; transition: all 0.2s ease;
+        box-shadow: var(--dashboard-card-shadow);
+    }
+    .weekly-schedule-widget:hover { border-color: var(--blue-primary); box-shadow: var(--dashboard-card-hover-shadow); }
+    .mini-cal-section { width: 250px; flex-shrink: 0; border-right: 1px solid var(--widget-border-color); padding-right: 30px; display: flex; flex-direction: column; }
+    
+    #mini-calendar { font-size: 0.75rem; flex: 1; }
+    #mini-calendar .fc-toolbar-title { font-size: 1rem !important; font-weight: 800; color: var(--text-main); }
+    #mini-calendar .fc-header-toolbar { margin-bottom: 15px !important; }
+    #mini-calendar .fc-button { padding: 0.2rem 0.4rem !important; background: transparent !important; border: none !important; color: var(--text-muted) !important; }
+    #mini-calendar .fc-button:hover { color: var(--blue-primary) !important; }
+    #mini-calendar .fc-daygrid-day-frame { height: 35px !important; min-height: 35px !important; display: flex; align-items: center; justify-content: center;}
+    #mini-calendar .fc-daygrid-day-top { flex-direction: row; justify-content: center; width: 100%; }
+    #mini-calendar .fc-daygrid-day-events { display: none !important; } 
+    #mini-calendar td, #mini-calendar th { border: none !important; } 
+    #mini-calendar .fc-daygrid-day { cursor: pointer; }
+    #mini-calendar .fc-daygrid-day-number { padding: 4px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; position: relative; isolation: isolate; z-index: 0; box-sizing: border-box; }
+    #mini-calendar .fc-daygrid-day-number.mini-event-ring::before { content: ''; position: absolute; inset: -2px; border-radius: 10px; padding: 2px; background: conic-gradient(from var(--mini-event-angle, 0deg), var(--mini-event-colors)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; z-index: -1; }
+    #mini-calendar .fc-daygrid-day-number.mini-event-ring-multi::before { animation: miniEventRingCycle 2.8s linear infinite; }
+    @property --mini-event-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+    @keyframes miniEventRingCycle { to { --mini-event-angle: 360deg; } }
+
+    .weekly-section { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    .weekly-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--widget-border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    
+    #weekly-schedule-container { display: flex; flex: 1; width: 100%; overflow: hidden; min-height: 0; position: relative; --weekly-range-space: 0px; }
+    .day-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; border-right: 1px dashed var(--widget-border-color); padding: 0 8px; overflow: hidden; min-height: 0; }
+    .day-col:last-child { border-right: none; }
+    .day-header-box { display: flex; align-items: baseline; gap: 6px; min-height: 52px; box-sizing: border-box; padding-bottom: 8px; border-bottom: 2px solid transparent; flex-shrink: 0; }
+    .day-num { font-size: 1.1rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px; }
+    .day-name { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    .day-col.is-today .day-header-box { border-bottom: 2px solid #14b8a6; }
+    .day-col.is-today .day-num, .day-col.is-today .day-name { color: #14b8a6; }
+
+    .day-events-list { display: flex; flex-direction: column; gap: 8px; padding: calc(5px + var(--weekly-range-space)) 4px 5px 0; flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+    .day-events-list::-webkit-scrollbar { width: 4px; }
+    .day-events-list::-webkit-scrollbar-track { background: transparent; }
+    .day-events-list::-webkit-scrollbar-thumb { background: var(--widget-border-color); border-radius: 4px; }
+    .day-events-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .weekly-event-item { font-size: 0.85rem; color: var(--text-sub); display: flex; align-items: center; line-height: 1.5; cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; position: relative; }
+    .weekly-event-item:hover { background: var(--hover-bg); color: var(--text-main); }
+    .weekly-event-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .weekly-range-layer { position: absolute; top: 64px; left: 0; right: 0; height: var(--weekly-range-space); z-index: 6; pointer-events: none; }
+    .weekly-range-bar { position: absolute; height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 5px; box-sizing: border-box; color: var(--text-main); pointer-events: auto; cursor: pointer; }
+    .weekly-range-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--event-color); flex: 0 0 auto; }
+    .weekly-range-title { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; font-weight: 800; color: var(--text-main); flex: 0 1 auto; }
+    .weekly-range-line { position: relative; height: 2px; min-width: 16px; flex: 1; background: var(--event-color); }
+    .weekly-range-line::after { content: ''; position: absolute; right: -2px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--event-color); }
+    
+    #global-tooltip { visibility: hidden; opacity: 0; position: fixed; background: #111827; color: #ffffff; padding: 13px 15px; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; font-size: 0.8rem; line-height: 1.55; z-index: 99999; width: max-content; min-width: 230px; max-width: min(340px, calc(100vw - 20px)); box-shadow: 0 14px 32px rgba(0,0,0,0.28); transition: opacity 0.14s ease; pointer-events: none; }
+    #global-tooltip::before { content: ''; position: absolute; top: 100%; left: var(--tooltip-arrow-left, 24px); transform: translateX(-50%); border-width: 7px; border-style: solid; border-color: #111827 transparent transparent transparent; }
+    .weekly-tooltip-title { padding-bottom: 9px; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.16); font-size: 0.9rem; font-weight: 800; line-height: 1.4; color: #ffffff; }
+    .weekly-tooltip-row { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+    .weekly-tooltip-label { color: #9ca3af; font-weight: 700; }
+    .weekly-tooltip-value { color: #f9fafb; overflow-wrap: anywhere; white-space: pre-wrap; }
+    .weekly-tooltip-detail { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.16); }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
+    .full-width { grid-column: 1 / -1; }
+    .profile-setup-area { display: flex; gap: 20px; align-items: flex-start; background: var(--hover-bg); padding: 20px; border-radius: 12px; margin-bottom: 5px; }
+    .modal-field { margin-bottom: 5px; text-align: left; }
+    .modal-field label { display: block; margin-bottom: 8px; color: var(--text-gray, #64748b); font-size: 0.85rem; font-weight: 700; }
+    .readonly-field { background-color: var(--hover-bg, #f1f5f9) !important; color: var(--text-gray, #64748b) !important; cursor: not-allowed; border: 1px solid var(--widget-border-color, #e2e8f0) !important; font-weight: 600; }
+    .profile-icon-option { font-size: 1.8rem; cursor: pointer; padding: 6px; border-radius: 50%; border: 3px solid transparent; transition: 0.2s; display:inline-flex; align-items:center; justify-content:center; width: 45px; height: 45px;}
+    .profile-icon-option.selected { border-color: var(--blue-primary); background: var(--blue-light, #eff6ff); }
+    .profile-icon-option:hover { background: var(--hover-bg, #f8f9fa); }
+    .emoji-scroll-box { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; max-height: 130px; overflow-y: auto; border: 1px solid var(--widget-border-color); padding: 10px; border-radius: 10px; background: var(--card-bg, #fff); }
+    .emoji-scroll-box::-webkit-scrollbar { width: 6px; }
+    .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
+    .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid var(--widget-border-color); margin-top: 10px; display: none; }
+
+    .pinned-notice { background-color: transparent; }
+    .pinned-notice .board-title { font-weight: 700; color: var(--blue-primary); filter: brightness(0.7); }
+    
+    .new-n-badge { display: inline-block; color: #ef4444; font-size: 0.65rem; font-weight: 900; margin-left: 5px; vertical-align: super; animation: blinkNew 1.5s infinite; }
+    @keyframes blinkNew { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .notice-item:hover { background-color: transparent !important; border-left: 3px solid transparent !important; padding-left: 10px !important; }
+    .notice-item:hover .board-title { color: var(--blue-primary) !important; text-decoration: underline; }
+
+
+/* 대시보드 각 그리드 카드 상단 색띠 개선 (테마 색상 적용 및 모서리 깨짐 방지) */
+.dashboard-wrapper {
+    position: relative;
+    z-index: 2;
+}
+
+.widget-card,
+.profile-card,
+.weekly-schedule-widget {
+    /* 기존 배경 그라데이션 띠를 제거하고 깔끔한 단일 배경으로 변경 */
+    background: var(--card-bg, #ffffff) !important;
+    
+    /* 상단 테두리(border-top)에 테마 색상(primary-color)을 직접 적용하여 자연스럽게 감싸도록 처리 */
+    border: 1px solid var(--card-border, var(--widget-border-color)) !important;
+    border-top: 4px solid var(--primary-color, var(--blue-primary)) !important;
+    
+    /* 둥근 모서리에 상단 색띠가 들뜨지 않고 딱 맞물리도록 강제 */
+    border-radius: var(--card-radius, 12px) !important;
+    overflow: hidden !important;
+
+    box-shadow: var(--card-shadow, var(--dashboard-card-shadow)) !important;
+    backdrop-filter: var(--card-backdrop, none) !important;
+    -webkit-backdrop-filter: var(--card-backdrop, none) !important;
+}
+
+.widget-card:hover,
+.profile-card:hover,
+.weekly-schedule-widget:hover {
+    /* 마우스 오버 시 전체 테두리가 테마 색상으로 빛나도록 유지 */
+    border-color: var(--primary-color, var(--blue-primary)) !important;
+    box-shadow: var(--card-shadow, var(--dashboard-card-hover-shadow)) !important;
+}
+
+.modal-content {
+    background: var(--card-bg, #ffffff) !important;
+    border: 1px solid var(--card-border, var(--widget-border-color)) !important;
+    box-shadow: var(--card-shadow, 0 25px 50px rgba(0, 0, 0, 0.15)) !important;
+    backdrop-filter: var(--card-backdrop, none) !important;
+    -webkit-backdrop-filter: var(--card-backdrop, none) !important;
+}
+
+.btn-action,
+.weather-pill,
+.pill-tabs,
+.emoji-scroll-box,
+#my-weekly-tasks-summary > div {
+    border-color: var(--card-border, var(--widget-border-color)) !important;
+}
+
+</style>
+
+<div class="dashboard-wrapper">
+    <div class="ustra-grid">
+        
+        <div style="grid-column: 1 / 2; grid-row: 1 / 3; display: flex; flex-direction: column; gap: 20px;">
+            <div class="profile-card">
+                <div style="display: flex; align-items: center; gap: 16px; cursor: pointer;" onclick="openMyInfoModal()" title="내 프로필 정보 수정">
+                    <div id="nav-profile-icon-container" style="width: 70px; height: 70px; background: #ffffff; border: 2px solid var(--widget-border-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: var(--text-sub); overflow: hidden;">
+                        {% if current_user_profile_path %}
+                            <img src="{{ current_user_profile_path }}" alt="Profile" style="width: 100%; height: 100%; object-fit: contain; background: #fff;">
+                        {% elif user_profile_paths and user_profile_paths.get(current_user) %}
+                            <img src="{{ user_profile_paths.get(current_user) }}" alt="Profile" style="width: 100%; height: 100%; object-fit: contain; background: #fff;">
+                        {% else %}
+                            {{ user_icons.get(current_user, '👤') if user_icons else '👤' }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <div id="nav-user-name" style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
+                        <div id="nav-user-dept-pos" style="font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; font-weight: 500;">
+                            {{ session.get('department', '소속미지정') }} | {{ session.get('position', '직급미지정') }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-primary" style="flex: 1;" onclick="recordAttendance('in')"><i class="fa-solid fa-sign-in-alt"></i> 출근</button>
+                    <button class="btn-action" style="flex: 1;" onclick="recordAttendance('out')"><i class="fa-solid fa-sign-out-alt"></i> 퇴근</button>
+                    
+                    <button class="btn-action" style="width: 42px; padding: 0; display: flex; align-items: center; justify-content: center;" onclick="location.href='{{ url_for('memo.memo_board') }}'" title="개인 화이트보드">
+                        <i class="fa-solid fa-chalkboard" style="font-size: 1.1rem; color: var(--text-main);"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="widget-card" style="flex: 1;">
+                <div class="widget-header">
+                    <div class="cal-title-area">
+                        <i class="fa-solid fa-list-check" style="color: var(--blue-primary);"></i> 나의 주간 업무 요약
+                    </div>
+                </div>
+                <div id="my-weekly-tasks-summary" class="scroll-area" style="flex: 1; display: flex; flex-direction: column;">
+                </div>
+            </div>
+        </div>
+
+        <div class="widget-card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
+            <!-- border-bottom: none; 을 지우고 margin-bottom: 6px; 만 남겨서 선을 복구합니다 -->
+            <div class="widget-header" style="margin-bottom: 6px;">
+                <div class="cal-title-area">업무 알림</div>
+                <div class="widget-icons"><i class="fa-solid fa-rotate-right" onclick="loadNotificationWidget()"></i></div>
+            </div>
+            
+            <!-- 호버 잘림 방지용 여백은 그대로 유지합니다 -->
+            <div id="notification-widget-area" class="scroll-area" style="flex:1; padding-top: 10px;">
+                <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding-top: 40px;">
+                    <i class="fa-solid fa-spinner fa-spin"></i> 로딩 중...
+                </div>
+            </div>
+        </div>
+
+        <div style="grid-column: 3 / 4; grid-row: 1 / 2; display: flex; flex-direction: column; height: 100%; min-width: 0; overflow: hidden;">
+    {% include 'chat_widget.html' %}
+</div>
+
+        <div class="widget-card" style="grid-column: 2 / 3; grid-row: 2 / 3;">
+            <div class="widget-header">
+                <div class="cal-title-area clickable" style="cursor: pointer;" onclick="location.href='/board/noti'">새담공지사항</div>
+                <div class="widget-icons">
+                    <i class="fa-solid fa-rotate-right" onclick="location.reload()"></i>
+                    <i class="fa-solid fa-plus" onclick="location.href='/board/noti/write'"></i>
+                </div>
+            </div>
+            
+            <div class="scroll-area" style="flex: 1;">
+                {% for post in board_posts %}
+                    {% set is_pin = post.is_pinned or post.pinned or post.notice_yn == 'Y' or post.is_notice or post.is_top %}
+                    {% if is_pin %}
+                    <div class="list-item-common notice-item pinned-notice" data-date="{{ (post.created_at or post.date)[:10] }}" onclick="location.href='/board/noti/read/{{ post.id if post.id else post['id'] }}'">
+                        <div class="board-title">
+                            <i class="fa-solid fa-bullhorn" style="color: #ea580c; margin-right: 6px; font-size: 0.8rem;" title="공지"></i>
+                            {{ post.title }}
+                            <span class="new-n-badge" style="display:none;">n</span>
+                            {% if post.filename %}<i class="fa-solid fa-paperclip" style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;"></i>{% endif %}
+                        </div>
+                        <div class="board-info">{{ post.author }} &nbsp;|&nbsp; {{ (post.created_at or post.date)[:10] }}</div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+
+                {% for post in board_posts %}
+                    {% set is_pin = post.is_pinned or post.pinned or post.notice_yn == 'Y' or post.is_notice or post.is_top %}
+                    {% if not is_pin %}
+                    <div class="list-item-common notice-item" data-date="{{ (post.created_at or post.date)[:10] }}" onclick="location.href='/board/noti/read/{{ post.id if post.id else post['id'] }}'">
+                        <div class="board-title">
+                            {{ post.title }}
+                            <span class="new-n-badge" style="display:none;">n</span>
+                            {% if post.filename %}<i class="fa-solid fa-paperclip" style="font-size:0.75rem; color:var(--text-muted); margin-left:4px;"></i>{% endif %}
+                        </div>
+                        <div class="board-info">{{ post.author }} &nbsp;|&nbsp; {{ (post.created_at or post.date)[:10] }}</div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+
+                {% if board_posts|length == 0 %}
+                <div style="text-align:center; padding:40px 0; color:var(--text-muted); font-size:0.9rem;">등록된 새담공지사항 글이 없습니다.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="widget-card" style="grid-column: 3 / 4; grid-row: 2 / 3;">
+            <div class="widget-header">
+                <div class="cal-title-area">Web / File Link</div>
+                <div class="widget-icons">
+                    <i class="fa-solid fa-plus" onclick="document.getElementById('weblinkModal').style.display='block'" title="링크 추가"></i>
+                </div>
+            </div>
+            
+            <div class="scroll-area" style="flex: 1;">
+                <div id="weblink-container" class="weather-weblink-grid">
+                    {% for link in weblinks %}
+                    <div class="weather-pill" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
+                        {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
+                        <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" style="position: absolute; top: -4px; right: -4px; z-index: 10; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"><i class="fa-solid fa-xmark"></i></div>
+                        {% endif %}
+                        
+                        {% if link.favicon_url == 'FILE' %}
+                            {% set ext = link.url.split('.')[-1] | lower %}
+                            {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'] %}
+                                <img src="{{ link.url }}" alt="thumb" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover; border: 1px solid var(--widget-border-color);">
+                            {% else %}
+                                <div style="width: 24px; height: 24px; background: #ffffff; border-radius: 4px; border: 1px solid var(--widget-border-color); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-sub);">
+                                    <i class="fa-solid fa-file"></i>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            <img src="{{ link.favicon_url }}" alt="icon" onerror="this.style.display='none'" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
+                        {% endif %}
+                        
+                        <div class="weather-pill-value">{{ link.title }}</div>
+                    </div>
+                    {% else %}
+                    <div style="grid-column: 1 / -1; text-align:center; color:var(--text-muted); font-size:0.8rem; padding:30px 0;">등록된 링크가 없습니다.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="weekly-schedule-widget" style="grid-column: 1 / 4; grid-row: 3 / 4;">
+            <div class="mini-cal-section">
+                <div id="mini-calendar"></div>
+            </div>
+            
+            <div class="weekly-section">
+                <div class="weekly-header">
+                    <div class="cal-title-area">주간 자원관리 현황</div>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <span id="weekly-date-range" style="font-size:0.85rem; color:var(--text-muted); font-weight:500; margin-right: 10px;">로딩중...</span>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="btn-action" style="padding: 4px 12px;" onclick="currentWeeklyStart = new Date(); renderWeeklySchedule();">오늘</button>
+                    </div>
+                </div>
+                <div id="weekly-schedule-container">
+                </div>
+            </div>
+        </div>
+
+        <div style="grid-column: 4 / 5; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 20px;">
+            <div class="widget-card" style="flex: 0 0 auto; min-height: 200px;">
+                <div class="widget-header">
+                    <div class="cal-title-area">오늘의 날씨</div>
+                    <div class="widget-icons"><i class="fa-solid fa-rotate-right" style="cursor:pointer;" onclick="alert('날씨 정보를 갱신합니다.')"></i></div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
+                    <i class="fa-solid fa-cloud-sun" style="font-size: 3rem; color: #60a5fa; margin-bottom: 8px;"></i>
+                    <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); letter-spacing:-0.5px;">18°C</div>
+                    <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 2px;">수원시 맑음 (강수확률 10%)</div>
+                    
+                    <div style="margin-top: 16px; display: flex; gap: 20px; font-size: 0.8rem; border-top: 1px dashed var(--widget-border-color); padding-top: 16px; width: 100%; justify-content: center;">
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                            <span style="color:var(--text-muted); font-size:0.75rem;">미세먼지</span>
+                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
+                        </div>
+                        <div style="width: 1px; background: var(--widget-border-color);"></div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+                            <span style="color:var(--text-muted); font-size:0.75rem;">초미세</span>
+                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="widget-card company-gallery-card" style="flex: 1;">
+                <div class="widget-header">
+                    <div class="cal-title-area">
+                        <i class="fa-regular fa-image" style="color: var(--blue-primary);"></i> 사내 갤러리
+                    </div>
+                    <div class="widget-icons" style="gap: 8px;">
+                        <button type="button" class="gallery-action-btn" onclick="location.reload()" title="새로고침">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                        <button type="button" class="gallery-action-btn" onclick="location.href='{{ url_for('gall2.index') }}'" title="사진 추가">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                {% if gallery_preview_items %}
+                <div class="company-gallery-list">
+                    {% for item in gallery_preview_items %}
+                    <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.index') }}'">
+                        {% if item.thumb_name %}
+                        <img class="company-gallery-thumb" src="{{ url_for('gall2.serve_thumb', filename=item.thumb_name) }}" alt="{{ item.title }}" loading="lazy">
+                        {% else %}
+                        <div class="company-gallery-thumb fallback"><i class="fa-regular fa-image"></i></div>
+                        {% endif %}
+                        <div style="min-width: 0;">
+                            <div class="company-gallery-title">
+                                {% if loop.first %}<span class="new-n-badge" style="display:inline-block; margin-left:0; margin-right:5px;">new</span>{% endif %}
+                                {{ item.title }}
+                            </div>
+                            <div class="company-gallery-meta">{{ item.tab_name or '기본 갤러리 2' }} · 사진 {{ item.photo_count or 0 }}장</div>
+                        </div>
+                        <div class="company-gallery-time">{{ item.created_at[:10] if item.created_at else '' }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="company-gallery-empty">
+                    <i class="fa-regular fa-images" style="font-size: 2.3rem; color: var(--blue-primary);"></i>
+                    <div>등록된 사내갤러리 사진이 없습니다.</div>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="global-tooltip"></div>
+
+<div id="myInfoModal" class="modal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div class="modal-content" style="background:var(--card-bg, #fff); backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); border:1px solid var(--widget-border-color); box-shadow:0 25px 50px rgba(0,0,0,0.15); margin:6% auto; padding:0; border-radius:20px; width:800px; max-width:95vw; max-height:85vh; overflow-y:auto; color:var(--text-main);">
+        <div class="modal-header" style="padding:25px 30px; border-bottom:1px solid var(--widget-border-color); display:flex; justify-content:space-between; align-items:center; background: transparent;">
+            <h3 style="margin:0; font-size:1.3rem; font-weight:800; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-address-card" style="color:var(--blue-primary);"></i> 개인 프로필 정보</h3>
+            <span style="cursor:pointer; font-size:1.8rem; color:var(--text-muted);" onclick="closeMyInfoModal()">&times;</span>
+        </div>
+        
+        <div id="myInfoLoading" style="text-align:center; padding:50px; color:var(--text-muted); font-weight:600;">데이터를 불러오는 중입니다...</div>
+        <div id="myInfoError" style="display:none; text-align:center; padding:50px; color:#ef4444; font-weight:600;"></div>
+        
+        <div id="myInfoDisplay" style="display:none;">
+            <form id="myInfoForm" onsubmit="event.preventDefault(); submitMyInfoUpdate();">
+                <div class="form-grid" id="myInfoGrid"></div>
+                
+                <div style="padding:20px 30px; display:flex; gap:10px; justify-content:flex-end; background:transparent; border-top:1px solid var(--widget-border-color);">
+                    <button type="submit" class="btn-primary" style="padding:12px 30px;"><i class="fa-solid fa-check" style="margin-right:5px;"></i> 변경사항 저장</button>
+                    <button type="button" class="btn-close-modal" onclick="closeMyInfoModal()">닫기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:6% auto; padding:30px; width:420px; position:relative;">
+        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 id="taskModalTitle" style="color: var(--text-main); margin-top: 0; margin-bottom: 20px; font-weight:800;"><i class="fa-solid fa-pen-clip" style="color:var(--blue-primary); margin-right:8px;"></i>새 일정 등록</h3>
+        <form id="taskForm">
+            <input type="hidden" id="taskId">
+            <input type="date" id="taskDate" class="modal-input" required readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
+            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
+            
+            <div style="background: var(--hover-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--widget-border-color); margin-bottom: 15px;">
+                <select id="taskCategory" class="modal-input" style="margin-bottom: 10px; cursor: pointer; font-weight:bold;">
+                    <option value="회의">회의</option>
+                    <option value="면접">면접</option>
+                    <option value="미팅">미팅</option>
+                    <option value="외근">외근</option>
+                    <option value="기타">기타</option>
+                </select>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="taskTitle" class="modal-input" placeholder="일정 제목" style="margin-bottom:0; flex:1;" required>
+                    <input type="time" id="taskTime" class="modal-input" style="margin-bottom:0; width:130px;">
+                </div>
+            </div>
+            
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 세부 내용" style="height:60px; resize: none;"></textarea>
+            <button type="button" class="btn-primary" onclick="saveTask()" style="width:100%; padding:14px;">일정 저장하기</button>
+        </form>
+    </div>
+</div>
+
+<div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:8% auto; padding:30px; width:450px; position:relative;">
+        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</span>
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-right:30px;">
+            <h3 id="dayEventsTitle" style="margin: 0; font-size: 1.2rem; font-weight: 800; color:var(--text-main);"></h3>
+            <button class="btn-action" style="background:var(--blue-primary); color:white; border:none; padding:6px 12px; font-size:0.8rem; border-radius: 6px;" onclick="openTaskModalFromDetails()"><i class="fa-solid fa-plus"></i> 추가</button>
+        </div>
+        
+        <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto; padding-right:5px;"></div>
+    </div>
+</div>
+
+<div id="weblinkModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:380px; position:relative;">
+        <span onclick="document.getElementById('weblinkModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
+        <h3 style="color: var(--text-main); margin-top: 0; margin-bottom: 20px; font-weight:800;"><i class="fa-solid fa-link" style="color:var(--blue-primary); margin-right:8px;"></i>링크 등록</h3>
+        <form id="weblinkForm">
+            <input type="text" id="weblinkTitle" class="modal-input" placeholder="표시될 이름" required>
+            <div style="margin-bottom: 15px; padding: 12px; background:var(--hover-bg); border-radius:10px; border:1px solid var(--widget-border-color); display: flex; gap: 20px; font-size: 0.9rem; font-weight: 600;">
+                <label style="cursor: pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="weblinkType" value="url" checked onchange="toggleWeblinkType()"> URL 링크</label>
+                <label style="cursor: pointer; display:flex; align-items:center; gap:5px;"><input type="radio" name="weblinkType" value="file" onchange="toggleWeblinkType()"> 파일 업로드</label>
+            </div>
+            <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소">
+            <input type="file" id="weblinkFile" class="modal-input" style="display: none; padding:10px;">
+            <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; padding:14px;">등록하기</button>
+        </form>
+    </div>
+</div>
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<script>
+    async function recordAttendance(type) {
+        const actionTxt = type === 'in' ? '출근' : '퇴근';
+        if (!confirm(`현재 시간으로 ${actionTxt} 처리하시겠습니까?`)) return;
+
+        try {
+            const res = await fetch(`/api/attendance/${type}`, { method: 'POST' });
+            const result = await res.json();
+            
+            if (res.ok && result.status === 'success') alert(result.message);
+            else alert(result.message || '처리 중 오류가 발생했습니다.');
+        } catch (error) { alert('서버 통신 오류가 발생했습니다.'); }
+    }
+
+    const avatarEmojis = [
+        '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
+        '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
+        '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
+        '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
+    ];
+    let currentMyInfo = null; 
+
+    function previewImage(input, previewId) {
+        const preview = document.getElementById(previewId);
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => { preview.src = e.target.result; preview.style.display = 'block'; };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            preview.src = ""; preview.style.display = 'none';
+        }
+    }
+
+    function formatPhoneNumber(input) {
+        let val = input.value.replace(/[^0-9]/g, '');
+        if (val.length > 3 && val.length <= 7) val = val.slice(0, 3) + '-' + val.slice(3);
+        else if (val.length > 7) val = val.slice(0, 3) + '-' + val.slice(3, 7) + '-' + val.slice(7, 11);
+        input.value = val;
+    }
+
+    function renderIcons(containerId, inputId, currentIcon) {
+        const container = document.getElementById(containerId);
+        if(!container) return;
+        container.innerHTML = avatarEmojis.map((e, i) => {
+            const isSelected = (currentIcon && currentIcon === e) || (!currentIcon && i === 0);
+            return `<div class="profile-icon-option ${isSelected ? 'selected' : ''}" onclick="selectIcon(this, '${inputId}', '${e}')" style="font-size:1.8rem; cursor:pointer; padding:6px; border-radius:50%; border:3px solid ${isSelected ? 'var(--blue-primary)' : 'transparent'}; background:${isSelected ? 'var(--blue-light)' : 'transparent'};">${e}</div>`;
+        }).join('');
+        if(!currentIcon && document.getElementById(inputId)) document.getElementById(inputId).value = avatarEmojis[0];
+    }
+
+    function selectIcon(el, inputId, emoji) {
+        document.querySelectorAll('#' + el.parentElement.id + ' .profile-icon-option').forEach(opt => {
+            opt.style.borderColor = 'transparent'; opt.style.background = 'transparent';
+        });
+        el.style.borderColor = 'var(--blue-primary)'; el.style.background = 'var(--blue-light)';
+        document.getElementById(inputId).value = emoji;
+    }
+
+    async function openMyInfoModal() {
+        const modal = document.getElementById('myInfoModal');
+        const loading = document.getElementById('myInfoLoading');
+        const errorDiv = document.getElementById('myInfoError');
+        const display = document.getElementById('myInfoDisplay');
+        const grid = document.getElementById('myInfoGrid');
+
+        modal.style.display = "block"; loading.style.display = "block";
+        errorDiv.style.display = "none"; display.style.display = "none"; grid.innerHTML = "";
+
+        try {
+            const res = await fetch('/user/list'); 
+            const users = await res.json();
+            
+            const currentEmpNo = "{{ session.get('emp_no', '') }}";
+            const currentName = "{{ session.get('user_name', '') }}";
+            
+            currentMyInfo = users.find(u => u.사번 === currentEmpNo || u.이름 === currentName);
+            
+            if (currentMyInfo) {
+                const u = currentMyInfo;
+                const profilePath = u.profile_path || '';
+                const icon = u.아이콘 || '👤';
+
+                let html = `
+                    <div class="full-width profile-setup-area">
+                        <div style="flex:1;">
+                            <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
+                            <input type="file" id="myinfo_profile_image" class="glass-input" accept="image/*" onchange="previewImage(this, 'preview_myinfo')" style="padding: 8px; font-size: 0.85em;">
+                            <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px; margin-top:10px; border-radius:50%; object-fit:cover;">
+                        </div>
+                        <div style="flex:2;">
+                            <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">기본 프로필 아이콘 선택</label>
+                            <div id="icon-container-myinfo" class="emoji-scroll-box" style="display:flex; flex-wrap:wrap; gap:5px; max-height:130px; overflow-y:auto; border:1px solid var(--widget-border-color); padding:10px; border-radius:10px; background:var(--card-bg, #fff);"></div>
+                            <input type="hidden" id="myinfo_profile_icon" value="${icon}">
+                        </div>
+                    </div>
+
+                    <div class="modal-field"><label>사번</label><input type="text" value="${u.사번||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field"><label>성명</label><input type="text" value="${u.이름||'-'}" readonly class="glass-input readonly-field"></div>
+                    
+                    <div class="modal-field"><label>새 비밀번호 <span style="color:#d9480f; font-weight:normal;">(영문/숫자/특수문자 조합 6자 이상)</span></label><input type="password" id="myinfo_pass" class="glass-input" placeholder="*** (변경시에만 입력)"></div>
+                    <div class="modal-field"><label>새 비밀번호 확인</label><input type="password" id="myinfo_pass_confirm" class="glass-input" placeholder="새 비밀번호 재입력"></div>
+
+                    <div class="modal-field"><label>연락처</label><input type="text" id="myinfo_phone" value="${u.전화번호||''}" oninput="formatPhoneNumber(this)" class="glass-input"></div>
+                    <div class="modal-field"><label>이메일</label><input type="email" id="myinfo_email" value="${u.이메일||''}" class="glass-input"></div>
+                    
+                    <div class="modal-field full-width"><label>주소지</label><input type="text" id="myinfo_address" value="${u.주소||''}" class="glass-input"></div>
+                    
+                    <div class="modal-field"><label>소속부서</label><input type="text" value="${u.소속||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field"><label>직급 (레벨: ${u.레벨||'-'})</label><input type="text" value="${u.직급||'-'}" readonly class="glass-input readonly-field"></div>
+                    <div class="modal-field full-width"><label>급여통장번호</label><input type="text" value="${u.계좌||'-'}" readonly class="glass-input readonly-field"></div>
+                `;
+
+                grid.innerHTML = html;
+                renderIcons('icon-container-myinfo', 'myinfo_profile_icon', icon);
+
+                loading.style.display = "none"; display.style.display = "block";
+            } else { throw new Error('사용자 정보를 불러올 수 없습니다. 관리자에게 문의하세요.'); }
+        } catch (e) {
+            loading.style.display = "none"; errorDiv.style.display = "block";
+            errorDiv.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i> 시스템 오류가 발생했습니다.<br><small>${e.message}</small>`;
+        }
+    }
+
+    async function submitMyInfoUpdate() {
+        if (!currentMyInfo) return alert("사용자 정보가 없습니다.");
+
+        const password = document.getElementById('myinfo_pass').value;
+        const passwordConfirm = document.getElementById('myinfo_pass_confirm').value;
+        const phone = document.getElementById('myinfo_phone').value;
+        const email = document.getElementById('myinfo_email').value;
+        const address = document.getElementById('myinfo_address').value;
+        const profileIcon = document.getElementById('myinfo_profile_icon').value;
+        const profileImage = document.getElementById('myinfo_profile_image').files[0];
+
+        if (password) {
+            if (password !== passwordConfirm) return alert("입력하신 새 비밀번호가 서로 일치하지 않습니다.");
+            const pwRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\])[\w!@#$%^&*()_+~`\-={}[\]:;"'<>,.?/|\\]{6,}$/;
+            if (!pwRegex.test(password)) return alert("비밀번호는 영문, 숫자, 특수문자를 모두 포함하여 6자리 이상이어야 합니다."); 
+        }
+
+        const formData = new FormData();
+        formData.append('user_idx', currentMyInfo.id);
+        formData.append('password', password || currentMyInfo.비밀번호 || ''); 
+        formData.append('phone', phone);
+        formData.append('email', email);
+        formData.append('address', address);
+        formData.append('profile_icon', profileIcon);
+        formData.append('position', currentMyInfo.직급 || '사원');
+        formData.append('level', currentMyInfo.레벨 || 10);
+        formData.append('department', currentMyInfo.소속 || '');
+        formData.append('bank_account', currentMyInfo.계좌 || '');
+        if (profileImage) formData.append('profile_image', profileImage);
+
+        try {
+            const res = await fetch('/user/update', { method: 'POST', body: formData });
+            const result = await res.json();
+            if (res.ok) { alert('프로필 정보가 성공적으로 변경되었습니다.'); closeMyInfoModal(); location.reload(); } 
+            else { alert(result.message || '정보 수정 처리에 실패했습니다.'); }
+        } catch (e) { alert('서버와의 통신이 원활하지 않습니다. 잠시 후 다시 시도해주세요.'); }
+    }
+
+    function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+    window.onclick = (e) => { if (e.target.id === 'myInfoModal') closeMyInfoModal(); }
+
+    function loadNotificationWidget() {
+        const widgetArea = document.getElementById('notification-widget-area');
+        if (!widgetArea) return; 
+        fetch('/widget/notifications').then(res => res.text()).then(html => { widgetArea.innerHTML = html; }).catch(err => console.error(err));
+    }
+
+    function renderMyWeeklyTasksSummary() {
+        const container = document.getElementById('my-weekly-tasks-summary');
+        if (!container) return;
+
+        const now = new Date();
+        const startOfRange = new Date(now);
+        const endOfRange = new Date(now);
+        endOfRange.setDate(now.getDate() + 6);
+
+        const sStr = toLocalDateString(startOfRange);
+        const eStr = toLocalDateString(endOfRange);
+
+        const myTasks = window.allCalendarEvents.filter(ev => {
+            const props = ev.extendedProps || {};
+            const owner = props.owner || currentUser;
+            if (owner !== currentUser) return false;
+            return eventOverlapsRange(ev, sStr, eStr);
+        });
+
+        myTasks.sort((a, b) => {
+            const aRange = getCalendarEventDateRange(a);
+            const bRange = getCalendarEventDateRange(b);
+            return aRange.start.localeCompare(bRange.start) || aRange.end.localeCompare(bRange.end);
+        });
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 12px; padding: 4px;">';
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+
+        if (myTasks.length === 0) {
+            html += `<div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 20px 0; font-weight: 400;">예정된 업무가 없습니다.</div>`;
+        } else {
+            // 1. 날짜별로 일정 그룹화
+            const groupedTasks = {};
+            const groupOrder = []; 
+            
+            myTasks.forEach(ev => {
+                const range = getCalendarEventDateRange(ev);
+                const startDate = new Date(`${range.start}T00:00:00`);
+                const endDate = new Date(`${range.end}T00:00:00`);
+                const startLabel = `${startDate.getMonth() + 1}/${startDate.getDate()}`;
+                const endLabel = `${endDate.getMonth() + 1}/${endDate.getDate()}`;
+                const dateLabel = range.start === range.end ? startLabel : `${startLabel}~${endLabel}`;
+                
+                const startDay = days[startDate.getDay()];
+                const endDay = days[endDate.getDay()];
+                const dayLabel = range.start === range.end ? startDay : `${startDay}~${endDay}`;
+                
+                const groupKey = `${dateLabel}|${dayLabel}`;
+                if (!groupedTasks[groupKey]) {
+                    groupedTasks[groupKey] = [];
+                    groupOrder.push(groupKey);
+                }
+                groupedTasks[groupKey].push(getWeeklyEventDisplayInfo(ev, range.start));
+            });
+
+            // 2. 그룹화된 데이터를 기반으로 HTML 렌더링
+            groupOrder.forEach(groupKey => {
+                const [dateLabel, dayLabel] = groupKey.split('|');
+                const tasks = groupedTasks[groupKey];
+                
+                // 전체 카드 박스
+                html += `<div style="background: var(--card-bg, #ffffff); border: 1px solid var(--widget-border-color); border-radius: 12px; padding: 14px; display: flex; gap: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">`;
+                
+                // 좌측 날짜 영역 (박스형)
+                html += `<div style="min-width: 60px; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px 0;">`
+                     + `<div style="font-size: 0.90rem; color: var(--text-main); font-weight: 700; white-space: nowrap; letter-spacing: -0.5px;">${dateLabel}</div>`
+                     + `<div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500; margin-top: 4px;">${dayLabel}</div>`
+                     + `</div>`;
+                     
+                // 우측 일정 목록 영역
+                html += `<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid var(--widget-border-color); padding-left: 5px;">`;
+                
+                tasks.forEach((info, index) => {
+                    const isLast = index === tasks.length - 1;
+                    const itemMarginBottom = isLast ? '0' : '8px';
+                    const itemPaddingBottom = isLast ? '0' : '8px';
+                    const itemBorderBottom = isLast ? 'none' : '1px solid var(--widget-border-color)';
+                    
+                    // 제목이 6자를 초과하면 말줄임표(...) 처리
+                    const rawTitle = info.title || '';
+                    const displayTitle = rawTitle.length > 6 ? rawTitle.substring(0, 6) + '...' : rawTitle;
+                    
+                    html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: ${itemMarginBottom}; padding-bottom: ${itemPaddingBottom}; border-bottom: ${itemBorderBottom};">`
+                         + `<span style="background: ${info.color}; color: white; font-size: 0.65rem; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-align: center; min-width: 32px; flex-shrink: 0;">${escapeWeeklyTooltipHtml(info.category)}</span>`
+                         // 글자 크기를 0.65rem으로 변경하고 두께를 높여 가독성 확보
+                         + `<div style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; min-width: 0; line-height: 1.4; flex: 1; white-space: nowrap;">${escapeWeeklyTooltipHtml(displayTitle)}</div>`
+                         + (info.time && info.time !== '종일' ? `<div style="color:var(--text-muted); font-size:0.75rem; white-space:nowrap; flex-shrink:0;">${info.time}</div>` : '')
+                         + `</div>`;
+                });
+                
+                html += `</div></div>`;
+            });
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+
+    function checkNewNotices() {
+        const now = new Date(); now.setHours(0,0,0,0);
+        document.querySelectorAll('.notice-item').forEach(el => {
+            const dateStr = el.getAttribute('data-date');
+            if(dateStr) {
+                const postDate = new Date(dateStr); postDate.setHours(0,0,0,0);
+                const diff = (now - postDate) / (1000 * 60 * 60 * 24);
+                if(diff >= 0 && diff <= 5) {
+                    const badge = el.querySelector('.new-n-badge');
+                    if(badge) badge.style.display = 'inline-block';
+                }
+            }
+        });
+    }
+
+    window.taskDataMap = window.taskDataMap || {};
+    window.allCalendarEvents = {{ events | tojson | safe }};
+    const currentUser = '{{ current_user }}';
+    const globalHolidays = {{ holidays_dict | tojson | safe }};
+    let currentWeeklyStart = new Date();
+
+    function escapeWeeklyTooltipHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatWeeklyTooltipDate(value) {
+        const dateText = String(value || '').split('T')[0];
+        return /^\d{4}-\d{2}-\d{2}$/.test(dateText) ? dateText.replace(/-/g, '.') : dateText;
+    }
+
+    function toLocalDateString(date) {
+        return date.getFullYear() + '-'
+            + String(date.getMonth() + 1).padStart(2, '0') + '-'
+            + String(date.getDate()).padStart(2, '0');
+    }
+
+    function getCalendarEventDateRange(eventData, fallbackDate = '') {
+        const start = String(eventData.start || fallbackDate || '').split('T')[0];
+        let end = String(eventData.end || start || '').split('T')[0];
+
+        // FullCalendar의 종일 일정 end는 마지막 날의 다음 날짜이므로 화면에서는 하루를 뺀다.
+        if (start && end && eventData.allDay && end > start) {
+            const inclusiveEnd = new Date(`${end}T00:00:00`);
+            inclusiveEnd.setDate(inclusiveEnd.getDate() - 1);
+            end = toLocalDateString(inclusiveEnd);
+        }
+
+        if (!end || (start && end < start)) end = start;
+        return { start, end };
+    }
+
+    function eventSpansDate(eventData, dateStr) {
+        const range = getCalendarEventDateRange(eventData);
+        return Boolean(range.start && range.start <= dateStr && dateStr <= range.end);
+    }
+
+    function eventOverlapsRange(eventData, rangeStart, rangeEnd) {
+        const range = getCalendarEventDateRange(eventData);
+        return Boolean(range.start && range.start <= rangeEnd && range.end >= rangeStart);
+    }
+
+    function dateDiffDays(startDateStr, endDateStr) {
+        const start = new Date(`${startDateStr}T00:00:00`);
+        const end = new Date(`${endDateStr}T00:00:00`);
+        return Math.round((end - start) / 86400000);
+    }
+
+    function getWeeklyEventDisplayInfo(eventData, fallbackDate = '') {
+        const props = eventData.extendedProps || {};
+        let category = props.category || eventData.category || '기타';
+        let title = props.task_title || eventData.title || '일정';
+        let time = props.task_time || '';
+
+        if (!props.category && !props.task_title) {
+            ['회의', '면접', '미팅', '휴가', '기타'].forEach(item => {
+                if (props[`cat_${item}_제목`]) {
+                    category = item;
+                    title = props[`cat_${item}_제목`];
+                    time = props[`cat_${item}_시간`] || time;
+                }
+            });
+        }
+
+        return {
+            title,
+            category,
+            time: time || '종일',
+            owner: props.owner || currentUser,
+            color: eventData.backgroundColor || eventData.color || 'var(--blue-primary)',
+            note: props.note || '',
+            period: getWeeklyTooltipPeriod(eventData, fallbackDate)
+        };
+    }
+
+    function getWeeklyTooltipPeriod(eventData, fallbackDate) {
+        const { start, end } = getCalendarEventDateRange(eventData, fallbackDate);
+
+        const startText = formatWeeklyTooltipDate(start);
+        const endText = formatWeeklyTooltipDate(end);
+        return endText && endText !== startText ? `${startText} ~ ${endText}` : startText;
+    }
+
+    function buildWeeklyTooltipHtml(data) {
+        const row = (label, value, extraClass = '') => `
+            <div class="weekly-tooltip-row ${extraClass}">
+                <span class="weekly-tooltip-label">${escapeWeeklyTooltipHtml(label)}</span>
+                <span class="weekly-tooltip-value">${escapeWeeklyTooltipHtml(value)}</span>
+            </div>`;
+
+        return `
+            <div class="weekly-tooltip-title">${escapeWeeklyTooltipHtml(data.title)}</div>
+            ${row('구분', data.category)}
+            ${row('담당자', data.owner)}
+            ${row('날짜', data.period)}
+            ${row('시간', data.time)}
+            ${row('상세내용', data.note || '입력된 상세내용이 없습니다.', 'weekly-tooltip-detail')}`;
+    }
+
+    function positionWeeklyTooltipAboveCursor(tooltip, pointerEvent) {
+        const viewportGap = 10;
+        const cursorGap = 16;
+        const tooltipRect = tooltip.getBoundingClientRect();
+        let left = pointerEvent.clientX + 14;
+
+        if (left + tooltipRect.width > window.innerWidth - viewportGap) {
+            left = pointerEvent.clientX - tooltipRect.width - 14;
+        }
+        left = Math.max(viewportGap, Math.min(left, window.innerWidth - tooltipRect.width - viewportGap));
+
+        const top = Math.max(viewportGap, pointerEvent.clientY - tooltipRect.height - cursorGap);
+        const arrowLeft = Math.max(14, Math.min(pointerEvent.clientX - left, tooltipRect.width - 14));
+        tooltip.style.setProperty('--tooltip-arrow-left', `${arrowLeft}px`);
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        try {
+            const userRes = await fetch('/user/my_info');
+            if (userRes.ok) {
+                const result = await userRes.json();
+                if (result.status === 'success') {
+                    const me = result.data;
+                    if (me.name) document.getElementById('nav-user-name').innerText = me.name;
+                    const deptPosEl = document.getElementById('nav-user-dept-pos');
+                    if (deptPosEl) deptPosEl.innerText = `${me.department || '소속미지정'} | ${me.position || '직급미지정'}`;
+                    const profileEl = document.getElementById('nav-profile-icon-container');
+                    if (profileEl) {
+                        if (me.profile_path) profileEl.innerHTML = `<img src="${me.profile_path}" style="width:100%; height:100%; object-fit:contain; background:#fff;">`;
+                        else if (me.profile_icon) profileEl.innerHTML = me.profile_icon;
+                    }
+                }
+            }
+        } catch(e) {}
+
+        var miniCalendarEl = document.getElementById('mini-calendar');
+        var miniCalendar = new FullCalendar.Calendar(miniCalendarEl, {
+            initialView: 'dayGridMonth', locale: 'ko',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            contentHeight: 'auto', fixedWeekCount: false, events: window.allCalendarEvents,
+            dayCellContent: function(arg) { return { html: `<div class="fc-daygrid-day-number">${arg.date.getDate()}</div>` }; },
+            dayCellDidMount: function(arg) {
+                const dObj = arg.date;
+                const dStr = toLocalDateString(dObj);
+                const dateStrForHoliday = dObj.getFullYear() + "-" + String(dObj.getMonth() + 1).padStart(2, '0') + "-" + String(dObj.getDate()).padStart(2, '0');
+                if (globalHolidays[dateStrForHoliday]) arg.el.classList.add('holiday-day');
+                const eventColors = [...new Set(window.allCalendarEvents
+                    .filter(event => eventSpansDate(event, dStr))
+                    .map(event => event.backgroundColor || event.color || '#2563eb'))];
+                if (eventColors.length) {
+                    const numberEl = arg.el.querySelector('.fc-daygrid-day-number');
+                    if (numberEl) {
+                        const segmentSize = 100 / eventColors.length;
+                        const colorSegments = eventColors.map((color, index) =>
+                            `${color} ${index * segmentSize}% ${(index + 1) * segmentSize}%`
+                        ).join(', ');
+                        numberEl.classList.add('mini-event-ring');
+                        numberEl.style.setProperty('--mini-event-colors', colorSegments);
+                        if (eventColors.length > 1) numberEl.classList.add('mini-event-ring-multi');
+                    }
+                }
+            },
+            dateClick: function(info) { openDayDetails(info.dateStr); },
+            eventClick: function(info) { info.jsEvent.preventDefault(); openDayDetails(info.event.startStr.split('T')[0]); }
+        });
+        miniCalendar.render();
+
+        renderWeeklySchedule();
+        renderMyWeeklyTasksSummary();
+        checkNewNotices(); 
+
+        var weblinkEl = document.getElementById('weblink-container');
+        if(weblinkEl) {
+            Sortable.create(weblinkEl, {
+                animation: 150, ghostClass: 'weblink-ghost',
+                onEnd: function (evt) {
+                    var newOrder = [];
+                    weblinkEl.querySelectorAll('.weather-pill').forEach(function(item) { newOrder.push(item.getAttribute('data-id')); });
+                    fetch('/update_weblink_order', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order: newOrder })
+                    }).catch(err => console.error("순서 저장 실패:", err));
+                }
+            });
+        }
+
+        loadNotificationWidget(); setInterval(loadNotificationWidget, 60000);
+
+        const globalTooltip = document.getElementById('global-tooltip');
+        document.addEventListener('mouseover', (e) => {
+            const item = e.target.closest('.weekly-event-item');
+            if (item) {
+                const encodedData = item.getAttribute('data-tooltip');
+                if (encodedData) {
+                    try {
+                        const tooltipData = JSON.parse(decodeURIComponent(encodedData));
+                        globalTooltip.innerHTML = buildWeeklyTooltipHtml(tooltipData);
+                        globalTooltip.style.visibility = 'visible';
+                        globalTooltip.style.opacity = '1';
+                        positionWeeklyTooltipAboveCursor(globalTooltip, e);
+                    } catch (error) {
+                        globalTooltip.style.visibility = 'hidden';
+                        globalTooltip.style.opacity = '0';
+                    }
+                }
+            }
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (e.target.closest('.weekly-event-item') && globalTooltip.style.visibility === 'visible') {
+                positionWeeklyTooltipAboveCursor(globalTooltip, e);
+            }
+        });
+        document.addEventListener('mouseout', (e) => {
+            const item = e.target.closest('.weekly-event-item');
+            const nextItem = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.weekly-event-item') : null;
+            if (item && nextItem !== item) {
+                globalTooltip.style.visibility = 'hidden';
+                globalTooltip.style.opacity = '0';
+            }
+        });
+    });
+
+    function shiftWeeklySchedule(days) {
+        currentWeeklyStart.setDate(currentWeeklyStart.getDate() + days);
+        renderWeeklySchedule();
+    }
+
+    function renderWeeklySchedule() {
+        const container = document.getElementById('weekly-schedule-container');
+        if (!container) return;
+        let html = ''; const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+
+        const endDate = new Date(currentWeeklyStart); endDate.setDate(currentWeeklyStart.getDate() + 6);
+        const startStr = `${currentWeeklyStart.getFullYear()}.${String(currentWeeklyStart.getMonth() + 1).padStart(2, '0')}.${String(currentWeeklyStart.getDate()).padStart(2, '0')}`;
+        const endStr = `${endDate.getFullYear()}.${String(endDate.getMonth() + 1).padStart(2, '0')}.${String(endDate.getDate()).padStart(2, '0')}`;
+        document.getElementById('weekly-date-range').innerText = `${startStr} ~ ${endStr}`;
+
+        const visibleStart = toLocalDateString(currentWeeklyStart);
+        const visibleEnd = toLocalDateString(endDate);
+        const rangeItems = window.allCalendarEvents
+            .filter(event => {
+                const range = getCalendarEventDateRange(event);
+                return range.start < range.end && eventOverlapsRange(event, visibleStart, visibleEnd);
+            })
+            .map(event => {
+                const range = getCalendarEventDateRange(event);
+                const clippedStart = range.start < visibleStart ? visibleStart : range.start;
+                const clippedEnd = range.end > visibleEnd ? visibleEnd : range.end;
+                return {
+                    event,
+                    startIndex: dateDiffDays(visibleStart, clippedStart),
+                    endIndex: dateDiffDays(visibleStart, clippedEnd),
+                    slot: 0
+                };
+            })
+            .sort((a, b) => a.startIndex - b.startIndex || b.endIndex - a.endIndex);
+
+        const slotEnds = [];
+        rangeItems.forEach(item => {
+            let slot = slotEnds.findIndex(lastEnd => item.startIndex > lastEnd);
+            if (slot === -1) slot = slotEnds.length;
+            item.slot = slot;
+            slotEnds[slot] = item.endIndex;
+        });
+        const rangeSpace = slotEnds.length ? (slotEnds.length * 28 + 2) : 0;
+        container.style.setProperty('--weekly-range-space', `${rangeSpace}px`);
+
+        const realToday = new Date();
+        const todayStr = toLocalDateString(realToday);
+
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(currentWeeklyStart); d.setDate(currentWeeklyStart.getDate() + i);
+            const dateStr = toLocalDateString(d);
+            const dayNum = d.getDate(); const dayName = daysOfWeek[d.getDay()]; const isToday = (dateStr === todayStr);
+
+            let textColorStyle = ''; let nameColorStyle = '';
+            if (d.getDay() === 0) { textColorStyle = 'color: #ef4444 !important;'; nameColorStyle = 'color: #ef4444 !important;'; } 
+            else if (d.getDay() === 6) { textColorStyle = 'color: var(--blue-primary) !important;'; nameColorStyle = 'color: var(--blue-primary) !important;'; }
+
+            let holidayBadge = '';
+            if (globalHolidays[dateStr]) {
+                textColorStyle = 'color: #ef4444 !important;'; nameColorStyle = 'color: #ef4444 !important;';
+                holidayBadge = `<div style="font-size: 0.65rem; color: #ef4444; font-weight: 700; background: #fee2e2; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; text-align: center;">${globalHolidays[dateStr]}</div>`;
+            }
+
+            const dayEvents = window.allCalendarEvents.filter(ev => {
+                const range = getCalendarEventDateRange(ev);
+                return range.start === range.end && range.start === dateStr;
+            });
+            let eventsHtml = '';
+            dayEvents.forEach(ev => {
+                const info = getWeeklyEventDisplayInfo(ev, dateStr);
+                const tooltipData = {
+                    title: info.title,
+                    category: info.category,
+                    owner: info.owner,
+                    period: info.period,
+                    time: info.time,
+                    note: info.note
+                };
+                const encodedTooltipData = encodeURIComponent(JSON.stringify(tooltipData));
+                eventsHtml += `<div class="weekly-event-item" data-tooltip="${encodedTooltipData}"><span style="color:${info.color}; margin-right:6px; font-size:0.6rem; transform: translateY(3px);">●</span><span class="weekly-event-text">${escapeWeeklyTooltipHtml(info.title)}</span></div>`;
+            });
+
+            const hasRangeEvent = rangeItems.some(item => item.startIndex <= i && i <= item.endIndex);
+            const emptyHtml = hasRangeEvent ? '' : '<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding-top:15px;">일정 없음</div>';
+            html += `<div class="day-col ${isToday ? 'is-today' : ''}"><div class="day-header-box" style="flex-direction: column; align-items: stretch;"><div style="display: flex; justify-content: space-between; align-items: center;"><span class="day-num" style="${textColorStyle}">${dayNum}</span><span class="day-name" style="${nameColorStyle}">${dayName}</span></div>${holidayBadge}</div><div class="day-events-list">${eventsHtml || emptyHtml}</div></div>`;
+        }
+
+        if (rangeItems.length) {
+            html += '<div class="weekly-range-layer">';
+            rangeItems.forEach(item => {
+                const info = getWeeklyEventDisplayInfo(item.event, visibleStart);
+                const tooltipData = {
+                    title: info.title,
+                    category: info.category,
+                    owner: info.owner,
+                    period: info.period,
+                    time: info.time,
+                    note: info.note
+                };
+                const encodedTooltipData = encodeURIComponent(JSON.stringify(tooltipData));
+                const span = item.endIndex - item.startIndex + 1;
+                const left = `calc((100% / 7) * ${item.startIndex} + 9px)`;
+                const width = `calc((100% / 7) * ${span} - 18px)`;
+                html += `<div class="weekly-range-bar weekly-event-item" data-tooltip="${encodedTooltipData}" style="--event-color:${info.color}; top:${item.slot * 28}px; left:${left}; width:${width};">`
+                    + `<span class="weekly-range-dot"></span><span class="weekly-range-title">${escapeWeeklyTooltipHtml(info.title)}</span><span class="weekly-range-line"></span></div>`;
+            });
+            html += '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function openDayDetails(dateStr) {
+        const dayEvents = window.allCalendarEvents.filter(e => eventSpansDate(e, dateStr));
+        document.getElementById('dayEventsTitle').innerText = dateStr + " 일정";
+        let html = ''; let renderedTaskIds = new Set(); 
+        
+        dayEvents.forEach(p => {
+            let bgColor = p.color || p.backgroundColor || 'var(--blue-primary)';
+            const props = p.extendedProps || {};
+            const rawId = props.task_id || p.id || ''; const taskId = String(rawId).replace(/[^0-9]/g, '');
+            if(taskId) window.taskDataMap[taskId] = p; 
+            
+            let catStr = props.category || '기타'; let titleStr = props.task_title || p.title || '일정';
+            let timeStr = props.task_time ? props.task_time : '종일'; let ownerStr = props.owner || currentUser; 
+
+            if (!props.category && !props.task_title) {
+                let found = false;
+                ['회의','면접','미팅','외근','기타'].forEach(c => {
+                    if (props[`cat_${c}_제목`]) { catStr = c; titleStr = props[`cat_${c}_제목`]; timeStr = props[`cat_${c}_시간`] ? props[`cat_${c}_시간`] : '종일'; found = true; }
+                });
+                if(!found && p.title) titleStr = p.title;
+            }
+
+            html += `<div style="border-left: 4px solid ${bgColor}; padding: 16px; margin-bottom: 12px; background: var(--hover-bg); border: 1px solid var(--widget-border-color); border-radius: 12px;">`;
+            if (catStr === "근태/휴가") {
+                html += `<div style="font-weight: 700; color: var(--text-main); font-size:1.05rem;">${titleStr}</div>`;
+            } else {
+                html += `<div style="font-weight: 700; color: var(--text-main); font-size:1.05rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;"><span style="background:${bgColor}; color:white; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">${catStr}</span><span>${titleStr}</span></div><div style="font-size: 0.85rem; color: var(--text-sub); line-height: 1.6; background: var(--card-bg, #ffffff); padding: 12px; border-radius: 8px; border: 1px solid var(--widget-border-color);"><div><strong style="color:var(--text-main); width: 50px; display: inline-block;">시간</strong> ${timeStr}</div><div><strong style="color:var(--text-main); width: 50px; display: inline-block;">작성자</strong> ${ownerStr}</div>`;
+                if (props.note) html += `<div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--widget-border-color);"><strong style="color:var(--text-main); width: 50px; display: inline-block; vertical-align: top;">내용</strong> <span style="display:inline-block; width:calc(100% - 55px); white-space: pre-wrap;">${props.note}</span></div>`;
+                html += `</div>`;
+            }
+            if (taskId && (!props.owner || props.owner === currentUser) && !renderedTaskIds.has(taskId)) {
+                html += `<div style="text-align:right; margin-top:12px;"><button class="btn-action btn-edit" onclick="editTask('${taskId}', '${dateStr}')" style="margin-right:6px;"><i class="fa-solid fa-pen"></i> 수정</button><button class="btn-action btn-delete" onclick="deleteTask('${taskId}')"><i class="fa-solid fa-trash"></i> 삭제</button></div>`;
+                renderedTaskIds.add(taskId);
+            }
+            html += `</div>`;
+        });
+        document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-muted); text-align:center; padding: 40px 0;">등록된 일정이 없습니다.</p>';
+        document.getElementById('dayEventsModal').style.display = 'block';
+    }
+
+    function openTaskModalFromDetails() {
+        const dateStr = document.getElementById('dayEventsTitle').innerText.split(' ')[0];
+        document.getElementById('dayEventsModal').style.display = 'none';
+        document.getElementById('taskForm').reset(); document.getElementById('taskId').value = ''; 
+        document.getElementById('taskOwner').value = currentUser; document.getElementById('taskDate').value = dateStr; document.getElementById('taskCategory').value = '회의';
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip" style="color:var(--blue-primary); margin-right:8px;"></i>새 일정 등록';
+        document.getElementById('taskModal').style.display = 'block';
+    }
+
+    function toggleEmojiPicker(pickerId) {
+        const picker = document.getElementById(pickerId);
+        picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
+    }
+    
+    function addEmoji(inputId, emoji) {
+        const input = document.getElementById(inputId);
+        input.value += emoji; input.focus(); document.getElementById('newMsgEmojiPicker').style.display = 'none';
+    }
+
+    function editTask(taskId, dateStr) {
+        document.getElementById('dayEventsModal').style.display = 'none'; 
+        const p = window.taskDataMap[taskId] || {}; const props = p.extendedProps || {};
+        document.getElementById('taskForm').reset(); document.getElementById('taskId').value = taskId; document.getElementById('taskDate').value = dateStr;
+        let foundCat = props.category || '기타'; let title = props.task_title || p.title || ''; let time = props.task_time || '';
+        if (!props.category && !props.task_title) {
+            ['회의','면접','미팅','외근','기타'].forEach(c => {
+                if (props[`cat_${c}_제목`]) { foundCat = c; title = props[`cat_${c}_제목`]; time = props[`cat_${c}_시간`] || ''; }
+            });
+        }
+        const validCats = ['회의','면접','미팅','외근','기타'];
+        if(!validCats.includes(foundCat)) foundCat = '기타';
+        document.getElementById('taskCategory').value = foundCat; document.getElementById('taskTitle').value = title; document.getElementById('taskTime').value = time; document.getElementById('taskNote').value = props.note || '';
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square" style="color:var(--blue-primary); margin-right:8px;"></i>일정 수정';
+        document.getElementById('taskModal').style.display = 'block';
+    }
+
+    async function deleteTask(taskId) {
+        if (!confirm("삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
+            if (res.ok) location.reload(); else alert("일정 삭제에 실패했습니다.");
+        } catch (error) { alert("서버 통신 중 오류가 발생했습니다."); }
+    }
+
+    async function saveTask() {
+        const taskId = document.getElementById('taskId').value;
+        const data = { date: document.getElementById('taskDate').value, owner: currentUser, note: document.getElementById('taskNote').value };
+        const selectedCat = document.getElementById('taskCategory').value;
+        ['회의','면접','미팅','외근','기타'].forEach(c => {
+            if (c === selectedCat) { data[c+'_제목'] = document.getElementById('taskTitle').value; data[c+'_시간'] = document.getElementById('taskTime').value; } 
+            else { data[c+'_제목'] = ''; data[c+'_시간'] = ''; }
+        });
+        data.category = selectedCat; data.task_title = document.getElementById('taskTitle').value; data.task_time = document.getElementById('taskTime').value; data.title = data.task_title; 
+        const url = taskId ? `/update_task/${taskId}` : '/save_task';
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if (res.ok) location.reload(); else alert("일정 저장에 실패했습니다.");
+        } catch (error) {}
+    }
+
+    function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
+
+    function toggleWeblinkType() {
+        const t = document.querySelector('input[name="weblinkType"]:checked').value;
+        if (t === 'url') { document.getElementById('weblinkUrl').style.display = 'block'; document.getElementById('weblinkFile').style.display = 'none'; } 
+        else { document.getElementById('weblinkUrl').style.display = 'none'; document.getElementById('weblinkFile').style.display = 'block'; }
+    }
+
+    async function saveWebLink() {
+        const title = document.getElementById('weblinkTitle').value; const type = document.querySelector('input[name="weblinkType"]:checked').value;
+        let fd = new FormData(); fd.append('title', title); fd.append('type', type);
+        if (type === 'url') fd.append('url', document.getElementById('weblinkUrl').value);
+        else fd.append('file', document.getElementById('weblinkFile').files[0]);
+        try {
+            const res = await fetch('/save_weblink', { method: 'POST', body: fd });
+            if (res.ok) location.reload();
+        } catch (error) {}
+    }
+
+    async function deleteWebLink(id) {
+        if (!confirm("삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' });
+            if (res.ok) location.reload();
+        } catch (error) {}
+    }
+</script>
+{% endblock %}

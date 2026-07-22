@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/css/glightbox.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
+
+<style>
+    /* =========================================
+       1. 🌸 귀여운 인덱스 탭 (다이어리 스타일)
+       ========================================= */
+    .gallery-tabs-container { margin-bottom: 0; padding-left: 15px; }
+    
+    .gallery-tabs { 
+        display: flex; flex-wrap: nowrap; overflow-x: auto; 
+        border-bottom: none; padding-left: 0; margin-bottom: 0;
+    }
+    
+    .gallery-tabs::-webkit-scrollbar { height: 6px; }
+    .gallery-tabs::-webkit-scrollbar-thumb { background: #ffc8dd; border-radius: 10px; }
+
+    /* 리스트 스타일 원천 차단 (까만 점 방지) */
+    .gallery-tabs .nav-item { flex-shrink: 0; margin-right: 5px; list-style: none !important; }
+
+    /* 비활성화 탭 (살짝 어둡고 귀엽게) */
+    .gallery-tabs .nav-link { 
+        color: #ff758f; 
+        background-color: #ffe5ec; 
+        border: 4px solid transparent; 
+        border-bottom: none; 
+        padding: 12px 25px; 
+        font-size: 0.95rem; font-weight: 600; 
+        border-radius: 20px 20px 0 0; /* 둥근 인덱스 모양 */
+        transition: all 0.3s ease;
+        display: flex; align-items: center; /* 텍스트와 배지 정렬 */
+        text-decoration: none;
+    }
+    .gallery-tabs .nav-link:hover { background-color: #ffc8dd; color: #c9184a; transform: translateY(-2px); }
+    
+    /* 활성화 탭 (본문 래퍼와 완벽하게 이어지는 딸기우유 테두리) */
+    .gallery-tabs .nav-link.active { 
+        color: #c9184a; 
+        background-color: #fff0f3; 
+        border: 4px solid #ffc8dd; 
+        border-bottom: 4px solid #fff0f3; /* 하단 선 가리기 */
+        margin-bottom: -4px; /* 아래로 살짝 당겨서 테두리 겹치게 */
+        z-index: 3; position: relative;
+        font-weight: 800; font-size: 1rem;
+    }
+    
+    /* 🏷️ 사진 개수 배지 스타일 */
+    .photo-count-badge {
+        background-color: rgba(255, 255, 255, 0.7);
+        color: #c9184a;
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        margin-left: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .gallery-tabs .nav-link:not(.active) .photo-count-badge {
+        background-color: #ffb3c6;
+        color: #fff;
+    }
+    
+    /* ✏️ 탭 이름 수정 인풋 효과 */
+    .tab-title { position: relative; display: inline-block; }
+    .tab-title[contenteditable="true"] { 
+        outline: none; border-bottom: 2px dashed rgba(255,117,143,0.3); cursor: text; 
+    }
+    .tab-title[contenteditable="true"]:focus { 
+        border-bottom: 2px dashed #c9184a; background: #ffe5ec; padding: 2px 8px; border-radius: 6px; 
+    }
+
+    /* =========================================
+       2. 🎀 메인 갤러리 본문 (모달창 귀여운 테마 적용)
+       ========================================= */
+    .gallery-content-wrapper {
+        background-color: #fff0f3; /* 사랑스러운 연핑크 배경 */
+        border: 4px solid #ffc8dd; /* 귀여운 핑크 테두리 */
+        border-top-left-radius: 0; /* 첫 번째 탭과 자연스럽게 이어지도록 */
+        border-top-right-radius: 24px;
+        border-bottom-right-radius: 24px;
+        border-bottom-left-radius: 24px;
+        padding: 30px;
+        box-shadow: 0 15px 30px rgba(255, 175, 204, 0.25);
+        margin-bottom: 40px;
+        min-height: 450px;
+        position: relative; z-index: 1;
+    }
+
+    /* =========================================
+       3. 🖼️ 귀여운 사진 그리드 & 체크박스
+       ========================================= */
+    .custom-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px; }
+    
+    .gallery-item {
+        position: relative; aspect-ratio: 1 / 1; border-radius: 16px; 
+        overflow: hidden; border: 3px solid #ffffff; background-color: #ffffff;
+        box-shadow: 0 6px 15px rgba(255, 175, 204, 0.3); transition: all 0.3s ease;
+    }
+    .gallery-item:hover { transform: translateY(-5px); border-color: #ffc8dd; box-shadow: 0 10px 20px rgba(255, 175, 204, 0.5); }
+    
+    .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+    .gallery-item:hover img { transform: scale(1.08); }
+
+    /* 눈에 띄는 귀여운 체크박스 */
+    .photo-checkbox {
+        position: absolute; top: 10px; left: 10px; width: 22px; height: 22px; cursor: pointer; z-index: 10;
+        accent-color: #ff758f; opacity: 0; transition: opacity 0.2s ease-in-out;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.2); border-radius: 6px;
+    }
+    .gallery-item:hover .photo-checkbox, .photo-checkbox:checked { opacity: 1; }
+
+    .item-overlay {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: linear-gradient(to top, rgba(201, 24, 74, 0.85), transparent); padding: 30px 10px 10px 10px;
+        display: flex; justify-content: space-between; align-items: center; opacity: 0; transition: opacity 0.3s ease; z-index: 2;
+    }
+    .gallery-item:hover .item-overlay { opacity: 1; }
+    .item-title { color: white; font-size: 0.85rem; font-weight: 600; max-width: 70%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+    .btn-delete { color: #ffb3c6; background: none; border: none; cursor: pointer; font-size: 1.1rem; transition: color 0.2s; }
+    .btn-delete:hover { color: #ffffff; transform: scale(1.1); }
+
+    /* =========================================
+       4. 🎛️ 하단 둥근 알약(Pill) 컨트롤 버튼들
+       ========================================= */
+    .action-bar {
+        margin-top: 40px; padding-top: 25px; border-top: 2px dashed #ffc8dd;
+        display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 15px;
+    }
+
+    .btn-cute {
+        border-radius: 30px; padding: 10px 24px; font-size: 0.95rem; font-weight: 700;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: none; display: inline-flex; align-items: center; gap: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08); cursor: pointer;
+    }
+    .btn-cute:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.12); }
+    
+    .btn-upload-cute { background: #ffffff; color: #ff758f; border: 2px solid #ffc8dd; }
+    .btn-upload-cute:hover { background: #ffc8dd; color: #c9184a; }
+    
+    .btn-select-cute { background: #ffffff; color: #6c757d; border: 2px solid #dee2e6; }
+    .btn-select-cute:hover { background: #e9ecef; color: #495057; }
+    
+    .btn-play-cute { background: linear-gradient(135deg, #ffafcc, #ffc8dd); color: #800f2f; }
+    .btn-play-cute:hover { filter: brightness(1.05); }
+
+    /* 하단 탭 삭제 버튼 전용 스타일 */
+    .btn-delete-cute { background: #ffffff; color: #ff4d4d; border: 2px solid #ffb3c6; }
+    .btn-delete-cute:hover { background: #ff4d4d; color: #ffffff; border-color: #ff4d4d; }
+
+    /* 드롭존 (귀여운 점선 박스) */
+    .dropzone-wrapper { display: none; margin-top: 15px; }
+    .dropzone {
+        background: #ffffff; border: 3px dashed #ffb3c6; border-radius: 20px;
+        min-height: 140px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; transition: all 0.3s ease;
+    }
+    .dropzone:hover { background: #fff0f3; border-color: #ff758f; }
+
+    /* =========================================
+       5. 🌸 모달창 공통 스타일 (슬라이드쇼 & 삭제 확인)
+       ========================================= */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0,0,0,0.6); z-index: 9999;
+        display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px);
+    }
+    
+    .modal-content-wrapper {
+        background: #fff0f3; border-radius: 24px; border: 4px solid #ffc8dd;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3); display: inline-flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* 슬라이드쇼 특화 */
+    .slideshow-content { max-width: 95vw; max-height: 95vh; }
+    .slideshow-header {
+        padding: 15px 25px; display: flex; justify-content: space-between; align-items: center;
+        background: #ffffff; border-bottom: 2px dashed #ffc8dd;
+    }
+    .slideshow-header h4 { margin: 0; font-size: 1.1rem; color: #ff8fab; font-weight: 800; }
+    .btn-close-modal { background: none; border: none; color: #ffb3c6; font-size: 1.8rem; cursor: pointer; transition: all 0.3s; }
+    .btn-close-modal:hover { color: #ff758f; transform: rotate(90deg); }
+
+    .slideshow-body { padding: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff0f3; }
+    .slideshow-img {
+        max-width: 95vw; max-height: calc(95vh - 85px); 
+        width: auto; height: auto; object-fit: contain; border-radius: 12px;
+        box-shadow: 0 8px 25px rgba(255, 175, 204, 0.4); transition: opacity 0.4s ease, transform 0.4s ease;
+        opacity: 0; transform: scale(0.95);
+    }
+    
+    .effect-active { opacity: 1 !important; transform: scale(1) translateX(0) !important; }
+    .effect-hide-fade { opacity: 0; }
+    .effect-hide-zoom { opacity: 0; transform: scale(0.6); }
+    .effect-hide-slide { opacity: 0; transform: translateX(100px); }
+
+    /* 탭 삭제 경고창 특화 */
+    .delete-confirm-content { padding: 40px 30px; text-align: center; max-width: 400px; background: #ffffff; }
+    .delete-confirm-icon { font-size: 3rem; color: #ff4d4d; margin-bottom: 15px; animation: bounce 2s infinite; }
+    @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-15px); } 60% { transform: translateY(-7px); } }
+</style>
+
+<div class="container-fluid mt-4 px-4">
+    
+    <div class="gallery-tabs-container">
+        <ul class="nav nav-tabs gallery-tabs border-0">
+            {% for tab in tabs %}
+            <li class="nav-item position-relative">
+                <a class="nav-link {% if tab.id == active_tab_id %}active{% endif %}" 
+                   href="{{ url_for('gallery.index', tab_id=tab.id) }}">
+                   
+                    <span class="tab-title" data-id="{{ tab.id }}" 
+                          {% if tab.id == active_tab_id %}
+                          contenteditable="true" 
+                          onclick="event.preventDefault();"
+                          title="클릭해서 이름 변경"
+                          {% endif %}>
+                        {{ tab.name }}
+                    </span>
+                    
+                    <span class="photo-count-badge" title="사진 개수">{{ tab.photo_count | default(0) }}</span>
+                    
+                    {% if tab.id == active_tab_id %}
+                        <i class="fas fa-pencil-alt ms-1 text-muted" 
+                           style="font-size: 0.75rem; cursor: pointer; opacity: 0.7;"
+                           onclick="event.preventDefault(); this.parentElement.querySelector('.tab-title').focus();"
+                           title="이름 수정"></i>
+                    {% endif %}
+                </a>
+            </li>
+            {% endfor %}
+            
+            <li class="nav-item align-self-end ms-2 mb-1">
+                <form action="{{ url_for('gallery.add_tab') }}" method="post">
+                    <button type="submit" class="btn btn-sm text-white border-0 shadow-sm" style="background: #ffb3c6; border-radius: 20px; padding: 6px 15px; font-weight: 600;">
+                        <i class="fas fa-plus"></i> 새 탭
+                    </button>
+                </form>
+            </li>
+        </ul>
+    </div>
+
+    <div class="gallery-content-wrapper">
+        
+        {% if files %}
+        <div class="custom-gallery-grid">
+            {% for file in files %}
+            <div class="gallery-item">
+                <input type="checkbox" class="photo-checkbox" value="{{ url_for('gallery.serve_file', filename=file.filename) }}" data-title="{{ file.title }}" onclick="event.stopPropagation();">
+                
+                <a href="{{ url_for('gallery.serve_file', filename=file.filename) }}" 
+                   class="glightbox w-100 h-100 d-block" 
+                   data-gallery="saedam_gallery" 
+                   data-title="{{ file.title }}">
+                    <img src="{{ url_for('gallery.serve_thumb', filename=file.thumb_name) }}" alt="{{ file.title }}" loading="lazy">
+                </a>
+                
+                <div class="item-overlay">
+                    <span class="item-title">{{ file.title }}</span>
+                    <a href="{{ url_for('gallery.delete', id=file.id, tab_id=active_tab_id) }}" 
+                       class="btn-delete" 
+                       onclick="return confirm('이 사진을 휴지통에 버릴까요? 🗑️')"
+                       title="삭제">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-box-open fa-4x mb-3" style="color: #ffc8dd;"></i>
+            <h5 class="text-secondary fw-bold" style="color: #ff758f !important;">아직 사진이 없어요! 예쁜 사진을 채워주세요 🌸</h5>
+        </div>
+        {% endif %}
+
+        <div class="action-bar">
+            <div>
+                <button id="btnToggleUpload" class="btn-cute btn-upload-cute">
+                    <i class="fas fa-camera"></i> 사진 올리기
+                </button>
+            </div>
+            
+            <div class="d-flex gap-2">
+                {% if active_tab_id != 1 %}
+                <button id="btnDeleteTabOpen" class="btn-cute btn-delete-cute">
+                    <i class="fas fa-trash-alt"></i> 현재 탭 지우기
+                </button>
+                {% endif %}
+
+                <button id="btnSelectAll" class="btn-cute btn-select-cute">
+                    <i class="fas fa-check-square"></i> 전체 선택
+                </button>
+                <button id="btnPlaySlideshow" class="btn-cute btn-play-cute">
+                    <i class="fas fa-play-circle"></i> 슬라이드쇼 재생
+                </button>
+            </div>
+        </div>
+        
+        <div id="uploadContent" class="dropzone-wrapper">
+            <form action="{{ url_for('gallery.upload', tab_id=active_tab_id) }}" class="dropzone" id="galleryDropzone">
+                <div class="dz-message" data-dz-message>
+                    <i class="fas fa-heart fa-2x mb-2" style="color: #ffafcc;"></i><br>
+                    <span class="fw-bold" style="color: #c9184a;">여기로 사진을 쏙! 끌어다 놓으세요.</span>
+                </div>
+            </form>
+        </div>
+        
+    </div>
+</div>
+
+<div id="slideshowModal" class="modal-overlay">
+    <div class="modal-content-wrapper slideshow-content">
+        <div class="slideshow-header">
+            <h4 id="slideshowTitle"><i class="fas fa-star" style="color: #ffc8dd;"></i> 갤러리 감상</h4>
+            <button id="btnCloseSlideshow" class="btn-close-modal"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="slideshow-body">
+            <img id="slideshowImg" src="" class="slideshow-img">
+        </div>
+    </div>
+</div>
+
+<div id="deleteTabModal" class="modal-overlay">
+    <div class="modal-content-wrapper delete-confirm-content">
+        <div class="delete-confirm-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h4 style="color:#c9184a; font-weight:900; margin-bottom:15px;">정말 탭을 지우시겠어요?</h4>
+        <p style="color:#ff758f; margin-bottom:30px; font-size:0.95rem;">
+            탭과 함께 <strong>안에 있는 모든 사진</strong>도<br>영구적으로 삭제됩니다! 🥺
+        </p>
+        
+        <form action="{{ url_for('gallery.delete_tab', tab_id=active_tab_id) }}" method="post">
+            <input type="hidden" name="delete_all_files" value="true">
+            <div class="d-flex justify-content-center gap-3">
+                <button type="button" id="btnCancelDelete" class="btn-cute btn-select-cute">앗, 취소할래요</button>
+                <button type="submit" class="btn-cute" style="background:#ff4d4d; color:white; border:none; box-shadow:0 4px 10px rgba(255, 77, 77, 0.3);">
+                    네, 다 지워주세요 🗑️
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/glightbox/3.2.0/js/glightbox.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.js"></script>
+
+<script>
+    // 1. GLightbox 초기화
+    const lightbox = GLightbox({
+        selector: '.glightbox',
+        touchNavigation: true,
+        loop: true,
+        width: '90vw'
+    });
+
+    // 2. ✏️ 탭 이름 수정 (AJAX) 로직
+    document.querySelectorAll('.tab-title[contenteditable="true"]').forEach(el => {
+        el.addEventListener('keydown', function(e) {
+            if(e.key === 'Enter') { e.preventDefault(); this.blur(); }
+        });
+        
+        el.addEventListener('blur', function() {
+            const tabId = this.getAttribute('data-id');
+            const newName = this.innerText.trim();
+            if(!newName) {
+                alert("이름을 비워둘 수 없어요!");
+                window.location.reload();
+                return;
+            }
+            
+            fetch("{{ url_for('gallery.rename_tab') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: tabId, name: newName })
+            }).then(res => res.json()).then(data => {
+                if(data.status !== "success") alert("이름 변경 실패 😢");
+            });
+        });
+    });
+
+    // 3. 사진 올리기 폼 접기/펴기
+    document.getElementById('btnToggleUpload').addEventListener('click', function() {
+        const content = document.getElementById('uploadContent');
+        if(content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            this.innerHTML = '<i class="fas fa-times"></i> 닫기';
+            this.style.background = '#e9ecef';
+            this.style.color = '#495057';
+            this.style.borderColor = '#dee2e6';
+            content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            content.style.display = 'none';
+            this.innerHTML = '<i class="fas fa-camera"></i> 사진 올리기';
+            this.style.background = '#ffffff';
+            this.style.color = '#ff758f';
+            this.style.borderColor = '#ffc8dd';
+        }
+    });
+
+    // 4. Dropzone.js 설정
+    Dropzone.options.galleryDropzone = {
+        paramName: "file",
+        maxFilesize: 20,
+        acceptedFiles: "image/*",
+        init: function() {
+            this.on("queuecomplete", function(file) {
+                setTimeout(() => { window.location.reload(); }, 1000);
+            });
+        }
+    };
+
+    // 5. 전체선택 및 슬라이드쇼 로직
+    let slideInterval;
+    let slideImages = [];
+    let currentIndex = 0;
+    const hideEffects = ['effect-hide-fade', 'effect-hide-zoom', 'effect-hide-slide'];
+
+    document.getElementById('btnSelectAll').addEventListener('click', function() {
+        const checkboxes = document.querySelectorAll('.photo-checkbox');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        checkboxes.forEach(cb => cb.checked = !allChecked);
+        
+        if(allChecked) {
+            this.innerHTML = '<i class="fas fa-check-square"></i> 전체 선택';
+        } else {
+            this.innerHTML = '<i class="fas fa-undo"></i> 선택 해제';
+        }
+    });
+
+    document.getElementById('btnPlaySlideshow').addEventListener('click', function() {
+        const checkedBoxes = document.querySelectorAll('.photo-checkbox:checked');
+        if(checkedBoxes.length === 0) {
+            alert('슬라이드쇼로 감상할 사진을 먼저 체크해주세요! ✨');
+            return;
+        }
+
+        slideImages = Array.from(checkedBoxes).map(cb => ({
+            src: cb.value,
+            title: cb.getAttribute('data-title')
+        }));
+        
+        currentIndex = 0;
+        document.getElementById('slideshowModal').style.display = 'flex';
+        
+        showSlide(); 
+        slideInterval = setInterval(nextSlide, 2500); 
+    });
+
+    document.getElementById('btnCloseSlideshow').addEventListener('click', function() {
+        document.getElementById('slideshowModal').style.display = 'none';
+        clearInterval(slideInterval);
+        const img = document.getElementById('slideshowImg');
+        img.className = 'slideshow-img'; 
+    });
+
+    function nextSlide() {
+        currentIndex = (currentIndex + 1) % slideImages.length;
+        showSlide();
+    }
+
+    function showSlide() {
+        const img = document.getElementById('slideshowImg');
+        const title = document.getElementById('slideshowTitle');
+
+        img.className = 'slideshow-img ' + hideEffects[Math.floor(Math.random() * hideEffects.length)];
+
+        setTimeout(() => {
+            img.src = slideImages[currentIndex].src;
+            title.innerHTML = `<i class="fas fa-heart" style="color: #ffb3c6;"></i> ${slideImages[currentIndex].title}`;
+            
+            img.onload = function() {
+                void img.offsetWidth; 
+                img.className = 'slideshow-img effect-active';
+            };
+        }, 400); 
+    }
+
+    // 6. 🚨 탭 삭제 모달 제어 로직
+    const btnDeleteTabOpen = document.getElementById('btnDeleteTabOpen');
+    const deleteTabModal = document.getElementById('deleteTabModal');
+    const btnCancelDelete = document.getElementById('btnCancelDelete');
+
+    if (btnDeleteTabOpen) {
+        btnDeleteTabOpen.addEventListener('click', function() {
+            deleteTabModal.style.display = 'flex';
+        });
+    }
+
+    if (btnCancelDelete) {
+        btnCancelDelete.addEventListener('click', function() {
+            deleteTabModal.style.display = 'none';
+        });
+    }
+</script>
+{% endblock %}

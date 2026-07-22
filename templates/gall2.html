@@ -1,0 +1,1229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.css">
+
+<style>
+    :root {
+        --saedam-blue: #004ea2;
+        --saedam-navy: #002c63;
+        --saedam-green: #28a745;
+        --bg-light: #f4f7fa;
+        --border-color: #d1d8e0;
+        --text-dark: #333;
+    }
+
+    .gallery-page {
+        padding: 0;
+        color: var(--text-dark);
+    }
+
+    /* admin.html의 컨테이너 스타일 적용 */
+    .gallery-content-wrapper {
+        width: 100%;
+        max-width: 1550px;
+        margin: 20px auto;
+        background: #fff;
+        padding: 30px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border-top: 5px solid var(--saedam-navy);
+        border-radius: 12px;
+        min-height: 520px;
+    }
+
+    /* admin.html의 헤더 스타일 적용 */
+    .admin-header {
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center;
+        margin-bottom: 20px; 
+        padding-bottom: 15px; 
+        border-bottom: 2px solid #f1f3f5;
+    }
+
+    .gallery-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    /* 버튼을 admin.html 스타일로 맞춤 */
+    .btn-gallery {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        border-radius: 5px;
+        border: 1px solid var(--border-color);
+        background: #fff;
+        color: var(--text-dark);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: 0.2s;
+        text-decoration: none;
+    }
+
+    .btn-gallery:hover {
+        background: #f4f7fa;
+    }
+
+    .btn-gallery.primary {
+        background: var(--saedam-blue);
+        color: white;
+        border: none;
+    }
+
+    .btn-gallery.primary:hover {
+        background: var(--saedam-navy);
+    }
+
+    .btn-gallery.danger {
+        background: #fff;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+    }
+
+    .btn-gallery.danger:hover {
+        background: #fff5f5;
+    }
+
+    .btn-gallery:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .post-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(234px, 1fr));
+        gap: 18px;
+    }
+
+    .post-card {
+        position: relative;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: #ffffff;
+        overflow: hidden;
+        cursor: pointer;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02), 0 4px 10px rgba(0, 0, 0, 0.04);
+        transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+    }
+
+    .post-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 8px;
+        pointer-events: none;
+        box-shadow: inset 0 0 0 3px rgba(248, 250, 252, 0.95), inset 0 4px 0 var(--saedam-blue);
+        z-index: 2;
+    }
+
+    .post-card:hover {
+        border-color: var(--saedam-blue);
+        box-shadow: 0 10px 20px rgba(0, 78, 162, 0.1);
+        transform: translateY(-2px);
+    }
+
+    .post-card:hover::before {
+        box-shadow: inset 0 0 0 3px rgba(244, 247, 250, 0.95), inset 0 4px 0 var(--saedam-blue);
+    }
+
+    .post-card.is-selected {
+        border-color: var(--saedam-blue);
+        box-shadow: 0 10px 20px rgba(0, 78, 162, 0.15);
+    }
+
+    .post-select-check {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 4;
+        width: 20px;
+        height: 20px;
+        accent-color: var(--saedam-blue);
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-3px);
+        transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+
+    .post-card:hover .post-select-check,
+    .post-card:focus-within .post-select-check,
+    .post-select-check:checked {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
+    .post-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        background: #f4f7fa;
+        display: block;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .post-thumb.empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        font-size: 2rem;
+    }
+
+    .post-body {
+        padding: 14px 15px 15px;
+    }
+
+.post-title {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: normal; /* 굵기 해제 (또는 400) */
+        color: var(--text-dark);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .post-meta {
+        margin-top: 7px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        color: #666;
+        font-size: 0.78rem;
+    }
+
+    .gallery-pagination {
+        display: flex; 
+        justify-content: center; 
+        gap: 5px; 
+        margin-top: 25px; 
+        list-style: none; 
+        padding: 0;
+    }
+
+    .page-link-button {
+        padding: 8px 14px;
+        border: 1px solid var(--border-color); 
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--saedam-navy);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .page-link-button:hover {
+        background: #f4f7fa;
+    }
+
+    .page-link-button.active {
+        background: var(--saedam-blue);
+        color: white;
+        border-color: var(--saedam-blue);
+    }
+
+    .page-link-button.disabled {
+        opacity: 0.45;
+        pointer-events: none;
+    }
+
+    .empty-state {
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #666;
+        text-align: center;
+        border: 1px dashed var(--border-color);
+        border-radius: 8px;
+        background: #f8fafc;
+    }
+
+    .upload-panel {
+        display: none;
+        margin-bottom: 22px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: #f4f7fa;
+        padding: 18px;
+    }
+
+    .upload-form-grid {
+        display: grid;
+        grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1.2fr);
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .gallery-input,
+    .gallery-textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: #ffffff;
+        color: var(--text-dark);
+        padding: 10px 12px;
+        font-family: inherit;
+        font-size: 0.85rem;
+        outline: none;
+    }
+
+    .gallery-textarea {
+        min-height: 92px;
+        resize: vertical;
+        line-height: 1.5;
+    }
+
+    .gallery-input:focus,
+    .gallery-textarea:focus {
+        border-color: var(--saedam-blue);
+        box-shadow: 0 0 0 2px rgba(0, 78, 162, 0.1);
+    }
+
+    .dropzone {
+        background: #ffffff;
+        border: 2px dashed #cbd5e1;
+        border-radius: 8px;
+        min-height: 170px;
+        max-height: 360px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        overflow-y: auto;
+        cursor: pointer;
+        padding: 22px;
+    }
+
+    .dropzone:hover {
+        border-color: var(--saedam-blue);
+        background: #f8fafc;
+    }
+
+    .dropzone .dz-message {
+        width: 100%;
+        text-align: center;
+        margin: 28px 0;
+        color: #666;
+    }
+
+    .dropzone.dz-started {
+        justify-content: flex-start;
+        align-content: flex-start;
+    }
+
+    .dropzone.dz-started .dz-message {
+        display: none;
+    }
+
+    .dropzone .dz-preview {
+        margin: 6px;
+        flex: 0 0 120px;
+    }
+
+    .dropzone .dz-preview .dz-image {
+        width: 120px;
+        height: 120px;
+        border-radius: 8px;
+    }
+
+    .upload-action-row {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .upload-hint {
+        margin-right: auto;
+        color: #666;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 14px;
+    }
+
+    .post-modal {
+        --modal-media-width: min(760px, calc(96vw - 342px));
+        --modal-image-width: auto;
+        --modal-image-height: auto;
+        width: fit-content;
+        max-width: 96vw;
+        max-height: 94vh;
+        height: auto;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        background: #ffffff;
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .post-modal-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .post-modal-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--saedam-navy);
+    }
+
+    .modal-close {
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        cursor: pointer;
+        color: #666;
+        font-size: 1.2rem;
+    }
+    
+    .modal-close:hover {
+        background: #f4f7fa;
+    }
+
+    .post-modal-body {
+        overflow: hidden;
+        min-height: 0;
+        max-height: calc(94vh - 68px);
+        padding: 20px;
+        display: grid;
+        grid-template-columns: var(--modal-media-width) 300px;
+        gap: 20px;
+    }
+
+    .modal-media-column {
+        min-height: 0;
+        width: var(--modal-media-width);
+        max-width: calc(96vw - 342px);
+        max-height: calc(94vh - 96px);
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 12px;
+    }
+
+    .modal-preview {
+        background: transparent;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .modal-preview img {
+        width: auto;
+        height: auto;
+        width: var(--modal-image-width);
+        height: var(--modal-image-height);
+        max-width: calc(96vw - 342px);
+        max-height: calc(94vh - 172px);
+        object-fit: contain;
+    }
+
+    .modal-overlay.slideshow-active {
+        background: rgba(0, 0, 0, 0.9);
+        padding: 0;
+    }
+
+    .modal-overlay.slideshow-active .post-modal {
+        display: block;
+        width: fit-content;
+        max-width: 100vw;
+        max-height: 100vh;
+        height: auto;
+        background: transparent;
+        box-shadow: none;
+        border-radius: 0;
+    }
+
+    .modal-overlay.slideshow-active .post-modal-header,
+    .modal-overlay.slideshow-active .modal-thumbs,
+    .modal-overlay.slideshow-active .post-detail-panel {
+        display: none;
+    }
+
+    .modal-overlay.slideshow-active .slideshow-stop-button {
+        display: inline-flex;
+    }
+
+    .modal-overlay.slideshow-active .modal-media-column {
+        display: block;
+    }
+
+    .modal-overlay.slideshow-active .post-modal-body {
+        display: block;
+        overflow: hidden;
+        padding: 0;
+    }
+
+    .modal-overlay.slideshow-active .modal-preview {
+        max-width: 100vw;
+        max-height: 100vh;
+    }
+
+    .modal-overlay.slideshow-active .modal-preview img {
+        max-width: 100vw;
+        max-height: 100vh;
+    }
+
+    .modal-thumbs {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+        gap: 8px;
+        width: 100%;
+        max-width: calc(96vw - 342px);
+        max-height: 66px;
+        overflow: hidden;
+    }
+
+    .modal-thumb {
+        border: 2px solid transparent;
+        border-radius: 6px;
+        padding: 0;
+        overflow: hidden;
+        background: #ffffff;
+        cursor: pointer;
+        aspect-ratio: 1 / 1;
+    }
+
+    .modal-thumb.active {
+        border-color: var(--saedam-blue);
+    }
+
+    .modal-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .post-detail-panel {
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 18px;
+        background: #ffffff;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .post-detail-summary {
+        color: #666;
+        font-size: 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 0 0 15px;
+    }
+
+    .post-detail-title-line {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 6px;
+        align-items: baseline;
+        color: var(--text-dark);
+    }
+
+    .post-detail-title-line strong {
+        min-width: 0;
+        font-size: 1rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .post-detail-byline {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        align-items: center;
+    }
+
+    .photo-count-button {
+        width: max-content;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        background: #f4f7fa;
+        color: #666;
+        padding: 4px 12px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: 0.2s;
+    }
+
+    .photo-count-button:hover,
+    .photo-count-button.active {
+        color: var(--saedam-blue);
+        border-color: var(--saedam-blue);
+        background: #f0f7ff;
+    }
+
+    .photo-info-panel {
+        display: none;
+        margin: -4px 0 15px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: #f4f7fa;
+        max-height: 160px;
+        overflow-y: auto;
+    }
+
+    .photo-info-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+        color: #555;
+    }
+
+    .photo-info-row:last-child {
+        border-bottom: none;
+    }
+
+    .photo-info-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .photo-info-size {
+        color: #666;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .post-detail-content {
+        white-space: pre-wrap;
+        line-height: 1.6;
+        color: var(--text-dark);
+        min-height: 120px;
+        max-height: 240px;
+        margin-top: 4px;
+        padding: 15px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background: #f4f7fa;
+        overflow-y: auto;
+        font-size: 0.85rem;
+    }
+
+    .post-modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: auto;
+        padding-top: 15px;
+    }
+
+    .post-edit-form {
+        display: none;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .slideshow-stop-button {
+        position: fixed;
+        right: 24px;
+        bottom: 22px;
+        z-index: 1000000;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #ffffff;
+        padding: 10px 16px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    @media (max-width: 860px) {
+        .upload-form-grid,
+        .post-modal-body {
+            grid-template-columns: 1fr;
+        }
+
+        .post-modal {
+            width: min(94vw, 720px);
+            height: auto;
+        }
+
+        .modal-media-column,
+        .modal-preview img,
+        .modal-thumbs {
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .modal-preview img {
+            max-height: calc(84vh - 270px);
+        }
+    }
+</style>
+
+<div class="gallery-page">
+    <div class="gallery-content-wrapper">
+        
+        <!-- 새담 스타일 헤더 적용 -->
+        <div class="admin-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <img src="http://www.saedam.org/img/logo01.gif" alt="새담 로고" style="height: 35px;">
+                <h2 style="margin:0; font-size:1.3rem;">사내 갤러리</h2>
+            </div>
+            <div style="font-size: 0.85rem; color: #666;">
+                현재 접속: <strong>{{ session.get('user_name') }}</strong>
+            </div>
+        </div>
+
+        <div class="gallery-toolbar">
+            <div class="gallery-title-block">
+                <div style="font-size: 0.85rem; color: #555;">
+                    💡 <strong>사내 갤러리 업로드 안내:</strong> 하나의 게시물에 20장/최대 20MB까지의 사진을 등록할 수 있습니다.
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items: center;">
+                <button id="btnSelectAllPosts" class="btn-gallery" type="button">
+                    <i class="fas fa-check-double"></i> 전체 선택
+                </button>
+                <button id="btnDeleteSelectedPosts" class="btn-gallery danger" type="button" disabled>
+                    🗑️ 선택 삭제
+                </button>
+                <button id="btnToggleUpload" class="btn-gallery primary" type="button">
+                    📝 게시물 작성
+                </button>
+            </div>
+        </div>
+
+        <div id="uploadContent" class="upload-panel">
+            <div class="upload-form-grid">
+                <input id="postTitleInput" class="gallery-input" type="text" maxlength="120" placeholder="게시물 제목">
+                <textarea id="postContentInput" class="gallery-textarea" placeholder="게시물 내용"></textarea>
+            </div>
+            <form action="{{ url_for('gall2.upload', tab_id=active_tab_id) }}" class="dropzone" id="galleryDropzone">
+                <div class="dz-message" data-dz-message>
+                    <i class="fas fa-cloud-arrow-up fa-2x" style="margin-bottom:8px;"></i><br>
+                    사진을 이곳에 끌어다 놓거나 클릭해서 선택하세요.<br>
+                    <small>전송 버튼을 눌러야 업로드가 완료됩니다.</small>
+                </div>
+            </form>
+            <div class="upload-action-row">
+                <span id="uploadQueueHint" class="upload-hint">대기 중인 사진이 없습니다.</span>
+                <button type="button" id="btnClearUploadQueue" class="btn-gallery" disabled>
+                    <i class="fas fa-eraser"></i> 대기열 비우기
+                </button>
+                <button type="button" id="btnStartUpload" class="btn-gallery primary" disabled>
+                    <i class="fas fa-paper-plane"></i> 게시물 전송
+                </button>
+            </div>
+        </div>
+
+        {% if posts %}
+        <div class="post-grid">
+            {% for post in posts %}
+            <article class="post-card" onclick="openGalleryPost({{ post.id }})">
+                <input type="checkbox" class="post-select-check" value="{{ post.id }}" aria-label="게시물 선택" onclick="event.stopPropagation();">
+                {% if post.cover_thumb %}
+                <img class="post-thumb" src="{{ url_for('gall2.serve_thumb', filename=post.cover_thumb) }}" alt="{{ post.title }}" loading="lazy">
+                {% else %}
+                <div class="post-thumb empty"><i class="far fa-images"></i></div>
+                {% endif %}
+                <div class="post-body">
+                    <h3 class="post-title">{{ post.title }}</h3>
+                    <div class="post-meta">
+                        <span><i class="far fa-user"></i> {{ post.author or '관리자' }}</span>
+                        <span><i class="far fa-calendar"></i> {{ post.created_at[:10] if post.created_at else '' }}</span>
+                        <span><i class="far fa-image"></i> {{ post.photo_count or 0 }}장</span>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% if pagination and pagination.total_pages > 1 %}
+        <nav class="gallery-pagination" aria-label="갤러리 페이지">
+            <a class="page-link-button {% if not pagination.has_prev_block %}disabled{% endif %}" href="{{ url_for('gall2.index', page=pagination.prev_block_page) }}">이전</a>
+            {% for page_no in range(pagination.block_start, pagination.block_end + 1) %}
+            <a class="page-link-button {% if page_no == pagination.page %}active{% endif %}" href="{{ url_for('gall2.index', page=page_no) }}">{{ page_no }}</a>
+            {% endfor %}
+            <a class="page-link-button {% if not pagination.has_next_block %}disabled{% endif %}" href="{{ url_for('gall2.index', page=pagination.next_block_page) }}">다음</a>
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <i class="far fa-images" style="font-size:2.5rem;"></i>
+            <strong>등록된 게시물이 없습니다.</strong>
+            <span>게시물 작성 버튼으로 사진과 내용을 함께 올려주세요.</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="postModal" class="modal-overlay">
+    <div class="post-modal">
+        <div class="post-modal-header">
+            <h3 id="modalTitle">게시물</h3>
+            <button type="button" class="modal-close" onclick="closePostModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="post-modal-body">
+            <div class="modal-media-column">
+                <div class="modal-preview">
+                    <img id="modalMainImage" src="" alt="">
+                </div>
+                <div id="modalThumbs" class="modal-thumbs"></div>
+            </div>
+            <aside class="post-detail-panel">
+                <div class="post-detail-summary">
+                    <div class="post-detail-title-line">
+                        <span>제목:</span>
+                        <strong id="modalSideTitle"></strong>
+                    </div>
+                    <div class="post-detail-byline">
+                        <span id="modalAuthor"></span>
+                        <span id="modalDate"></span>
+                    </div>
+                    <button type="button" id="modalCount" class="photo-count-button"></button>
+                </div>
+                <div id="photoInfoPanel" class="photo-info-panel"></div>
+                <div id="modalContent" class="post-detail-content"></div>
+                <div id="postEditForm" class="post-edit-form">
+                    <input id="modalEditTitle" class="gallery-input" type="text" maxlength="120" style="margin-bottom:10px;">
+                    <textarea id="modalEditContent" class="gallery-textarea"></textarea>
+                    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+                        <button type="button" id="btnCancelEdit" class="btn-gallery">취소</button>
+                        <button type="button" id="btnSaveEdit" class="btn-gallery primary">저장</button>
+                    </div>
+                </div>
+                <div class="post-modal-actions">
+                    <button type="button" id="btnModalEdit" class="btn-gallery"><i class="fas fa-pen"></i> 수정</button>
+                    <button type="button" id="btnModalDelete" class="btn-gallery danger"><i class="fas fa-trash"></i> 삭제</button>
+                    <button type="button" id="btnModalSlideshow" class="btn-gallery"><i class="fas fa-play"></i> 슬라이드쇼 재생</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+    <button type="button" id="btnSlideshowStop" class="slideshow-stop-button">[X] 중지</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/dropzone.min.js"></script>
+<script>
+    // 기존의 JavaScript 로직은 변경 없이 그대로 유지됩니다. (업로드 및 모달 기능)
+    const galleryPosts = {{ posts|tojson }};
+    const rawUrlTemplate = "{{ url_for('gall2.serve_file', filename='__filename__') }}";
+    const thumbUrlTemplate = "{{ url_for('gall2.serve_thumb', filename='__filename__') }}";
+    const currentPage = {{ pagination.page if pagination else 1 }};
+    let activePost = null;
+    let activeImageIndex = 0;
+    let slideshowTimer = null;
+
+    function fileUrl(template, filename) {
+        return template.replace('__filename__', encodeURIComponent(filename));
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function fitModalToCurrentImage() {
+        const modal = document.querySelector('#postModal .post-modal');
+        const image = document.getElementById('modalMainImage');
+        if (!modal || !image || !image.naturalWidth || !image.naturalHeight) return;
+        if (document.getElementById('postModal').classList.contains('slideshow-active')) return;
+
+        const sidePanelWidth = 300;
+        const bodyPaddingX = 40; /* 패딩 20px * 2 */
+        const bodyPaddingY = 40;
+        const bodyGap = 20;
+        const headerReserve = 70;
+        const thumbsReserve = document.getElementById('modalThumbs').children.length > 0 ? 76 : 0;
+        const maxImageWidth = Math.max(220, Math.floor(window.innerWidth * 0.96 - sidePanelWidth - bodyGap - bodyPaddingX));
+        const maxImageHeight = Math.max(240, Math.floor(window.innerHeight * 0.94 - headerReserve - bodyPaddingY - thumbsReserve));
+        const scale = Math.min(1, maxImageWidth / image.naturalWidth, maxImageHeight / image.naturalHeight);
+        const imageWidth = Math.max(1, Math.floor(image.naturalWidth * scale));
+        const imageHeight = Math.max(1, Math.floor(image.naturalHeight * scale));
+
+        modal.style.setProperty('--modal-media-width', `${imageWidth}px`);
+        modal.style.setProperty('--modal-image-width', `${imageWidth}px`);
+        modal.style.setProperty('--modal-image-height', `${imageHeight}px`);
+    }
+
+    function stopSlideshow() {
+        if (slideshowTimer) {
+            clearInterval(slideshowTimer);
+            slideshowTimer = null;
+        }
+        document.getElementById('postModal').classList.remove('slideshow-active');
+        document.getElementById('btnModalSlideshow').innerHTML = '<i class="fas fa-play"></i> 슬라이드쇼 재생';
+    }
+
+    function renderPhotoInfoPanel() {
+        const panel = document.getElementById('photoInfoPanel');
+        const images = activePost && activePost.images ? activePost.images : [];
+        panel.innerHTML = images.map((image, index) => `
+            <div class="photo-info-row">
+                <span class="photo-info-name" title="${escapeHtml(image.title || image.filename)}">${index + 1}. ${escapeHtml(image.title || image.filename)}</span>
+                <span class="photo-info-size">${escapeHtml(image.file_size_label || '0 KB')}</span>
+            </div>
+        `).join('');
+        panel.style.display = 'none';
+        document.getElementById('modalCount').classList.remove('active');
+    }
+
+    function setModalImage(index) {
+        if (!activePost || !activePost.images || activePost.images.length === 0) return;
+        activeImageIndex = index;
+        const image = activePost.images[index];
+        const mainImage = document.getElementById('modalMainImage');
+        mainImage.onload = fitModalToCurrentImage;
+        mainImage.src = fileUrl(rawUrlTemplate, image.filename);
+        mainImage.alt = image.title || activePost.title;
+        if (mainImage.complete) fitModalToCurrentImage();
+        document.querySelectorAll('.modal-thumb').forEach((el, i) => {
+            el.classList.toggle('active', i === index);
+        });
+    }
+
+    function openGalleryPost(postId) {
+        activePost = galleryPosts.find(post => Number(post.id) === Number(postId));
+        if (!activePost) return;
+        stopSlideshow();
+        document.getElementById('modalTitle').textContent = activePost.title || '게시물';
+        document.getElementById('modalSideTitle').textContent = activePost.title || '게시물';
+        document.getElementById('modalAuthor').textContent = `작성자: ${activePost.author || '관리자'}`;
+        document.getElementById('modalDate').textContent = `작성일: ${(activePost.created_at || '').slice(0, 10)}`;
+        document.getElementById('modalCount').innerHTML = `<i class="far fa-image"></i> ${(activePost.images || []).length}장`;
+        renderPhotoInfoPanel();
+        document.getElementById('modalContent').textContent = activePost.content || '등록된 내용이 없습니다.';
+        document.getElementById('modalEditTitle').value = activePost.title || '';
+        document.getElementById('modalEditContent').value = activePost.content || '';
+        document.getElementById('postEditForm').style.display = 'none';
+
+        const thumbs = document.getElementById('modalThumbs');
+        thumbs.innerHTML = '';
+        (activePost.images || []).forEach((image, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'modal-thumb';
+            button.onclick = () => {
+                stopSlideshow();
+                setModalImage(index);
+            };
+            button.innerHTML = `<img src="${fileUrl(thumbUrlTemplate, image.thumb_name)}" alt="">`;
+            thumbs.appendChild(button);
+        });
+
+        if (activePost.images && activePost.images.length > 0) {
+            setModalImage(0);
+        } else {
+            document.getElementById('modalMainImage').removeAttribute('src');
+        }
+
+        document.getElementById('postModal').style.display = 'flex';
+        fitModalToCurrentImage();
+    }
+
+    function closePostModal() {
+        stopSlideshow();
+        document.getElementById('postModal').style.display = 'none';
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        document.body.appendChild(document.getElementById('postModal'));
+    });
+
+    function getSelectedPostIds() {
+        return Array.from(document.querySelectorAll('.post-select-check:checked')).map(input => input.value);
+    }
+
+    function refreshSelectedControls() {
+        const checks = Array.from(document.querySelectorAll('.post-select-check'));
+        const selectedCount = getSelectedPostIds().length;
+        const selectAllBtn = document.getElementById('btnSelectAllPosts');
+        const deleteBtn = document.getElementById('btnDeleteSelectedPosts');
+        checks.forEach(input => {
+            input.closest('.post-card').classList.toggle('is-selected', input.checked);
+        });
+        selectAllBtn.disabled = checks.length === 0;
+        selectAllBtn.innerHTML = selectedCount === checks.length && checks.length > 0
+            ? '<i class="fas fa-square-minus"></i> 전체 해제'
+            : '<i class="fas fa-check-double"></i> 전체 선택';
+        deleteBtn.disabled = selectedCount === 0;
+    }
+
+    document.querySelectorAll('.post-select-check').forEach(input => {
+        input.addEventListener('change', refreshSelectedControls);
+    });
+
+    document.getElementById('btnSelectAllPosts').addEventListener('click', function() {
+        const checks = Array.from(document.querySelectorAll('.post-select-check'));
+        const shouldCheck = checks.some(input => !input.checked);
+        checks.forEach(input => { input.checked = shouldCheck; });
+        refreshSelectedControls();
+    });
+
+    document.getElementById('btnDeleteSelectedPosts').addEventListener('click', function() {
+        const postIds = getSelectedPostIds();
+        if (postIds.length === 0) return;
+        if (!confirm(`선택한 게시물 ${postIds.length}개와 포함된 사진을 삭제할까요?`)) return;
+        fetch("{{ url_for('gall2.delete_bulk') }}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ post_ids: postIds })
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+                window.location.href = `{{ url_for('gall2.index') }}?page=${currentPage}`;
+            } else {
+                alert(data.message || '선택삭제에 실패했습니다.');
+            }
+        }).catch(() => {
+            alert('선택삭제 중 오류가 발생했습니다.');
+        });
+    });
+
+    refreshSelectedControls();
+
+    document.getElementById('btnToggleUpload').addEventListener('click', function() {
+        const panel = document.getElementById('uploadContent');
+        const isOpen = panel.style.display === 'block';
+        panel.style.display = isOpen ? 'none' : 'block';
+        this.innerHTML = isOpen ? '📝 게시물 작성' : '<i class="fas fa-times"></i> 닫기';
+        if (!isOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+    Dropzone.options.galleryDropzone = {
+        paramName: "file",
+        maxFilesize: 20,
+        acceptedFiles: "image/*",
+        autoProcessQueue: false,
+        parallelUploads: 3,
+        addRemoveLinks: true,
+        dictRemoveFile: "대기열에서 제거",
+        init: function() {
+            const dz = this;
+            const startBtn = document.getElementById('btnStartUpload');
+            const clearBtn = document.getElementById('btnClearUploadQueue');
+            const queueHint = document.getElementById('uploadQueueHint');
+            const titleInput = document.getElementById('postTitleInput');
+            const contentInput = document.getElementById('postContentInput');
+            let uploadStarted = false;
+            let uploadToken = '';
+
+            function getPendingFiles() {
+                return dz.files.filter(file =>
+                    file.accepted !== false &&
+                    file.status !== Dropzone.SUCCESS &&
+                    file.status !== Dropzone.ERROR &&
+                    file.status !== Dropzone.CANCELED
+                );
+            }
+
+            function queuePendingFiles() {
+                getPendingFiles().forEach(file => {
+                    if (file.status === Dropzone.ADDED) {
+                        dz.enqueueFile(file);
+                    }
+                });
+            }
+
+            function refreshUploadControls() {
+                const pendingCount = getPendingFiles().length;
+                const fileCount = dz.files.filter(file => file.status !== Dropzone.CANCELED).length;
+                const uploadingCount = dz.getUploadingFiles().length;
+                startBtn.disabled = pendingCount === 0 || uploadingCount > 0;
+                clearBtn.disabled = fileCount === 0 || uploadingCount > 0;
+                if (uploadingCount > 0) {
+                    queueHint.textContent = `사진 ${uploadingCount}장을 전송하는 중입니다.`;
+                } else if (pendingCount > 0) {
+                    queueHint.textContent = `전송 대기 사진 ${pendingCount}장`;
+                } else {
+                    queueHint.textContent = '대기 중인 사진이 없습니다.';
+                }
+            }
+
+            startBtn.addEventListener('click', function() {
+                if (!titleInput.value.trim()) {
+                    alert('게시물 제목을 입력해 주세요.');
+                    titleInput.focus();
+                    return;
+                }
+                if (getPendingFiles().length === 0) {
+                    alert('업로드할 사진을 추가해 주세요.');
+                    return;
+                }
+                uploadStarted = true;
+                uploadToken = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                queuePendingFiles();
+                dz.processQueue();
+                refreshUploadControls();
+            });
+
+            clearBtn.addEventListener('click', function() {
+                dz.removeAllFiles(true);
+                uploadStarted = false;
+                uploadToken = '';
+                refreshUploadControls();
+            });
+
+            this.on("sending", function(file, xhr, formData) {
+                formData.append('title', titleInput.value.trim());
+                formData.append('content', contentInput.value.trim());
+                formData.append('upload_token', uploadToken);
+            });
+            this.on("addedfile", refreshUploadControls);
+            this.on("acceptedfile", refreshUploadControls);
+            this.on("removedfile", refreshUploadControls);
+            this.on("processing", refreshUploadControls);
+            this.on("success", refreshUploadControls);
+            this.on("complete", function() {
+                refreshUploadControls();
+                if (uploadStarted && getPendingFiles().length > 0 && dz.getUploadingFiles().length === 0) {
+                    queuePendingFiles();
+                    dz.processQueue();
+                }
+            });
+            this.on("error", function(file, message) {
+                refreshUploadControls();
+                alert(typeof message === 'string' ? message : '업로드 중 오류가 발생했습니다.');
+            });
+            this.on("queuecomplete", function() {
+                refreshUploadControls();
+                if (uploadStarted) {
+                    setTimeout(() => { window.location.reload(); }, 800);
+                }
+            });
+            refreshUploadControls();
+        }
+    };
+
+    document.getElementById('btnModalEdit').addEventListener('click', function() {
+        document.getElementById('postEditForm').style.display = 'block';
+        document.getElementById('modalEditTitle').focus();
+    });
+
+    document.getElementById('btnCancelEdit').addEventListener('click', function() {
+        document.getElementById('postEditForm').style.display = 'none';
+    });
+
+    document.getElementById('btnSaveEdit').addEventListener('click', function() {
+        if (!activePost) return;
+        const title = document.getElementById('modalEditTitle').value.trim();
+        const content = document.getElementById('modalEditContent').value.trim();
+        if (!title) {
+            alert('제목을 입력해 주세요.');
+            return;
+        }
+        fetch(`/gall2/post/${activePost.id}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, content })
+        }).then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert(data.message || '수정에 실패했습니다.');
+            }
+        });
+    });
+
+    document.getElementById('btnModalDelete').addEventListener('click', function() {
+        if (!activePost) return;
+        if (!confirm('이 게시물과 포함된 사진을 삭제할까요?')) return;
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = `/gall2/post/${activePost.id}/delete?page=${currentPage}`;
+        document.body.appendChild(form);
+        form.submit();
+    });
+
+    document.getElementById('modalCount').addEventListener('click', function() {
+        const panel = document.getElementById('photoInfoPanel');
+        const shouldOpen = panel.style.display !== 'block';
+        panel.style.display = shouldOpen ? 'block' : 'none';
+        this.classList.toggle('active', shouldOpen);
+    });
+
+    document.getElementById('btnModalSlideshow').addEventListener('click', function() {
+        if (!activePost || !activePost.images || activePost.images.length === 0) return;
+        if (slideshowTimer) {
+            stopSlideshow();
+            return;
+        }
+        this.innerHTML = '<i class="fas fa-pause"></i> 슬라이드쇼 중지';
+        document.getElementById('postModal').classList.add('slideshow-active');
+        slideshowTimer = setInterval(() => {
+            const nextIndex = (activeImageIndex + 1) % activePost.images.length;
+            setModalImage(nextIndex);
+        }, 2200);
+    });
+
+    document.getElementById('modalMainImage').addEventListener('click', function(event) {
+        if (slideshowTimer) {
+            event.stopPropagation();
+            stopSlideshow();
+        }
+    });
+
+    document.getElementById('btnSlideshowStop').addEventListener('click', function(event) {
+        event.stopPropagation();
+        stopSlideshow();
+    });
+
+    document.getElementById('postModal').addEventListener('click', function(event) {
+        if (event.target === this) closePostModal();
+    });
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && document.getElementById('postModal').style.display === 'flex') {
+            closePostModal();
+        }
+    });
+
+    window.addEventListener('resize', fitModalToCurrentImage);
+</script>
+{% endblock %}

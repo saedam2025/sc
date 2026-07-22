@@ -1,0 +1,1640 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+    <style>
+        /* === 다이나믹 테마 변수 (기본값) === */
+        :root {
+            --body-bg: #f8fafc;
+            --primary-color: #4a90e2;
+            --primary-dark: #357abd;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --card-bg: rgba(255, 255, 255, 0.6);
+            --card-border: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            --card-backdrop: blur(24px);
+            --input-bg: rgba(255, 255, 255, 0.8);
+            --input-text: #1e293b;
+            --widget-bg: rgba(255, 255, 255, 0.7);
+            --widget-hover: rgba(255, 255, 255, 1);
+            --widget-border: rgba(255, 255, 255, 1);
+            --effect-color1: transparent;
+            --effect-color2: transparent;
+            --effect-color3: transparent;
+        }
+
+        .theme-manager-shell, .theme-manager-shell *, .theme-modal-backdrop, .theme-modal-backdrop * { box-sizing: border-box; }
+        .theme-manager-shell, .theme-modal-backdrop { font-family: 'Pretendard', sans-serif; }
+
+        .content-container { max-width: none !important; padding: 0 24px 24px !important; }
+        .main-footer { display: none; }
+
+        /* 테마관리 화면에서는 상단 드롭다운의 재실행 애니메이션으로 인한 hover 떨림을 차단 */
+        .navbar .menu-item {
+            transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+        }
+        .navbar .menu-item-wrapper:hover .dropdown-content {
+            animation: none !important;
+            transform: translateX(-50%) !important;
+        }
+
+        .theme-manager-shell {
+            display: grid; grid-template-columns: 430px minmax(0, 1fr);
+            height: calc(100vh - 124px); min-height: 680px; overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, .28); border-radius: 24px;
+            background: rgba(248, 250, 252, .84); box-shadow: 0 24px 70px rgba(15, 23, 42, .14);
+            transition: background 0.8s ease, color 0.5s ease;
+        }
+
+        /* 레이아웃 구조 */
+        .theme-manager-shell .sidebar {
+            width: auto; background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex; flex-direction: column; min-height: 0; z-index: 10;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); background: rgba(255, 255, 255, 0.96); }
+        .sidebar-header h2 { font-size: 18px; color: #1e293b; margin-bottom: 8px; }
+        .sidebar-header p { font-size: 13px; color: #64748b; }
+
+        .active-theme-box {
+            padding: 14px 20px; border-bottom: 1px solid rgba(0,0,0,0.1);
+            background: rgba(248, 250, 252, 0.72);
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center;
+        }
+        .active-theme-label { font-size: 11px; color: #64748b; font-weight: 800; margin-bottom: 4px; }
+        .active-theme-name { font-size: 13px; color: #0f172a; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .clear-theme-btn {
+            border: none; border-radius: 8px; background: #ef4444; color: #fff;
+            padding: 8px 10px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap;
+        }
+        .clear-theme-btn:hover { background: #dc2626; }
+
+        .theme-list-container {
+            flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px 18px;
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-auto-rows: 160px; gap: 10px; align-content: start;
+            scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;
+        }
+        .theme-list-container::-webkit-scrollbar { width: 6px; }
+        .theme-list-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        .theme-item {
+            min-width: 0; padding: 8px; border-radius: 13px; cursor: pointer;
+            margin: 0; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            display: flex; flex-direction: column; gap: 8px;
+            background: #ffffff; border: 1px solid #dbe3ee;
+        }
+        .theme-list-container > .theme-grid-card {
+            box-sizing:border-box; width:100%; height:160px; min-height:160px; max-height:160px;
+            display:grid; grid-template-rows:104px minmax(0, 1fr); row-gap:8px;
+            overflow:hidden; align-self:stretch; justify-self:stretch;
+        }
+
+        .theme-item:hover { border-color: #94a3b8; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(15,23,42,.09); }
+        .theme-item.active { background: #ffffff; color: #0f172a; border-color: var(--primary-color); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 22%, transparent), 0 9px 22px rgba(15,23,42,.12); }
+        .theme-item.active .theme-num { color: var(--primary-color); }
+        .theme-item.active .theme-name { color: #0f172a; }
+        .theme-item.active .action-name { color: var(--primary-color); }
+
+        .theme-num { font-size: 11px; color: #94a3b8; font-weight: 800; width: auto; flex: 0 0 auto; text-align: left; margin-right: 0; }
+        .theme-name { font-size: 13px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #1e293b; }
+        .action-name { font-size: 11px; color: var(--primary-color); font-weight: 600; margin-left: 5px; }
+
+        .preview-area {
+            flex: 1; position: relative; display: flex;
+            align-items: center; justify-content: center;
+            overflow: hidden; padding: 40px; background: var(--body-bg);
+            transition: background .45s ease;
+        }
+
+        #theme-preview-effect-container { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+
+        /* 미리보기용 목업 컴포넌트 */
+        .mock-card {
+            position: relative; z-index: 2;
+            background: var(--card-bg);
+            backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop);
+            border: 1px solid var(--card-border);
+            box-shadow: var(--card-shadow);
+            border-radius: 24px; padding: 40px;
+            width: 100%; max-width: 500px;
+            color: var(--text-dark);
+            transition: all 0.5s ease;
+        }
+
+        .mock-header { text-align: center; margin-bottom: 30px; }
+        .mock-header h1 { font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .mock-header p { font-size: 14px; color: var(--text-gray); }
+
+        .mock-widget {
+            background: var(--widget-bg); border: 1px solid var(--widget-border);
+            border-radius: 14px; padding: 20px; text-align: center;
+            margin-bottom: 20px; transition: all 0.3s;
+        }
+        .mock-widget:hover { background: var(--widget-hover); transform: translateY(-3px); }
+
+        .mock-btn {
+            width: 100%; padding: 15px; border: none; border-radius: 12px;
+            background: var(--primary-color); color: white;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.3s;
+        }
+        .mock-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .mock-actions { display: flex; flex-direction: column; gap: 10px; }
+        .mock-btn.random-theme-btn { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); }
+        .mock-btn.random-theme-btn:hover { background: var(--widget-hover); color: var(--primary-color); }
+
+        /* ==========================================
+           애니메이션 효과 CSS
+           ========================================== */
+        
+        /* 1) stars (별빛과 유성) */
+        .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
+        .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
+        .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
+        .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
+        @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
+        @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
+
+        /* 2) bubbles (물방울) */
+        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
+
+        /* 3) blobs (번지는 덩어리) */
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
+        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
+        .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
+        .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* 4) orbs (빛구슬과 사이버그리드) */
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
+        .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
+        .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
+        .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
+        @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
+
+        /* 5) waves (겹치는 회전 파도) */
+        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+        .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
+        .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
+        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* 6) geometry (떠다니는 유리 도형) */
+        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+
+        /* 7) rings (진동하는 유리 링) */
+        .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
+        @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
+
+        /* 8) polygons (다각형 모형) */
+        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+        /* 9) lines (교차하는 발광 선) */
+        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+        .line-pos { animation: slideLinePos infinite linear; }
+        .line-neg { animation: slideLineNeg infinite linear; }
+        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+        @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+
+        /* 10) starPop (터지는 십자 별) */
+        .spark-pop-star { position: absolute; color: var(--primary-color); font-weight: 900; line-height: 1; opacity: 0; pointer-events: none; transform-origin: center; text-shadow: 0 0 1px rgba(255, 255, 255, 1), 0 0 6px rgba(255, 255, 255, 0.9), 0 0 14px var(--effect-color1), 0 0 26px var(--primary-color); animation: sparkPopStar ease-in-out infinite; }
+        @keyframes sparkPopStar { 0%, 100% { opacity: 0; transform: scale(0.25) rotate(0deg); filter: brightness(1) blur(0.5px); } 12% { opacity: 0.95; transform: scale(1.05) rotate(12deg); filter: brightness(1.25) blur(0); } 24% { opacity: 0.35; transform: scale(0.72) rotate(-8deg); } 42% { opacity: 1; transform: scale(1.25) rotate(18deg); filter: brightness(1.45); } 68% { opacity: 0.18; transform: scale(0.55) rotate(-12deg); } }
+
+        /* 11) starSprinkle (반짝이는 미세 입자 별) */
+        .sprinkle-star { position: absolute; width: 7px; height: 7px; opacity: 0; pointer-events: none; transform-origin: center; animation: sprinkleStarBlink ease-in-out infinite; }
+        .sprinkle-star::before, .sprinkle-star::after { content: ''; position: absolute; left: 50%; top: 50%; background: var(--primary-color); border-radius: 999px; transform: translate(-50%, -50%); box-shadow: 0 0 4px rgba(255, 255, 255, 0.95), 0 0 10px var(--effect-color1), 0 0 18px var(--primary-color); }
+        .sprinkle-star::before { width: 100%; height: 2px; } .sprinkle-star::after { width: 2px; height: 100%; }
+        @keyframes sprinkleStarBlink { 0%, 100% { opacity: 0; transform: scale(0.35) rotate(0deg); } 18% { opacity: 0.9; transform: scale(1) rotate(45deg); } 45% { opacity: 0.3; transform: scale(0.65) rotate(80deg); } 70% { opacity: 1; transform: scale(1.2) rotate(135deg); } }
+
+        /* 12) glitterField (아래서 위로 뜨는 둥근 점) */
+        .glitter-field-dot { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--primary-color); opacity: 0; pointer-events: none; box-shadow: 0 0 4px rgba(255, 255, 255, 0.95), 0 0 9px var(--effect-color1), 0 0 18px var(--primary-color); animation: glitterFieldFloat linear infinite; }
+        @keyframes glitterFieldFloat { 0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.45); } 14% { opacity: 0.9; } 48% { opacity: 0.42; transform: translate3d(16px, -28vh, 0) scale(1.05); } 76% { opacity: 0.95; } 100% { opacity: 0; transform: translate3d(-10px, -62vh, 0) scale(0.45); } }
+
+        /* 13) cometTwinkle (대각선으로 떨어지는 꼬리별) */
+        .clean-comet { position: absolute; width: 150px; height: 3px; border-radius: 999px; opacity: 0; pointer-events: none; background: linear-gradient(90deg, rgba(255, 255, 255, 1), var(--primary-color), var(--effect-color1), transparent); box-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 18px var(--primary-color); transform: rotate(-26deg); animation: cleanCometMove linear infinite; }
+        .clean-comet::before { content: ''; position: absolute; left: -5px; top: -5px; width: 13px; height: 13px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 8px rgba(255, 255, 255, 1), 0 0 20px var(--primary-color), 0 0 32px var(--effect-color1); }
+        @keyframes cleanCometMove { 0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(-26deg); } 7% { opacity: 1; } 23% { opacity: 0; transform: translate3d(-42vw, 24vh, 0) rotate(-26deg); } 100% { opacity: 0; transform: translate3d(-42vw, 24vh, 0) rotate(-26deg); } }
+
+        /* 14) neonGeometryFlow (네온 선과 입체 도형) */
+        .neon-flow-line { position: absolute; height: 2px; width: 34vw; min-width: 260px; opacity: 0; pointer-events: none; border-radius: 999px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), var(--effect-color1), transparent); box-shadow: 0 0 10px rgba(255, 255, 255, 0.75), 0 0 22px var(--effect-color1); animation: neonFlowLineMove linear infinite; }
+        .neon-flow-line.reverse { animation-name: neonFlowLineMoveReverse; }
+        @keyframes neonFlowLineMove { 0% { opacity: 0; transform: translate3d(30vw, -10vh, 0) rotate(-18deg) scaleX(0.45); } 12% { opacity: 0.8; } 45% { opacity: 0.55; transform: translate3d(-18vw, 18vh, 0) rotate(-18deg) scaleX(1); } 72% { opacity: 0.15; } 100% { opacity: 0; transform: translate3d(-55vw, 35vh, 0) rotate(-18deg) scaleX(0.55); } }
+        @keyframes neonFlowLineMoveReverse { 0% { opacity: 0; transform: translate3d(-30vw, -8vh, 0) rotate(18deg) scaleX(0.45); } 12% { opacity: 0.75; } 45% { opacity: 0.5; transform: translate3d(18vw, 18vh, 0) rotate(18deg) scaleX(1); } 72% { opacity: 0.15; } 100% { opacity: 0; transform: translate3d(55vw, 35vh, 0) rotate(18deg) scaleX(0.55); } }
+        .geo-flow-shape { position: absolute; opacity: 0; pointer-events: none; background: linear-gradient(135deg, rgba(255,255,255,0.82), var(--effect-color1), rgba(255,255,255,0.28)); border: 1px solid rgba(255,255,255,0.65); box-shadow: 0 0 10px rgba(255,255,255,0.45), 0 0 24px var(--effect-color1); animation: geoFlowShapeFloat ease-in-out infinite; }
+        .geo-flow-shape.diamond { transform: rotate(45deg); }
+        .geo-flow-shape.triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        .geo-flow-shape.slash { height: 8px !important; border-radius: 999px; transform: rotate(-28deg); }
+        @keyframes geoFlowShapeFloat { 0%, 100% { opacity: 0; filter: blur(1px); } 18% { opacity: 0.75; filter: blur(0); } 48% { opacity: 0.42; transform: translate3d(18px, -18px, 0) rotate(18deg); } 70% { opacity: 0.85; } }
+
+        /* 나머지 20개 테마 효과 CSS (기존 유지) */
+        .snow-flake { position: absolute; border-radius: 50%; background: #fff; opacity: 0.8; box-shadow: 0 0 8px #fff; animation: snowFall linear infinite; }
+        @keyframes snowFall { 0% { transform: translateY(-10vh) translateX(0); } 100% { transform: translateY(110vh) translateX(30px); } }
+        .firefly { position: absolute; border-radius: 50%; box-shadow: 0 0 10px currentColor, 0 0 20px currentColor; animation: fireflyMove ease-in-out infinite alternate; }
+        @keyframes fireflyMove { 0% { transform: translate(0, 0) scale(0.8); opacity: 0.3; } 100% { transform: translate(40px, -60px) scale(1.5); opacity: 1; } }
+        .aurora-band { position: absolute; width: 150vw; height: 50vh; filter: blur(80px); opacity: 0.5; border-radius: 50%; animation: auroraSway 15s infinite alternate ease-in-out; }
+        @keyframes auroraSway { 0% { transform: translateX(-20vw) translateY(-10vh) rotate(-5deg); } 100% { transform: translateX(10vw) translateY(20vh) rotate(5deg); } }
+        .confetti-piece { position: absolute; animation: spinFall linear infinite; }
+        @keyframes spinFall { 0% { transform: translateY(-10vh) rotate(0deg) rotateX(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg) rotateX(360deg); opacity: 0; } }
+        .lantern { position: absolute; border-radius: 10px 10px 5px 5px; box-shadow: 0 0 20px currentColor; animation: floatUp linear infinite; }
+        @keyframes floatUp { 0% { transform: translateY(110vh) translateX(0) scale(1); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-10vh) translateX(50px) scale(0.8); opacity: 0; } }
+        .ripple-ring { position: absolute; border-radius: 50%; border: 2px solid; animation: rippleExpand linear infinite; }
+        @keyframes rippleExpand { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+        .meteor { position: absolute; width: 2px; height: 60px; background: linear-gradient(to bottom, transparent, #fff); animation: meteorDrop linear infinite; }
+        @keyframes meteorDrop { 0% { transform: translateY(-20vh) translateX(20vw) rotate(45deg); opacity: 1; } 100% { transform: translateY(120vh) translateX(-40vw) rotate(45deg); opacity: 0; } }
+        .crystal-prism { position: absolute; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); opacity: 0.5; filter: drop-shadow(0 0 10px currentColor); animation: crystalSpin linear infinite; }
+        @keyframes crystalSpin { 0% { transform: translateY(110vh) rotateY(0deg) rotateZ(0deg); } 100% { transform: translateY(-20vh) rotateY(360deg) rotateZ(180deg); } }
+        .cosmic-dust { position: absolute; border-radius: 50%; filter: blur(4px); animation: pulseDust ease-in-out infinite alternate; }
+        @keyframes pulseDust { 0% { transform: scale(0.5); opacity: 0.1; } 100% { transform: scale(2); opacity: 0.7; } }
+        .floating-heart { position: absolute; font-size: 24px; animation: heartFloat ease-in infinite; }
+        @keyframes heartFloat { 0% { transform: translateY(100vh) scale(0.5); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-10vh) scale(1.5); opacity: 0; } }
+        .cyber-line { position: absolute; height: 1px; width: 100vw; left: 0; box-shadow: 0 0 10px currentColor; animation: gridMove linear infinite; }
+        @keyframes gridMove { 0% { transform: translateY(0vh) scaleY(1); opacity: 0; } 50% { opacity: 0.5; } 100% { transform: translateY(100vh) scaleY(2); opacity: 0; } }
+        .matrix-drop { position: absolute; width: 2px; height: 80px; background: linear-gradient(to bottom, transparent, currentColor, #fff); animation: matrixFall linear infinite; }
+        @keyframes matrixFall { 0% { transform: translateY(-100px); opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+        .autumn-leaf { position: absolute; border-radius: 0 50% 0 50%; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); animation: leafFall linear infinite; }
+        @keyframes leafFall { 0% { transform: translateY(-10vh) translateX(0) rotate(0deg) rotateX(0deg); } 100% { transform: translateY(110vh) translateX(100px) rotate(360deg) rotateX(360deg); } }
+        .circuit-path { position: absolute; border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor; animation: drawCircuit linear infinite; }
+        @keyframes drawCircuit { 0% { width: 0; height: 0; opacity: 1; } 50% { width: 80px; height: 0; opacity: 1;} 100% { width: 80px; height: 80px; opacity: 0; } }
+        .electric-spark { position: absolute; background: #fff; box-shadow: 0 0 15px currentColor, 0 0 30px #fff; animation: sparkFlash 0.5s infinite steps(2); }
+        @keyframes sparkFlash { 0% { opacity: 0; transform: scale(1) rotate(0deg); } 50% { opacity: 1; transform: scale(2) rotate(25deg); } 100% { opacity: 0; transform: scale(1) rotate(-25deg); } }
+        .diamond-pulse { position: absolute; transform: rotate(45deg); border: 2px solid currentColor; animation: diamondBeat ease-in-out infinite alternate; }
+        @keyframes diamondBeat { 0% { transform: rotate(45deg) scale(0.5); opacity: 0.1; } 100% { transform: rotate(45deg) scale(1.5); opacity: 0.8; box-shadow: inset 0 0 15px currentColor; } }
+        .light-pillar { position: absolute; height: 100vh; top: 0; background: linear-gradient(to left, transparent, currentColor, transparent); animation: pillarFade linear infinite; }
+        @keyframes pillarFade { 0% { opacity: 0; transform: translateX(-5vw); } 50% { opacity: 0.2; } 100% { opacity: 0; transform: translateX(5vw); } }
+        .magic-rune { position: absolute; font-family: monospace; font-size: 30px; font-weight: bold; animation: runeGlow linear infinite; }
+        @keyframes runeGlow { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 50% { opacity: 0.8; text-shadow: 0 0 15px currentColor; transform: translateY(-30px) scale(1.2); } 100% { opacity: 0; transform: translateY(-60px) scale(0.8); } }
+        .plasma-orb { position: absolute; border-radius: 50%; filter: blur(8px); animation: plasmaBounce ease-in-out infinite alternate; }
+        @keyframes plasmaBounce { 0% { transform: translateY(0) scale(0.8); opacity: 0.4; } 100% { transform: translateY(-80px) scale(1.3); opacity: 0.9; } }
+        .stardust-trail { position: absolute; border-radius: 50%; box-shadow: 0 0 12px currentColor; animation: trailWander linear infinite; }
+        @keyframes trailWander { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(120px, 120px); opacity: 0; } }
+
+        .seasonal-petal, .festival-ribbon, .pepero-stick, .christmas-snowflake, .christmas-ornament, .summer-sparkle, .harvest-moon { position: absolute; pointer-events: none; }
+        .seasonal-petal { top: -12vh; border-radius: 72% 28% 68% 32%; background: var(--effect-color1); box-shadow: 0 0 10px rgba(255,255,255,0.55), 0 0 18px currentColor; animation: seasonalDrift linear infinite; }
+        .seasonal-petal.cherry-petal { background: radial-gradient(circle at 35% 30%, #ffffff, var(--effect-color1) 45%, var(--effect-color2)); color: var(--effect-color1); }
+        .seasonal-petal.spring-leaf { border-radius: 0 72% 0 72%; background: linear-gradient(135deg, var(--effect-color1), var(--effect-color2)); color: var(--effect-color1); }
+        .seasonal-petal.rose-petal { background: radial-gradient(circle at 30% 25%, var(--effect-color3), var(--effect-color2)); color: var(--effect-color2); }
+        .festival-ribbon { top: -12vh; border-radius: 999px 999px 4px 4px; background: linear-gradient(180deg, var(--effect-color1), var(--effect-color2)); box-shadow: 0 0 14px rgba(255,255,255,0.55); animation: seasonalDrift linear infinite; }
+        .pepero-stick { top: -14vh; border-radius: 999px; background: linear-gradient(180deg, #5b2a16 0 46%, #f5c16c 46% 100%); box-shadow: 0 0 10px rgba(124,45,18,0.32); animation: seasonalDrift linear infinite; }
+        .christmas-snowflake { top: -12vh; color: #ffffff; line-height: 1; font-weight: 900; text-shadow: 0 0 10px #fff, 0 0 22px var(--effect-color1); animation: seasonalDrift linear infinite; }
+        .christmas-ornament { top: -12vh; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #ffffff, var(--effect-color2) 36%, var(--effect-color3)); box-shadow: 0 0 16px rgba(255,255,255,0.7), 0 0 24px var(--effect-color2); animation: seasonalDrift linear infinite; }
+        .christmas-ornament::before { content: ''; position: absolute; left: 35%; top: -18%; width: 30%; height: 22%; border-radius: 3px; background: #facc15; }
+        .summer-sparkle { border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.95), var(--effect-color2) 35%, transparent 68%); box-shadow: 0 0 16px var(--effect-color2); animation: summerFloat ease-in-out infinite; }
+        .harvest-moon { right: 8%; top: 9%; width: min(26vw, 240px); height: min(26vw, 240px); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff8d6, #fde68a 58%, #f59e0b); box-shadow: 0 0 50px rgba(245,158,11,0.5); animation: moonPulse 5s ease-in-out infinite alternate; }
+        @keyframes seasonalDrift { 0% { transform: translate3d(0, -14vh, 0) rotate(0deg); opacity: 0; } 10% { opacity: var(--season-opacity, 0.9); } 100% { transform: translate3d(var(--drift, 70px), 118vh, 0) rotate(var(--spin, 720deg)); opacity: 0; } }
+        @keyframes summerFloat { 0%, 100% { transform: translate3d(0, 0, 0) scale(0.75); opacity: 0.25; } 50% { transform: translate3d(var(--drift, 35px), -34px, 0) scale(1.15); opacity: 0.95; } }
+        @keyframes moonPulse { 0% { transform: scale(0.96); filter: brightness(1); } 100% { transform: scale(1.03); filter: brightness(1.12); } }
+
+        /* ==========================================
+           3009번 테마: 크리스마스 시즌2 전용 애니메이션
+           ========================================== */
+        .santa-fly { 
+            position: absolute; font-size: 60px; 
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.6)); 
+            animation: flySanta 14s linear infinite; 
+            pointer-events: none; z-index: 1; 
+        }
+        @keyframes flySanta {
+            0% { transform: translate(-15vw, 15vh) scale(0.6) rotate(15deg); opacity: 0; }
+            15% { opacity: 1; }
+            50% { transform: translate(45vw, 5vh) scale(1.2) rotate(-5deg); }
+            85% { opacity: 1; }
+            100% { transform: translate(115vw, 25vh) scale(0.6) rotate(-20deg); opacity: 0; }
+        }
+        
+        .xmas-magic-icon { 
+            position: absolute; 
+            filter: drop-shadow(0 0 8px currentColor); 
+            animation: xmasFall linear infinite; 
+            pointer-events: none; z-index: 0; 
+        }
+        @keyframes xmasFall {
+            0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: var(--icon-opacity, 0.8); }
+            90% { opacity: var(--icon-opacity, 0.8); }
+            100% { transform: translateY(110vh) translateX(50px) rotate(360deg); opacity: 0; }
+        }
+        .theme-manager-title-row, .theme-stats, .preview-toolbar, .theme-modal-head, .theme-modal-foot { display:flex; align-items:center; }
+        .theme-manager-title-row { justify-content:space-between; gap:12px; }
+        .theme-manager-title-row h2 { margin:0; }
+        .theme-count-badge { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:25px; padding:0 9px; border-radius:999px; background:#e0e7ff; color:#4338ca; font-size:11px; font-weight:900; }
+        .theme-top-action { border:0; border-radius:10px; padding:9px 12px; background:#0f172a; color:#fff; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .theme-top-action:hover { background:var(--primary-color); }
+        .theme-stats { gap:8px; padding:12px 16px; border-bottom:1px solid #e2e8f0; background:#fff; }
+        .theme-stat { flex:1; padding:9px 10px; border-radius:12px; background:#f8fafc; border:1px solid #e2e8f0; text-align:center; }
+        .theme-stat strong { display:block; color:#0f172a; font-size:15px; }
+        .theme-stat span { color:#64748b; font-size:10px; font-weight:700; }
+        .theme-controls { padding:14px 14px 10px; border-bottom:1px solid #e2e8f0; background:#fff; }
+        .theme-search { position:relative; }
+        .theme-search > i { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#94a3b8; }
+        .theme-search input { width:100%; height:42px; border:1px solid #cbd5e1; border-radius:12px; padding:0 38px; color:#0f172a; background:#fff; outline:none; }
+        .theme-search input:focus { border-color:var(--primary-color); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary-color) 13%, transparent); }
+        .theme-search-clear { position:absolute; right:8px; top:7px; width:28px; height:28px; border:0; border-radius:8px; color:#64748b; background:transparent; cursor:pointer; }
+        .theme-category-menu { display:flex; gap:6px; margin-top:10px; overflow-x:auto; padding-bottom:3px; scrollbar-width:thin; }
+        .theme-category-btn { border:1px solid #dbe3ee; border-radius:999px; padding:7px 10px; background:#fff; color:#475569; font-size:11px; font-weight:800; cursor:pointer; white-space:nowrap; }
+        .theme-category-btn.active { border-color:var(--primary-color); background:var(--primary-color); color:#fff; }
+        .theme-filter-row { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:9px; }
+        .theme-filter-row select { min-width:0; height:36px; padding:0 10px; border:1px solid #dbe3ee; border-radius:10px; background:#f8fafc; color:#334155; font-size:11px; font-weight:700; }
+        .restore-hidden-btn { height:36px; padding:0 10px; border:1px solid #dbe3ee; border-radius:10px; background:#fff; color:#475569; cursor:pointer; font-size:11px; font-weight:800; }
+        .theme-item { min-height:0; padding:8px; }
+        .theme-grid-card > .theme-thumbnail {
+            position:relative; display:block; flex:0 0 104px;
+            width:100%; height:104px; min-height:104px; max-height:104px;
+            overflow:hidden; border-radius:10px;
+            background:var(--thumb-body-bg, #e2e8f0); background-size:cover; background-position:center;
+            border:1px solid rgba(255,255,255,.72); isolation:isolate;
+        }
+        .theme-thumbnail::before {
+            content:''; position:absolute; inset:0; z-index:-1;
+            background:linear-gradient(135deg, rgba(255,255,255,.2), transparent 58%, rgba(15,23,42,.08));
+        }
+        .theme-thumbnail-orb {
+            position:absolute; z-index:1; width:62px; height:62px; right:-16px; top:-18px; border-radius:50%;
+            background:var(--thumb-primary, #4f46e5); opacity:.3; filter:blur(2px);
+        }
+        .theme-thumbnail-effect {
+            position:absolute; inset:0; z-index:1; pointer-events:none;
+            background-image:url("{{ url_for('static', filename='images/theme-effects/effect-sprite.webp') }}?v=20260720-1");
+            background-repeat:no-repeat; background-size:700% 700%;
+            background-position:var(--effect-thumb-x) var(--effect-thumb-y);
+            opacity:.78;
+        }
+        .theme-thumbnail-card {
+            position:absolute; z-index:2; left:50%; top:52%; width:68%; height:62%; transform:translate(-50%,-50%);
+            display:grid; align-content:center; gap:6px; padding:10px; border-radius:10px;
+            background:var(--thumb-card-bg, rgba(255,255,255,.72));
+            border:1px solid var(--thumb-card-border, rgba(255,255,255,.85));
+            box-shadow:0 7px 18px rgba(15,23,42,.12);
+        }
+        .theme-thumbnail-line { display:block; height:5px; border-radius:999px; background:var(--thumb-text, #334155); opacity:.24; }
+        .theme-thumbnail-line.short { width:58%; }
+        .theme-thumbnail-button { display:block; width:42%; height:9px; margin-top:1px; border-radius:999px; background:var(--thumb-primary, #4f46e5); }
+        .theme-thumbnail-style {
+            position:absolute; z-index:3; left:7px; top:7px; max-width:calc(100% - 38px); overflow:hidden; text-overflow:ellipsis;
+            padding:4px 6px; border-radius:999px; background:rgba(15,23,42,.62); color:#fff;
+            font-size:9px; line-height:1; font-weight:900; white-space:nowrap; backdrop-filter:blur(4px);
+        }
+        .theme-thumbnail-check {
+            position:absolute; z-index:3; right:7px; top:7px; width:22px; height:22px; border-radius:50%;
+            display:grid; place-items:center; background:var(--primary-color); color:#fff; font-size:10px;
+            box-shadow:0 4px 10px rgba(15,23,42,.2); opacity:0; transform:scale(.75); transition:.2s;
+        }
+        .theme-item.active .theme-thumbnail-check { opacity:1; transform:scale(1); }
+        .theme-grid-card > .theme-item-footer {
+            min-width:0; width:100%; height:30px; min-height:30px; flex:0 0 30px;
+            display:flex; align-items:center; gap:5px; overflow:hidden;
+        }
+        .theme-item-main { min-width:0; flex:1; display:flex; align-items:center; gap:7px; overflow:hidden; }
+        .theme-item-copy { min-width:0; flex:1; }
+        .theme-item-copy .theme-name { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; font-weight:900; }
+        .theme-item-copy small { display:block; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:3px; color:#94a3b8; font-size:10px; font-weight:700; }
+        .theme-item.active .theme-item-copy small { color:#64748b; }
+        .theme-item-actions { display:flex; gap:3px; flex:0 0 auto; }
+        .theme-item-btn { width:27px; height:27px; border:0; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:#64748b; background:rgba(148,163,184,.12); cursor:pointer; }
+        .theme-item-btn:hover { color:var(--primary-color); background:#fff; }
+        .theme-item-btn.favorite { color:#f59e0b; }
+        .theme-item.active .theme-item-btn { color:#475569; background:#f1f5f9; }
+        .theme-item.active .theme-item-btn.favorite { color:#f59e0b; }
+        .theme-list-empty { grid-column:1 / -1; padding:38px 16px; text-align:center; color:#64748b; }
+        .theme-list-empty i { display:block; margin-bottom:10px; font-size:24px; color:#94a3b8; }
+        .theme-load-more { grid-column:1 / -1; width:100%; margin:2px 0 0; height:40px; border:1px dashed #cbd5e1; border-radius:12px; background:#f8fafc; color:#475569; font-weight:800; cursor:pointer; }
+        .preview-area { align-items:stretch; padding:28px; }
+        .preview-stage { position:relative; z-index:2; width:100%; display:flex; align-items:center; justify-content:center; }
+        .preview-toolbar { position:absolute; z-index:4; top:18px; left:18px; right:18px; justify-content:space-between; gap:12px; }
+        .preview-toolbar-group { display:flex; gap:7px; flex-wrap:wrap; }
+        .preview-tool-btn { min-height:38px; padding:0 12px; border:1px solid rgba(255,255,255,.72); border-radius:11px; background:rgba(255,255,255,.88); color:#334155; box-shadow:0 8px 24px rgba(15,23,42,.1); backdrop-filter:blur(12px); cursor:pointer; font-weight:800; }
+        .preview-tool-btn:hover { color:var(--primary-color); transform:translateY(-1px); }
+        .preview-tool-btn.danger:hover { color:#dc2626; }
+        .preview-tool-btn.is-favorite { color:#d97706; }
+        .mock-card { align-self:center; }
+        .theme-toast-region { position:fixed; top:96px; right:24px; z-index:30000; display:grid; gap:9px; pointer-events:none; }
+        .theme-toast { min-width:260px; max-width:390px; padding:13px 15px; border-radius:13px; background:#0f172a; color:#fff; box-shadow:0 18px 45px rgba(15,23,42,.25); font-size:13px; font-weight:700; animation:themeToastIn .22s ease; }
+        .theme-toast.success { background:#047857; } .theme-toast.error { background:#b91c1c; } .theme-toast.warning { background:#b45309; }
+        @keyframes themeToastIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        .theme-modal-backdrop { position:fixed; inset:0; z-index:25000; display:none; align-items:center; justify-content:center; padding:20px; background:rgba(15,23,42,.52); }
+        .theme-modal-backdrop.open { display:flex; }
+        .theme-modal { width:min(680px, 100%); max-height:min(820px, 92vh); overflow:hidden; border-radius:22px; background:#fff; color:#0f172a; box-shadow:0 30px 90px rgba(15,23,42,.3); }
+        .theme-modal-head { justify-content:space-between; padding:20px 22px; border-bottom:1px solid #e2e8f0; }
+        .theme-modal-head h2 { margin:0; font-size:20px; }
+        .theme-modal-close { width:36px; height:36px; border:0; border-radius:10px; color:#64748b; background:#f1f5f9; cursor:pointer; }
+        .theme-modal-body { padding:20px 22px; overflow-y:auto; max-height:calc(92vh - 150px); }
+        .theme-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+        .theme-field { display:grid; gap:7px; }
+        .theme-field.full { grid-column:1 / -1; }
+        .theme-field label { font-size:12px; color:#475569; font-weight:900; }
+        .theme-field input, .theme-field select { width:100%; height:43px; border:1px solid #cbd5e1; border-radius:11px; padding:0 12px; background:#fff; color:#0f172a; }
+        .theme-field input[type=color] { padding:4px; cursor:pointer; }
+        .theme-creator-preview { grid-column:1 / -1; height:120px; border-radius:16px; padding:18px; display:flex; align-items:flex-end; color:var(--creator-text, #0f172a); background:var(--creator-bg); box-shadow:inset 0 0 0 1px rgba(255,255,255,.55); }
+        .theme-creator-preview strong { padding:8px 12px; border-radius:10px; background:var(--creator-card, rgba(255,255,255,.78)); border:1px solid rgba(255,255,255,.8); }
+        .theme-modal-foot { justify-content:flex-end; gap:9px; padding:15px 22px; border-top:1px solid #e2e8f0; background:#f8fafc; }
+        .theme-modal-btn { min-height:41px; padding:0 17px; border:1px solid #cbd5e1; border-radius:11px; background:#fff; color:#334155; cursor:pointer; font-weight:900; }
+        .theme-modal-btn.primary { border-color:var(--primary-color); background:var(--primary-color); color:#fff; }
+        @media (max-width:1100px) { .theme-manager-shell { grid-template-columns:360px minmax(0, 1fr); } .preview-area { padding:20px; } }
+        @media (max-width:820px) {
+            .content-container { padding:0 12px 18px !important; }
+            .theme-manager-shell { display:flex; flex-direction:column; height:auto; min-height:0; overflow:visible; }
+            .theme-manager-shell .sidebar { height:620px; border-right:0; border-bottom:1px solid #e2e8f0; }
+            .preview-area { min-height:620px; }
+            .theme-form-grid { grid-template-columns:1fr; }
+            .theme-field.full, .theme-creator-preview { grid-column:1; }
+        }
+        @media (max-width:440px) {
+            .theme-list-container { grid-template-columns:1fr; grid-auto-rows:184px; }
+            .theme-list-container > .theme-grid-card { height:184px; min-height:184px; max-height:184px; grid-template-rows:128px minmax(0, 1fr); }
+            .theme-grid-card > .theme-thumbnail { flex-basis:128px; height:128px; min-height:128px; max-height:128px; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+    <section class="theme-manager-shell" aria-label="인트라넷 테마 관리">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="theme-manager-title-row">
+                    <div>
+                        <h2><i class="fa-solid fa-swatchbook"></i> 테마 관리</h2>
+                        <p>분류별 탐색·저장·제작을 한곳에서 관리합니다.</p>
+                    </div>
+                    <button class="theme-top-action" type="button" id="createThemeBtn"><i class="fa-solid fa-plus"></i> 새 테마</button>
+                </div>
+            </div>
+            <div class="active-theme-box">
+                <div>
+                    <div class="active-theme-label">현재 인트라넷 적용 테마</div>
+                    <div class="active-theme-name" id="activeThemeName">
+                        {% if global_theme and global_theme.name %}
+                            {% if global_theme.index is defined and global_theme.index is not none %}{{ global_theme.index }}. {% endif %}{{ global_theme.name }}
+                        {% else %}적용된 테마 없음{% endif %}
+                    </div>
+                </div>
+                <button class="clear-theme-btn" type="button" id="clearThemeBtn">적용 해제</button>
+            </div>
+            <div class="theme-stats">
+                <div class="theme-stat"><strong id="totalThemeCount">0</strong><span>전체 테마</span></div>
+                <div class="theme-stat"><strong id="favoriteThemeCount">0</strong><span>즐겨찾기</span></div>
+                <div class="theme-stat"><strong id="customThemeCount">0</strong><span>직접 제작</span></div>
+                <div class="theme-stat"><strong id="hiddenThemeCount">0</strong><span>숨김</span></div>
+            </div>
+            <div class="theme-controls">
+                <div class="theme-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input id="themeSearchInput" type="search" placeholder="번호·이름·효과 검색" autocomplete="off">
+                    <button class="theme-search-clear" id="clearThemeSearch" type="button" title="검색어 지우기"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <nav class="theme-category-menu" id="themeCategoryMenu" aria-label="테마 분류">
+                    <button class="theme-category-btn active" type="button" data-category="all">전체</button>
+                    <button class="theme-category-btn" type="button" data-category="favorite">즐겨찾기</button>
+                    <button class="theme-category-btn" type="button" data-category="gallery">기본 갤러리</button>
+                    <button class="theme-category-btn" type="button" data-category="accent">포인트 컬러</button>
+                    <button class="theme-category-btn" type="button" data-category="deep-color">딥 컬러</button>
+                    <button class="theme-category-btn" type="button" data-category="seasonal">계절·기념일</button>
+                    <button class="theme-category-btn" type="button" data-category="custom">직접 제작</button>
+                    <button class="theme-category-btn" type="button" data-category="hidden">숨김</button>
+                </nav>
+                <div class="theme-filter-row">
+                    <select id="themeStyleFilter" aria-label="화면 스타일 필터">
+                        <option value="all">모든 화면 스타일</option>
+                        <option value="유리">유리</option><option value="솔리드">솔리드</option>
+                        <option value="네온">네온</option><option value="뉴모피즘">뉴모피즘</option><option value="클레이">클레이</option>
+                    </select>
+                    <button class="restore-hidden-btn" type="button" id="restoreHiddenBtn"><i class="fa-solid fa-rotate-left"></i> 숨김 전체 복원</button>
+                </div>
+            </div>
+            <div class="theme-list-container" id="theme-list"></div>
+        </aside>
+
+        <div class="preview-area">
+            <div id="theme-preview-effect-container"></div>
+            <div class="preview-toolbar">
+                <div class="preview-toolbar-group">
+                    <button class="preview-tool-btn" id="previewFavoriteBtn" type="button"><i class="fa-regular fa-star"></i> 즐겨찾기</button>
+                    <button class="preview-tool-btn" id="copyThemeBtn" type="button"><i class="fa-regular fa-copy"></i> 복사해서 만들기</button>
+                    <button class="preview-tool-btn" id="editThemeBtn" type="button" hidden><i class="fa-regular fa-pen-to-square"></i> 수정</button>
+                </div>
+                <button class="preview-tool-btn danger" id="removeThemeBtn" type="button"><i class="fa-regular fa-trash-can"></i> 목록에서 삭제</button>
+            </div>
+            <div class="preview-stage">
+                <div class="mock-card">
+                    <div class="mock-header">
+                        <h1 id="preview-title">테마를 선택해주세요</h1>
+                        <p id="preview-desc">좌측 목록에서 테마를 선택하면 즉시 미리 볼 수 있습니다.</p>
+                    </div>
+                    <div class="mock-widget">
+                        <i class="fa-solid fa-palette" style="font-size:24px;color:var(--primary-color);margin-bottom:10px;"></i>
+                        <h3 style="font-size:16px;margin-bottom:5px;">현재 테마 효과</h3>
+                        <p style="font-size:13px;color:var(--text-gray);" id="preview-effect">대기중</p>
+                    </div>
+                    <div class="mock-actions">
+                        <button class="mock-btn random-theme-btn" type="button" id="randomThemeBtn"><i class="fa-solid fa-dice"></i> 현재 분류에서 랜덤 선택</button>
+                        <button class="mock-btn" type="button" id="applyThemeBtn"><i class="fa-solid fa-check"></i> 인트라넷 전체 테마로 적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="theme-toast-region" id="themeToastRegion" aria-live="polite"></div>
+    <div class="theme-modal-backdrop" id="themeCreatorModal" role="dialog" aria-modal="true" aria-labelledby="themeCreatorTitle">
+        <form class="theme-modal" id="themeCreatorForm">
+            <div class="theme-modal-head">
+                <div><h2 id="themeCreatorTitle">새 테마 만들기</h2><p id="themeCreatorHelp" style="margin:4px 0 0;color:#64748b;font-size:12px;">색상과 효과를 조합해 사용자 테마를 만듭니다.</p></div>
+                <button class="theme-modal-close" type="button" data-close-theme-modal><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="theme-modal-body">
+                <input type="hidden" id="customThemeId">
+                <div class="theme-form-grid">
+                    <div class="theme-field full"><label for="customThemeName">테마 이름</label><input id="customThemeName" maxlength="160" required placeholder="예: 새담 오션 블루"></div>
+                    <div class="theme-field"><label for="customThemeStyle">화면 스타일</label><select id="customThemeStyle"><option value="glass">유리</option><option value="solid">솔리드</option><option value="glow">네온</option><option value="neumorphism">뉴모피즘</option><option value="clay">클레이</option></select></div>
+                    <div class="theme-field"><label for="customThemeEffect">배경 효과</label><select id="customThemeEffect"><option value="blobs">번지는 블롭</option><option value="stars">별빛</option><option value="bubbles">물방울</option><option value="aurora">오로라</option><option value="starSprinkle">반짝이는 별</option><option value="snowfall">눈송이</option><option value="autumnLeaves">단풍</option><option value="confetti">컨페티</option><option value="none">효과 없음</option></select></div>
+                    <div class="theme-field"><label for="customBgStart">배경 시작색</label><input id="customBgStart" type="color" value="#eef2ff"></div>
+                    <div class="theme-field"><label for="customBgEnd">배경 끝색</label><input id="customBgEnd" type="color" value="#dbeafe"></div>
+                    <div class="theme-field"><label for="customPrimary">포인트 색상</label><input id="customPrimary" type="color" value="#4f46e5"></div>
+                    <div class="theme-field"><label for="customText">글자 색상</label><input id="customText" type="color" value="#0f172a"></div>
+                    <div class="theme-creator-preview" id="themeCreatorPreview"><strong id="themeCreatorPreviewName">새담 사용자 테마</strong></div>
+                </div>
+            </div>
+            <div class="theme-modal-foot"><button class="theme-modal-btn" type="button" data-close-theme-modal>취소</button><button class="theme-modal-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 테마 저장</button></div>
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260710-3008"></script>
+    <script>
+        // === 엔진 설정 ===
+        // 🌟 다크모드(사이버)를 제외하고 5가지 밝은 UI 스타일만 순환 적용
+        const uiStyles = ['glass', 'solid', 'glow', 'neumorphism', 'clay'];
+        const paletteNames = ["파스텔", "비비드", "뮤트", "하이콘트라스트", "딥틴트"];
+        
+        const effectsList = [
+            'stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines', 'starPop', 'starSprinkle', 'glitterField', 'cometTwinkle', 'neonGeometryFlow',
+            'snowfall', 'fireflies', 'aurora', 'confetti', 'lanterns', 'rippleWaves', 'meteorShower', 'crystalPrisms', 'cosmicDust', 'floatingHearts', 'cyberLines', 'matrixDrops', 'autumnLeaves', 'circuitPaths', 'electricSparks', 'diamondPulse', 'lightPillars', 'magicRunes', 'plasmaOrbs', 'stardustTrails'
+        ]; 
+
+        // 한 장짜리 정지 이미지에서 효과별 칸을 선택한다. 썸네일에서는 실제 효과 애니메이션을 실행하지 않는다.
+        const themeEffectThumbnailOrder = [
+            ...effectsList,
+            'springBreeze', 'cherryBlossoms', 'summerVacation', 'chuseokMoon',
+            'seollalRibbons', 'christmasMagic', 'peperoDay', 'roseDay', 'christmasSeason2'
+        ];
+        const themeEffectThumbnailPositions = Object.fromEntries(
+            themeEffectThumbnailOrder.map((effect, index) => [effect, {
+                x: (index % 7) * (100 / 6),
+                y: Math.floor(index / 7) * (100 / 6)
+            }])
+        );
+        
+        const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
+        const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
+
+        const generatedThemes = [];
+        const savedCustomThemes = {{ custom_themes|tojson }};
+        const themePreferences = {{ theme_preferences|tojson }};
+        let currentThemeIndex = 0;
+        let currentCategory = 'all';
+        let currentStyle = 'all';
+        let currentQuery = '';
+        let visibleThemeLimit = 60;
+        const themePageSize = 60;
+
+        // 총 2000개의 테마 생성
+        for (let i = 0; i < 2000; i++) {
+            // 색상 뭉침 방지 (황금각 분산)
+            const hue = Math.floor((i * 137.5) % 360);
+            
+            const paletteStyle = i % 5;
+            const useComplementary = (i % 7 === 0); 
+            const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+            
+            let bgS, bgL, priS, priL, effS, effL;
+
+            switch (paletteStyle) {
+                case 0: bgS = 40; bgL = 95; priS = 70; priL = 50; effS = 70; effL = 75; break; // 파스텔
+                case 1: bgS = 70; bgL = 90; priS = 90; priL = 45; effS = 90; effL = 65; break; // 비비드
+                case 2: bgS = 20; bgL = 92; priS = 40; priL = 45; effS = 40; effL = 70; break; // 뮤트
+                case 3: bgS = 10; bgL = 98; priS = 85; priL = 30; effS = 85; effL = 60; break; // 하이콘트라스트
+                case 4: bgS = 50; bgL = 85; priS = 65; priL = 40; effS = 65; effL = 65; break; // 딥틴트
+            }
+
+            const effectType = effectsList[i % effectsList.length];
+            const uiStyle = uiStyles[i % uiStyles.length]; 
+            
+            // 스타일 한글명 매핑
+            let styleNameKOR = "유리";
+            if (uiStyle === 'solid') styleNameKOR = "솔리드";
+            else if (uiStyle === 'glow') styleNameKOR = "네온";
+            else if (uiStyle === 'neumorphism') styleNameKOR = "뉴모피즘";
+            else if (uiStyle === 'clay') styleNameKOR = "클레이";
+            
+            const pName = paletteNames[paletteStyle];
+            const name = `[${styleNameKOR}/${pName}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+            
+            const primary = `hsl(${pointHue}, ${priS}%, ${priL}%)`;
+            const primaryDark = `hsl(${pointHue}, ${priS}%, ${Math.max(20, priL - 10)}%)`;
+            const bg = `linear-gradient(-45deg, hsl(${hue}, ${bgS}%, ${bgL}%), hsl(${(hue + 30) % 360}, ${bgS + 10}%, ${bgL - 5}%), hsl(${(hue - 30 + 360) % 360}, ${bgS}%, ${bgL}%))`;
+            
+            let vars = {
+                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                "--text-dark": "#0f172a", "--text-gray": "#64748b", "--input-text": "#1e293b", 
+                "--effect-color1": `hsl(${hue}, ${effS}%, ${effL}%)`, 
+                "--effect-color2": `hsl(${(hue + 40) % 360}, ${effS}%, ${effL}%)`, 
+                "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, ${effS}%, ${effL}%)`
+            };
+
+            // 밝은 배경을 기반으로 한 5가지 UI 스타일에 따른 CSS 변수 세팅
+            if (uiStyle === 'glass') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
+                vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
+                vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
+            } else if (uiStyle === 'solid') {
+                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
+                vars["--widget-bg"] = "#f1f5f9"; vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+            } else if (uiStyle === 'glow') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
+                vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
+                vars["--widget-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
+            } else if (uiStyle === 'neumorphism') {
+                const neuBg = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 90%)`; 
+                const darkShadow = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 80%)`;
+                const lightShadow = `#ffffff`;
+                vars["--body-bg"] = neuBg; vars["--card-bg"] = neuBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--card-shadow"] = `12px 12px 24px ${darkShadow}, -12px -12px 24px ${lightShadow}`;
+                vars["--widget-bg"] = neuBg; vars["--widget-border"] = "transparent"; vars["--widget-hover"] = neuBg;
+            } else if (uiStyle === 'clay') {
+                const clayBg = `hsl(${hue}, ${bgS}%, 95%)`;
+                vars["--card-bg"] = clayBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--card-shadow"] = `10px 10px 20px rgba(0,0,0,0.1), inset -6px -6px 16px rgba(0,0,0,0.08), inset 6px 6px 16px rgba(255,255,255,0.9)`;
+                vars["--widget-bg"] = clayBg; vars["--widget-border"] = "transparent"; vars["--widget-hover"] = clayBg;
+            }
+            
+            generatedThemes.push({ name: name, type: effectType, vars: vars });
+        }
+
+        generatedThemes.length = 0;
+        generatedThemes.push({
+            name: '[기본] 테마없음',
+            type: 'none',
+            vars: {
+                '--body-bg': '#ffffff',
+                '--app-bg': '#ffffff',
+                '--main-bg': '#ffffff',
+                '--primary-color': '#2563eb',
+                '--primary-light': '#eff6ff',
+                '--primary-dark': '#1d4ed8',
+                '--text-dark': '#0f172a',
+                '--text-gray': '#64748b',
+                '--border-color': '#e2e8f0',
+                '--border-light': '#f1f5f9',
+                '--widget-hover': '#f8fafc',
+                '--card-bg': '#ffffff',
+                '--card-border': '#e2e8f0',
+                '--card-shadow': '0 0 0 rgba(0, 0, 0, 0)',
+                '--card-backdrop': 'none',
+                '--input-bg': '#f8fafc',
+                '--input-text': '#1e293b',
+                '--widget-bg': '#ffffff',
+                '--widget-border': '#e2e8f0',
+                '--effect-color1': 'transparent',
+                '--effect-color2': 'transparent',
+                '--effect-color3': 'transparent'
+            },
+            catalog: 'default',
+            isDefault: true
+        });
+        generatedThemes.push(
+            ...SaedamThemeCatalog.createThemeCatalog('gallery', 2000),
+            ...SaedamThemeCatalog.createAccentThemeCatalog(500),
+            ...SaedamThemeCatalog.createDeepColorThemeCatalog(500),
+            ...SaedamThemeCatalog.createSeasonalThemeCatalog()
+        );
+
+        // 3009번째 크리스마스 시즌2 테마 강제 추가
+        generatedThemes.push({
+            name: '[기념일/크리스마스 시즌2] 산타와 마법의 숲',
+            type: 'christmasSeason2',
+            vars: {
+                "--body-bg": "linear-gradient(135deg, #020617 0%, #004ea2 50%, #0f172a 100%)",
+                "--primary-color": "#e11d48", 
+                "--primary-dark": "#be123c",
+                "--text-dark": "#ffffff",
+                "--text-gray": "#cbd5e1",
+                "--card-bg": "rgba(255, 255, 255, 0.12)",
+                "--card-border": "rgba(255, 255, 255, 0.25)",
+                "--card-shadow": "0 20px 40px rgba(0, 0, 0, 0.4)",
+                "--card-backdrop": "blur(24px)",
+                "--input-bg": "rgba(255, 255, 255, 0.1)",
+                "--input-text": "#ffffff",
+                "--widget-bg": "rgba(255, 255, 255, 0.08)",
+                "--widget-hover": "rgba(255, 255, 255, 0.15)",
+                "--widget-border": "rgba(255, 255, 255, 0.2)",
+                "--effect-color1": "transparent",
+                "--effect-color2": "transparent",
+                "--effect-color3": "transparent"
+            },
+            catalog: 'seasonal',
+            isDefault: false
+        });
+        savedCustomThemes.forEach(theme => generatedThemes.push(theme));
+        generatedThemes.forEach((theme, index) => {
+            if (!theme.key) {
+                if (theme.isDefault) theme.key = 'default:0';
+                else if (theme.catalog && theme.catalogIndex) theme.key = `${theme.catalog}:${theme.catalogIndex}`;
+                else theme.key = `${theme.catalog || 'gallery'}:${theme.type || index}`;
+            }
+            theme.catalog = theme.catalog || (theme.isCustom ? 'custom' : 'gallery');
+        });
+
+        function esc(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+        }
+
+        function themeThumbnailStyle(theme) {
+            const vars = theme.vars || {};
+            return [
+                `background:${vars['--body-bg'] || '#e2e8f0'}`,
+                `--thumb-body-bg:${vars['--body-bg'] || '#e2e8f0'}`,
+                `--thumb-primary:${vars['--primary-color'] || '#4f46e5'}`,
+                `--thumb-card-bg:${vars['--card-bg'] || 'rgba(255,255,255,.72)'}`,
+                `--thumb-card-border:${vars['--card-border'] || 'rgba(255,255,255,.85)'}`,
+                `--thumb-text:${vars['--text-dark'] || '#334155'}`
+            ].join(';');
+        }
+
+        function themeEffectThumbnailStyle(theme) {
+            const position = themeEffectThumbnailPositions[theme.type];
+            return position
+                ? `--effect-thumb-x:${position.x.toFixed(4)}%;--effect-thumb-y:${position.y.toFixed(4)}%`
+                : '';
+        }
+
+        function themePreference(theme) {
+            if (!themePreferences[theme.key]) themePreferences[theme.key] = { is_favorite: false, is_hidden: false };
+            return themePreferences[theme.key];
+        }
+
+        function inferThemeStyle(theme) {
+            const named = String(theme.name || '').match(/^\[([^/\]]+)/);
+            if (named && ['유리','솔리드','네온','뉴모피즘','클레이'].includes(named[1])) return named[1];
+            const vars = theme.vars || {};
+            const shadow = String(vars['--card-shadow'] || '');
+            if (shadow.includes('inset')) return '클레이';
+            if (shadow.includes('-12px -12px')) return '뉴모피즘';
+            if (String(vars['--card-border']) === String(vars['--primary-color'])) return '네온';
+            if (String(vars['--card-backdrop'] || '').includes('blur')) return '유리';
+            return '솔리드';
+        }
+
+        function themeDisplayCode(theme, index) {
+            return theme.isCustom ? `C${theme.id}` : String(getThemeDisplayNumber(index));
+        }
+
+        function getFilteredThemes() {
+            const query = currentQuery.trim().toLowerCase();
+            return generatedThemes.map((theme, index) => ({ theme, index })).filter(({theme, index}) => {
+                const pref = themePreference(theme);
+                if (currentCategory === 'hidden') {
+                    if (!pref.is_hidden) return false;
+                } else {
+                    if (pref.is_hidden) return false;
+                    if (currentCategory === 'favorite' && !pref.is_favorite) return false;
+                    if (!['all','favorite'].includes(currentCategory)) {
+                        const catalogMatch = theme.catalog === currentCategory || (currentCategory === 'gallery' && theme.isDefault);
+                        if (!catalogMatch) return false;
+                    }
+                }
+                if (currentStyle !== 'all' && inferThemeStyle(theme) !== currentStyle) return false;
+                if (!query) return true;
+                const haystack = `${themeDisplayCode(theme,index)} ${theme.name || ''} ${theme.type || ''} ${theme.catalog || ''}`.toLowerCase();
+                return haystack.includes(query);
+            });
+        }
+
+        function updateThemeStats() {
+            const values = Object.values(themePreferences);
+            document.getElementById('totalThemeCount').textContent = generatedThemes.length - 1;
+            document.getElementById('favoriteThemeCount').textContent = values.filter(item => item.is_favorite).length;
+            document.getElementById('customThemeCount').textContent = generatedThemes.filter(theme => theme.isCustom).length;
+            document.getElementById('hiddenThemeCount').textContent = values.filter(item => item.is_hidden).length;
+        }
+
+        function renderThemeList(resetLimit = false) {
+            if (resetLimit) visibleThemeLimit = themePageSize;
+            const listContainer = document.getElementById('theme-list');
+            const filtered = getFilteredThemes();
+            const visible = filtered.slice(0, visibleThemeLimit);
+            if (!visible.length) {
+                listContainer.innerHTML = `<div class="theme-list-empty"><i class="fa-regular fa-folder-open"></i><strong>조건에 맞는 테마가 없습니다</strong><br><small>검색어나 분류를 변경해보세요.</small></div>`;
+                updateThemeStats();
+                return;
+            }
+            listContainer.innerHTML = visible.map(({theme, index}) => {
+                const pref = themePreference(theme);
+                const isActive = index === currentThemeIndex;
+                const effectThumbnailStyle = themeEffectThumbnailStyle(theme);
+                const removeAction = theme.isDefault ? '' : pref.is_hidden
+                    ? `<button class="theme-item-btn" type="button" data-action="restore" title="목록에 복원"><i class="fa-solid fa-rotate-left"></i></button>`
+                    : theme.isCustom
+                        ? `<button class="theme-item-btn" type="button" data-action="delete" title="사용자 테마 삭제"><i class="fa-regular fa-trash-can"></i></button>`
+                        : `<button class="theme-item-btn" type="button" data-action="hide" title="목록에서 숨김"><i class="fa-regular fa-trash-can"></i></button>`;
+                return `<article class="theme-item theme-grid-card ${isActive ? 'active' : ''}" id="theme-item-${index}" data-theme-index="${index}" title="${esc(theme.name)}">
+                    <div class="theme-thumbnail" style="${esc(themeThumbnailStyle(theme))}">
+                        <span class="theme-thumbnail-orb"></span>
+                        ${effectThumbnailStyle ? `<span class="theme-thumbnail-effect" style="${esc(effectThumbnailStyle)}"></span>` : ''}
+                        <div class="theme-thumbnail-card"><span class="theme-thumbnail-line short"></span><span class="theme-thumbnail-line"></span><span class="theme-thumbnail-button"></span></div>
+                        <span class="theme-thumbnail-style">${esc(inferThemeStyle(theme))}</span>
+                        <span class="theme-thumbnail-check"><i class="fa-solid fa-check"></i></span>
+                    </div>
+                    <div class="theme-item-footer">
+                        <div class="theme-item-main"><span class="theme-num">${esc(themeDisplayCode(theme,index))}.</span><div class="theme-item-copy"><div class="theme-name">${esc(theme.name)}</div><small>${esc(theme.type || 'none')}</small></div></div>
+                        <div class="theme-item-actions"><button class="theme-item-btn ${pref.is_favorite ? 'favorite' : ''}" type="button" data-action="favorite" title="즐겨찾기 ${pref.is_favorite ? '해제' : '저장'}"><i class="fa-${pref.is_favorite ? 'solid' : 'regular'} fa-star"></i></button>${removeAction}</div>
+                    </div>
+                </article>`;
+            }).join('') + (filtered.length > visible.length ? `<button class="theme-load-more" id="themeLoadMore" type="button">${filtered.length - visible.length}개 더 보기</button>` : '');
+            updateThemeStats();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderThemeList(true);
+            applyTheme(0);
+            setupThemeManagerEvents();
+            updateCreatorPreview();
+        });
+
+        // 기타 테마 효과용 유틸리티 함수
+        function buildElements(container, className, count, styleConfigurator) {
+            for(let i=0; i<count; i++) {
+                let el = document.createElement('div');
+                el.className = className;
+                styleConfigurator(el, i);
+                container.appendChild(el);
+            }
+        }
+
+        function configureSeasonalFall(el, options = {}) {
+            const size = Math.random() * (options.sizeRange || 14) + (options.sizeMin || 10);
+            el.style.left = Math.random() * 100 + '%';
+            el.style.width = (options.width ? options.width(size) : size) + 'px';
+            el.style.height = (options.height ? options.height(size) : size) + 'px';
+            el.style.animationDuration = (Math.random() * (options.durationRange || 5) + (options.durationMin || 5)) + 's';
+            el.style.animationDelay = Math.random() * (options.delayMax || 6) + 's';
+            el.style.setProperty('--drift', (Math.random() * 160 - 80) + 'px');
+            el.style.setProperty('--spin', (Math.random() * 720 + 360) + 'deg');
+            if (options.opacity) el.style.setProperty('--season-opacity', options.opacity);
+        }
+
+        function configureSummerSparkle(el) {
+            const size = Math.random() * 22 + 10;
+            el.style.left = Math.random() * 100 + '%';
+            el.style.top = Math.random() * 100 + '%';
+            el.style.width = el.style.height = size + 'px';
+            el.style.animationDuration = (Math.random() * 4 + 3) + 's';
+            el.style.animationDelay = Math.random() * 4 + 's';
+            el.style.setProperty('--drift', (Math.random() * 90 - 45) + 'px');
+        }
+
+        function renderSeasonalThemeEffect(container, effectType, buildFn) {
+            if (effectType === 'springBreeze') {
+                buildFn(container, 'seasonal-petal spring-leaf', 34, (el) => configureSeasonalFall(el, { sizeMin: 8, sizeRange: 14, durationMin: 7, durationRange: 6, opacity: 0.82 }));
+                buildFn(container, 'summer-sparkle', 10, configureSummerSparkle);
+                return true;
+            } else if (effectType === 'cherryBlossoms') {
+                buildFn(container, 'seasonal-petal cherry-petal', 52, (el) => configureSeasonalFall(el, { sizeMin: 9, sizeRange: 17, durationMin: 8, durationRange: 7, opacity: 0.92 }));
+                return true;
+            } else if (effectType === 'summerVacation') {
+                container.innerHTML = '<div class="wave" style="background: var(--effect-color1); opacity:0.2"></div><div class="wave wave-2" style="background: var(--effect-color3); opacity:0.16"></div>';
+                buildFn(container, 'summer-sparkle', 32, configureSummerSparkle);
+                return true;
+            } else if (effectType === 'chuseokMoon') {
+                buildFn(container, 'harvest-moon', 1, () => {});
+                buildFn(container, 'seasonal-petal spring-leaf', 24, (el) => configureSeasonalFall(el, { sizeMin: 10, sizeRange: 18, durationMin: 7, durationRange: 5, opacity: 0.78 }));
+                return true;
+            } else if (effectType === 'seollalRibbons') {
+                buildFn(container, 'festival-ribbon', 38, (el) => configureSeasonalFall(el, { sizeMin: 7, sizeRange: 7, height: size => size * 3.2, durationMin: 5, durationRange: 5, opacity: 0.88 }));
+                return true;
+            } else if (effectType === 'christmasMagic') {
+                buildFn(container, 'christmas-snowflake', 30, (el, i) => {
+                    el.textContent = i % 3 === 0 ? '❄' : '✦';
+                    configureSeasonalFall(el, { sizeMin: 22, sizeRange: 28, durationMin: 7, durationRange: 7, opacity: 0.95 });
+                    el.style.fontSize = el.style.width;
+                });
+                buildFn(container, 'christmas-ornament', 18, (el) => configureSeasonalFall(el, { sizeMin: 14, sizeRange: 20, durationMin: 8, durationRange: 6, opacity: 0.86 }));
+                return true;
+            } else if (effectType === 'peperoDay') {
+                buildFn(container, 'pepero-stick', 34, (el) => configureSeasonalFall(el, { sizeMin: 7, sizeRange: 5, height: size => size * 8, durationMin: 5, durationRange: 5, opacity: 0.88 }));
+                return true;
+            } else if (effectType === 'roseDay') {
+                buildFn(container, 'seasonal-petal rose-petal', 46, (el) => configureSeasonalFall(el, { sizeMin: 11, sizeRange: 18, durationMin: 7, durationRange: 6, opacity: 0.9 }));
+                return true;
+            }
+            return false;
+        }
+
+        const themeVarKeys = [
+            '--body-bg', '--app-bg', '--main-bg', '--primary-color', '--primary-light',
+            '--primary-dark', '--text-dark', '--text-gray', '--border-color', '--border-light',
+            '--input-text', '--tooltip-bg', '--tooltip-text', '--effect-color1', '--effect-color2',
+            '--effect-color3', '--card-bg', '--card-border', '--card-backdrop', '--card-shadow',
+            '--input-bg', '--widget-bg', '--widget-hover', '--widget-border', '--nav-bg'
+        ];
+
+        function resetPreviewThemeVars() {
+            const previewScope = document.querySelector('.preview-area');
+            if (!previewScope) return;
+            themeVarKeys.forEach(key => previewScope.style.removeProperty(key));
+        }
+
+        function getThemeDisplayNumber(index) {
+            return generatedThemes[index] && generatedThemes[index].isDefault ? 0 : index;
+        }
+
+        function getThemeTotalCount() {
+            return Math.max(0, generatedThemes.length - 1);
+        }
+
+        function applyTheme(index) {
+            currentThemeIndex = index;
+            document.querySelectorAll('.theme-item').forEach(el => el.classList.remove('active'));
+            const selectedItem = document.getElementById(`theme-item-${index}`);
+            if(selectedItem) {
+                selectedItem.classList.add('active');
+                selectedItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+
+            const t = generatedThemes[index];
+            resetPreviewThemeVars();
+            const previewScope = document.querySelector('.preview-area');
+            for (const [key, value] of Object.entries(t.vars)) {
+                previewScope.style.setProperty(key, value);
+            }
+
+            document.getElementById('preview-title').innerText = t.name;
+            document.getElementById('preview-desc').innerText = `${t.isCustom ? '사용자 제작' : '테마 번호 ' + getThemeDisplayNumber(index)} · ${t.catalog || 'gallery'} · ${inferThemeStyle(t)}`;
+            document.getElementById('preview-effect').innerText = t.isDefault ? '배경 효과: 없음' : `배경 효과: ${t.type.toUpperCase()}`;
+            updateSelectedThemeActions();
+
+            const container = document.getElementById('theme-preview-effect-container');
+            container.innerHTML = ''; 
+            if (t.isDefault) return;
+            
+            /* =========================================================
+               로그인창(source 6)의 핵심 14종 고퀄리티 애니메이션 이식
+               ========================================================= */
+            if (t.type === 'stars') {
+                container.innerHTML = `
+                    <div class="stars-small"></div>
+                    <div class="stars-medium"></div>
+                    <div class="stars-large"></div>
+                    <div class="shooting-star" style="top:20%; right:-10%;"></div>
+                    <div class="shooting-star" style="top:50%; right:-20%; animation-delay:4s; animation-duration:12s;"></div>
+                `;
+            } else if (t.type === 'bubbles') {
+                for(let i=0; i<30; i++) {
+                    let b = document.createElement('div');
+                    b.className = 'bubble';
+                    b.style.left = Math.random() * 100 + '%';
+                    b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px';
+                    b.style.animationDuration = (Math.random() * 8 + 4) + 's';
+                    b.style.animationDelay = (Math.random() * 5) + 's';
+                    container.appendChild(b);
+                }
+            } else if (t.type === 'blobs') {
+                container.innerHTML = `
+                    <div class="blob blob-1" style="background: var(--effect-color1)"></div>
+                    <div class="blob blob-2" style="background: var(--effect-color2)"></div>
+                    <div class="blob blob-3" style="background: var(--effect-color3)"></div>
+                `;
+            } else if (t.type === 'orbs') {
+                container.innerHTML = `
+                    <div class="glow-orb orb-1" style="background: var(--effect-color1)"></div>
+                    <div class="glow-orb orb-2" style="background: var(--effect-color2)"></div>
+                    <div class="glow-orb orb-3" style="background: var(--effect-color3)"></div>
+                    <div class="cyber-grid"></div>
+                `;
+            } else if (t.type === 'waves') {
+                container.innerHTML = `
+                    <div class="wave" style="background: var(--effect-color1); opacity:0.3"></div>
+                    <div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div>
+                    <div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>
+                `;
+            } else if (t.type === 'geometry') {
+                for(let i=0; i<15; i++) {
+                    let el = document.createElement('div');
+                    el.className = 'shape-box';
+                    if(i%3===0) el.style.borderRadius = '50%'; 
+                    if(i%4===0) el.style.borderRadius = '30% 70% 70% 30% / 30% 30% 70% 70%';
+                    el.style.left = Math.random() * 100 + '%';
+                    let size = Math.random() * 60 + 20;
+                    el.style.width = size + 'px';
+                    el.style.height = size + 'px';
+                    el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                    el.style.animationDelay = (Math.random() * 10) + 's';
+                    el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                    container.appendChild(el);
+                }
+            } else if (t.type === 'rings') {
+                for(let i=0; i<6; i++) {
+                    let el = document.createElement('div');
+                    el.className = 'glass-ring';
+                    el.style.left = (Math.random() * 80 + 10) + '%';
+                    el.style.top = (Math.random() * 80 + 10) + '%';
+                    let size = Math.random() * 300 + 150;
+                    el.style.width = size + 'px';
+                    el.style.height = size + 'px';
+                    el.style.marginLeft = -(size/2) + 'px';
+                    el.style.marginTop = -(size/2) + 'px';
+                    el.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                    el.style.animationDelay = -(Math.random() * 5) + 's';
+                    el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                    container.appendChild(el);
+                }
+            } else if (t.type === 'polygons') {
+                for(let i=0; i<15; i++) {
+                    let el = document.createElement('div');
+                    el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon');
+                    el.style.left = Math.random() * 100 + '%';
+                    let size = Math.random() * 80 + 30;
+                    el.style.width = size + 'px';
+                    el.style.height = size + 'px';
+                    el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                    el.style.animationDelay = (Math.random() * 10) + 's';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                    container.appendChild(el);
+                }
+            } else if (t.type === 'lines') {
+                for(let i=0; i<12; i++) {
+                    let el = document.createElement('div');
+                    el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg');
+                    el.style.top = (Math.random() * 150 - 25) + '%';
+                    el.style.animationDuration = (Math.random() * 8 + 5) + 's';
+                    el.style.animationDelay = (Math.random() * 5) + 's';
+                    el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`;
+                    container.appendChild(el);
+                }
+            } else if (t.type === 'starPop') {
+                for (let i = 0; i < 42; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'spark-pop-star';
+                    star.textContent = i % 3 === 0 ? '✦' : (i % 3 === 1 ? '✧' : '✶');
+                    star.style.left = Math.random() * 96 + '%';
+                    star.style.top = Math.random() * 92 + '%';
+                    star.style.fontSize = (Math.random() * 20 + 12) + 'px';
+                    star.style.animationDuration = (Math.random() * 3.8 + 2.2) + 's';
+                    star.style.animationDelay = (Math.random() * 5) + 's';
+                    star.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                    star.style.textShadow = `
+                        0 0 1px rgba(255,255,255,1),
+                        0 0 7px rgba(255,255,255,0.95),
+                        0 0 16px var(--effect-color${(i % 3) + 1}),
+                        0 0 30px var(--primary-color)
+                    `;
+                    container.appendChild(star);
+                }
+            } else if (t.type === 'starSprinkle') {
+                for (let i = 0; i < 78; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'sprinkle-star';
+                    const size = Math.random() * 8 + 5;
+                    star.style.width = size + 'px';
+                    star.style.height = size + 'px';
+                    star.style.left = Math.random() * 98 + '%';
+                    star.style.top = Math.random() * 94 + '%';
+                    star.style.animationDuration = (Math.random() * 4 + 2.8) + 's';
+                    star.style.animationDelay = (Math.random() * 6) + 's';
+                    container.appendChild(star);
+                }
+            } else if (t.type === 'glitterField') {
+                for (let i = 0; i < 95; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'glitter-field-dot';
+                    dot.style.left = Math.random() * 100 + '%';
+                    dot.style.bottom = (Math.random() * 38 - 12) + '%';
+                    dot.style.width = dot.style.height = (Math.random() * 4 + 2) + 'px';
+                    dot.style.animationDuration = (Math.random() * 10 + 7) + 's';
+                    dot.style.animationDelay = (Math.random() * 8) + 's';
+                    dot.style.background = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i % 3) + 1})`;
+                    dot.style.boxShadow = `0 0 4px rgba(255,255,255,0.95), 0 0 10px var(--effect-color${(i % 3) + 1}), 0 0 20px var(--primary-color)`;
+                    container.appendChild(dot);
+                }
+            } else if (t.type === 'cometTwinkle') {
+                for (let i = 0; i < 7; i++) {
+                    const comet = document.createElement('div');
+                    comet.className = 'clean-comet';
+                    comet.style.left = (Math.random() * 45 + 58) + '%';
+                    comet.style.top = (Math.random() * 64 + 5) + '%';
+                    comet.style.animationDuration = (Math.random() * 7 + 8) + 's';
+                    comet.style.animationDelay = (Math.random() * 7) + 's';
+                    comet.style.background = `linear-gradient(90deg, rgba(255,255,255,1), var(--primary-color), var(--effect-color${(i % 3) + 1}), transparent)`;
+                    container.appendChild(comet);
+                }
+                for (let i = 0; i < 26; i++) {
+                    const star = document.createElement('div');
+                    star.className = 'spark-pop-star';
+                    star.textContent = i % 2 === 0 ? '✦' : '✧';
+                    star.style.left = Math.random() * 96 + '%';
+                    star.style.top = Math.random() * 90 + '%';
+                    star.style.fontSize = (Math.random() * 12 + 10) + 'px';
+                    star.style.animationDuration = (Math.random() * 4 + 3) + 's';
+                    star.style.animationDelay = (Math.random() * 5) + 's';
+                    container.appendChild(star);
+                }
+            } else if (t.type === 'neonGeometryFlow') {
+                for (let i = 0; i < 14; i++) {
+                    const line = document.createElement('div');
+                    line.className = 'neon-flow-line' + (i % 2 === 0 ? '' : ' reverse');
+                    line.style.left = (Math.random() * 95 - 10) + '%';
+                    line.style.top = (Math.random() * 90) + '%';
+                    line.style.width = (Math.random() * 28 + 24) + 'vw';
+                    line.style.animationDuration = (Math.random() * 7 + 7) + 's';
+                    line.style.animationDelay = (Math.random() * 7) + 's';
+                    line.style.background = `linear-gradient(
+                        90deg, transparent, rgba(255,255,255,0.95), var(--effect-color${(i % 3) + 1}), transparent
+                    )`;
+                    line.style.boxShadow = `0 0 10px rgba(255,255,255,0.75), 0 0 22px var(--effect-color${(i % 3) + 1})`;
+                    container.appendChild(line);
+                }
+                const shapeTypes = ['diamond', 'triangle', 'slash'];
+                for (let i = 0; i < 22; i++) {
+                    const shape = document.createElement('div');
+                    const type = shapeTypes[i % shapeTypes.length];
+                    shape.className = 'geo-flow-shape ' + type;
+                    const size = Math.random() * 24 + 12;
+                    shape.style.width = size + 'px';
+                    shape.style.height = type === 'slash' ? '8px' : size + 'px';
+                    shape.style.left = Math.random() * 96 + '%';
+                    shape.style.top = Math.random() * 88 + '%';
+                    shape.style.background = `linear-gradient(135deg, rgba(255,255,255,0.82), var(--effect-color${(i % 3) + 1}), rgba(255,255,255,0.28))`;
+                    shape.style.boxShadow = `0 0 10px rgba(255,255,255,0.45), 0 0 24px var(--effect-color${((i + 1) % 3) + 1})`;
+                    shape.style.animationDuration = (Math.random() * 5 + 4) + 's';
+                    shape.style.animationDelay = (Math.random() * 6) + 's';
+                    container.appendChild(shape);
+                }
+            } 
+            /* =========================================================
+               기존 갤러리 20가지 추가 효과 유지
+               ========================================================= */
+            else if (t.type === 'snowfall') {
+                buildElements(container, 'snow-flake', 60, el => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = el.style.height = (Math.random() * 4 + 2) + 'px';
+                    el.style.animationDuration = (Math.random() * 5 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'fireflies') {
+                buildElements(container, 'firefly', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 5 + 3) + 'px';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'aurora') {
+                buildElements(container, 'aurora-band', 3, (el, i) => {
+                    el.style.top = (i * 20 - 10) + '%'; el.style.background = `var(--effect-color${i+1})`; el.style.animationDelay = (i * 2) + 's';
+                });
+            } else if (t.type === 'confetti') {
+                buildElements(container, 'confetti-piece', 40, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = (Math.random() * 8 + 4) + 'px'; el.style.height = (Math.random() * 15 + 8) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.animationDuration = (Math.random() * 4 + 3) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'lanterns') {
+                buildElements(container, 'lantern', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = (Math.random() * 15 + 10) + 'px'; el.style.height = (Math.random() * 25 + 15) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 8 + 6) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'rippleWaves') {
+                buildElements(container, 'ripple-ring', 6, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 100 + 50) + 'px'; el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'meteorShower') {
+                buildElements(container, 'meteor', 20, (el) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.animationDuration = (Math.random() * 2 + 1) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'crystalPrisms') {
+                buildElements(container, 'crystal-prism', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 10 + 5) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'cosmicDust') {
+                buildElements(container, 'cosmic-dust', 30, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 80 + 30) + 'px'; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'floatingHearts') {
+                buildElements(container, 'floating-heart', 20, (el, i) => {
+                    el.textContent = '❤'; el.style.left = Math.random() * 100 + '%';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.fontSize = (Math.random() * 20 + 10) + 'px'; el.style.animationDuration = (Math.random() * 6 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'cyberLines') {
+                buildElements(container, 'cyber-line', 10, (el, i) => {
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'matrixDrops') {
+                buildElements(container, 'matrix-drop', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'autumnLeaves') {
+                buildElements(container, 'autumn-leaf', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = el.style.height = (Math.random() * 20 + 10) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.animationDuration = (Math.random() * 6 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'circuitPaths') {
+                buildElements(container, 'circuit-path', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%'; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'electricSparks') {
+                buildElements(container, 'electric-spark', 20, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 30 + 10) + 'px'; el.style.height = '2px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (t.type === 'diamondPulse') {
+                buildElements(container, 'diamond-pulse', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px'; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 2 + 1) + 's'; el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (t.type === 'lightPillars') {
+                buildElements(container, 'light-pillar', 8, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = (Math.random() * 80 + 40) + 'px'; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'magicRunes') {
+                const runes = ['✧', '✦', '✶', '✵', '❖', '✣'];
+                buildElements(container, 'magic-rune', 18, (el, i) => {
+                    el.textContent = runes[Math.floor(Math.random() * runes.length)];
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'plasmaOrbs') {
+                buildElements(container, 'plasma-orb', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 50 + 20) + 'px'; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'stardustTrails') {
+                buildElements(container, 'stardust-trail', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 6 + 3) + 'px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'christmasSeason2') {
+                const santa = document.createElement('i');
+                santa.className = 'fa-solid fa-sleigh santa-fly';
+                santa.style.color = '#ffffff'; 
+                container.appendChild(santa);
+
+                const xmasIcons = ['fa-snowflake', 'fa-tree', 'fa-gift', 'fa-bell', 'fa-snowman', 'fa-candy-cane', 'fa-star'];
+                const iconColors = ['#ffffff', '#22c55e', '#f43f5e', '#facc15', '#e2e8f0', '#e11d48', '#fde047'];
+
+                buildElements(container, 'xmas-magic-icon', 50, (el, i) => {
+                    const isSnow = i % 2 === 0;
+                    const iconIdx = isSnow ? 0 : Math.floor(Math.random() * (xmasIcons.length - 1)) + 1;
+                    
+                    el.classList.add('fa-solid', xmasIcons[iconIdx]);
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.color = isSnow ? '#ffffff' : iconColors[iconIdx];
+                    
+                    el.style.fontSize = (Math.random() * 20 + 10) + 'px';
+                    el.style.animationDuration = (Math.random() * 7 + 6) + 's';
+                    el.style.animationDelay = (Math.random() * 7) + 's';
+                    
+                    el.style.setProperty('--icon-opacity', (Math.random() * 0.6 + 0.3).toString());
+                });
+            } else if (renderSeasonalThemeEffect(container, t.type, buildElements)) {
+            }
+        }
+
+        function triggerEntranceAnimation() {
+            const candidates = getFilteredThemes().filter(item =>
+                !item.theme.isDefault && !themePreference(item.theme).is_hidden
+            );
+            if (!candidates.length) return toast('현재 조건에서 선택할 테마가 없습니다.', 'warning');
+            let selected = candidates[Math.floor(Math.random() * candidates.length)];
+            if (candidates.length > 1 && selected.index === currentThemeIndex) {
+                selected = candidates[(candidates.indexOf(selected) + 1) % candidates.length];
+            }
+            applyTheme(selected.index);
+        }
+
+        function toast(message, type = 'success') {
+            const region = document.getElementById('themeToastRegion');
+            const item = document.createElement('div');
+            item.className = `theme-toast ${type}`;
+            item.textContent = message;
+            region.appendChild(item);
+            setTimeout(() => item.remove(), 3400);
+        }
+
+        async function themeApi(url, options = {}) {
+            const response = await fetch(url, options);
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || '요청을 처리하지 못했습니다.');
+            return data;
+        }
+
+        function updateSelectedThemeActions() {
+            const theme = generatedThemes[currentThemeIndex] || generatedThemes[0];
+            const pref = themePreference(theme);
+            const favoriteBtn = document.getElementById('previewFavoriteBtn');
+            favoriteBtn.classList.toggle('is-favorite', !!pref.is_favorite);
+            favoriteBtn.innerHTML = `<i class="fa-${pref.is_favorite ? 'solid' : 'regular'} fa-star"></i> ${pref.is_favorite ? '즐겨찾기 해제' : '즐겨찾기 저장'}`;
+            document.getElementById('editThemeBtn').hidden = !theme.isCustom;
+            const removeBtn = document.getElementById('removeThemeBtn');
+            removeBtn.hidden = !!theme.isDefault;
+            removeBtn.innerHTML = pref.is_hidden
+                ? '<i class="fa-solid fa-rotate-left"></i> 목록에 복원'
+                : theme.isCustom
+                    ? '<i class="fa-regular fa-trash-can"></i> 사용자 테마 삭제'
+                    : '<i class="fa-regular fa-trash-can"></i> 목록에서 삭제';
+        }
+
+        async function persistThemePreference(theme) {
+            const pref = themePreference(theme);
+            await themeApi('/admin/themes/preferences', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({key: theme.key, is_favorite: !!pref.is_favorite, is_hidden: !!pref.is_hidden})
+            });
+        }
+
+        async function toggleFavorite(index) {
+            const theme = generatedThemes[index];
+            const pref = themePreference(theme);
+            pref.is_favorite = !pref.is_favorite;
+            try {
+                await persistThemePreference(theme);
+                renderThemeList();
+                updateSelectedThemeActions();
+                toast(pref.is_favorite ? '즐겨찾기에 저장했습니다.' : '즐겨찾기에서 삭제했습니다.');
+            } catch (error) {
+                pref.is_favorite = !pref.is_favorite;
+                toast(error.message, 'error');
+            }
+        }
+
+        async function restoreTheme(index) {
+            const theme = generatedThemes[index];
+            const pref = themePreference(theme);
+            pref.is_hidden = false;
+            try {
+                await persistThemePreference(theme);
+                renderThemeList(true);
+                updateSelectedThemeActions();
+                toast('테마를 관리 목록에 복원했습니다.');
+            } catch (error) {
+                pref.is_hidden = true;
+                toast(error.message, 'error');
+            }
+        }
+
+        async function removeTheme(index) {
+            const theme = generatedThemes[index];
+            if (!theme || theme.isDefault) return;
+            const pref = themePreference(theme);
+            if (pref.is_hidden) return restoreTheme(index);
+            if (theme.isCustom) {
+                if (!confirm(`사용자 제작 테마 '${theme.name}'을 완전히 삭제하시겠습니까?`)) return;
+                try {
+                    const data = await themeApi(`/admin/themes/custom/${theme.id}/delete`, {method:'POST'});
+                    if (data.cleared_active) {
+                        localStorage.removeItem('saedam_theme');
+                        localStorage.removeItem('saedam_theme_effect');
+                        localStorage.removeItem('saedam_theme_name');
+                        document.getElementById('activeThemeName').textContent = '적용된 테마 없음';
+                    }
+                    delete themePreferences[theme.key];
+                    generatedThemes.splice(index, 1);
+                    currentThemeIndex = 0;
+                    applyTheme(0);
+                    renderThemeList(true);
+                    toast(data.message || '사용자 테마를 삭제했습니다.');
+                } catch (error) { toast(error.message, 'error'); }
+                return;
+            }
+            if (!confirm(`'${theme.name}' 테마를 관리 목록에서 삭제하시겠습니까?\n숨김 메뉴에서 언제든 복원할 수 있습니다.`)) return;
+            pref.is_hidden = true;
+            try {
+                await persistThemePreference(theme);
+                if (currentThemeIndex === index) applyTheme(0);
+                renderThemeList(true);
+                toast('테마를 목록에서 삭제했습니다. 숨김 메뉴에서 복원할 수 있습니다.');
+            } catch (error) {
+                pref.is_hidden = false;
+                toast(error.message, 'error');
+            }
+        }
+
+        function selectThemeCategory(category) {
+            currentCategory = category;
+            document.querySelectorAll('.theme-category-btn').forEach(button => button.classList.toggle('active', button.dataset.category === category));
+            renderThemeList(true);
+        }
+
+        async function restoreAllHiddenThemes() {
+            const hiddenCount = Object.values(themePreferences).filter(item => item.is_hidden).length;
+            if (!hiddenCount) return toast('복원할 숨김 테마가 없습니다.', 'warning');
+            if (!confirm(`숨김 테마 ${hiddenCount}개를 모두 복원하시겠습니까?`)) return;
+            try {
+                const data = await themeApi('/admin/themes/preferences/restore-hidden', {method:'POST'});
+                Object.values(themePreferences).forEach(item => { item.is_hidden = false; });
+                renderThemeList(true);
+                toast(data.message || '숨김 테마를 복원했습니다.');
+            } catch (error) { toast(error.message, 'error'); }
+        }
+
+        function shadeHex(hex, amount) {
+            const value = String(hex || '#4f46e5').replace('#','');
+            const number = parseInt(value.length === 3 ? value.split('').map(c => c + c).join('') : value, 16);
+            const clamp = channel => Math.max(0, Math.min(255, channel + amount));
+            return `#${[number >> 16, (number >> 8) & 255, number & 255].map(channel => clamp(channel).toString(16).padStart(2,'0')).join('')}`;
+        }
+
+        function hexRgba(hex, alpha) {
+            const value = String(hex || '#4f46e5').replace('#','');
+            const number = parseInt(value, 16);
+            return `rgba(${number >> 16}, ${(number >> 8) & 255}, ${number & 255}, ${alpha})`;
+        }
+
+        function buildCustomThemeVars() {
+            const style = document.getElementById('customThemeStyle').value;
+            const bgStart = document.getElementById('customBgStart').value;
+            const bgEnd = document.getElementById('customBgEnd').value;
+            const primary = document.getElementById('customPrimary').value;
+            const text = document.getElementById('customText').value;
+            const bg = `linear-gradient(135deg, ${bgStart} 0%, ${bgEnd} 100%)`;
+            const vars = {
+                '--body-bg': bg, '--app-bg': bg, '--main-bg': bg, '--primary-color': primary,
+                '--primary-light': hexRgba(primary, .12), '--primary-dark': shadeHex(primary, -28),
+                '--text-dark': text, '--text-gray': shadeHex(text, 72), '--input-text': text,
+                '--border-color': hexRgba(primary, .22), '--border-light': hexRgba(primary, .1),
+                '--effect-color1': shadeHex(primary, 45), '--effect-color2': primary, '--effect-color3': shadeHex(primary, -36),
+                '--tooltip-bg': '#0f172a', '--tooltip-text': '#ffffff'
+            };
+            if (style === 'solid') Object.assign(vars, {'--card-bg':'#ffffff','--card-border':hexRgba(primary,.18),'--card-backdrop':'none','--card-shadow':'0 18px 38px rgba(15,23,42,.12)','--input-bg':'#f8fafc','--widget-bg':'#ffffff','--widget-hover':hexRgba(primary,.08),'--widget-border':hexRgba(primary,.16),'--nav-bg':'#ffffff'});
+            else if (style === 'glow') Object.assign(vars, {'--card-bg':'rgba(255,255,255,.84)','--card-border':primary,'--card-backdrop':'blur(12px)','--card-shadow':`0 0 28px ${hexRgba(primary,.42)}`,'--input-bg':'rgba(255,255,255,.64)','--widget-bg':'rgba(255,255,255,.62)','--widget-hover':'rgba(255,255,255,.94)','--widget-border':primary,'--nav-bg':'rgba(255,255,255,.88)'});
+            else if (style === 'neumorphism') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':'transparent','--card-backdrop':'none','--card-shadow':`12px 12px 24px ${shadeHex(bgEnd,-24)}, -12px -12px 24px #ffffff`,'--input-bg':'rgba(255,255,255,.46)','--widget-bg':bgEnd,'--widget-hover':bgEnd,'--widget-border':'transparent','--nav-bg':bgEnd});
+            else if (style === 'clay') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':'transparent','--card-backdrop':'none','--card-shadow':'10px 10px 20px rgba(0,0,0,.1), inset -6px -6px 16px rgba(0,0,0,.08), inset 6px 6px 16px rgba(255,255,255,.9)','--input-bg':'rgba(255,255,255,.58)','--widget-bg':bgEnd,'--widget-hover':shadeHex(bgEnd,8),'--widget-border':'transparent','--nav-bg':bgEnd});
+            else Object.assign(vars, {'--card-bg':'rgba(255,255,255,.68)','--card-border':'rgba(255,255,255,.9)','--card-backdrop':'blur(24px)','--card-shadow':'0 16px 42px rgba(15,23,42,.13)','--input-bg':'rgba(255,255,255,.82)','--widget-bg':'rgba(255,255,255,.72)','--widget-hover':'rgba(255,255,255,.96)','--widget-border':'rgba(255,255,255,.9)','--nav-bg':'rgba(255,255,255,.78)'});
+            return vars;
+        }
+
+        function updateCreatorPreview() {
+            const preview = document.getElementById('themeCreatorPreview');
+            if (!preview) return;
+            const vars = buildCustomThemeVars();
+            preview.style.setProperty('--creator-bg', vars['--body-bg']);
+            preview.style.setProperty('--creator-text', vars['--text-dark']);
+            preview.style.setProperty('--creator-card', vars['--card-bg']);
+            document.getElementById('themeCreatorPreviewName').textContent = document.getElementById('customThemeName').value || '새담 사용자 테마';
+        }
+
+        function colorFromVars(value, fallback) {
+            const match = String(value || '').match(/#[0-9a-fA-F]{6}/);
+            return match ? match[0] : fallback;
+        }
+
+        function openThemeCreator(theme = null, editing = false) {
+            document.getElementById('customThemeId').value = editing && theme?.isCustom ? theme.id : '';
+            document.getElementById('themeCreatorTitle').textContent = editing ? '사용자 테마 수정' : theme ? '선택 테마 복사해서 만들기' : '새 테마 만들기';
+            document.getElementById('customThemeName').value = editing ? theme.name : theme ? `${theme.name} 복사본` : '';
+            const styleMap = {'유리':'glass','솔리드':'solid','네온':'glow','뉴모피즘':'neumorphism','클레이':'clay'};
+            document.getElementById('customThemeStyle').value = styleMap[inferThemeStyle(theme || {})] || 'glass';
+            document.getElementById('customThemeEffect').value = [...document.getElementById('customThemeEffect').options].some(option => option.value === theme?.type) ? theme.type : 'blobs';
+            const vars = theme?.vars || {};
+            const backgroundColors = String(vars['--body-bg'] || '').match(/#[0-9a-fA-F]{6}/g) || [];
+            document.getElementById('customBgStart').value = backgroundColors[0] || '#eef2ff';
+            document.getElementById('customBgEnd').value = backgroundColors[1] || backgroundColors[0] || '#dbeafe';
+            document.getElementById('customPrimary').value = colorFromVars(vars['--primary-color'], '#4f46e5');
+            document.getElementById('customText').value = colorFromVars(vars['--text-dark'], '#0f172a');
+            document.getElementById('themeCreatorModal').classList.add('open');
+            document.body.style.overflow = 'hidden';
+            updateCreatorPreview();
+        }
+
+        function closeThemeCreator() {
+            document.getElementById('themeCreatorModal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        async function saveCustomTheme(event) {
+            event.preventDefault();
+            const id = document.getElementById('customThemeId').value;
+            const payload = {name: document.getElementById('customThemeName').value.trim(), category:'custom', effect:document.getElementById('customThemeEffect').value, vars:buildCustomThemeVars()};
+            if (!payload.name) return toast('테마 이름을 입력해주세요.', 'warning');
+            try {
+                const data = await themeApi(id ? `/admin/themes/custom/${id}` : '/admin/themes/custom', {method:id?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+                const existingIndex = generatedThemes.findIndex(theme => theme.key === data.theme.key);
+                let targetIndex;
+                if (existingIndex >= 0) { generatedThemes[existingIndex] = data.theme; targetIndex = existingIndex; }
+                else { generatedThemes.push(data.theme); targetIndex = generatedThemes.length - 1; themePreferences[data.theme.key] = {is_favorite:true,is_hidden:false}; await persistThemePreference(data.theme); }
+                closeThemeCreator();
+                selectThemeCategory('custom');
+                applyTheme(targetIndex);
+                renderThemeList(true);
+                toast(data.message || '테마를 저장했습니다.');
+            } catch (error) { toast(error.message, 'error'); }
+        }
+
+        function setupThemeManagerEvents() {
+            document.getElementById('theme-list').addEventListener('click', async event => {
+                if (event.target.closest('#themeLoadMore')) { visibleThemeLimit += themePageSize; return renderThemeList(); }
+                const item = event.target.closest('[data-theme-index]');
+                if (!item) return;
+                const index = Number(item.dataset.themeIndex);
+                const action = event.target.closest('[data-action]')?.dataset.action;
+                if (action === 'favorite') return toggleFavorite(index);
+                if (action === 'hide' || action === 'delete') return removeTheme(index);
+                if (action === 'restore') return restoreTheme(index);
+                applyTheme(index);
+            });
+            document.getElementById('themeCategoryMenu').addEventListener('click', event => { const button = event.target.closest('[data-category]'); if (button) selectThemeCategory(button.dataset.category); });
+            document.getElementById('themeSearchInput').addEventListener('input', event => { currentQuery = event.target.value; renderThemeList(true); });
+            document.getElementById('clearThemeSearch').addEventListener('click', () => { document.getElementById('themeSearchInput').value=''; currentQuery=''; renderThemeList(true); });
+            document.getElementById('themeStyleFilter').addEventListener('change', event => { currentStyle=event.target.value; renderThemeList(true); });
+            document.getElementById('restoreHiddenBtn').addEventListener('click', restoreAllHiddenThemes);
+            document.getElementById('createThemeBtn').addEventListener('click', () => openThemeCreator());
+            document.getElementById('copyThemeBtn').addEventListener('click', () => openThemeCreator(generatedThemes[currentThemeIndex], false));
+            document.getElementById('editThemeBtn').addEventListener('click', () => openThemeCreator(generatedThemes[currentThemeIndex], true));
+            document.getElementById('previewFavoriteBtn').addEventListener('click', () => toggleFavorite(currentThemeIndex));
+            document.getElementById('removeThemeBtn').addEventListener('click', () => removeTheme(currentThemeIndex));
+            document.getElementById('randomThemeBtn').addEventListener('click', triggerEntranceAnimation);
+            document.getElementById('applyThemeBtn').addEventListener('click', applySelectedThemeToIntranet);
+            document.getElementById('clearThemeBtn').addEventListener('click', clearForcedTheme);
+            document.getElementById('themeCreatorForm').addEventListener('submit', saveCustomTheme);
+            document.querySelectorAll('[data-close-theme-modal]').forEach(button => button.addEventListener('click', closeThemeCreator));
+            document.getElementById('themeCreatorModal').addEventListener('click', event => { if (event.target === event.currentTarget) closeThemeCreator(); });
+            ['customThemeName','customThemeStyle','customThemeEffect','customBgStart','customBgEnd','customPrimary','customText'].forEach(id => document.getElementById(id).addEventListener('input', updateCreatorPreview));
+            document.addEventListener('keydown', event => { if (event.key === 'Escape') closeThemeCreator(); });
+        }
+
+        async function applySelectedThemeToIntranet() {
+            const theme = generatedThemes[currentThemeIndex] || generatedThemes[0];
+            if (!theme) return;
+
+            try {
+                const payload = {
+                    key: theme.key,
+                    name: theme.name,
+                    index: theme.isCustom ? null : getThemeDisplayNumber(currentThemeIndex),
+                    catalog: theme.catalog,
+                    effect: theme.type,
+                    vars: theme.vars
+                };
+                const res = await fetch('/admin/themes/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    toast(data.message || '테마 적용에 실패했습니다.', 'error');
+                    return;
+                }
+
+                localStorage.setItem('saedam_theme', JSON.stringify(theme.vars));
+                localStorage.setItem('saedam_theme_effect', theme.type);
+                localStorage.setItem('saedam_theme_name', theme.name);
+                document.getElementById('activeThemeName').innerText = `${themeDisplayCode(theme,currentThemeIndex)}. ${theme.name}`;
+                toast('선택한 테마가 인트라넷 모든 메뉴에 적용되었습니다.');
+            } catch (error) {
+                toast('테마 적용 중 오류가 발생했습니다.', 'error');
+            }
+        }
+
+        async function clearForcedTheme() {
+            if (!confirm('강제 적용된 전체 테마를 해제하시겠습니까?')) return;
+
+            try {
+                const res = await fetch('/admin/themes/clear', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) {
+                    toast(data.message || '테마 적용 해제에 실패했습니다.', 'error');
+                    return;
+                }
+
+                localStorage.removeItem('saedam_theme');
+                localStorage.removeItem('saedam_theme_effect');
+                localStorage.removeItem('saedam_theme_name');
+                applyTheme(0);
+                document.getElementById('activeThemeName').innerText = '적용된 테마 없음';
+                toast('강제 적용 테마가 해제되었습니다.');
+            } catch (error) {
+                toast('테마 적용 해제 중 오류가 발생했습니다.', 'error');
+            }
+        }
+    </script>
+{% endblock %}

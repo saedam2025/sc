@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>테마 갤러리 (가시성 개선 및 액션표기) - 새담 인트라넷</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+    <style>
+        /* === 다이나믹 테마 변수 (기본값) === */
+        :root {
+            --body-bg: #f8fafc;
+            --primary-color: #4a90e2;
+            --primary-dark: #357abd;
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --card-bg: rgba(255, 255, 255, 0.6);
+            --card-border: rgba(255, 255, 255, 0.9);
+            --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+            --card-backdrop: blur(24px);
+            --input-bg: rgba(255, 255, 255, 0.8);
+            --input-text: #1e293b;
+            --widget-bg: rgba(255, 255, 255, 0.7);
+            --widget-hover: rgba(255, 255, 255, 1);
+            --widget-border: rgba(255, 255, 255, 1);
+            --effect-color1: transparent;
+            --effect-color2: transparent;
+            --effect-color3: transparent;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+
+        body {
+            display: flex; height: 100vh; overflow: hidden;
+            background: var(--body-bg); transition: background 0.8s ease;
+        }
+
+        /* 레이아웃 구조 */
+        .sidebar {
+            width: 320px; background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex; flex-direction: column; z-index: 10;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-header { padding: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); background: rgba(255, 255, 255, 0.5); }
+        .sidebar-header h2 { font-size: 18px; color: #1e293b; margin-bottom: 8px; }
+        .sidebar-header p { font-size: 13px; color: #64748b; }
+
+        .theme-list-container { flex: 1; overflow-y: auto; padding: 10px; }
+        .theme-list-container::-webkit-scrollbar { width: 6px; }
+        .theme-list-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        .theme-item {
+            padding: 12px 15px; border-radius: 8px; cursor: pointer;
+            margin-bottom: 5px; transition: all 0.2s;
+            display: flex; align-items: center; gap: 10px;
+            background: transparent; border: 1px solid transparent;
+        }
+
+        .theme-item:hover { background: rgba(0, 0, 0, 0.03); }
+        .theme-item.active { background: var(--primary-color); color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .theme-item.active .theme-num { color: rgba(255,255,255,0.7); }
+        .theme-item.active .theme-name { color: #ffffff; }
+        .theme-item.active .action-name { color: rgba(255,255,255,0.8); }
+
+        .theme-num { font-size: 12px; color: #94a3b8; font-weight: 600; width: 35px; }
+        .theme-name { font-size: 14px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-dark); }
+        .action-name { font-size: 11px; color: var(--primary-color); font-weight: 600; margin-left: 5px; }
+
+        .preview-area {
+            flex: 1; position: relative; display: flex;
+            align-items: center; justify-content: center;
+            overflow: hidden; padding: 40px;
+        }
+
+        #bg-effect-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: hidden; }
+
+        /* 미리보기용 목업 컴포넌트 */
+        .mock-card {
+            position: relative; z-index: 2;
+            background: var(--card-bg);
+            backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop);
+            border: 1px solid var(--card-border);
+            box-shadow: var(--card-shadow);
+            border-radius: 24px; padding: 40px;
+            width: 100%; max-width: 500px;
+            color: var(--text-dark);
+            transition: all 0.5s ease;
+        }
+
+        .mock-header { text-align: center; margin-bottom: 30px; }
+        .mock-header h1 { font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .mock-header p { font-size: 14px; color: var(--text-gray); }
+
+        .mock-widget {
+            background: var(--widget-bg); border: 1px solid var(--widget-border);
+            border-radius: 14px; padding: 20px; text-align: center;
+            margin-bottom: 20px; transition: all 0.3s;
+        }
+        .mock-widget:hover { background: var(--widget-hover); transform: translateY(-3px); }
+
+        .mock-btn {
+            width: 100%; padding: 15px; border: none; border-radius: 12px;
+            background: var(--primary-color); color: white;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: all 0.3s;
+        }
+        .mock-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+
+        /* ==========================================
+           애니메이션 효과 CSS
+           ========================================== */
+        
+        /* 🌟 가시성이 개선된 신규 STARS */
+        .star-element { position: absolute; border-radius: 50%; animation: twinkleStar ease-in-out infinite alternate; }
+        @keyframes twinkleStar { 0% { opacity: 0.1; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1.5); box-shadow: 0 0 8px currentColor; } }
+
+        /* 🌟 가시성이 개선된 COMETTWINKLE */
+        .clean-comet { position: absolute; height: 3px; border-radius: 999px; opacity: 0; transform: rotate(-26deg); animation: cleanCometMove linear infinite; }
+        .clean-comet::before { content: ''; position: absolute; left: -2px; top: -3px; width: 9px; height: 9px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor, 0 0 20px #fff; }
+        @keyframes cleanCometMove {
+            0% { opacity: 0; transform: translate3d(20vw, -10vh, 0) rotate(-26deg); }
+            10% { opacity: 1; }
+            40% { opacity: 1; }
+            70%, 100% { opacity: 0; transform: translate3d(-70vw, 50vh, 0) rotate(-26deg); }
+        }
+
+        /* 기타 기존 효과들 */
+        .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; animation: rise infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0) scale(1); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5); opacity: 0; } }
+        .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
+        .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; } .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; }
+        @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 50% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
+        .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; }
+        @keyframes orbOrbit { 0% { transform: translate(0, 0); } 100% { transform: translate(15vw, 15vh); } }
+        .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+        @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; }
+        @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+        .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1); animation: ringPulse infinite ease-in-out alternate; }
+        @keyframes ringPulse { 0% { transform: scale(0.8); opacity: 0.2; } 100% { transform: scale(1.1); opacity: 0.7; } }
+        .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+        .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); } .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+        .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+        .line-pos { animation: slideLinePos infinite linear; }
+        @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+        .spark-pop-star { position: absolute; font-weight: 900; opacity: 0; animation: sparkPopStar ease-in-out infinite; }
+        @keyframes sparkPopStar { 0%, 100% { opacity: 0; transform: scale(0.25); } 42% { opacity: 1; transform: scale(1.25); } }
+        .sprinkle-star { position: absolute; width: 7px; height: 7px; opacity: 0; animation: sprinkleStarBlink ease-in-out infinite; }
+        .sprinkle-star::before, .sprinkle-star::after { content: ''; position: absolute; left: 50%; top: 50%; background: var(--primary-color); border-radius: 999px; transform: translate(-50%, -50%); box-shadow: 0 0 10px var(--effect-color1); }
+        .sprinkle-star::before { width: 100%; height: 2px; } .sprinkle-star::after { width: 2px; height: 100%; }
+        @keyframes sprinkleStarBlink { 0%, 100% { opacity: 0; transform: scale(0.35); } 70% { opacity: 1; transform: scale(1.2); } }
+        .glitter-field-dot { position: absolute; border-radius: 50%; opacity: 0; animation: glitterFieldFloat linear infinite; }
+        @keyframes glitterFieldFloat { 0% { opacity: 0; transform: translateY(0); } 48% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-60vh); } }
+        .neon-flow-line { position: absolute; height: 2px; opacity: 0; border-radius: 999px; animation: neonFlowLineMove linear infinite; }
+        @keyframes neonFlowLineMove { 0% { opacity: 0; transform: translate3d(30vw, -10vh, 0) rotate(-18deg) scaleX(0.45); } 45% { opacity: 0.8; transform: translate3d(-18vw, 18vh, 0) rotate(-18deg) scaleX(1); } 100% { opacity: 0; transform: translate3d(-55vw, 35vh, 0) rotate(-18deg) scaleX(0.55); } }
+        .geo-flow-shape { position: absolute; opacity: 0; border: 1px solid rgba(255,255,255,0.65); animation: geoFlowShapeFloat ease-in-out infinite; }
+        .geo-flow-shape.diamond { transform: rotate(45deg); } .geo-flow-shape.triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+        @keyframes geoFlowShapeFloat { 0%, 100% { opacity: 0; } 50% { opacity: 0.85; transform: translateY(-20px) rotate(20deg); } }
+
+        /* 신규 20종 */
+        .snow-flake { position: absolute; border-radius: 50%; background: #fff; opacity: 0.8; box-shadow: 0 0 8px #fff; animation: snowFall linear infinite; }
+        @keyframes snowFall { 0% { transform: translateY(-10vh) translateX(0); } 100% { transform: translateY(110vh) translateX(30px); } }
+        .firefly { position: absolute; border-radius: 50%; box-shadow: 0 0 10px currentColor, 0 0 20px currentColor; animation: fireflyMove ease-in-out infinite alternate; }
+        @keyframes fireflyMove { 0% { transform: translate(0, 0) scale(0.8); opacity: 0.3; } 100% { transform: translate(40px, -60px) scale(1.5); opacity: 1; } }
+        .aurora-band { position: absolute; width: 150vw; height: 50vh; filter: blur(80px); opacity: 0.5; border-radius: 50%; animation: auroraSway 15s infinite alternate ease-in-out; }
+        @keyframes auroraSway { 0% { transform: translateX(-20vw) translateY(-10vh) rotate(-5deg); } 100% { transform: translateX(10vw) translateY(20vh) rotate(5deg); } }
+        .confetti-piece { position: absolute; animation: spinFall linear infinite; }
+        @keyframes spinFall { 0% { transform: translateY(-10vh) rotate(0deg) rotateX(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg) rotateX(360deg); opacity: 0; } }
+        .lantern { position: absolute; border-radius: 10px 10px 5px 5px; box-shadow: 0 0 20px currentColor; animation: floatUp linear infinite; }
+        @keyframes floatUp { 0% { transform: translateY(110vh) translateX(0) scale(1); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-10vh) translateX(50px) scale(0.8); opacity: 0; } }
+        .ripple-ring { position: absolute; border-radius: 50%; border: 2px solid; animation: rippleExpand linear infinite; }
+        @keyframes rippleExpand { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(4); opacity: 0; } }
+        .meteor { position: absolute; width: 2px; height: 60px; background: linear-gradient(to bottom, transparent, #fff); animation: meteorDrop linear infinite; }
+        @keyframes meteorDrop { 0% { transform: translateY(-20vh) translateX(20vw) rotate(45deg); opacity: 1; } 100% { transform: translateY(120vh) translateX(-40vw) rotate(45deg); opacity: 0; } }
+        .crystal-prism { position: absolute; clip-path: polygon(50% 0%, 100% 100%, 0% 100%); opacity: 0.5; filter: drop-shadow(0 0 10px currentColor); animation: crystalSpin linear infinite; }
+        @keyframes crystalSpin { 0% { transform: translateY(110vh) rotateY(0deg) rotateZ(0deg); } 100% { transform: translateY(-20vh) rotateY(360deg) rotateZ(180deg); } }
+        .cosmic-dust { position: absolute; border-radius: 50%; filter: blur(4px); animation: pulseDust ease-in-out infinite alternate; }
+        @keyframes pulseDust { 0% { transform: scale(0.5); opacity: 0.1; } 100% { transform: scale(2); opacity: 0.7; } }
+        .floating-heart { position: absolute; font-size: 24px; animation: heartFloat ease-in infinite; }
+        @keyframes heartFloat { 0% { transform: translateY(100vh) scale(0.5); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-10vh) scale(1.5); opacity: 0; } }
+        .cyber-line { position: absolute; height: 1px; width: 100vw; left: 0; box-shadow: 0 0 10px currentColor; animation: gridMove linear infinite; }
+        @keyframes gridMove { 0% { transform: translateY(0vh) scaleY(1); opacity: 0; } 50% { opacity: 0.5; } 100% { transform: translateY(100vh) scaleY(2); opacity: 0; } }
+        .matrix-drop { position: absolute; width: 2px; height: 80px; background: linear-gradient(to bottom, transparent, currentColor, #fff); animation: matrixFall linear infinite; }
+        @keyframes matrixFall { 0% { transform: translateY(-100px); opacity: 1; } 100% { transform: translateY(100vh); opacity: 0; } }
+        .autumn-leaf { position: absolute; border-radius: 0 50% 0 50%; box-shadow: inset 0 0 10px rgba(0,0,0,0.1); animation: leafFall linear infinite; }
+        @keyframes leafFall { 0% { transform: translateY(-10vh) translateX(0) rotate(0deg) rotateX(0deg); } 100% { transform: translateY(110vh) translateX(100px) rotate(360deg) rotateX(360deg); } }
+        .circuit-path { position: absolute; border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor; animation: drawCircuit linear infinite; }
+        @keyframes drawCircuit { 0% { width: 0; height: 0; opacity: 1; } 50% { width: 80px; height: 0; opacity: 1;} 100% { width: 80px; height: 80px; opacity: 0; } }
+        .electric-spark { position: absolute; background: #fff; box-shadow: 0 0 15px currentColor, 0 0 30px #fff; animation: sparkFlash 0.5s infinite steps(2); }
+        @keyframes sparkFlash { 0% { opacity: 0; transform: scale(1) rotate(0deg); } 50% { opacity: 1; transform: scale(2) rotate(25deg); } 100% { opacity: 0; transform: scale(1) rotate(-25deg); } }
+        .diamond-pulse { position: absolute; transform: rotate(45deg); border: 2px solid currentColor; animation: diamondBeat ease-in-out infinite alternate; }
+        @keyframes diamondBeat { 0% { transform: rotate(45deg) scale(0.5); opacity: 0.1; } 100% { transform: rotate(45deg) scale(1.5); opacity: 0.8; box-shadow: inset 0 0 15px currentColor; } }
+        .light-pillar { position: absolute; height: 100vh; top: 0; background: linear-gradient(to left, transparent, currentColor, transparent); animation: pillarFade linear infinite; }
+        @keyframes pillarFade { 0% { opacity: 0; transform: translateX(-5vw); } 50% { opacity: 0.2; } 100% { opacity: 0; transform: translateX(5vw); } }
+        .magic-rune { position: absolute; font-family: monospace; font-size: 30px; font-weight: bold; animation: runeGlow linear infinite; }
+        @keyframes runeGlow { 0% { opacity: 0; transform: translateY(0) scale(0.8); } 50% { opacity: 0.8; text-shadow: 0 0 15px currentColor; transform: translateY(-30px) scale(1.2); } 100% { opacity: 0; transform: translateY(-60px) scale(0.8); } }
+        .plasma-orb { position: absolute; border-radius: 50%; filter: blur(8px); animation: plasmaBounce ease-in-out infinite alternate; }
+        @keyframes plasmaBounce { 0% { transform: translateY(0) scale(0.8); opacity: 0.4; } 100% { transform: translateY(-80px) scale(1.3); opacity: 0.9; } }
+        .stardust-trail { position: absolute; border-radius: 50%; box-shadow: 0 0 12px currentColor; animation: trailWander linear infinite; }
+        @keyframes trailWander { 0% { transform: translate(0, 0); opacity: 1; } 100% { transform: translate(120px, 120px); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2>테마 갤러리</h2>
+            <p>1100개의 테마를 확인하고 클릭해보세요.</p>
+        </div>
+        <div class="theme-list-container" id="theme-list">
+            <!-- 자바스크립트를 통해 1100개의 테마 목록이 여기에 생성됩니다. -->
+        </div>
+    </div>
+
+    <div class="preview-area">
+        <div id="bg-effect-container"></div>
+        
+        <div class="mock-card">
+            <div class="mock-header">
+                <h1 id="preview-title">테마를 선택해주세요</h1>
+                <p id="preview-desc">좌측 목록에서 테마를 클릭하면 여기에 적용됩니다.</p>
+            </div>
+            
+            <div class="mock-widget">
+                <i class="fa-solid fa-palette" style="font-size: 24px; color: var(--primary-color); margin-bottom: 10px;"></i>
+                <h3 style="font-size: 16px; margin-bottom: 5px;">현재 테마 효과</h3>
+                <p style="font-size: 13px; color: var(--text-gray);" id="preview-effect">대기중</p>
+            </div>
+
+            <button class="mock-btn">
+                <i class="fa-solid fa-check"></i> 새담 인트라넷 적용 테스트
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // === 엔진 설정 ===
+        const uiStyles = ['glass', 'solid', 'glow'];
+        
+        const effectsList = [
+            'stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines', 'starPop', 'starSprinkle', 'glitterField', 'cometTwinkle', 'neonGeometryFlow',
+            'snowfall', 'fireflies', 'aurora', 'confetti', 'lanterns', 'rippleWaves', 'meteorShower', 'crystalPrisms', 'cosmicDust', 'floatingHearts', 'cyberLines', 'matrixDrops', 'autumnLeaves', 'circuitPaths', 'electricSparks', 'diamondPulse', 'lightPillars', 'magicRunes', 'plasmaOrbs', 'stardustTrails'
+        ]; 
+        
+        const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
+        const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
+
+        const generatedThemes = [];
+
+        for (let i = 0; i < 1100; i++) {
+            const hue = Math.floor((i / 1100) * 360);
+            const useComplementary = (i % 5 === 0);
+            const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+            
+            const effectType = effectsList[i % effectsList.length];
+            const uiStyle = uiStyles[i % uiStyles.length]; 
+            
+            const styleNameKOR = uiStyle === 'glass' ? "유리" : (uiStyle === 'solid' ? "솔리드" : "네온");
+            const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+            
+            let vars = {};
+            const primary = `hsl(${pointHue}, 70%, 50%)`;
+            const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
+            const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
+            
+            vars = {
+                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                "--text-dark": "#0f172a", "--text-gray": "#64748b", "--input-text": "#1e293b", 
+                "--effect-color1": `hsl(${hue}, 70%, 75%)`, 
+                "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, 
+                "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`
+            };
+
+            if (uiStyle === 'glass') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
+                vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
+                vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
+            } else if (uiStyle === 'solid') {
+                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
+                vars["--widget-bg"] = "#f1f5f9"; vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+            } else if (uiStyle === 'glow') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
+                vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
+                vars["--widget-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
+            }
+            
+            generatedThemes.push({ name: name, type: effectType, vars: vars });
+        }
+
+        window.onload = () => {
+            const listContainer = document.getElementById('theme-list');
+            const fragment = document.createDocumentFragment();
+            
+            generatedThemes.forEach((t, i) => {
+                const item = document.createElement('div');
+                item.className = 'theme-item';
+                item.id = `theme-item-${i}`;
+                item.onclick = () => applyTheme(i);
+                
+                // 테마 이름 옆에 (액션이름) 표기 추가
+                item.innerHTML = `
+                    <span class="theme-num">${i + 1}</span>
+                    <span class="theme-name">${t.name} <span class="action-name">(${t.type})</span></span>
+                `;
+                fragment.appendChild(item);
+            });
+            listContainer.appendChild(fragment);
+            applyTheme(0);
+        };
+
+        // DOM 요소 생성 헬퍼 함수
+        function buildElements(container, className, count, styleConfigurator) {
+            for(let i=0; i<count; i++) {
+                let el = document.createElement('div');
+                el.className = className;
+                styleConfigurator(el, i);
+                container.appendChild(el);
+            }
+        }
+
+        function applyTheme(index) {
+            document.querySelectorAll('.theme-item').forEach(el => el.classList.remove('active'));
+            const selectedItem = document.getElementById(`theme-item-${index}`);
+            if(selectedItem) {
+                selectedItem.classList.add('active');
+                selectedItem.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+
+            const t = generatedThemes[index];
+            for (const [key, value] of Object.entries(t.vars)) {
+                document.documentElement.style.setProperty(key, value);
+            }
+
+            document.getElementById('preview-title').innerText = t.name;
+            document.getElementById('preview-desc').innerText = `테마 인덱스: ${index + 1} / 1100`;
+            document.getElementById('preview-effect').innerText = `배경 효과: ${t.type.toUpperCase()}`;
+
+            const container = document.getElementById('bg-effect-container');
+            container.innerHTML = ''; 
+            
+            // 🌟 1. 개선된 STARS 로직
+            if (t.type === 'stars') {
+                buildElements(container, 'star-element', 80, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = Math.random() * 100 + '%';
+                    const size = Math.random() * 3 + 2;
+                    el.style.width = size + 'px'; el.style.height = size + 'px';
+                    // 테마 컬러에 맞게 별 색상 지정
+                    el.style.backgroundColor = i % 3 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.color = el.style.backgroundColor; 
+                    el.style.animationDuration = (Math.random() * 3 + 1.5) + 's';
+                    el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } 
+            // 🌟 2. 개선된 COMETTWINKLE 로직
+            else if (t.type === 'cometTwinkle') {
+                buildElements(container, 'clean-comet', 20, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.top = (Math.random() * 80 - 10) + '%';
+                    el.style.width = (Math.random() * 120 + 60) + 'px';
+                    const color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.color = color; // 가상요소(::before)의 발광 색상용
+                    el.style.background = `linear-gradient(90deg, ${color}, transparent)`;
+                    el.style.animationDuration = (Math.random() * 4 + 3) + 's';
+                    el.style.animationDelay = Math.random() * 6 + 's';
+                });
+            }
+            
+            // 나머지 효과들
+            else if (t.type === 'bubbles') {
+                buildElements(container, 'bubble', 15, el => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 25 + 10) + 'px';
+                    el.style.animationDuration = (Math.random() * 8 + 4) + 's';
+                });
+            } else if (t.type === 'blobs') {
+                container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div>`;
+            } else if (t.type === 'orbs') {
+                container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div>`;
+            } else if (t.type === 'waves') {
+                container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div>`;
+            } else if (t.type === 'geometry') {
+                buildElements(container, 'shape-box', 8, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 60 + 20) + 'px';
+                    el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                    el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                });
+            } else if (t.type === 'rings') {
+                buildElements(container, 'glass-ring', 4, (el, i) => {
+                    el.style.left = (Math.random() * 80 + 10) + '%'; el.style.top = (Math.random() * 80 + 10) + '%';
+                    el.style.width = el.style.height = (Math.random() * 200 + 100) + 'px';
+                    el.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                    el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                });
+            } else if (t.type === 'polygons') {
+                buildElements(container, 'polygon', 10, (el, i) => {
+                    el.className += (i%2===0 ? ' poly-triangle' : ' poly-hexagon');
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 80 + 30) + 'px';
+                    el.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                });
+            } else if (t.type === 'lines') {
+                buildElements(container, 'glowing-line line-pos', 8, (el, i) => {
+                    el.style.top = (Math.random() * 100) + '%';
+                    el.style.animationDuration = (Math.random() * 8 + 5) + 's';
+                    el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`;
+                });
+            } else if (t.type === 'starPop') {
+                buildElements(container, 'spark-pop-star', 20, (el, i) => {
+                    el.textContent = '✦'; el.style.left = Math.random() * 96 + '%'; el.style.top = Math.random() * 92 + '%';
+                    el.style.fontSize = (Math.random() * 20 + 12) + 'px'; el.style.animationDuration = (Math.random() * 3.8 + 2.2) + 's';
+                    el.style.color = `var(--effect-color${(i % 3) + 1})`;
+                });
+            } else if (t.type === 'starSprinkle') {
+                buildElements(container, 'sprinkle-star', 30, el => {
+                    el.style.width = el.style.height = (Math.random() * 8 + 5) + 'px';
+                    el.style.left = Math.random() * 98 + '%'; el.style.top = Math.random() * 94 + '%';
+                    el.style.animationDuration = (Math.random() * 4 + 2.8) + 's';
+                });
+            } else if (t.type === 'glitterField') {
+                buildElements(container, 'glitter-field-dot', 40, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.bottom = (Math.random() * 38 - 12) + '%';
+                    el.style.width = el.style.height = (Math.random() * 4 + 2) + 'px'; el.style.animationDuration = (Math.random() * 10 + 7) + 's';
+                    el.style.background = `var(--effect-color${(i % 3) + 1})`;
+                });
+            } else if (t.type === 'neonGeometryFlow') {
+                buildElements(container, 'geo-flow-shape diamond', 10, (el, i) => {
+                    el.style.width = el.style.height = (Math.random() * 24 + 12) + 'px';
+                    el.style.left = Math.random() * 96 + '%'; el.style.top = Math.random() * 88 + '%';
+                    el.style.background = `linear-gradient(135deg, rgba(255,255,255,0.82), var(--effect-color${(i % 3) + 1}), rgba(255,255,255,0.28))`;
+                    el.style.animationDuration = (Math.random() * 5 + 4) + 's';
+                });
+            } else if (t.type === 'snowfall') {
+                buildElements(container, 'snow-flake', 60, el => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 4 + 2) + 'px';
+                    el.style.animationDuration = (Math.random() * 5 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'fireflies') {
+                buildElements(container, 'firefly', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 5 + 3) + 'px';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'aurora') {
+                buildElements(container, 'aurora-band', 3, (el, i) => {
+                    el.style.top = (i * 20 - 10) + '%'; el.style.background = `var(--effect-color${i+1})`; el.style.animationDelay = (i * 2) + 's';
+                });
+            } else if (t.type === 'confetti') {
+                buildElements(container, 'confetti-piece', 40, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 8 + 4) + 'px'; el.style.height = (Math.random() * 15 + 8) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 3) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'lanterns') {
+                buildElements(container, 'lantern', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 15 + 10) + 'px'; el.style.height = (Math.random() * 25 + 15) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 8 + 6) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'rippleWaves') {
+                buildElements(container, 'ripple-ring', 6, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 100 + 50) + 'px';
+                    el.style.borderColor = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'meteorShower') {
+                buildElements(container, 'meteor', 20, (el) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.animationDuration = (Math.random() * 2 + 1) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'crystalPrisms') {
+                buildElements(container, 'crystal-prism', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 10 + 5) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'cosmicDust') {
+                buildElements(container, 'cosmic-dust', 30, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 80 + 30) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'floatingHearts') {
+                buildElements(container, 'floating-heart', 20, (el, i) => {
+                    el.textContent = '❤'; el.style.left = Math.random() * 100 + '%';
+                    el.style.color = i % 2 === 0 ? 'var(--primary-color)' : `var(--effect-color${(i%3)+1})`;
+                    el.style.fontSize = (Math.random() * 20 + 10) + 'px';
+                    el.style.animationDuration = (Math.random() * 6 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'cyberLines') {
+                buildElements(container, 'cyber-line', 10, (el, i) => {
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'matrixDrops') {
+                buildElements(container, 'matrix-drop', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'autumnLeaves') {
+                buildElements(container, 'autumn-leaf', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 20 + 10) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 6 + 4) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            } else if (t.type === 'circuitPaths') {
+                buildElements(container, 'circuit-path', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'electricSparks') {
+                buildElements(container, 'electric-spark', 20, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = (Math.random() * 30 + 10) + 'px'; el.style.height = '2px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (t.type === 'diamondPulse') {
+                buildElements(container, 'diamond-pulse', 15, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 40 + 20) + 'px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 2 + 1) + 's'; el.style.animationDelay = Math.random() * 2 + 's';
+                });
+            } else if (t.type === 'lightPillars') {
+                buildElements(container, 'light-pillar', 8, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.width = (Math.random() * 80 + 40) + 'px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'magicRunes') {
+                const runes = ['✧', '✦', '✶', '✵', '❖', '✣'];
+                buildElements(container, 'magic-rune', 18, (el, i) => {
+                    el.textContent = runes[Math.floor(Math.random() * runes.length)];
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.color = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 4 + 2) + 's'; el.style.animationDelay = Math.random() * 4 + 's';
+                });
+            } else if (t.type === 'plasmaOrbs') {
+                buildElements(container, 'plasma-orb', 12, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 50 + 20) + 'px';
+                    el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 3 + 2) + 's'; el.style.animationDelay = Math.random() * 3 + 's';
+                });
+            } else if (t.type === 'stardustTrails') {
+                buildElements(container, 'stardust-trail', 25, (el, i) => {
+                    el.style.left = Math.random() * 100 + '%'; el.style.top = Math.random() * 100 + '%';
+                    el.style.width = el.style.height = (Math.random() * 6 + 3) + 'px';
+                    el.style.color = `var(--effect-color${(i%3)+1})`; el.style.background = `var(--effect-color${(i%3)+1})`;
+                    el.style.animationDuration = (Math.random() * 5 + 3) + 's'; el.style.animationDelay = Math.random() * 5 + 's';
+                });
+            }
+        }
+    </script>
+</body>
+</html>

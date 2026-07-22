@@ -1,0 +1,617 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .admin-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; color: var(--text-dark, #1e293b); }
+    .admin-side { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 12px; height: fit-content; box-shadow: var(--dashboard-card-shadow, 0 8px 24px rgba(15,23,42,.05)); }
+    .admin-side-title { font-weight: 800; font-size: 15px; padding: 10px; display: flex; gap: 8px; align-items: center; }
+    .admin-nav-link { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 8px; color: var(--text-gray, #64748b); text-decoration: none; font-weight: 700; font-size: 14px; }
+    .admin-nav-link:hover, .admin-nav-link.active { background: rgba(74,144,226,.12); color: var(--primary-color, #4a90e2); }
+    .admin-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+    
+    /* 1. 상단 메뉴 띠 (테마 색상 자동 적용) */
+    .page-ribbon { 
+        height: 6px; 
+        background: linear-gradient(90deg, var(--primary-color, #4a90e2), var(--effect-color1, #93c5fd)); 
+        border-radius: 6px; 
+        margin-bottom: 16px; 
+    }
+
+    .admin-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 14px; }
+    .admin-title { margin: 0; font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 10px; }
+    .admin-subtitle { margin-top: 6px; color: var(--text-gray, #64748b); font-weight: 600; font-size: 13px; }
+    .panel { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 16px; box-shadow: var(--dashboard-card-shadow, 0 8px 24px rgba(15,23,42,.05)); }
+    .panel-title { font-size: 17px; font-weight: 900; margin: 0; display: flex; gap: 8px; align-items: center; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .stat-box { border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 14px; background: rgba(255,255,255,.55); }
+    .stat-label { color: var(--text-gray, #64748b); font-weight: 800; font-size: 12px; }
+    .stat-value { margin-top: 8px; font-size: 22px; font-weight: 900; color: var(--primary-color, #4a90e2); }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th, .data-table td { padding: 10px 9px; border-bottom: 1px solid var(--border-color, #e2e8f0); text-align: left; vertical-align: middle; }
+    .data-table th { color: var(--text-gray, #64748b); font-size: 12px; font-weight: 900; background: rgba(248,250,252,.7); }
+    
+    /* 게시판 생성용 새로운 와이드 그리드 시스템 */
+    .create-form-section { display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color, #e2e8f0); }
+    .board-create-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
+    .permission-create-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; }
+    
+    /* 제목과 폼을 하나의 묶음으로 묶는 그룹 테두리 박스 */
+    .form-group-wrapper {
+        border: 1px solid var(--border-color, #cbd5e1);
+        border-radius: 8px;
+        padding: 16px 18px;
+        background: rgba(248, 250, 252, 0.4);
+    }
+    
+    .form-section-title { 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        font-size: 14px; 
+        font-weight: 900; 
+        color: var(--primary-color, #4a90e2); 
+        margin-bottom: 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px dashed rgba(74, 144, 226, 0.3); /* 은은한 점선 구분선 */
+    }
+    
+    .form-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+    .form-field label { font-size: 12px; color: var(--text-gray, #64748b); font-weight: 800; }
+    .form-field input, .form-field select, .form-field textarea { 
+        width: 100%; 
+        border: 1px solid var(--border-color, #cbd5e1); 
+        border-radius: 8px; 
+        padding: 9px 10px; 
+        background: var(--input-bg, #fff); 
+        color: var(--input-text, #1e293b); 
+        font: inherit; 
+        font-size: 13px; 
+        box-sizing: border-box; 
+    }
+    
+    /* 2. 게시판 목록 내 명칭 & 설명 그룹 */
+    .table-input-group { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 6px; 
+    }
+    .table-input { 
+        width: 100%; 
+        border: 1px solid var(--border-color, #cbd5e1); 
+        border-radius: 6px; 
+        padding: 7px 10px; 
+        font-size: 13px; 
+        background: var(--input-bg, #f8fafc); 
+        color: var(--input-text, #1e293b); 
+        transition: all 0.2s; 
+        box-sizing: border-box; 
+    }
+    .table-input:focus { 
+        outline: none; 
+        border-color: var(--primary-color, #4a90e2); 
+        background: #fff; 
+        box-shadow: 0 0 0 2px rgba(74,144,226,.2); 
+    }
+
+    /* 3. 권한 수정 입력란 뱃지(Badge) 스타일로 개선 */
+    .permission-inputs { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 6px; 
+        align-items: center; 
+    }
+    .perm-badge { 
+        display: inline-flex; 
+        align-items: center; 
+        background: rgba(100,116,139,.06); 
+        border: 1px solid var(--border-color, #e2e8f0); 
+        border-radius: 6px; 
+        padding: 3px 6px; 
+        font-size: 11px; 
+    }
+    .perm-badge span { 
+        color: var(--text-gray, #64748b); 
+        font-weight: 700; 
+        margin-right: 4px; 
+    }
+    .perm-badge input { 
+        width: 32px; 
+        border: none; 
+        background: transparent; 
+        font-weight: 900; 
+        color: var(--primary-color, #4a90e2); 
+        text-align: center; 
+        outline: none; 
+        font-size: 12px; 
+    }
+    .perm-badge input:focus { 
+        background: #fff; 
+        border-radius: 4px; 
+        box-shadow: 0 0 0 1px var(--primary-color, #4a90e2); 
+    }
+
+    .table-actions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 8px; padding: 9px 12px; font-weight: 900; cursor: pointer; text-decoration: none; font-size: 13px; white-space: nowrap; }
+    .btn-primary { background: var(--primary-color, #4a90e2); color: #fff; }
+    .btn-ghost { background: rgba(100,116,139,.11); color: var(--text-dark, #1e293b); }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-small { padding: 7px 9px; font-size: 12px; }
+    .muted { color: var(--text-gray, #64748b); font-weight: 600; }
+    
+    .mono { font-family: Consolas, monospace; font-size: 15px; font-weight: 800; color: #334155; }
+    .row-num { font-size: 15px; font-weight: 900; color: #64748b; text-align: center; }
+    
+    .disk-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 14px; }
+    .root-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; }
+    .root-card.active { border-color: var(--primary-color, #4a90e2); background: rgba(74,144,226,.11); }
+    .theme-preview { min-height: 260px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--preview-bg, #f8fafc); }
+    .theme-card { width: min(420px, 80%); background: var(--preview-card, rgba(255,255,255,.75)); border: 1px solid var(--preview-border, rgba(255,255,255,.9)); box-shadow: var(--preview-shadow, 0 16px 36px rgba(15,23,42,.14)); border-radius: 8px; padding: 24px; text-align: center; position: relative; z-index: 1; }
+    .theme-list { max-height: 320px; overflow: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; }
+    .theme-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border-color, #e2e8f0); cursor: pointer; }
+    .theme-item:hover { background: rgba(74,144,226,.09); }
+    .empty-note { padding: 34px; text-align: center; color: var(--text-gray, #64748b); font-weight: 700; }
+    
+    @media (max-width: 980px) {
+        .admin-shell, .disk-layout, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
+    }
+
+    /* 상단 메뉴 테마 색상 띠 (테두리를 덮으며 둥글게) */
+    .admin-side, .panel {
+        position: relative;
+    }
+    .admin-side::before, .panel::before {
+        content: "";
+        position: absolute;
+        top: -1px; left: -1px; right: -1px;
+        height: 6px;
+        background: linear-gradient(90deg, var(--primary-color, #4a90e2), var(--effect-color1, #93c5fd));
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        z-index: 10;
+    }
+
+    /* PC화면에서 좌측 메뉴판 높이를 우측 첫번째 패널과 정렬 */
+    @media (min-width: 981px) {
+        .admin-side { margin-top: 78px; }
+    }
+</style>
+
+<div class="admin-shell">
+    <aside class="admin-side">
+        <div class="admin-side-title"><i class="fa-solid fa-screwdriver-wrench"></i> 통합관리</div>
+        {% for key, label, icon, href in admin_tabs %}
+            <a class="admin-nav-link {% if active_section == key %}active{% endif %}" href="{{ href }}">
+                <i class="fa-solid {{ icon }}"></i>{{ label }}
+            </a>
+        {% endfor %}
+    </aside>
+
+    <section class="admin-main">
+
+        {% if active_section == 'boards' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-clipboard-list"></i> 게시판관리</h1>
+                <div class="admin-subtitle">게시판 생성, 전체 목록, 권한, 게시물 수, 사용 용량을 한 화면에서 관리합니다.</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="panel-title"><i class="fa-solid fa-folder-plus"></i> 신규 게시판 생성</h2>
+                <button type="button" class="btn btn-primary" id="toggleFormBtn" onclick="toggleBoardForm()">
+                    <i class="fa-solid fa-plus"></i> 게시판 생성하기
+                </button>
+            </div>
+            
+            <!-- 처음에 display: none; 으로 숨겨둠 -->
+            <form id="boardCreateForm" class="create-form-section" style="display: none;">
+                
+                <!-- 그룹 테두리로 묶인 텍스트 설정 박스 -->
+                <div class="form-group-wrapper">
+                    <div class="form-section-title"><i class="fa-solid fa-file-signature"></i> 텍스트 설정</div>
+                    <div class="board-create-grid">
+                        <div class="form-field"><label>영문 ID</label><input name="name_en" placeholder="notice" required></div>
+                        <div class="form-field"><label>게시판명</label><input name="name_kr" placeholder="공지사항" required></div>
+                        <div class="form-field"><label>설명</label><input name="desc_text" placeholder="게시판 설명"></div>
+                    </div>
+                </div>
+                
+                <!-- 그룹 테두리로 묶인 권한 설정 박스 -->
+                <div class="form-group-wrapper">
+                    <div class="form-section-title"><i class="fa-solid fa-shield-halved"></i> 권한 설정</div>
+                    <div class="permission-create-grid">
+                        <div class="form-field"><label>접근</label><input name="lvl_access" type="number" min="0" max="14" value="10"></div>
+                        <div class="form-field"><label>읽기</label><input name="lvl_read" type="number" min="0" max="14" value="10"></div>
+                        <div class="form-field"><label>쓰기</label><input name="lvl_write" type="number" min="0" max="14" value="2"></div>
+                        <div class="form-field"><label>삭제</label><input name="lvl_delete" type="number" min="0" max="14" value="2"></div>
+                        <div class="form-field"><label>댓글</label><input name="lvl_comment" type="number" min="0" max="14" value="10"></div>
+                    </div>
+                </div>
+                
+                <!-- 우측 하단 폼 제출 버튼 -->
+                <div style="display:flex; justify-content:flex-end; margin-top:2px;">
+                    <button class="btn btn-primary" type="submit" style="padding: 10px 24px;"><i class="fa-solid fa-check"></i> 생성 완료</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-list"></i> 전체게시판 목록</h2>
+            <table class="data-table">
+                <thead><tr><th style="width:48px; text-align: center;">번호</th><th>게시판 ID</th><th>게시판명</th><th>권한 access/read/write/delete/comment</th><th>게시물</th><th>조회수</th><th>댓글</th><th>사용용량</th><th style="text-align: center;">관리</th></tr></thead>
+                <tbody>
+                    {% for board in boards %}
+                    <tr>
+                        <td class="row-num">{{ loop.index }}</td>
+                        <td class="mono">{{ board.name_en }}</td>
+                        <td>
+                            <div class="table-input-group">
+                                <input class="table-input" name="name_kr" value="{{ board.name_kr }}" form="boardUpdate{{ board.id }}" placeholder="게시판명">
+                                <input class="table-input" name="desc_text" value="{{ board.desc_text or '' }}" form="boardUpdate{{ board.id }}" placeholder="게시판 설명">
+                            </div>
+                        </td>
+                        <td>
+                            <div class="permission-inputs">
+                                <label class="perm-badge" title="접근">
+                                    <span>접근</span>
+                                    <input name="lvl_access" type="number" min="0" max="14" value="{{ board.lvl_access }}" form="boardUpdate{{ board.id }}">
+                                </label>
+                                <label class="perm-badge" title="읽기">
+                                    <span>읽기</span>
+                                    <input name="lvl_read" type="number" min="0" max="14" value="{{ board.lvl_read }}" form="boardUpdate{{ board.id }}">
+                                </label>
+                                <label class="perm-badge" title="쓰기">
+                                    <span>쓰기</span>
+                                    <input name="lvl_write" type="number" min="0" max="14" value="{{ board.lvl_write }}" form="boardUpdate{{ board.id }}">
+                                </label>
+                                <label class="perm-badge" title="삭제">
+                                    <span>삭제</span>
+                                    <input name="lvl_delete" type="number" min="0" max="14" value="{{ board.lvl_delete }}" form="boardUpdate{{ board.id }}">
+                                </label>
+                                <label class="perm-badge" title="댓글">
+                                    <span>댓글</span>
+                                    <input name="lvl_comment" type="number" min="0" max="14" value="{{ board.lvl_comment }}" form="boardUpdate{{ board.id }}">
+                                </label>
+                            </div>
+                        </td>
+                        <td>{{ board.post_count }}개</td>
+                        <td>{{ board.view_count }}</td>
+                        <td>{{ board.comment_count }}</td>
+                        <td>{{ format_size(board.file_size) }}</td>
+                        <td>
+                            <form id="boardUpdate{{ board.id }}" action="/admin/boards/{{ board.id }}/permissions" method="post"></form>
+                            <div class="table-actions">
+                                <button class="btn btn-primary btn-small" type="submit" form="boardUpdate{{ board.id }}"><i class="fa-solid fa-check"></i>수정사항 저장</button>
+                                <button class="btn btn-danger btn-small" type="button" onclick='deleteBoard({{ board.id }}, {{ board.name_kr|tojson }}, {{ board.post_count }}, {{ board.comment_count }})'><i class="fa-solid fa-trash"></i>삭제</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="empty-note">등록된 게시판이 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if active_section == 'disk' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-hard-drive"></i> 디스크관리</h1>
+                <div class="admin-subtitle">메뉴별 사용량을 확인하고 허용된 데이터 폴더 안의 파일을 접근/삭제합니다.</div>
+            </div>
+            <div class="muted">전체 {{ disk_stats.used }} / {{ disk_stats.total }} ({{ disk_stats.percent }}%)</div>
+        </div>
+        <div class="disk-layout">
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-layer-group"></i> 메뉴별 용량</h2>
+                {% for root in roots %}
+                <a class="root-card {% if root.key == selected_root.key %}active{% endif %}" href="/admin/disk?root={{ root.key }}">
+                    <span><i class="fa-solid {{ root.icon }}"></i> {{ root.label }}</span>
+                    <strong>{{ root.size_text }}</strong>
+                </a>
+                {% endfor %}
+            </div>
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-folder-open"></i> {{ selected_root.label }} / {{ current_path }}</h2>
+                <table class="data-table">
+                    <thead><tr><th>이름</th><th>크기</th><th>수정일</th><th>작업</th></tr></thead>
+                    <tbody>
+                        {% if parent_path != None %}
+                        <tr><td colspan="4"><a class="btn btn-ghost btn-small" href="/admin/disk?root={{ selected_root.key }}&path={{ parent_path }}"><i class="fa-solid fa-level-up-alt"></i>상위 폴더</a></td></tr>
+                        {% endif %}
+                        {% for file in files %}
+                        <tr>
+                            <td>
+                                {% if file.is_dir %}
+                                <a href="/admin/disk?root={{ selected_root.key }}&path={{ file.rel_path|urlencode }}"><i class="fa-solid fa-folder" style="color:#f59e0b;"></i> {{ file.name }}</a>
+                                {% else %}
+                                <a href="/admin/disk/download?root={{ selected_root.key }}&path={{ file.rel_path|urlencode }}"><i class="fa-solid fa-file"></i> {{ file.name }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ file.size }}</td>
+                            <td>{{ file.mtime }}</td>
+                            <td><button class="btn btn-danger btn-small" onclick='deleteDiskItem({{ selected_root.key|tojson }}, {{ file.rel_path|tojson }})'><i class="fa-solid fa-trash"></i>삭제</button></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="empty-note">표시할 파일이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if active_section == 'themes' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-palette"></i> 테마관리</h1>
+                <div class="admin-subtitle">테마를 미리보고 전체 메뉴 적용, 미적용, 사용자 테마 추가/삭제를 관리합니다.</div>
+            </div>
+            <button class="btn btn-ghost" onclick="clearManagedTheme()"><i class="fa-solid fa-ban"></i>미적용</button>
+        </div>
+        <div class="grid-2">
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-wand-magic-sparkles"></i> 추천 테마</h2>
+                <div class="theme-list" id="themeList"></div>
+            </div>
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-eye"></i> 미리보기</h2>
+                <div class="theme-preview" id="themePreview">
+                    <div class="theme-card">
+                        <h3 id="themePreviewTitle" style="margin:0 0 8px;">테마 선택</h3>
+                        <p id="themePreviewDesc" class="muted" style="margin:0 0 18px;">왼쪽 목록에서 테마를 선택하세요.</p>
+                        <button class="btn btn-primary" onclick="applySelectedTheme()"><i class="fa-solid fa-check"></i>전체 메뉴 적용</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-box-archive"></i> 추가한 테마</h2>
+            <table class="data-table">
+                <thead><tr><th>테마명</th><th>효과</th><th>등록일</th><th>작업</th></tr></thead>
+                <tbody>
+                    {% for theme in custom_themes %}
+                    <tr>
+                        <td>{{ theme.name }}</td><td>{{ theme.effect }}</td><td>{{ theme.created_at }}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick='applyRawTheme({ name: {{ theme.name|tojson }}, effect: {{ theme.effect|tojson }}, vars: {{ theme.vars_json|safe }} })'><i class="fa-solid fa-check"></i>적용</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteCustomTheme({{ theme.id }})"><i class="fa-solid fa-trash"></i>삭제</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-note">아직 추가한 테마가 없습니다. 추천 테마를 선택한 뒤 사용자 테마로 저장할 수 있습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button class="btn btn-ghost" style="margin-top:12px;" onclick="saveSelectedAsCustom()"><i class="fa-solid fa-plus"></i>현재 선택 테마 추가</button>
+        </div>
+        {% endif %}
+
+        {% if active_section == 'stats' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-chart-line"></i> 이용통계</h1>
+                <div class="admin-subtitle">일별 로그인/로그아웃, 메뉴별, 회원별 이용 현황을 확인합니다.</div>
+            </div>
+        </div>
+        <div class="grid-3">
+            {% for label, value in content_counts.items() %}
+            <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ value }}</div></div>
+            {% endfor %}
+        </div>
+        <div class="grid-2">
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-right-to-bracket"></i> 일별 로그인/로그아웃</h2>
+                <table class="data-table"><thead><tr><th>일자</th><th>로그인</th><th>로그아웃</th></tr></thead><tbody>
+                    {% for row in daily_login %}<tr><td>{{ row.day }}</td><td>{{ row.login_count }}</td><td>{{ row.logout_count }}</td></tr>{% else %}<tr><td colspan="3" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
+                </tbody></table>
+            </div>
+            <div class="panel">
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-bars-progress"></i> 메뉴별 이용통계</h2>
+                <table class="data-table"><thead><tr><th>메뉴</th><th>접속</th></tr></thead><tbody>
+                    {% for row in menu_stats %}<tr><td>{{ row.menu_name }}</td><td>{{ row.count }}</td></tr>{% else %}<tr><td colspan="2" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
+                </tbody></table>
+            </div>
+        </div>
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-users-viewfinder"></i> 회원별 이용통계</h2>
+            <table class="data-table"><thead><tr><th>회원</th><th>사번</th><th>접속</th><th>최근 사용</th></tr></thead><tbody>
+                {% for row in user_stats %}<tr><td>{{ row.user_name }}</td><td>{{ row.emp_no }}</td><td>{{ row.count }}</td><td>{{ row.last_used }}</td></tr>{% else %}<tr><td colspan="4" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
+            </tbody></table>
+        </div>
+        {% endif %}
+
+        {% if active_section == 'settings' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-user-shield"></i> Admin설정</h1>
+                <div class="admin-subtitle">Admin 계정과 핵심 관리자 상태를 확인하고 비밀번호를 재설정합니다.</div>
+            </div>
+        </div>
+        <div class="grid-3">
+            {% for label, value in counts.items() %}
+            <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ value }}</div></div>
+            {% endfor %}
+        </div>
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-key"></i> Admin 비밀번호 재설정</h2>
+            {% if admin_user %}
+            <p class="muted">admin 계정: {{ admin_user.name }} / {{ admin_user.position }} / Level {{ admin_user.level }}</p>
+            <form action="/admin/settings/admin-password" method="post" class="form-row" onsubmit="return confirm('Admin 비밀번호를 변경하시겠습니까?');">
+                <div class="form-field"><label>새 비밀번호</label><input type="password" name="new_password" required></div>
+                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-key"></i>재설정</button>
+            </form>
+            {% else %}
+            <div class="empty-note">admin 계정을 찾을 수 없습니다.</div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+</div>
+
+<script>
+// 이미 존재하는 게시판의 영문 ID 목록을 배열로 가져옵니다 (중복 검증용)
+const existingBoardIds = [
+    {% if boards %}
+        {% for board in boards %}
+            {{ board.name_en|tojson }}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    {% endif %}
+];
+
+// 게시판 생성 폼 열기/닫기 토글 함수
+function toggleBoardForm() {
+    const form = document.getElementById('boardCreateForm');
+    const btn = document.getElementById('toggleFormBtn');
+    
+    if (form.style.display === 'none') {
+        form.style.display = 'flex';
+        btn.innerHTML = '<i class="fa-solid fa-minus"></i> 닫기';
+        btn.classList.replace('btn-primary', 'btn-ghost');
+    } else {
+        form.style.display = 'none';
+        btn.innerHTML = '<i class="fa-solid fa-plus"></i> 게시판 생성하기';
+        btn.classList.replace('btn-ghost', 'btn-primary');
+    }
+}
+
+const sampleThemes = [
+    { name: '클린 스카이', effect: 'blobs', vars: { '--body-bg': 'linear-gradient(135deg,#eef7ff,#f8fbff)', '--primary-color': '#2563eb', '--primary-dark': '#1d4ed8', '--card-bg': 'rgba(255,255,255,.78)', '--card-border': 'rgba(191,219,254,.9)', '--card-shadow': '0 14px 32px rgba(37,99,235,.12)', '--widget-bg': 'rgba(255,255,255,.72)', '--widget-border': 'rgba(191,219,254,.8)', '--effect-color1': '#93c5fd', '--effect-color2': '#bfdbfe', '--effect-color3': '#60a5fa' } },
+    { name: '민트 포커스', effect: 'orbs', vars: { '--body-bg': 'linear-gradient(135deg,#ecfdf5,#f8fafc)', '--primary-color': '#059669', '--primary-dark': '#047857', '--card-bg': 'rgba(255,255,255,.82)', '--card-border': 'rgba(167,243,208,.9)', '--card-shadow': '0 14px 32px rgba(5,150,105,.12)', '--widget-bg': 'rgba(240,253,250,.8)', '--widget-border': 'rgba(153,246,228,.8)', '--effect-color1': '#6ee7b7', '--effect-color2': '#99f6e4', '--effect-color3': '#34d399' } },
+    { name: '로즈 데스크', effect: 'starSprinkle', vars: { '--body-bg': 'linear-gradient(135deg,#fff1f2,#f8fafc)', '--primary-color': '#e11d48', '--primary-dark': '#be123c', '--card-bg': 'rgba(255,255,255,.82)', '--card-border': 'rgba(254,205,211,.95)', '--card-shadow': '0 14px 32px rgba(225,29,72,.11)', '--widget-bg': 'rgba(255,241,242,.8)', '--widget-border': 'rgba(254,205,211,.85)', '--effect-color1': '#fda4af', '--effect-color2': '#fecdd3', '--effect-color3': '#fb7185' } },
+    { name: '앰버 노트', effect: 'geometry', vars: { '--body-bg': 'linear-gradient(135deg,#fffbeb,#f8fafc)', '--primary-color': '#d97706', '--primary-dark': '#b45309', '--card-bg': 'rgba(255,255,255,.82)', '--card-border': 'rgba(253,230,138,.9)', '--card-shadow': '0 14px 32px rgba(217,119,6,.12)', '--widget-bg': 'rgba(255,251,235,.8)', '--widget-border': 'rgba(253,230,138,.85)', '--effect-color1': '#fbbf24', '--effect-color2': '#fde68a', '--effect-color3': '#f59e0b' } }
+];
+let selectedTheme = sampleThemes[0];
+
+function renderThemeList() {
+    const list = document.getElementById('themeList');
+    if (!list) return;
+    list.innerHTML = sampleThemes.map((theme, index) => `
+        <div class="theme-item" onclick="selectTheme(${index})">
+            <strong>${theme.name}</strong><span class="muted">${theme.effect}</span>
+        </div>
+    `).join('');
+    selectTheme(0);
+}
+
+function selectTheme(index) {
+    selectedTheme = sampleThemes[index];
+    const preview = document.getElementById('themePreview');
+    if (!preview) return;
+    preview.style.setProperty('--preview-bg', selectedTheme.vars['--body-bg']);
+    preview.style.setProperty('--preview-card', selectedTheme.vars['--card-bg']);
+    preview.style.setProperty('--preview-border', selectedTheme.vars['--card-border']);
+    preview.style.setProperty('--preview-shadow', selectedTheme.vars['--card-shadow']);
+    preview.style.setProperty('--primary-color', selectedTheme.vars['--primary-color']);
+    document.getElementById('themePreviewTitle').textContent = selectedTheme.name;
+    document.getElementById('themePreviewDesc').textContent = `배경 효과: ${selectedTheme.effect}`;
+}
+
+async function applyRawTheme(theme) {
+    const res = await fetch('/admin/themes/apply', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(theme)
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || '테마 적용에 실패했습니다.');
+    alert('테마가 전체 메뉴에 적용되었습니다.');
+    location.reload();
+}
+
+function applySelectedTheme() {
+    applyRawTheme(selectedTheme);
+}
+
+async function clearManagedTheme() {
+    if (!confirm('전체 메뉴 적용 테마를 해제하시겠습니까?')) return;
+    await fetch('/admin/themes/clear', { method: 'POST' });
+    alert('테마 적용이 해제되었습니다.');
+    location.reload();
+}
+
+async function saveSelectedAsCustom() {
+    const name = prompt('추가할 테마명을 입력하세요.', selectedTheme.name);
+    if (!name) return;
+    const res = await fetch('/admin/themes/custom', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ ...selectedTheme, name })
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || '테마 추가에 실패했습니다.');
+    location.reload();
+}
+
+async function deleteCustomTheme(id) {
+    if (!confirm('이 테마를 삭제하시겠습니까?')) return;
+    await fetch(`/admin/themes/custom/${id}/delete`, { method: 'POST' });
+    location.reload();
+}
+
+async function deleteBoard(boardId, boardName, postCount, commentCount) {
+    const warning = [
+        `[${boardName}] 게시판을 삭제합니다.`,
+        `게시물 ${postCount}개, 댓글 ${commentCount}개와 첨부파일이 함께 삭제됩니다.`,
+        '삭제 후에는 되돌릴 수 없습니다.',
+        '',
+        '정말 삭제하시겠습니까?'
+    ].join('\n');
+    if (!confirm(warning)) return;
+
+    const secondCheck = prompt('삭제하려면 게시판명을 그대로 입력하세요.');
+    if (secondCheck !== boardName) {
+        alert('게시판명이 일치하지 않아 삭제를 취소했습니다.');
+        return;
+    }
+
+    const res = await fetch(`/admin/boards/${boardId}/delete`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || '게시판 삭제에 실패했습니다.');
+    alert(data.message || '게시판을 삭제했습니다.');
+    location.reload();
+}
+
+async function deleteDiskItem(root, path) {
+    if (!confirm(`삭제하시겠습니까?\n${path}`)) return;
+    const formData = new FormData();
+    formData.append('root', root);
+    formData.append('path', path);
+    const res = await fetch('/admin/disk/delete', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || '삭제에 실패했습니다.');
+    location.reload();
+}
+
+const boardCreateForm = document.getElementById('boardCreateForm');
+if (boardCreateForm) {
+    boardCreateForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const data = Object.fromEntries(new FormData(boardCreateForm).entries());
+        
+        // 폼 제출 전 영문 ID 중복 검증 로직
+        if (existingBoardIds.includes(data.name_en)) {
+            alert(`'${data.name_en}'(은)는 이미 사용 중인 영문 ID입니다. 다른 ID를 입력해 주세요.`);
+            const idInput = boardCreateForm.querySelector('input[name="name_en"]');
+            if(idInput) idInput.focus(); // 중복 시 해당 입력창으로 포커스 이동
+            return; 
+        }
+
+        const res = await fetch('/admin/boards/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (!res.ok) return alert(result.message || '게시판 생성에 실패했습니다.');
+        location.reload();
+    });
+}
+
+renderThemeList();
+</script>
+{% endblock %}

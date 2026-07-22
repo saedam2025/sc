@@ -1,0 +1,1085 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+    .aim-page {
+        --aim-primary: var(--primary-color, #2563eb);
+        --aim-primary-soft: color-mix(in srgb, var(--aim-primary) 10%, transparent);
+        --aim-card: var(--card-bg, #ffffff);
+        --aim-border: var(--card-border, var(--border-color, #dbe3ef));
+        --aim-text: var(--text-color, #172033);
+        --aim-muted: var(--text-gray, #64748b);
+        --aim-surface: var(--widget-bg, #f7f9fc);
+        --aim-hover: var(--widget-hover, #edf3fb);
+        min-height: calc(100vh - 112px);
+        color: var(--aim-text);
+    }
+    .aim-page *, .aim-page *::before, .aim-page *::after { box-sizing: border-box; }
+    .aim-page button, .aim-page input, .aim-page select, .aim-page textarea { font: inherit; }
+    .aim-page button { color: inherit; }
+    .aim-page [hidden] { display: none !important; }
+    .aim-page .sr-only, .aim-modal-backdrop .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+
+    .aim-hero {
+        display: flex; align-items: center; justify-content: space-between; gap: 18px;
+        margin: 4px 0 18px; padding: 20px 24px; border: 1px solid var(--aim-border);
+        border-radius: 20px; background:
+            radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--aim-primary) 17%, transparent), transparent 32%),
+            var(--aim-card); box-shadow: var(--card-shadow, 0 10px 35px rgba(15, 23, 42, .07));
+    }
+    .aim-hero-copy { display: flex; align-items: center; gap: 15px; min-width: 0; }
+    .aim-hero-icon {
+        width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center;
+        border-radius: 16px; background: var(--aim-primary); color: white; font-size: 1.35rem;
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--aim-primary) 28%, transparent);
+    }
+    .aim-hero h1 { margin: 0; font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.035em; }
+    .aim-hero p { margin: 6px 0 0; color: var(--aim-muted); font-size: .92rem; line-height: 1.5; }
+    .aim-system-state { display: flex; align-items: center; gap: 8px; color: var(--aim-muted); font-size: .82rem; white-space: nowrap; }
+    .aim-system-dot { width: 9px; height: 9px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 5px rgba(34,197,94,.12); }
+
+    .aim-layout { display: grid; grid-template-columns: 292px minmax(0, 1fr); gap: 18px; align-items: start; }
+    .aim-card { background: var(--aim-card); border: 1px solid var(--aim-border); border-radius: 18px; box-shadow: var(--card-shadow, 0 8px 28px rgba(15,23,42,.055)); }
+    .aim-sidebar { position: sticky; top: 88px; overflow: hidden; }
+    .aim-sidebar-head { padding: 18px; border-bottom: 1px solid var(--aim-border); }
+    .aim-sidebar-title { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 13px; }
+    .aim-sidebar-title h2 { margin: 0; font-size: 1.02rem; }
+    .aim-count-badge { min-width: 27px; height: 27px; display: inline-grid; place-items: center; padding: 0 8px; border-radius: 999px; background: var(--aim-primary-soft); color: var(--aim-primary); font-weight: 800; font-size: .78rem; }
+    .aim-search { position: relative; }
+    .aim-search > i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; }
+    .aim-search input { width: 100%; min-height: 40px; padding: 9px 12px 9px 35px; border: 1px solid var(--aim-border); border-radius: 11px; background: var(--aim-surface); color: var(--aim-text); outline: none; }
+    .aim-search input:focus { border-color: var(--aim-primary); box-shadow: 0 0 0 3px var(--aim-primary-soft); }
+    .aim-group-list { display: grid; gap: 6px; max-height: 375px; overflow: auto; padding: 10px; }
+    .aim-group-item { width: 100%; display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 13px; padding: 10px; background: transparent; text-align: left; cursor: pointer; transition: .18s ease; }
+    .aim-group-item:hover { background: var(--aim-hover); }
+    .aim-group-item.active { background: var(--aim-primary-soft); border-color: color-mix(in srgb, var(--aim-primary) 33%, var(--aim-border)); }
+    .aim-group-symbol { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: var(--aim-surface); color: var(--aim-primary); }
+    .aim-group-item.active .aim-group-symbol { background: var(--aim-primary); color: #fff; }
+    .aim-group-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; font-weight: 800; }
+    .aim-group-meta { display: block; margin-top: 3px; color: var(--aim-muted); font-size: .72rem; }
+    .aim-sidebar-empty { padding: 32px 18px; color: var(--aim-muted); text-align: center; font-size: .84rem; line-height: 1.55; }
+    .aim-group-config { border-top: 1px solid var(--aim-border); padding: 16px 18px; }
+    .aim-section-label { margin: 0 0 10px; color: var(--aim-muted); font-size: .75rem; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+    .aim-feature-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .aim-feature-chip { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border: 1px solid transparent; border-radius: 999px; background: var(--aim-surface); color: var(--aim-muted); font-size: .72rem; font-weight: 700; cursor: pointer; }
+    .aim-feature-chip:hover { border-color: color-mix(in srgb, var(--aim-primary) 35%, var(--aim-border)); }
+    .aim-feature-chip.on { background: var(--aim-primary-soft); color: var(--aim-primary); }
+    .aim-sidebar-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 18px 18px; }
+
+    .aim-btn { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid var(--aim-border); border-radius: 11px; padding: 9px 14px; background: var(--aim-card); color: var(--aim-text); font-weight: 750; font-size: .84rem; cursor: pointer; transition: .17s ease; text-decoration: none; white-space: nowrap; }
+    .aim-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--aim-primary) 55%, var(--aim-border)); color: var(--aim-primary); transform: translateY(-1px); }
+    .aim-btn:focus-visible, .aim-icon-btn:focus-visible, .aim-tab:focus-visible, .aim-mode-card:focus-visible { outline: 3px solid var(--aim-primary-soft); outline-offset: 2px; }
+    .aim-btn:disabled { opacity: .48; cursor: not-allowed; }
+    .aim-btn.primary { background: var(--aim-primary); border-color: var(--aim-primary); color: #fff; box-shadow: 0 7px 15px color-mix(in srgb, var(--aim-primary) 22%, transparent); }
+    .aim-btn.primary:hover:not(:disabled) { color: #fff; filter: brightness(.97); }
+    .aim-btn.danger { color: #dc2626; }
+    .aim-btn.danger:hover:not(:disabled) { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+    .aim-btn.soft { background: var(--aim-primary-soft); border-color: transparent; color: var(--aim-primary); }
+    .aim-btn.small { min-height: 34px; padding: 7px 10px; font-size: .77rem; border-radius: 9px; }
+    .aim-icon-btn { width: 34px; height: 34px; display: inline-grid; place-items: center; border: 1px solid var(--aim-border); border-radius: 9px; background: var(--aim-card); cursor: pointer; }
+    .aim-icon-btn:hover { color: var(--aim-primary); border-color: color-mix(in srgb, var(--aim-primary) 45%, var(--aim-border)); }
+
+    .aim-main { min-width: 0; overflow: hidden; }
+    .aim-tabs { display: flex; gap: 5px; padding: 10px; overflow-x: auto; border-bottom: 1px solid var(--aim-border); }
+    .aim-tab { position: relative; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 11px; padding: 10px 16px; background: transparent; color: var(--aim-muted); font-weight: 800; font-size: .84rem; cursor: pointer; white-space: nowrap; }
+    .aim-tab:hover { background: var(--aim-hover); color: var(--aim-text); }
+    .aim-tab.active { background: var(--aim-primary-soft); color: var(--aim-primary); }
+    .aim-tab-badge { min-width: 21px; height: 21px; display: inline-grid; place-items: center; padding: 0 6px; border-radius: 999px; background: var(--aim-surface); font-size: .69rem; }
+    .aim-tab.active .aim-tab-badge { background: var(--aim-primary); color: white; }
+    .aim-panel { display: none; padding: 22px; }
+    .aim-panel.active { display: block; animation: aimFade .18s ease-out; }
+    @keyframes aimFade { from { opacity: .25; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .aim-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+    .aim-panel-head h2 { margin: 0; font-size: 1.16rem; }
+    .aim-panel-head p { margin: 5px 0 0; color: var(--aim-muted); font-size: .82rem; line-height: 1.5; }
+    .aim-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+
+    .aim-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px; margin-bottom: 12px; border: 1px solid var(--aim-border); border-radius: 13px; background: var(--aim-surface); }
+    .aim-toolbar .aim-search { width: min(100%, 320px); }
+    .aim-summary { display: flex; align-items: center; gap: 8px; color: var(--aim-muted); font-size: .8rem; }
+    .aim-summary strong { color: var(--aim-primary); font-size: .92rem; }
+    .aim-table-wrap { overflow: auto; border: 1px solid var(--aim-border); border-radius: 13px; }
+    .aim-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    .aim-table th, .aim-table td { padding: 12px 13px; border-bottom: 1px solid var(--aim-border); text-align: left; vertical-align: middle; }
+    .aim-table th { position: sticky; top: 0; z-index: 1; background: var(--aim-surface); color: var(--aim-muted); font-size: .74rem; font-weight: 850; }
+    .aim-table td { font-size: .82rem; }
+    .aim-table tbody tr:hover { background: color-mix(in srgb, var(--aim-primary) 3.5%, transparent); }
+    .aim-table tbody tr:last-child td { border-bottom: 0; }
+    .aim-cell-name { font-weight: 800; }
+    .aim-cell-mail { color: var(--aim-primary); word-break: break-all; }
+    .aim-cell-memo { max-width: 280px; color: var(--aim-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .aim-row-actions { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .aim-empty { padding: 54px 20px; text-align: center; color: var(--aim-muted); }
+    .aim-empty i { display: block; margin-bottom: 12px; color: color-mix(in srgb, var(--aim-primary) 50%, #94a3b8); font-size: 2.1rem; }
+    .aim-empty strong { display: block; margin-bottom: 5px; color: var(--aim-text); }
+
+    .aim-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+    .aim-field { min-width: 0; }
+    .aim-field.full { grid-column: 1 / -1; }
+    .aim-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: var(--aim-text); font-size: .8rem; font-weight: 800; }
+    .aim-label small { color: var(--aim-muted); font-weight: 600; }
+    .aim-input, .aim-select, .aim-textarea { width: 100%; border: 1px solid var(--aim-border); border-radius: 11px; padding: 10px 12px; background: var(--aim-card); color: var(--aim-text); outline: none; }
+    .aim-input, .aim-select { min-height: 43px; }
+    .aim-textarea { min-height: 96px; resize: vertical; }
+    .aim-input:focus, .aim-select:focus, .aim-textarea:focus { border-color: var(--aim-primary); box-shadow: 0 0 0 3px var(--aim-primary-soft); }
+    .aim-help { margin: 6px 0 0; color: var(--aim-muted); font-size: .72rem; line-height: 1.5; }
+
+    .aim-compose-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .7fr); gap: 18px; align-items: start; }
+    .aim-compose-section { padding: 17px; border: 1px solid var(--aim-border); border-radius: 15px; background: var(--aim-card); }
+    .aim-compose-section + .aim-compose-section { margin-top: 14px; }
+    .aim-subtitle { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: .93rem; }
+    .aim-subtitle i { color: var(--aim-primary); }
+    .aim-editor-shell { position: relative; overflow: hidden; border: 1px solid var(--aim-border); border-radius: 12px; }
+    .aim-editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 8px; border-bottom: 1px solid var(--aim-border); background: var(--aim-surface); }
+    .aim-editor-tool { width: 34px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+    .aim-editor-tool:hover { background: var(--aim-hover); color: var(--aim-primary); }
+    .aim-tool-sep { width: 1px; height: 22px; margin: 0 4px; background: var(--aim-border); }
+    .aim-editor { min-height: 255px; max-height: 480px; overflow: auto; padding: 18px; background: #fff; color: #172033; outline: none; line-height: 1.65; }
+    .aim-editor:empty::before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; }
+    .aim-editor img { max-width: 100%; height: auto; }
+    .aim-editor img.aim-image-selected { outline: 3px solid var(--aim-primary); outline-offset: 3px; }
+    .aim-image-size-control { display: inline-flex; align-items: center; gap: 7px; margin-left: 5px; color: var(--aim-muted); font-size: .78rem; font-weight: 800; }
+    .aim-image-size-control[hidden] { display: none; }
+    .aim-image-size-control input[type="range"] { width: 112px; accent-color: var(--aim-primary); cursor: pointer; }
+    .aim-image-size-control output { min-width: 38px; color: var(--aim-primary); text-align: right; }
+    .aim-image-resize-handle { position: absolute; z-index: 5; width: 16px; height: 16px; display: none; padding: 0; border: 2px solid #fff; border-radius: 4px; background: var(--aim-primary); box-shadow: 0 1px 5px rgba(15,23,42,.35); cursor: nwse-resize; touch-action: none; }
+    .aim-image-resize-handle.visible { display: block; }
+    .aim-variables { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .aim-variable { border: 1px solid color-mix(in srgb, var(--aim-primary) 30%, var(--aim-border)); border-radius: 999px; padding: 6px 9px; background: var(--aim-primary-soft); color: var(--aim-primary); font-size: .72rem; font-weight: 800; cursor: pointer; }
+    .aim-variable:hover { background: var(--aim-primary); color: white; }
+
+    .aim-mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+    .aim-mode-card { position: relative; display: block; border: 1px solid var(--aim-border); border-radius: 12px; padding: 12px; cursor: pointer; background: var(--aim-card); }
+    .aim-mode-card:has(input:checked) { border-color: var(--aim-primary); background: var(--aim-primary-soft); box-shadow: inset 0 0 0 1px var(--aim-primary); }
+    .aim-mode-card input { position: absolute; opacity: 0; }
+    .aim-mode-card strong { display: flex; align-items: center; gap: 7px; font-size: .8rem; }
+    .aim-mode-card strong i { color: var(--aim-primary); }
+    .aim-mode-card small { display: block; margin-top: 5px; color: var(--aim-muted); font-size: .69rem; line-height: 1.45; }
+    .aim-dropzone { display: grid; place-items: center; min-height: 128px; margin-top: 11px; padding: 18px; border: 2px dashed var(--aim-border); border-radius: 13px; background: var(--aim-surface); color: var(--aim-muted); text-align: center; cursor: pointer; transition: .18s ease; }
+    .aim-dropzone:hover, .aim-dropzone.dragover { border-color: var(--aim-primary); background: var(--aim-primary-soft); color: var(--aim-primary); }
+    .aim-dropzone i { font-size: 1.7rem; margin-bottom: 8px; }
+    .aim-dropzone strong { display: block; color: var(--aim-text); font-size: .8rem; }
+    .aim-dropzone small { display: block; margin-top: 4px; font-size: .69rem; }
+    .aim-file-list { display: grid; gap: 7px; margin-top: 10px; }
+    .aim-file-item { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid var(--aim-border); border-radius: 10px; background: var(--aim-card); }
+    .aim-file-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--aim-primary-soft); color: var(--aim-primary); }
+    .aim-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; font-weight: 750; }
+    .aim-file-size { color: var(--aim-muted); font-size: .66rem; }
+    .aim-check { display: inline-flex; align-items: flex-start; gap: 8px; color: var(--aim-muted); font-size: .75rem; line-height: 1.45; cursor: pointer; }
+    .aim-check input { margin-top: 2px; accent-color: var(--aim-primary); }
+    .aim-send-summary { display: grid; gap: 9px; padding: 15px; border: 1px solid var(--aim-border); border-radius: 13px; background: var(--aim-surface); }
+    .aim-send-summary-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .76rem; color: var(--aim-muted); }
+    .aim-send-summary-row strong { color: var(--aim-text); }
+    .aim-send-summary-row.total { padding-top: 9px; border-top: 1px dashed var(--aim-border); font-size: .84rem; }
+
+    .aim-account-grid, .aim-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+    .aim-resource-card { position: relative; display: flex; flex-direction: column; min-height: 150px; padding: 16px; border: 1px solid var(--aim-border); border-radius: 14px; background: var(--aim-card); }
+    .aim-resource-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .aim-resource-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--aim-primary-soft); color: var(--aim-primary); }
+    .aim-resource-card h3 { margin: 11px 0 4px; font-size: .9rem; }
+    .aim-resource-card p { margin: 0; color: var(--aim-muted); font-size: .74rem; line-height: 1.45; word-break: break-all; }
+    .aim-resource-card footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 14px; }
+    .aim-status-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 8px; background: #ecfdf5; color: #047857; font-size: .66rem; font-weight: 850; }
+    .aim-status-pill.unverified { background: #fff7ed; color: #c2410c; }
+    .aim-status-pill.disabled { background: #f1f5f9; color: #64748b; }
+    .aim-template-preview { max-height: 72px; margin-top: 10px; overflow: hidden; color: var(--aim-muted); font-size: .72rem; line-height: 1.55; mask-image: linear-gradient(#000 45%, transparent); }
+
+    .aim-history-filters { display: grid; grid-template-columns: minmax(180px, 1.2fr) repeat(3, minmax(125px, .65fr)); gap: 9px; margin-bottom: 12px; }
+    .aim-history-list { display: grid; gap: 8px; }
+    .aim-history-item { display: grid; grid-template-columns: minmax(0,1.4fr) .7fr .7fr auto; align-items: center; gap: 13px; padding: 14px; border: 1px solid var(--aim-border); border-radius: 13px; background: var(--aim-card); cursor: pointer; }
+    .aim-history-item:hover { border-color: color-mix(in srgb, var(--aim-primary) 45%, var(--aim-border)); background: color-mix(in srgb, var(--aim-primary) 2.5%, var(--aim-card)); }
+    .aim-history-title { min-width: 0; }
+    .aim-history-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .84rem; }
+    .aim-history-title small, .aim-history-stat small { display: block; margin-top: 4px; color: var(--aim-muted); font-size: .68rem; }
+    .aim-history-stat { font-size: .77rem; }
+    .aim-job-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 6px 9px; background: var(--aim-surface); color: var(--aim-muted); font-size: .7rem; font-weight: 850; white-space: nowrap; }
+    .aim-job-pill.completed, .aim-job-pill.success { background: #ecfdf5; color: #047857; }
+    .aim-job-pill.running, .aim-job-pill.queued { background: #eff6ff; color: #1d4ed8; }
+    .aim-job-pill.failed, .aim-job-pill.completed_with_errors { background: #fef2f2; color: #b91c1c; }
+    .aim-job-pill.cancelled, .aim-job-pill.cancel_requested { background: #fff7ed; color: #c2410c; }
+
+    .aim-progress { position: fixed; right: 25px; bottom: 25px; z-index: 5500; width: min(410px, calc(100vw - 30px)); padding: 16px; border: 1px solid var(--aim-border); border-radius: 16px; background: var(--aim-card); box-shadow: 0 20px 60px rgba(15,23,42,.22); }
+    .aim-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .aim-progress-title { display: flex; align-items: center; gap: 9px; font-weight: 850; font-size: .86rem; }
+    .aim-progress-title i { color: var(--aim-primary); }
+    .aim-progress-track { height: 9px; margin: 13px 0 9px; overflow: hidden; border-radius: 999px; background: var(--aim-surface); }
+    .aim-progress-bar { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--aim-primary), #06b6d4); transition: width .3s ease; }
+    .aim-progress-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--aim-muted); font-size: .7rem; }
+    .aim-progress-stats { display: flex; gap: 10px; margin-top: 11px; }
+    .aim-progress-stat { flex: 1; padding: 8px; border-radius: 9px; background: var(--aim-surface); text-align: center; }
+    .aim-progress-stat strong { display: block; font-size: .87rem; }
+    .aim-progress-stat span { color: var(--aim-muted); font-size: .64rem; }
+
+    .aim-modal-backdrop {
+        --aim-primary: var(--primary-color, #2563eb);
+        --aim-primary-soft: color-mix(in srgb, var(--aim-primary) 10%, #ffffff);
+        --aim-border: var(--card-border, var(--border-color, #dbe3ef));
+        --aim-text: #172033;
+        --aim-muted: #64748b;
+        --aim-surface: #f7f9fc;
+        position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center;
+        padding: 20px; background: rgba(15,23,42,.55); backdrop-filter: blur(4px);
+        color: var(--aim-text); font-size: 16px;
+    }
+    .aim-modal-backdrop *, .aim-modal-backdrop *::before, .aim-modal-backdrop *::after { box-sizing: border-box; }
+    .aim-modal-backdrop button, .aim-modal-backdrop input, .aim-modal-backdrop select, .aim-modal-backdrop textarea { font: inherit; }
+    .aim-modal-backdrop.open { display: flex; }
+    .aim-modal { width: min(590px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--aim-border); border-radius: 18px; background: #fff; color: var(--aim-text); box-shadow: 0 28px 90px rgba(15,23,42,.3); animation: aimModal .18s ease-out; }
+    .aim-modal.wide { width: min(900px, 100%); }
+    @keyframes aimModal { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+    .aim-modal-head, .aim-modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 19px; }
+    .aim-modal-head { border-bottom: 1px solid var(--aim-border); background: #fff; }
+    .aim-modal-foot { justify-content: flex-end; border-top: 1px solid var(--aim-border); background: #fff; }
+    .aim-modal-head h2 { margin: 0; font-size: 1.15rem; }
+    .aim-modal-body { overflow: auto; padding: 19px; background: #fff; font-size: 1rem; }
+    .aim-modal .aim-label { font-size: .9rem; }
+    .aim-modal .aim-input, .aim-modal .aim-select, .aim-modal .aim-textarea { background: #fff; color: #172033; font-size: 1rem; }
+    .aim-modal .aim-btn { background: #fff; color: var(--aim-text); font-size: .9rem; }
+    .aim-modal .aim-btn.primary { background: var(--aim-primary); border-color: var(--aim-primary); color: #fff; }
+    .aim-modal .aim-icon-btn { background: #fff; color: var(--aim-text); }
+    .aim-modal-note { margin: 0 0 15px; padding: 11px 12px; border-radius: 10px; background: var(--aim-primary-soft); color: color-mix(in srgb, var(--aim-primary) 82%, #111827); font-size: .875rem; line-height: 1.5; }
+    .aim-secret-wrap { position: relative; }
+    .aim-secret-wrap .aim-input { padding-right: 45px; }
+    .aim-secret-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 33px; height: 33px; border: 0; border-radius: 8px; background: transparent; color: var(--aim-muted); cursor: pointer; }
+    .aim-preflight-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
+    .aim-preflight-stat { padding: 12px 8px; border: 1px solid var(--aim-border); border-radius: 11px; background: var(--aim-surface); text-align: center; }
+    .aim-preflight-stat strong { display: block; font-size: 1.12rem; }
+    .aim-preflight-stat span { color: var(--aim-muted); font-size: .67rem; }
+    .aim-issue-list { display: grid; gap: 8px; }
+    .aim-issue { display: grid; grid-template-columns: 26px 1fr; gap: 9px; padding: 10px; border-radius: 10px; background: var(--aim-surface); font-size: .74rem; line-height: 1.45; }
+    .aim-issue.error { background: #fef2f2; color: #991b1b; }
+    .aim-issue.warning { background: #fff7ed; color: #9a3412; }
+    .aim-issue.ok { background: #ecfdf5; color: #065f46; }
+    .aim-match-table { max-height: 285px; overflow: auto; margin-top: 14px; border: 1px solid var(--aim-border); border-radius: 11px; }
+    .aim-log-list { display: grid; gap: 7px; }
+    .aim-log-item { display: grid; grid-template-columns: 23px minmax(0,1.1fr) minmax(0,1.2fr) auto; align-items: center; gap: 9px; padding: 9px 10px; border: 1px solid var(--aim-border); border-radius: 10px; font-size: .73rem; }
+    .aim-log-item .ok { color: #16a34a; } .aim-log-item .bad { color: #dc2626; } .aim-log-item .wait { color: #64748b; }
+    .aim-log-error { color: #b91c1c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .aim-toast-region { position: fixed; top: 86px; right: 18px; z-index: 12000; display: grid; gap: 8px; width: min(360px, calc(100vw - 36px)); pointer-events: none; }
+    .aim-toast { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 9px; padding: 12px; border: 1px solid var(--aim-border); border-radius: 12px; background: var(--aim-card); box-shadow: 0 16px 40px rgba(15,23,42,.17); animation: aimToast .22s ease-out; pointer-events: auto; }
+    @keyframes aimToast { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+    .aim-toast.success i { color: #16a34a; } .aim-toast.error i { color: #dc2626; } .aim-toast.warning i { color: #d97706; }
+    .aim-toast span { font-size: .77rem; line-height: 1.4; }
+    .aim-toast button { border: 0; background: transparent; color: var(--aim-muted); cursor: pointer; }
+    .aim-loading { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; border-radius: inherit; background: color-mix(in srgb, var(--aim-card) 82%, transparent); backdrop-filter: blur(3px); }
+    .aim-loading-box { display: flex; align-items: center; gap: 10px; padding: 13px 17px; border: 1px solid var(--aim-border); border-radius: 12px; background: var(--aim-card); box-shadow: 0 10px 30px rgba(15,23,42,.12); color: var(--aim-muted); font-size: .8rem; }
+
+    @media (max-width: 1100px) {
+        .aim-layout { grid-template-columns: 245px minmax(0, 1fr); }
+        .aim-compose-grid { grid-template-columns: 1fr; }
+        .aim-sidebar { top: 78px; }
+        .aim-account-grid, .aim-template-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 820px) {
+        .aim-hero { align-items: flex-start; }
+        .aim-system-state { display: none; }
+        .aim-layout { grid-template-columns: 1fr; }
+        .aim-sidebar { position: static; }
+        .aim-group-list { max-height: 220px; }
+        .aim-panel { padding: 16px; }
+        .aim-tabs { padding: 8px; }
+        .aim-tab { padding: 9px 12px; }
+        .aim-form-grid, .aim-history-filters { grid-template-columns: 1fr; }
+        .aim-field.full { grid-column: auto; }
+        .aim-history-item { grid-template-columns: minmax(0,1fr) auto; }
+        .aim-history-stat { display: none; }
+    }
+    @media (max-width: 560px) {
+        .aim-hero { padding: 16px; border-radius: 15px; }
+        .aim-hero-icon { width: 44px; height: 44px; flex-basis: 44px; border-radius: 13px; }
+        .aim-hero p { font-size: .78rem; }
+        .aim-panel-head { flex-direction: column; }
+        .aim-actions { width: 100%; justify-content: flex-start; }
+        .aim-actions .aim-btn { flex: 1; }
+        .aim-mode-grid { grid-template-columns: 1fr; }
+        .aim-preflight-summary { grid-template-columns: 1fr 1fr; }
+        .aim-modal-backdrop { padding: 8px; }
+        .aim-modal { max-height: calc(100vh - 16px); border-radius: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .aim-page *, .aim-page *::before, .aim-page *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+</style>
+
+<div class="aim-page" id="aiMailApp">
+    <header class="aim-hero">
+        <div class="aim-hero-copy">
+            <div class="aim-hero-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div>
+                <h1>스마트 메일전송</h1>
+                <p>수신자와 첨부파일을 똑똑하게 연결하고, 안전한 사전검사 후 한 번에 발송합니다.</p>
+            </div>
+        </div>
+        <div class="aim-system-state" id="systemState"><span class="aim-system-dot"></span><span>메일 시스템 준비 중</span></div>
+    </header>
+
+    <div class="aim-layout">
+        <aside class="aim-card aim-sidebar" aria-label="작업그룹">
+            <div class="aim-sidebar-head">
+                <div class="aim-sidebar-title"><h2>작업그룹</h2><span class="aim-count-badge" id="groupCount">0</span></div>
+                <div class="aim-search"><i class="fa-solid fa-magnifying-glass"></i><label class="sr-only" for="groupSearch">작업그룹 검색</label><input id="groupSearch" type="search" placeholder="그룹 검색"></div>
+                <button class="aim-btn primary" id="createGroupBtn" style="width:100%; margin-top:10px"><i class="fa-solid fa-plus"></i> 새 작업그룹</button>
+            </div>
+            <div class="aim-group-list" id="groupList" role="listbox" aria-label="작업그룹 목록"></div>
+            <div class="aim-group-config" id="groupConfig" hidden>
+                <p class="aim-section-label">사용 기능</p>
+                <div class="aim-feature-chips" id="featureChips"></div>
+            </div>
+            <div class="aim-sidebar-actions" id="groupActions" hidden>
+                <button class="aim-btn small" id="copyGroupBtn"><i class="fa-regular fa-copy"></i> 복사</button>
+                <button class="aim-btn small danger" id="archiveGroupBtn"><i class="fa-regular fa-trash-can"></i> 삭제</button>
+            </div>
+        </aside>
+
+        <main class="aim-card aim-main" style="position:relative">
+            <nav class="aim-tabs" role="tablist" aria-label="Ai메일전송 기능">
+                <button class="aim-tab active" role="tab" aria-selected="true" aria-controls="panel-recipients" data-tab="recipients"><i class="fa-solid fa-users"></i> 수신자 관리 <span class="aim-tab-badge" id="recipientTabCount">0</span></button>
+                <button class="aim-tab" role="tab" aria-selected="false" aria-controls="panel-compose" data-tab="compose"><i class="fa-solid fa-pen-to-square"></i> 메일 작성</button>
+                <button class="aim-tab" role="tab" aria-selected="false" aria-controls="panel-senders" data-tab="senders"><i class="fa-solid fa-at"></i> 발송계정</button>
+                <button class="aim-tab" role="tab" aria-selected="false" aria-controls="panel-templates" data-tab="templates"><i class="fa-solid fa-layer-group"></i> 템플릿 <span class="aim-tab-badge" id="templateTabCount">0</span></button>
+                <button class="aim-tab" role="tab" aria-selected="false" aria-controls="panel-history" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> 발송이력</button>
+            </nav>
+
+            <section class="aim-panel active" id="panel-recipients" role="tabpanel" data-panel="recipients">
+                <div class="aim-panel-head">
+                    <div><h2>수신자 관리</h2><p>직접 등록하거나 동일한 제목행의 엑셀 파일로 최대 300명까지 일괄 등록할 수 있습니다.</p></div>
+                    <div class="aim-actions">
+                        <a class="aim-btn" href="/ai-mail/api/recipient-template.xlsx" id="recipientTemplateLink"><i class="fa-solid fa-download"></i> 엑셀 양식</a>
+                        <label class="aim-btn" for="recipientImport"><i class="fa-solid fa-file-arrow-up"></i> 엑셀 등록<input id="recipientImport" type="file" accept=".xlsx" hidden></label>
+                        <button class="aim-btn primary" id="addRecipientBtn"><i class="fa-solid fa-user-plus"></i> 수신자 추가</button>
+                    </div>
+                </div>
+                <div class="aim-toolbar">
+                    <div class="aim-search"><i class="fa-solid fa-magnifying-glass"></i><label class="sr-only" for="recipientSearch">수신자 검색</label><input id="recipientSearch" type="search" placeholder="수신자명, 이메일, 메모 검색"></div>
+                    <div class="aim-summary"><button class="aim-btn small danger" id="bulkDeleteRecipientsBtn" disabled><i class="fa-regular fa-trash-can"></i> 선택 삭제</button><span>선택 <strong id="selectedRecipientCount">0</strong>명 · 전체 <strong id="recipientCount">0</strong>/300명</span></div>
+                </div>
+                <div class="aim-table-wrap">
+                    <table class="aim-table">
+                        <thead><tr><th style="width:45px"><label class="sr-only" for="selectAllRecipients">전체 선택</label><input id="selectAllRecipients" type="checkbox"></th><th>수신자명</th><th>메일주소</th><th>메모</th><th style="width:95px">관리</th></tr></thead>
+                        <tbody id="recipientRows"></tbody>
+                    </table>
+                    <div class="aim-empty" id="recipientEmpty"><i class="fa-regular fa-address-book"></i><strong>등록된 수신자가 없습니다</strong><span>수신자를 추가하거나 엑셀 양식으로 일괄 등록해 주세요.</span></div>
+                </div>
+            </section>
+
+            <section class="aim-panel" id="panel-compose" role="tabpanel" data-panel="compose">
+                <div class="aim-panel-head">
+                    <div><h2>메일 작성</h2><p>선택한 수신자별로 메일을 개별 발송하므로 서로의 주소가 노출되지 않습니다.</p></div>
+                    <div class="aim-actions"><button class="aim-btn" id="resetComposeBtn"><i class="fa-solid fa-arrow-rotate-left"></i> 작성 초기화</button></div>
+                </div>
+                <div class="aim-compose-grid">
+                    <div>
+                        <div class="aim-compose-section">
+                            <h3 class="aim-subtitle"><i class="fa-solid fa-envelope"></i> 메일 내용</h3>
+                            <div class="aim-form-grid">
+                                <div class="aim-field"><label class="aim-label" for="composeSender">발송계정</label><select class="aim-select" id="composeSender"><option value="">발송계정을 선택하세요</option></select></div>
+                                <div class="aim-field"><label class="aim-label" for="composeTemplate">템플릿 불러오기</label><select class="aim-select" id="composeTemplate"><option value="">직접 작성</option></select></div>
+                                <div class="aim-field full"><label class="aim-label" for="composeSubject">메일 제목 <small><span id="subjectLength">0</span>/200</small></label><input class="aim-input" id="composeSubject" maxlength="200" placeholder="메일 제목을 입력하세요"></div>
+                                <div class="aim-field full">
+                                    <span class="aim-label" id="editorLabel">메일 내용</span>
+                                    <div class="aim-editor-shell">
+                                        <div class="aim-editor-toolbar" role="toolbar" aria-label="메일 편집 도구">
+                                            <button class="aim-editor-tool" type="button" data-command="bold" title="굵게" aria-label="굵게"><i class="fa-solid fa-bold"></i></button>
+                                            <button class="aim-editor-tool" type="button" data-command="italic" title="기울임" aria-label="기울임"><i class="fa-solid fa-italic"></i></button>
+                                            <button class="aim-editor-tool" type="button" data-command="underline" title="밑줄" aria-label="밑줄"><i class="fa-solid fa-underline"></i></button>
+                                            <span class="aim-tool-sep"></span>
+                                            <button class="aim-editor-tool" type="button" data-command="insertUnorderedList" title="글머리 기호" aria-label="글머리 기호"><i class="fa-solid fa-list-ul"></i></button>
+                                            <button class="aim-editor-tool" type="button" data-command="insertOrderedList" title="번호 목록" aria-label="번호 목록"><i class="fa-solid fa-list-ol"></i></button>
+                                            <span class="aim-tool-sep"></span>
+                                            <button class="aim-editor-tool" type="button" id="insertLinkBtn" title="링크" aria-label="링크 삽입"><i class="fa-solid fa-link"></i></button>
+                                            <button class="aim-editor-tool" type="button" id="insertImageBtn" title="이미지" aria-label="이미지 삽입"><i class="fa-regular fa-image"></i></button>
+                                            <button class="aim-editor-tool" type="button" data-command="removeFormat" title="서식 지우기" aria-label="서식 지우기"><i class="fa-solid fa-eraser"></i></button>
+                                            <input id="editorImageInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                                        </div>
+                                        <div class="aim-editor" id="composeEditor" role="textbox" aria-labelledby="editorLabel" aria-multiline="true" contenteditable="true" data-placeholder="메일 내용을 입력하세요. 새담 로고 등 이미지도 넣을 수 있습니다."></div>
+                                    </div>
+                                    <div class="aim-variables" aria-label="개인화 변수">
+                                        <button class="aim-variable" type="button" data-variable="&#123;&#123;수신자명&#125;&#125;">&#123;&#123;수신자명&#125;&#125;</button>
+                                        <button class="aim-variable" type="button" data-variable="&#123;&#123;메일주소&#125;&#125;">&#123;&#123;메일주소&#125;&#125;</button>
+                                        <button class="aim-variable" type="button" data-variable="&#123;&#123;메모&#125;&#125;">&#123;&#123;메모&#125;&#125;</button>
+                                        <button class="aim-variable" type="button" data-variable="&#123;&#123;작업그룹명&#125;&#125;">&#123;&#123;작업그룹명&#125;&#125;</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="aim-compose-section">
+                            <h3 class="aim-subtitle"><i class="fa-solid fa-paperclip"></i> 첨부 방식</h3>
+                            <div class="aim-mode-grid">
+                                <label class="aim-mode-card" tabindex="0"><input type="radio" name="attachmentMode" value="smart" checked><strong><i class="fa-solid fa-wand-magic-sparkles"></i> 개인별 자동분류</strong><small>파일명 앞부분과 수신자명을 비교해 자동 연결</small></label>
+                                <label class="aim-mode-card" tabindex="0"><input type="radio" name="attachmentMode" value="common"><strong><i class="fa-solid fa-people-group"></i> 공통파일 일괄</strong><small>선택한 모든 수신자에게 같은 파일 발송</small></label>
+                            </div>
+                            <label class="aim-dropzone" id="attachmentDropzone" for="attachmentInput"><span><i class="fa-solid fa-cloud-arrow-up"></i><strong>파일을 끌어놓거나 눌러 선택</strong><small>여러 파일을 한 번에 등록할 수 있습니다.</small></span><input id="attachmentInput" type="file" multiple hidden></label>
+                            <p class="aim-help" id="attachmentHelp">개인별 파일 예: <strong>청곡초등학교_07월_내역서.xlsx</strong> · Windows 파일명에는 * 대신 _를 사용해 주세요.</p>
+                            <div class="aim-file-list" id="attachmentList"></div>
+                            <label class="aim-check" style="margin-top:11px"><input id="allowMissingAttachment" type="checkbox"><span>개인별 파일이 없는 수신자도 첨부 없이 발송 허용</span></label>
+                        </div>
+                        <div class="aim-compose-section">
+                            <h3 class="aim-subtitle"><i class="fa-solid fa-sliders"></i> 발송 설정</h3>
+                            <div class="aim-field"><label class="aim-label" for="sendInterval">발송 간격 <small>초</small></label><input class="aim-input" id="sendInterval" type="number" min="0.5" max="60" step="0.5" value="2"></div>
+                            <div class="aim-send-summary" style="margin-top:13px">
+                                <div class="aim-send-summary-row"><span>작업그룹</span><strong id="composeGroupName">선택 안 됨</strong></div>
+                                <div class="aim-send-summary-row"><span>발송 대상</span><strong><span id="composeRecipientCount">0</span>명</strong></div>
+                                <div class="aim-send-summary-row"><span>첨부파일</span><strong><span id="composeFileCount">0</span>개</strong></div>
+                                <div class="aim-send-summary-row total"><span>사전검사 후 발송</span><i class="fa-solid fa-shield-halved" style="color:var(--aim-primary)"></i></div>
+                            </div>
+                            <button class="aim-btn primary" id="prepareSendBtn" style="width:100%; margin-top:12px; min-height:47px"><i class="fa-solid fa-magnifying-glass-chart"></i> 발송 준비 및 사전검사</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="aim-panel" id="panel-senders" role="tabpanel" data-panel="senders">
+                <div class="aim-panel-head"><div><h2>발송계정</h2><p>구글 앱 비밀번호는 안전하게 저장되며 화면에는 다시 표시되지 않습니다.</p></div><div class="aim-actions"><button class="aim-btn primary" id="addSenderBtn"><i class="fa-solid fa-plus"></i> 발송계정 등록</button></div></div>
+                <div class="aim-account-grid" id="senderGrid"></div>
+                <div class="aim-empty" id="senderEmpty"><i class="fa-solid fa-at"></i><strong>등록된 발송계정이 없습니다</strong><span>메일 주소와 구글 앱 비밀번호를 등록해 주세요.</span></div>
+            </section>
+
+            <section class="aim-panel" id="panel-templates" role="tabpanel" data-panel="templates">
+                <div class="aim-panel-head"><div><h2>메일 템플릿</h2><p>제목·본문·이미지를 함께 저장하고 언제든 불러올 수 있습니다. 최대 100개까지 등록됩니다.</p></div><div class="aim-actions"><button class="aim-btn primary" id="addTemplateBtn"><i class="fa-solid fa-plus"></i> 새 템플릿</button></div></div>
+                <div class="aim-toolbar"><div class="aim-search"><i class="fa-solid fa-magnifying-glass"></i><label class="sr-only" for="templateSearch">템플릿 검색</label><input id="templateSearch" type="search" placeholder="템플릿명 또는 제목 검색"></div><div class="aim-summary"><span>등록 <strong id="templateCount">0</strong>/100개</span></div></div>
+                <div class="aim-template-grid" id="templateGrid"></div>
+                <div class="aim-empty" id="templateEmpty"><i class="fa-regular fa-file-lines"></i><strong>저장된 템플릿이 없습니다</strong><span>자주 쓰는 메일 제목과 내용을 템플릿으로 저장해 보세요.</span></div>
+            </section>
+
+            <section class="aim-panel" id="panel-history" role="tabpanel" data-panel="history">
+                <div class="aim-panel-head"><div><h2>발송이력</h2><p>완료·실패·중단된 작업과 수신자별 처리 결과를 언제든 확인할 수 있습니다.</p></div><div class="aim-actions"><button class="aim-btn" id="refreshHistoryBtn"><i class="fa-solid fa-rotate"></i> 새로고침</button></div></div>
+                <div class="aim-history-filters">
+                    <div class="aim-search"><i class="fa-solid fa-magnifying-glass"></i><label class="sr-only" for="historySearch">발송이력 검색</label><input id="historySearch" type="search" placeholder="제목, 수신자, 작업그룹 검색"></div>
+                    <select class="aim-select" id="historyStatus"><option value="">전체 상태</option><option value="completed">완료</option><option value="completed_with_errors">일부 실패</option><option value="running">진행 중</option><option value="cancelled">중단</option><option value="failed">실패</option></select>
+                    <input class="aim-input" id="historyDateFrom" type="date" aria-label="시작일">
+                    <input class="aim-input" id="historyDateTo" type="date" aria-label="종료일">
+                </div>
+                <div class="aim-history-list" id="historyList"></div>
+                <div class="aim-empty" id="historyEmpty"><i class="fa-solid fa-clock-rotate-left"></i><strong>발송이력이 없습니다</strong><span>메일 발송을 시작하면 완료 내역이 이곳에 기록됩니다.</span></div>
+            </section>
+
+            <div class="aim-loading" id="appLoading"><div class="aim-loading-box"><i class="fa-solid fa-spinner fa-spin"></i><span>메일 작업공간을 불러오는 중입니다.</span></div></div>
+        </main>
+    </div>
+
+    <section class="aim-progress" id="progressCard" aria-live="polite" hidden>
+        <div class="aim-progress-head"><div class="aim-progress-title"><i class="fa-solid fa-paper-plane"></i><span id="progressTitle">메일 발송 진행 중</span></div><button class="aim-btn small danger" id="stopSendBtn"><i class="fa-solid fa-stop"></i> 중단</button></div>
+        <div class="aim-progress-track"><div class="aim-progress-bar" id="progressBar"></div></div>
+        <div class="aim-progress-meta"><span id="progressMessage">발송을 준비하고 있습니다.</span><strong id="progressPercent">0%</strong></div>
+        <div class="aim-progress-stats"><div class="aim-progress-stat"><strong id="progressSuccess">0</strong><span>성공</span></div><div class="aim-progress-stat"><strong id="progressFailed">0</strong><span>실패</span></div><div class="aim-progress-stat"><strong id="progressRemaining">0</strong><span>남음</span></div></div>
+    </section>
+</div>
+
+<div class="aim-toast-region" id="toastRegion" aria-live="polite"></div>
+
+<div class="aim-modal-backdrop" id="groupModal" role="dialog" aria-modal="true" aria-labelledby="groupModalTitle">
+    <form class="aim-modal" id="groupForm">
+        <div class="aim-modal-head"><h2 id="groupModalTitle">새 작업그룹</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body">
+            <input id="groupEditId" type="hidden">
+            <div class="aim-field"><label class="aim-label" for="groupName">작업그룹명</label><input class="aim-input" id="groupName" maxlength="60" required placeholder="예: 7월 학교별 내역서"></div>
+            <p class="aim-section-label" style="margin-top:17px">그룹에서 사용할 기능</p>
+            <div class="aim-form-grid">
+                <label class="aim-mode-card"><input type="checkbox" name="groupFeature" value="smart_attachment" checked><strong><i class="fa-solid fa-wand-magic-sparkles"></i> 개인별 자동분류</strong><small>수신자명과 파일명 자동 연결</small></label>
+                <label class="aim-mode-card"><input type="checkbox" name="groupFeature" value="common_attachment" checked><strong><i class="fa-solid fa-people-group"></i> 공통파일 발송</strong><small>같은 파일을 선택 대상에게 발송</small></label>
+                <label class="aim-mode-card"><input type="checkbox" name="groupFeature" value="templates" checked><strong><i class="fa-solid fa-layer-group"></i> 메일 템플릿</strong><small>저장된 제목과 본문 사용</small></label>
+            </div>
+        </div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>취소</button><button class="aim-btn primary" type="submit"><i class="fa-solid fa-check"></i> 저장</button></div>
+    </form>
+</div>
+
+<div class="aim-modal-backdrop" id="copyGroupModal" role="dialog" aria-modal="true" aria-labelledby="copyGroupTitle">
+    <form class="aim-modal" id="copyGroupForm">
+        <div class="aim-modal-head"><h2 id="copyGroupTitle">수신자를 복사해 새 그룹 만들기</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body"><p class="aim-modal-note">현재 그룹의 수신자 목록만 복사됩니다. 발송이력과 발송계정 비밀번호는 복사되지 않습니다.</p><div class="aim-field"><label class="aim-label" for="copyGroupName">새 작업그룹명</label><input class="aim-input" id="copyGroupName" maxlength="60" required></div></div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>취소</button><button class="aim-btn primary" type="submit"><i class="fa-regular fa-copy"></i> 복사 생성</button></div>
+    </form>
+</div>
+
+<div class="aim-modal-backdrop" id="recipientModal" role="dialog" aria-modal="true" aria-labelledby="recipientModalTitle">
+    <form class="aim-modal" id="recipientForm">
+        <div class="aim-modal-head"><h2 id="recipientModalTitle">수신자 추가</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body"><input id="recipientEditId" type="hidden"><div class="aim-form-grid"><div class="aim-field"><label class="aim-label" for="recipientName">수신자명</label><input class="aim-input" id="recipientName" maxlength="100" required placeholder="예: 청곡초등학교"></div><div class="aim-field"><label class="aim-label" for="recipientEmail">메일주소</label><input class="aim-input" id="recipientEmail" type="email" maxlength="254" required placeholder="school@example.com"></div><div class="aim-field full"><label class="aim-label" for="recipientMemo">메모</label><textarea class="aim-textarea" id="recipientMemo" maxlength="500" placeholder="담당자, 참고사항 등"></textarea></div></div></div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>취소</button><button class="aim-btn primary" type="submit"><i class="fa-solid fa-check"></i> 저장</button></div>
+    </form>
+</div>
+
+<div class="aim-modal-backdrop" id="senderModal" role="dialog" aria-modal="true" aria-labelledby="senderModalTitle">
+    <form class="aim-modal" id="senderForm">
+        <div class="aim-modal-head"><h2 id="senderModalTitle">발송계정 등록</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body">
+            <input id="senderEditId" type="hidden"><p class="aim-modal-note"><i class="fa-solid fa-shield-halved"></i> 구글 계정의 2단계 인증에서 발급한 앱 비밀번호를 사용하세요. 저장 후 비밀번호 원문은 다시 표시되지 않습니다.</p>
+            <div class="aim-form-grid"><div class="aim-field"><label class="aim-label" for="senderLabel">계정 이름</label><input class="aim-input" id="senderLabel" maxlength="60" required placeholder="예: 새담 대표메일"></div><div class="aim-field"><label class="aim-label" for="senderEmail">발송 메일주소</label><input class="aim-input" id="senderEmail" type="email" maxlength="254" required placeholder="saedam2025@gmail.com"></div><div class="aim-field full"><label class="aim-label" for="senderPassword">구글 앱 비밀번호 <small id="senderPasswordHint"></small></label><div class="aim-secret-wrap"><input class="aim-input" id="senderPassword" type="password" autocomplete="new-password" placeholder="16자리 앱 비밀번호"><button class="aim-secret-toggle" id="senderPasswordToggle" type="button" aria-label="비밀번호 표시 전환"><i class="fa-regular fa-eye"></i></button></div><p class="aim-help">공백은 자동으로 제거됩니다. 일반 로그인 비밀번호는 사용하지 마세요.</p></div></div>
+            <div id="senderTestResult" style="margin-top:13px"></div>
+        </div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" id="testSenderBtn"><i class="fa-solid fa-plug-circle-check"></i> 연결 테스트</button><button class="aim-btn" type="button" data-close-modal>취소</button><button class="aim-btn primary" type="submit"><i class="fa-solid fa-lock"></i> 안전하게 저장</button></div>
+    </form>
+</div>
+
+<div class="aim-modal-backdrop" id="templateModal" role="dialog" aria-modal="true" aria-labelledby="templateModalTitle">
+    <form class="aim-modal wide" id="templateForm">
+        <div class="aim-modal-head"><h2 id="templateModalTitle">메일 템플릿 저장</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body"><input id="templateEditId" type="hidden"><div class="aim-form-grid"><div class="aim-field"><label class="aim-label" for="templateName">템플릿명</label><input class="aim-input" id="templateName" maxlength="80" required placeholder="예: 월별 내역서 발송"></div><div class="aim-field"><label class="aim-label" for="templateSubject">메일 제목</label><input class="aim-input" id="templateSubject" maxlength="200" required></div><div class="aim-field full"><span class="aim-label" id="templateEditorLabel">메일 내용</span><div class="aim-editor-shell"><div class="aim-editor-toolbar" role="toolbar" aria-label="템플릿 편집 도구"><button class="aim-editor-tool" type="button" data-template-command="bold" aria-label="굵게"><i class="fa-solid fa-bold"></i></button><button class="aim-editor-tool" type="button" data-template-command="italic" aria-label="기울임"><i class="fa-solid fa-italic"></i></button><button class="aim-editor-tool" type="button" data-template-command="insertUnorderedList" aria-label="글머리 기호"><i class="fa-solid fa-list-ul"></i></button><button class="aim-editor-tool" type="button" id="templateInsertImageBtn" aria-label="이미지 삽입"><i class="fa-regular fa-image"></i></button><span class="aim-image-size-control" id="templateImageSizeControl" hidden><label for="templateImageSize">이미지 크기</label><input id="templateImageSize" type="range" min="10" max="100" step="5" value="100"><output id="templateImageSizeValue" for="templateImageSize">100%</output></span><input id="templateImageInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></div><div class="aim-editor" id="templateEditor" role="textbox" aria-labelledby="templateEditorLabel" aria-multiline="true" contenteditable="true" data-placeholder="저장할 메일 내용을 입력하세요."></div><button class="aim-image-resize-handle" id="templateImageResizeHandle" type="button" tabindex="-1" aria-label="선택한 이미지 크기 조절"></button></div></div></div></div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>취소</button><button class="aim-btn primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 템플릿 저장</button></div>
+    </form>
+</div>
+
+<div class="aim-modal-backdrop" id="preflightModal" role="dialog" aria-modal="true" aria-labelledby="preflightTitle">
+    <div class="aim-modal wide">
+        <div class="aim-modal-head"><h2 id="preflightTitle">발송 전 사전검사</h2><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="aim-modal-body"><div class="aim-preflight-summary"><div class="aim-preflight-stat"><strong id="pfTotal">0</strong><span>발송 대상</span></div><div class="aim-preflight-stat"><strong id="pfMatched">0</strong><span>파일 연결</span></div><div class="aim-preflight-stat"><strong id="pfWarnings">0</strong><span>주의</span></div><div class="aim-preflight-stat"><strong id="pfErrors">0</strong><span>오류</span></div></div><div class="aim-issue-list" id="preflightIssues"></div><div class="aim-match-table"><table class="aim-table"><thead><tr><th>수신자</th><th>메일주소</th><th>연결 파일</th><th>상태</th></tr></thead><tbody id="preflightRows"></tbody></table></div></div>
+        <div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>돌아가서 수정</button><button class="aim-btn primary" id="startSendBtn" type="button"><i class="fa-solid fa-paper-plane"></i> 확인 후 발송 시작</button></div>
+    </div>
+</div>
+
+<div class="aim-modal-backdrop" id="historyModal" role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+    <div class="aim-modal wide"><div class="aim-modal-head"><div><h2 id="historyModalTitle">발송 상세</h2><p class="aim-help" id="historyModalMeta" style="margin-top:4px"></p></div><button class="aim-icon-btn" type="button" data-close-modal aria-label="닫기"><i class="fa-solid fa-xmark"></i></button></div><div class="aim-modal-body"><div class="aim-preflight-summary" id="historySummary"></div><h3 class="aim-subtitle"><i class="fa-solid fa-list-check"></i> 수신자별 처리 결과</h3><div class="aim-log-list" id="historyLogs"></div></div><div class="aim-modal-foot"><button class="aim-btn" type="button" data-close-modal>닫기</button></div></div>
+</div>
+
+<script>
+(() => {
+    'use strict';
+
+    const API_ROOT = '/ai-mail/api';
+    const state = {
+        csrf: '', groups: [], senders: [], templates: [], history: [], recipients: [],
+        activeGroupId: null, selectedRecipients: new Set(), attachments: [], campaignId: null, campaignStatus: null,
+        preflight: null, progressTimer: null, progressHideTimer: null, progressPollErrors: 0, historyTimer: null
+    };
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+    const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+    const htmlText = (value) => { const el = document.createElement('div'); el.innerHTML = value || ''; return el.textContent || ''; };
+    const activeGroup = () => state.groups.find(g => String(g.id) === String(state.activeGroupId));
+    const normalizeStatus = (value) => String(value || '').toLowerCase().replace(/\s+/g, '_');
+    const formatDate = (value) => value ? new Intl.DateTimeFormat('ko-KR', {dateStyle:'medium', timeStyle:'short'}).format(new Date(value)) : '-';
+    const formatBytes = (bytes) => { const size = Number(bytes || 0); if (size < 1024) return `${size} B`; if (size < 1048576) return `${(size/1024).toFixed(1)} KB`; return `${(size/1048576).toFixed(1)} MB`; };
+    const safeDownloadUrl = (value) => { try { const url = new URL(String(value || ''), location.origin); return url.origin === location.origin && url.pathname.startsWith('/ai-mail/api/campaigns/') ? `${url.pathname}${url.search}` : ''; } catch { return ''; } };
+
+    async function api(path, options = {}) {
+        const url = path.startsWith('http') || path.startsWith('/') ? path : `${API_ROOT}/${path.replace(/^\//, '')}`;
+        const opts = {...options, headers: {...(options.headers || {})}};
+        if (state.csrf && !['GET','HEAD'].includes((opts.method || 'GET').toUpperCase())) opts.headers['X-CSRF-Token'] = state.csrf;
+        if (opts.body && !(opts.body instanceof FormData) && typeof opts.body !== 'string') {
+            opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.body);
+        }
+        const response = await fetch(url, opts);
+        const type = response.headers.get('content-type') || '';
+        const data = type.includes('application/json') ? await response.json() : await response.text();
+        if (!response.ok) {
+            const error = new Error(data?.message || data?.error || (typeof data === 'string' ? data : `요청 처리 실패 (${response.status})`));
+            error.status = response.status; error.data = data; throw error;
+        }
+        return data?.data ?? data;
+    }
+
+    function toast(message, type = 'success', timeout = 4000) {
+        const icons = {success:'fa-circle-check', error:'fa-circle-exclamation', warning:'fa-triangle-exclamation', info:'fa-circle-info'};
+        const node = document.createElement('div'); node.className = `aim-toast ${type}`;
+        node.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${esc(message)}</span><button type="button" aria-label="알림 닫기"><i class="fa-solid fa-xmark"></i></button>`;
+        $('#toastRegion').appendChild(node); const remove = () => node.remove(); $('button', node).addEventListener('click', remove); setTimeout(remove, timeout);
+    }
+    function openModal(id) { const modal = $(`#${id}`); if (!modal) return; modal.classList.add('open'); const focusable = $('input:not([type=hidden]), select, textarea, button', modal); setTimeout(() => focusable?.focus(), 30); }
+    function closeModal(modal) { const node = typeof modal === 'string' ? $(`#${modal}`) : modal; node?.classList.remove('open'); if (node?.id === 'templateModal') clearTemplateImageSelection(); }
+    function setLoading(show, text) { $('#appLoading').hidden = !show; if (text) $('.aim-loading-box span').textContent = text; }
+    function featureValues(group) {
+        const raw = group?.features ?? group?.feature_flags ?? [];
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return raw.split(',').map(v => v.trim()).filter(Boolean); } }
+        return Object.entries(raw || {}).filter(([,on]) => on).map(([key]) => key);
+    }
+    function statusLabel(status) {
+        const labels = {draft:'작성중', staged:'사전검사 대기', queued:'대기', running:'진행 중', cancel_requested:'중단 요청', cancelled:'중단', completed:'완료', success:'완료', completed_with_errors:'일부 실패', failed:'실패'};
+        return labels[normalizeStatus(status)] || status || '대기';
+    }
+
+    async function bootstrap() {
+        setLoading(true);
+        try {
+            const data = await api('bootstrap');
+            state.csrf = data.csrf_token || data.csrf || '';
+            state.groups = data.groups || [];
+            state.senders = data.senders || [];
+            state.templates = data.templates || [];
+            state.history = data.recent_campaigns || data.campaigns || [];
+            const saved = sessionStorage.getItem('aiMailGroupId');
+            state.activeGroupId = state.groups.some(g => String(g.id) === String(saved)) ? saved : state.groups[0]?.id ?? null;
+            renderAll();
+            if (state.activeGroupId) await loadRecipients();
+            $('#systemState span:last-child').textContent = '메일 시스템 준비 완료';
+            resumeRunningCampaign();
+        } catch (error) {
+            $('#systemState span:last-child').textContent = '연결 확인 필요';
+            $('.aim-system-dot').style.background = '#f59e0b';
+            toast(error.message || '메일 작업공간을 불러오지 못했습니다.', 'error', 7000);
+            renderAll();
+        } finally { setLoading(false); }
+    }
+
+    function renderAll() { renderGroups(); renderRecipients(); renderSenders(); renderTemplates(); renderHistory(); syncCompose(); }
+    function renderGroups() {
+        const query = $('#groupSearch').value.trim().toLowerCase();
+        const rows = state.groups.filter(g => !query || String(g.name || '').toLowerCase().includes(query));
+        $('#groupCount').textContent = state.groups.length;
+        $('#groupList').innerHTML = rows.map(g => `<button class="aim-group-item ${String(g.id) === String(state.activeGroupId) ? 'active' : ''}" type="button" role="option" aria-selected="${String(g.id) === String(state.activeGroupId)}" data-group-id="${esc(g.id)}"><span class="aim-group-symbol"><i class="fa-solid fa-folder-open"></i></span><span><span class="aim-group-name">${esc(g.name)}</span><span class="aim-group-meta">수신자 ${Number(g.recipient_count || g.recipients_count || 0)}명</span></span><i class="fa-solid fa-chevron-right" style="font-size:.68rem;color:var(--aim-muted)"></i></button>`).join('') || `<div class="aim-sidebar-empty">${query ? '검색 결과가 없습니다.' : '새 작업그룹을 만들어 시작하세요.'}</div>`;
+        const group = activeGroup();
+        $('#groupConfig').hidden = !group; $('#groupActions').hidden = !group;
+        const featureLabels = {smart_attachment:'개인파일 자동', common_attachment:'공통파일', templates:'템플릿'};
+        const enabledFeatures = new Set(featureValues(group));
+        $('#featureChips').innerHTML = group ? Object.entries(featureLabels).map(([key,label]) => `<button type="button" class="aim-feature-chip ${enabledFeatures.has(key) ? 'on' : ''}" data-feature-toggle="${key}" aria-pressed="${enabledFeatures.has(key)}"><i class="fa-solid ${enabledFeatures.has(key) ? 'fa-check' : 'fa-plus'}"></i>${label}</button>`).join('') : '';
+    }
+
+    async function selectGroup(id) {
+        if (String(id) === String(state.activeGroupId)) return;
+        state.activeGroupId = id; sessionStorage.setItem('aiMailGroupId', id); state.selectedRecipients.clear(); state.attachments = []; renderGroups(); renderAttachments(); syncCompose();
+        await loadRecipients();
+    }
+    async function toggleGroupFeature(key) {
+        const group = activeGroup(); if (!group) return;
+        const features = new Set(featureValues(group)); features.has(key) ? features.delete(key) : features.add(key);
+        try {
+            const result = await api(`groups/${group.id}`, {method:'PATCH', body:{name:group.name, features:[...features]}});
+            state.groups = state.groups.map(item => String(item.id) === String(group.id) ? {...item,...result.group} : item);
+            renderGroups(); syncCompose(); toast(features.has(key) ? '그룹 기능을 켰습니다.' : '그룹 기능을 껐습니다.');
+        } catch (error) { toast(error.message, 'error'); }
+    }
+    async function loadRecipients() {
+        if (!state.activeGroupId) { state.recipients = []; renderRecipients(); return; }
+        try {
+            const data = await api(`groups/${state.activeGroupId}/recipients`);
+            state.recipients = Array.isArray(data) ? data : (data.recipients || []);
+            state.selectedRecipients = new Set([...state.selectedRecipients].filter(id => state.recipients.some(r => String(r.id) === String(id))));
+            renderRecipients(); renderGroups(); syncCompose();
+        } catch (error) { toast(error.message, 'error'); }
+    }
+    function filteredRecipients() {
+        const q = $('#recipientSearch').value.trim().toLowerCase();
+        return state.recipients.filter(r => !q || [r.name, r.recipient_name, r.email, r.memo].some(v => String(v || '').toLowerCase().includes(q)));
+    }
+    function renderRecipients() {
+        const rows = filteredRecipients();
+        $('#recipientRows').innerHTML = rows.map(r => { const id = String(r.id); const name = r.name ?? r.recipient_name ?? ''; return `<tr><td><input class="recipient-check" type="checkbox" data-id="${esc(id)}" aria-label="${esc(name)} 선택" ${state.selectedRecipients.has(id) ? 'checked' : ''}></td><td class="aim-cell-name">${esc(name)}</td><td class="aim-cell-mail">${esc(r.email)}</td><td class="aim-cell-memo" title="${esc(r.memo || '')}">${esc(r.memo || '-')}</td><td><span class="aim-row-actions"><button class="aim-icon-btn edit-recipient" type="button" data-id="${esc(id)}" aria-label="수정"><i class="fa-regular fa-pen-to-square"></i></button><button class="aim-icon-btn delete-recipient" type="button" data-id="${esc(id)}" aria-label="삭제"><i class="fa-regular fa-trash-can"></i></button></span></td></tr>`; }).join('');
+        $('#recipientEmpty').hidden = rows.length > 0;
+        if (!rows.length) $('#recipientEmpty').innerHTML = $('#recipientSearch').value.trim() ? '<i class="fa-solid fa-magnifying-glass"></i><strong>검색 결과가 없습니다</strong><span>다른 수신자명, 이메일 또는 메모로 검색해 보세요.</span>' : '<i class="fa-regular fa-address-book"></i><strong>등록된 수신자가 없습니다</strong><span>수신자를 추가하거나 엑셀 양식으로 일괄 등록해 주세요.</span>';
+        $('#recipientCount').textContent = state.recipients.length; $('#recipientTabCount').textContent = state.recipients.length;
+        $('#selectedRecipientCount').textContent = state.selectedRecipients.size; $('#bulkDeleteRecipientsBtn').disabled = !state.selectedRecipients.size;
+        $('#selectAllRecipients').checked = rows.length > 0 && rows.every(r => state.selectedRecipients.has(String(r.id)));
+        $('#selectAllRecipients').indeterminate = rows.some(r => state.selectedRecipients.has(String(r.id))) && !$('#selectAllRecipients').checked;
+        $('#addRecipientBtn').disabled = !state.activeGroupId || state.recipients.length >= 300;
+    }
+
+    function syncCompose() {
+        const group = activeGroup();
+        const selectedSender = $('#composeSender').value;
+        const selectedTemplate = $('#composeTemplate').value;
+        const features = new Set(featureValues(group));
+        const smartEnabled = !!group && features.has('smart_attachment');
+        const commonEnabled = !!group && features.has('common_attachment');
+        const templatesEnabled = !!group && features.has('templates');
+        const smartInput = $('input[name="attachmentMode"][value="smart"]');
+        const commonInput = $('input[name="attachmentMode"][value="common"]');
+        smartInput.disabled = !smartEnabled; smartInput.closest('.aim-mode-card').hidden = !smartEnabled;
+        commonInput.disabled = !commonEnabled; commonInput.closest('.aim-mode-card').hidden = !commonEnabled;
+        if (!smartEnabled) smartInput.checked = false;
+        if (!commonEnabled) commonInput.checked = false;
+        if (smartEnabled && !commonEnabled) smartInput.checked = true;
+        if (commonEnabled && !smartEnabled) commonInput.checked = true;
+        if (smartEnabled && commonEnabled && !smartInput.checked && !commonInput.checked) smartInput.checked = true;
+        const templateTab = $('.aim-tab[data-tab="templates"]');
+        templateTab.hidden = !templatesEnabled;
+        $('#composeTemplate').closest('.aim-field').hidden = !templatesEnabled;
+        if (!templatesEnabled) $('#composeTemplate').value = '';
+        if (!smartEnabled && !commonEnabled) {
+            state.attachments = [];
+            $('#attachmentList').innerHTML = '';
+            $('#allowMissingAttachment').checked = false;
+            $('#attachmentDropzone').hidden = true;
+            $('#attachmentHelp').hidden = true;
+            $('#attachmentList').hidden = true;
+            $('#allowMissingAttachment').closest('.aim-check').hidden = true;
+        } else {
+            $('#attachmentDropzone').hidden = false;
+            $('#attachmentHelp').hidden = false;
+            $('#attachmentHelp').innerHTML = smartEnabled ? '개인별 파일 예: <strong>청곡초등학교_07월_내역서.xlsx</strong> · Windows 파일명에는 * 대신 _를 사용해 주세요.' : '등록한 파일을 선택한 모든 수신자에게 각각 개별 메일로 발송합니다.';
+            $('#attachmentList').hidden = false;
+            $('#allowMissingAttachment').closest('.aim-check').hidden = !smartEnabled;
+        }
+        if (!templatesEnabled && $('.aim-panel[data-panel="templates"]').classList.contains('active')) switchTab('compose');
+        $('#composeGroupName').textContent = group?.name || '선택 안 됨';
+        $('#composeRecipientCount').textContent = state.selectedRecipients.size || state.recipients.length;
+        $('#composeFileCount').textContent = state.attachments.length;
+        $('#composeSender').innerHTML = '<option value="">발송계정을 선택하세요</option>' + state.senders.filter(s => s.is_active !== false && s.is_active !== 0 && s.enabled !== false && s.active !== false).map(s => `<option value="${esc(s.id)}">${esc(s.label || s.name || s.email)} · ${esc(s.email)}</option>`).join('');
+        $('#composeTemplate').innerHTML = '<option value="">직접 작성</option>' + state.templates.filter(t => t.is_active !== false && t.is_active !== 0).map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+        if ([...$('#composeSender').options].some(option => option.value === selectedSender)) $('#composeSender').value = selectedSender;
+        if ([...$('#composeTemplate').options].some(option => option.value === selectedTemplate)) $('#composeTemplate').value = selectedTemplate;
+        $('#prepareSendBtn').disabled = !group || !state.recipients.length;
+    }
+
+    function renderSenders() {
+        $('#senderGrid').innerHTML = state.senders.map(s => { const verified = !!(s.verified_at || s.verified || s.status === 'verified' || s.last_test_status === 'success'); const enabled = s.is_active !== false && s.is_active !== 0 && s.enabled !== false && s.active !== false; return `<article class="aim-resource-card"><div class="aim-resource-head"><div class="aim-resource-icon"><i class="fa-brands fa-google"></i></div><div><button class="aim-icon-btn edit-sender" data-id="${esc(s.id)}" type="button" aria-label="수정"><i class="fa-regular fa-pen-to-square"></i></button> <button class="aim-icon-btn delete-sender" data-id="${esc(s.id)}" type="button" aria-label="사용 중지" ${!enabled ? 'disabled' : ''}><i class="fa-solid fa-ban"></i></button></div></div><h3>${esc(s.label || s.name || '발송계정')}</h3><p>${esc(s.email)}</p><footer><span class="aim-status-pill ${!enabled ? 'disabled' : !verified ? 'unverified' : ''}"><i class="fa-solid ${verified ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>${!enabled ? '사용 안 함' : verified ? '연결 확인됨' : '테스트 필요'}</span><button class="aim-btn small test-sender-card" data-id="${esc(s.id)}" type="button" ${!enabled ? 'disabled' : ''}><i class="fa-solid fa-plug-circle-check"></i> 테스트</button></footer></article>`; }).join('');
+        $('#senderEmpty').hidden = state.senders.length > 0;
+    }
+    function renderTemplates() {
+        const q = $('#templateSearch').value.trim().toLowerCase();
+        const activeTemplates = state.templates.filter(t => t.is_active !== false && t.is_active !== 0);
+        const list = activeTemplates.filter(t => !q || [t.name,t.subject].some(v => String(v || '').toLowerCase().includes(q)));
+        $('#templateGrid').innerHTML = list.map(t => `<article class="aim-resource-card"><div class="aim-resource-head"><div class="aim-resource-icon"><i class="fa-regular fa-file-lines"></i></div><div><button class="aim-icon-btn use-template" data-id="${esc(t.id)}" type="button" aria-label="메일 작성에 적용"><i class="fa-solid fa-arrow-up-right-from-square"></i></button> <button class="aim-icon-btn edit-template" data-id="${esc(t.id)}" type="button" aria-label="수정"><i class="fa-regular fa-pen-to-square"></i></button> <button class="aim-icon-btn delete-template" data-id="${esc(t.id)}" type="button" aria-label="삭제"><i class="fa-regular fa-trash-can"></i></button></div></div><h3>${esc(t.name)}</h3><p><strong>제목</strong> ${esc(t.subject || '-')}</p><div class="aim-template-preview">${esc(htmlText(t.preview_html || t.body_html || t.content || ''))}</div><footer><span class="aim-status-pill"><i class="fa-solid fa-image"></i>${(t.preview_html || t.body_html || '').includes('<img') ? '이미지 포함' : '텍스트 템플릿'}</span></footer></article>`).join('');
+        $('#templateEmpty').hidden = list.length > 0;
+        if (!list.length) $('#templateEmpty').innerHTML = $('#templateSearch').value.trim() ? '<i class="fa-solid fa-magnifying-glass"></i><strong>검색 결과가 없습니다</strong><span>다른 템플릿명 또는 메일 제목으로 검색해 보세요.</span>' : '<i class="fa-regular fa-file-lines"></i><strong>저장된 템플릿이 없습니다</strong><span>자주 쓰는 메일 제목과 내용을 템플릿으로 저장해 보세요.</span>';
+        $('#templateCount').textContent = activeTemplates.length; $('#templateTabCount').textContent = activeTemplates.length; $('#addTemplateBtn').disabled = activeTemplates.length >= 100;
+    }
+
+    function filteredHistory() {
+        const q = $('#historySearch').value.trim().toLowerCase(), status = $('#historyStatus').value, from = $('#historyDateFrom').value, to = $('#historyDateTo').value;
+        return state.history.filter(h => {
+            const date = String(h.created_at || h.started_at || '').slice(0,10), hay = [h.subject,h.group_name,h.sender_email,h.recipient_names].join(' ').toLowerCase();
+            return (!q || hay.includes(q)) && (!status || normalizeStatus(h.status) === status) && (!from || date >= from) && (!to || date <= to);
+        });
+    }
+    function renderHistory() {
+        const list = filteredHistory();
+        $('#historyList').innerHTML = list.map(h => { const status = normalizeStatus(h.status); const total = Number(h.total_count || h.total || 0), sent = Number(h.sent_count || h.success_count || 0), failed = Number(h.failed_count || h.error_count || 0); return `<button class="aim-history-item" type="button" data-campaign-id="${esc(h.id)}"><span class="aim-history-title"><strong>${esc(h.subject || '(제목 없음)')}</strong><small>${esc(h.group_name || '작업그룹')} · ${formatDate(h.created_at || h.started_at)}</small></span><span class="aim-history-stat"><strong>${sent}/${total}건</strong><small>성공 / 전체</small></span><span class="aim-history-stat"><strong style="color:${failed ? '#dc2626' : 'inherit'}">${failed}건</strong><small>실패</small></span><span class="aim-job-pill ${status}"><i class="fa-solid fa-circle"></i>${esc(statusLabel(status))}</span></button>`; }).join('');
+        $('#historyEmpty').hidden = list.length > 0;
+    }
+
+    function switchTab(name) {
+        $$('.aim-tab').forEach(tab => { const on = tab.dataset.tab === name; tab.classList.toggle('active', on); tab.setAttribute('aria-selected', String(on)); });
+        $$('.aim-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === name));
+        if (name === 'history') refreshHistory(false);
+    }
+    function editCommand(command, editor = $('#composeEditor'), value = null) { editor.focus(); document.execCommand(command, false, value); }
+    function insertAtCursor(value, editor = $('#composeEditor'), isHtml = false) { editor.focus(); document.execCommand(isHtml ? 'insertHTML' : 'insertText', false, value); }
+    function insertImage(file, editor) {
+        if (!file) return; if (!file.type.startsWith('image/')) return toast('이미지 파일만 넣을 수 있습니다.', 'warning');
+        if (file.size > 3 * 1024 * 1024) return toast('본문 이미지는 한 장당 3MB 이하로 등록해 주세요.', 'warning');
+        const reader = new FileReader(); reader.onload = () => {
+            const marker = `aim-insert-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            insertAtCursor(`<img src="${reader.result}" alt="메일 이미지" style="max-width:100%;height:auto" data-aim-insert="${marker}">`, editor, true);
+            const image = $(`[data-aim-insert="${marker}"]`, editor);
+            image?.removeAttribute('data-aim-insert');
+            if (editor.id === 'templateEditor' && image) requestAnimationFrame(() => selectTemplateImage(image));
+        }; reader.readAsDataURL(file);
+    }
+
+    let selectedTemplateImage = null;
+    function templateEditorContentWidth() {
+        const editor = $('#templateEditor'), style = getComputedStyle(editor);
+        return Math.max(1, editor.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
+    }
+    function currentTemplateImagePercent(image = selectedTemplateImage) {
+        if (!image) return 100;
+        const styled = /^([\d.]+)%$/.exec(image.style.width || '');
+        return Math.min(100, Math.max(10, styled ? Number(styled[1]) : image.getBoundingClientRect().width / templateEditorContentWidth() * 100));
+    }
+    function updateTemplateImageHandle() {
+        const handle = $('#templateImageResizeHandle'), editor = $('#templateEditor');
+        if (!selectedTemplateImage || !selectedTemplateImage.isConnected || !$('#templateModal').classList.contains('open')) { handle.classList.remove('visible'); return; }
+        const shellRect = editor.closest('.aim-editor-shell').getBoundingClientRect(), editorRect = editor.getBoundingClientRect(), imageRect = selectedTemplateImage.getBoundingClientRect();
+        if (imageRect.bottom < editorRect.top || imageRect.top > editorRect.bottom || imageRect.right < editorRect.left || imageRect.left > editorRect.right) { handle.classList.remove('visible'); return; }
+        handle.style.left = `${Math.min(editorRect.right, imageRect.right) - shellRect.left - 8}px`;
+        handle.style.top = `${Math.min(editorRect.bottom, imageRect.bottom) - shellRect.top - 8}px`;
+        handle.classList.add('visible');
+    }
+    function syncTemplateImageSizeControl() {
+        const percent = Math.round(currentTemplateImagePercent());
+        $('#templateImageSize').value = String(percent);
+        $('#templateImageSizeValue').textContent = `${percent}%`;
+        updateTemplateImageHandle();
+    }
+    function selectTemplateImage(image) {
+        if (!image || !$('#templateEditor').contains(image)) return clearTemplateImageSelection();
+        selectedTemplateImage?.classList.remove('aim-image-selected');
+        selectedTemplateImage = image;
+        selectedTemplateImage.classList.add('aim-image-selected');
+        $('#templateImageSizeControl').hidden = false;
+        syncTemplateImageSizeControl();
+    }
+    function clearTemplateImageSelection() {
+        selectedTemplateImage?.classList.remove('aim-image-selected');
+        selectedTemplateImage = null;
+        const control = $('#templateImageSizeControl'), handle = $('#templateImageResizeHandle');
+        if (control) control.hidden = true;
+        handle?.classList.remove('visible');
+    }
+    function setTemplateImageWidth(percent) {
+        if (!selectedTemplateImage) return;
+        const width = Math.min(100, Math.max(10, Number(percent) || 100));
+        selectedTemplateImage.style.width = `${width.toFixed(1).replace(/\.0$/, '')}%`;
+        selectedTemplateImage.style.maxWidth = '100%';
+        selectedTemplateImage.style.height = 'auto';
+        selectedTemplateImage.removeAttribute('width');
+        selectedTemplateImage.removeAttribute('height');
+        syncTemplateImageSizeControl();
+    }
+    function cleanEditorHtml(editor) {
+        const clone = editor.cloneNode(true);
+        $$('.aim-image-selected', clone).forEach(image => image.classList.remove('aim-image-selected'));
+        return clone.innerHTML.trim();
+    }
+
+    function renderAttachments() {
+        $('#attachmentList').innerHTML = state.attachments.map((file, index) => `<div class="aim-file-item"><span class="aim-file-icon"><i class="fa-regular fa-file"></i></span><span><span class="aim-file-name" title="${esc(file.name)}">${esc(file.name)}</span><span class="aim-file-size">${formatBytes(file.size)}</span></span><button class="aim-icon-btn remove-file" type="button" data-index="${index}" aria-label="파일 제거"><i class="fa-solid fa-xmark"></i></button></div>`).join(''); syncCompose();
+    }
+    function addAttachments(files) {
+        for (const file of files) {
+            if (state.attachments.some(item => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) continue;
+            state.attachments.push(file);
+        }
+        renderAttachments();
+    }
+
+    function composePayload() {
+        const modes = $$('input[name="attachmentMode"]:checked').map(input => input.value);
+        const interval = Number($('#sendInterval').value || 2);
+        return {
+            group_id: Number(state.activeGroupId), sender_id: Number($('#composeSender').value), template_id: $('#composeTemplate').value ? Number($('#composeTemplate').value) : null,
+            subject: $('#composeSubject').value.trim(), body_html: $('#composeEditor').innerHTML.trim(), html_content: $('#composeEditor').innerHTML.trim(),
+            recipient_ids: state.selectedRecipients.size ? [...state.selectedRecipients].map(Number) : state.recipients.map(r => Number(r.id)),
+            attachment_mode: modes[0] || 'none', attachment_modes: modes, allow_missing_attachment: $('#allowMissingAttachment').checked,
+            send_interval: interval, interval_seconds: interval
+        };
+    }
+    function validateCompose(payload) {
+        if (!state.activeGroupId) return '작업그룹을 선택해 주세요.';
+        if (!payload.recipient_ids.length) return '발송할 수신자가 없습니다.';
+        if (!payload.sender_id) return '발송계정을 선택해 주세요.';
+        if (!payload.subject) return '메일 제목을 입력해 주세요.';
+        if (!htmlText(payload.body_html).trim() && !payload.body_html.includes('<img')) return '메일 내용을 입력해 주세요.';
+        if (!payload.attachment_modes.length && state.attachments.length) return '첨부 방식을 선택해 주세요.';
+        if (payload.attachment_modes.includes('smart') && !state.attachments.length && !payload.allow_missing_attachment) return '개인별 자동분류 파일을 등록하거나 미첨부 발송 허용을 선택해 주세요.';
+        return '';
+    }
+
+    async function prepareCampaign() {
+        const payload = composePayload(), problem = validateCompose(payload); if (problem) return toast(problem, 'warning');
+        const btn = $('#prepareSendBtn'); btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 사전검사 준비 중';
+        try {
+            await discardStagedCampaign();
+            const form = new FormData();
+            ['group_id','sender_id','subject','body_html','attachment_mode','send_interval','allow_missing_attachment'].forEach(key => form.append(key, payload[key] ?? ''));
+            if (payload.template_id) form.append('template_id', payload.template_id);
+            form.append('recipient_ids', JSON.stringify(payload.recipient_ids));
+            form.append('attachment_modes', JSON.stringify(payload.attachment_modes));
+            state.attachments.forEach(file => form.append('files', file));
+            const result = await api('campaigns', {method:'POST', body:form});
+            const campaign = result.campaign || result;
+            state.campaignId = campaign.id || campaign.campaign_id;
+            state.campaignStatus = normalizeStatus(campaign.status || 'staged');
+            state.preflight = await api(`campaigns/${state.campaignId}/preflight`, {method:'POST', body:{allow_missing_attachment:payload.allow_missing_attachment}});
+            state.preflight = await enrichPreflight(state.preflight);
+            renderPreflight(state.preflight); openModal('preflightModal');
+        } catch (error) {
+            if (error.data?.preflight) {
+                state.preflight = await enrichPreflight(error.data);
+                renderPreflight(error.data);
+                openModal('preflightModal');
+                toast(error.message || '사전검사에서 수정할 항목을 발견했습니다.', 'warning', 7000);
+            } else {
+                toast(error.message || '사전검사를 완료하지 못했습니다.', 'error', 7000);
+            }
+        }
+        finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> 발송 준비 및 사전검사'; }
+    }
+    async function discardStagedCampaign() {
+        if (!state.campaignId || state.campaignStatus !== 'staged') return;
+        const id = state.campaignId;
+        try { await api(`campaigns/${id}`, {method:'DELETE'}); }
+        catch (error) { console.warn('이전 임시 발송작업을 정리하지 못했습니다.', error); }
+        finally { if (String(state.campaignId) === String(id)) { state.campaignId = null; state.campaignStatus = null; } }
+    }
+    async function enrichPreflight(data) {
+        const report = data.preflight || data;
+        try {
+            const detail = await api(`campaigns/${state.campaignId}`);
+            const recipients = detail.recipients || [], attachments = detail.attachments || [];
+            const missing = new Set((report.missing_recipients || []).map(item => String(item.id)));
+            const invalid = new Set((report.invalid_recipients || []).map(item => String(item.id)));
+            report.matches = recipients.map(recipient => {
+                const files = attachments.filter(file => file.kind === 'common' || String(file.campaign_recipient_id) === String(recipient.id));
+                const hasProblem = invalid.has(String(recipient.id)) || (missing.has(String(recipient.id)) && !detail.campaign?.allow_missing_attachment);
+                const hasWarning = missing.has(String(recipient.id)) && detail.campaign?.allow_missing_attachment;
+                return {...recipient, files, status:hasProblem ? 'failed' : hasWarning ? 'warning' : 'ready', message:hasProblem ? '확인 필요' : hasWarning ? '첨부 없이 발송' : files.length ? '연결 완료' : '첨부 없음'};
+            });
+        } catch (error) { console.warn('사전검사 상세를 불러오지 못했습니다.', error); }
+        return data;
+    }
+    function renderPreflight(data = {}) {
+        const report = data.preflight || data;
+        const summary = report.counts || report.summary || report;
+        const errors = report.errors || [], warnings = report.warnings || [], matches = report.matches || report.recipients || [];
+        const supplementalWarnings = [
+            ...(report.unmatched_files || []).map(item => ({message:`수신자와 일치하지 않는 파일: ${item.original_name || item.filename || item.name || item}`})),
+            ...(report.ambiguous_files || []).map(item => ({message:`수신자가 여러 명으로 판단되는 파일: ${item.original_name || item.filename || item.name || item}`})),
+            ...(report.missing_recipients || []).map(item => ({message:`개인 첨부파일 없음: ${item.recipient_name || item.name || item}`})),
+            ...(report.invalid_recipients || []).map(item => ({message:`수신자 정보 오류: ${item.recipient_name || item.email || item}`})),
+            ...(report.oversized_recipients || []).map(item => ({message:`메일 허용 용량 초과: ${item.recipient_name || item.name || item}`}))
+        ];
+        const allWarnings = [...warnings, ...supplementalWarnings];
+        $('#pfTotal').textContent = summary.total_count ?? summary.total_recipients ?? summary.recipients ?? summary.total ?? matches.length ?? 0;
+        $('#pfMatched').textContent = summary.matched_count ?? summary.matched_recipients ?? summary.matched_smart_files ?? summary.matched_files ?? summary.matched ?? matches.filter(m => m.attachments?.length || m.files?.length).length;
+        $('#pfWarnings').textContent = summary.warning_count ?? allWarnings.length; $('#pfErrors').textContent = summary.error_count ?? errors.length;
+        const issues = [
+            ...errors.map(item => ({type:'error', text: item.message || item})), ...allWarnings.map(item => ({type:'warning', text: item.message || item}))
+        ];
+        if (!issues.length) issues.push({type:'ok', text:'발송을 막는 오류가 없습니다. 수신자와 연결 파일을 마지막으로 확인해 주세요.'});
+        $('#preflightIssues').innerHTML = issues.map(item => `<div class="aim-issue ${item.type}"><i class="fa-solid ${item.type === 'error' ? 'fa-circle-xmark' : item.type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i><span>${esc(item.text)}</span></div>`).join('');
+        $('#preflightRows').innerHTML = matches.map(m => { const files = m.attachments || m.files || []; const status = normalizeStatus(m.status || (m.error ? 'failed' : 'ready')); return `<tr><td class="aim-cell-name">${esc(m.name || m.recipient_name)}</td><td class="aim-cell-mail">${esc(m.email)}</td><td class="aim-cell-memo">${esc(files.map(f => f.original_name || f.name || f).join(', ') || '첨부 없음')}</td><td><span class="aim-job-pill ${status}">${esc(m.message || statusLabel(status))}</span></td></tr>`; }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--aim-muted)">검사 결과에 상세 연결 정보가 없습니다.</td></tr>';
+        $('#startSendBtn').disabled = Number(summary.error_count ?? errors.length) > 0 || report.ok === false || report.can_start === false;
+    }
+
+    async function startCampaign() {
+        if (!state.campaignId) return;
+        const btn = $('#startSendBtn'); btn.disabled = true;
+        try {
+            await api(`campaigns/${state.campaignId}/start`, {method:'POST', body:{}}); state.campaignStatus = 'queued'; closeModal('preflightModal'); showProgress({status:'running'}); pollProgress(); toast('메일 발송을 시작했습니다. 화면을 이동해도 계속 진행됩니다.'); refreshHistory(false);
+        } catch (error) { toast(error.message, 'error'); btn.disabled = false; }
+    }
+    function showProgress(data = {}) {
+        const total = Number(data.total_count || data.total || 0), processed = Number(data.processed_count || data.processed || (Number(data.sent_count || 0) + Number(data.failed_count || 0) + Number(data.cancelled_count || 0))), sent = Number(data.sent_count || data.success_count || 0), failed = Number(data.failed_count || data.error_count || 0), remaining = Math.max(0, total - processed), percent = total ? Math.round(processed / total * 100) : 0, status = normalizeStatus(data.status);
+        $('#progressCard').hidden = false; $('#progressBar').style.width = `${percent}%`; $('#progressPercent').textContent = `${percent}%`; $('#progressSuccess').textContent = sent; $('#progressFailed').textContent = failed; $('#progressRemaining').textContent = remaining;
+        $('#progressTitle').textContent = ['completed','success'].includes(status) ? '메일 발송 완료' : status === 'completed_with_errors' ? '메일 발송 완료 · 일부 실패' : status === 'failed' ? '메일 발송 오류' : status === 'cancelled' ? '메일 발송 중단 완료' : status === 'cancel_requested' ? '메일 발송 중단 처리 중' : '메일 발송 진행 중';
+        $('#progressMessage').textContent = data.error_message || data.message || (status === 'cancel_requested' ? '현재 처리 중인 연결을 종료하고 남은 발송을 정리하고 있습니다.' : total ? `${processed}/${total}건 처리됨` : '발송을 준비하고 있습니다.');
+        state.campaignStatus = status || state.campaignStatus;
+        const terminal = ['completed','success','completed_with_errors','failed','cancelled'].includes(status); $('#stopSendBtn').disabled = terminal || status === 'cancel_requested'; $('#stopSendBtn').innerHTML = status === 'cancel_requested' ? '<i class="fa-solid fa-spinner fa-spin"></i> 중단 요청됨' : '<i class="fa-solid fa-stop"></i> 중단';
+        if (state.progressHideTimer) { clearTimeout(state.progressHideTimer); state.progressHideTimer = null; }
+        if (terminal) state.progressHideTimer = setTimeout(() => { $('#progressCard').hidden = true; state.progressHideTimer = null; }, ['failed','cancelled'].includes(status) ? 3500 : 7000);
+        return terminal;
+    }
+    function pollProgress() {
+        clearInterval(state.progressTimer);
+        state.progressPollErrors = 0;
+        const tick = async () => { if (!state.campaignId) return; try { const result = await api(`campaigns/${state.campaignId}/status`); state.progressPollErrors = 0; const data = result.campaign || result.progress || result; if (showProgress(data)) { clearInterval(state.progressTimer); state.progressTimer = null; refreshHistory(false); } } catch (error) { console.warn(error); state.progressPollErrors += 1; if (state.progressPollErrors >= 3) { clearInterval(state.progressTimer); state.progressTimer = null; $('#progressTitle').textContent = '발송 상태 확인 오류'; $('#progressMessage').textContent = error.message || '발송 상태를 확인하지 못했습니다.'; $('#stopSendBtn').disabled = true; if (state.progressHideTimer) clearTimeout(state.progressHideTimer); state.progressHideTimer = setTimeout(() => { $('#progressCard').hidden = true; state.progressHideTimer = null; }, 5000); toast('발송 상태 확인에 실패했습니다. 발송이력에서 결과를 확인해주세요.', 'error', 7000); refreshHistory(false); } } };
+        tick(); state.progressTimer = setInterval(tick, 1500);
+    }
+    function resumeRunningCampaign() {
+        const running = state.history.find(h => ['running','queued','cancel_requested'].includes(normalizeStatus(h.status))); if (!running) return; state.campaignId = running.id; state.campaignStatus = normalizeStatus(running.status); showProgress(running); pollProgress();
+    }
+    async function cancelCampaign() {
+        if (!state.campaignId || !confirm('현재 처리 중인 메일은 취소되지 않을 수 있습니다. 아직 발송하지 않은 건을 중단할까요?')) return;
+        $('#stopSendBtn').disabled = true; $('#stopSendBtn').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 중단 요청 중';
+        try { const result = await api(`campaigns/${state.campaignId}/cancel`, {method:'POST', body:{}}), data = result.campaign || {status:'cancel_requested'}; const terminal = showProgress(data); toast(result.message || '발송 중단을 요청했습니다.', 'warning'); if (terminal) { clearInterval(state.progressTimer); state.progressTimer = null; refreshHistory(false); } else { pollProgress(); } } catch (error) { $('#stopSendBtn').disabled = false; $('#stopSendBtn').innerHTML = '<i class="fa-solid fa-stop"></i> 중단'; toast(error.message, 'error'); }
+    }
+
+    async function refreshHistory(notify = true) {
+        try { const data = await api('campaigns'); state.history = Array.isArray(data) ? data : (data.campaigns || []); renderHistory(); if (notify) toast('발송이력을 새로 불러왔습니다.'); } catch (error) { if (notify) toast(error.message, 'error'); }
+    }
+    async function showHistory(id) {
+        openModal('historyModal'); $('#historyModalTitle').textContent = '발송 상세 불러오는 중'; $('#historyLogs').innerHTML = '<div class="aim-empty"><i class="fa-solid fa-spinner fa-spin"></i><strong>수신자별 결과를 불러오고 있습니다</strong></div>';
+        try {
+            const [detailData, logsData] = await Promise.all([api(`campaigns/${id}`), api(`campaigns/${id}/logs?per_page=100`)]), detail = detailData.campaign || detailData, campaignAttachments = detailData.attachments || [], rawLogs = detailData.recipients?.length ? detailData.recipients : (Array.isArray(logsData) ? logsData : (logsData.logs || [])), logs = rawLogs.map(log => ({...log, attachments:campaignAttachments.filter(file => !file.campaign_recipient_id || String(file.campaign_recipient_id) === String(log.id))})), status = normalizeStatus(detail.status), total = Number(detail.total_count || detail.total || logs.length), sent = Number(detail.sent_count || detail.success_count || logs.filter(l => ['sent','success','completed'].includes(normalizeStatus(l.status))).length), failed = Number(detail.failed_count || detail.error_count || logs.filter(l => normalizeStatus(l.status) === 'failed').length);
+            $('#historyModalTitle').textContent = detail.subject || '(제목 없음)'; $('#historyModalMeta').textContent = `${detail.group_name || '작업그룹'} · ${formatDate(detail.created_at || detail.started_at)} · ${statusLabel(status)}`;
+            $('#historySummary').innerHTML = `<div class="aim-preflight-stat"><strong>${total}</strong><span>전체</span></div><div class="aim-preflight-stat"><strong>${sent}</strong><span>성공</span></div><div class="aim-preflight-stat"><strong>${failed}</strong><span>실패</span></div><div class="aim-preflight-stat"><strong>${Math.max(0,total-sent-failed)}</strong><span>중단/대기</span></div>`;
+            $('#historyLogs').innerHTML = logs.map(l => { const s = normalizeStatus(l.status), ok = ['sent','success','completed'].includes(s); const attachments = l.attachments || l.files || []; const attachmentLinks = attachments.map(f => { const url = safeDownloadUrl(f.url || f.download_url); return url ? `<a class="aim-icon-btn" href="${esc(url)}" download title="${esc(f.name || f.original_name)}"><i class="fa-solid fa-paperclip"></i></a>` : `<span title="${esc(f.name || f.original_name || f)}"><i class="fa-solid fa-paperclip"></i></span>`; }).join(''); return `<div class="aim-log-item"><i class="fa-solid ${ok ? 'fa-circle-check ok' : s === 'failed' ? 'fa-circle-xmark bad' : 'fa-clock wait'}"></i><span><strong>${esc(l.recipient_name || l.name || '-')}</strong><br><small>${esc(l.email || l.recipient_email || '')}</small></span><span class="${s === 'failed' ? 'aim-log-error' : ''}" title="${esc(l.error_message || l.message || '')}">${esc(l.error_message || l.message || statusLabel(s))}</span><span>${attachmentLinks}</span></div>`; }).join('') || '<div class="aim-empty"><i class="fa-regular fa-rectangle-list"></i><strong>건별 기록이 없습니다</strong></div>';
+        } catch (error) { $('#historyLogs').innerHTML = `<div class="aim-issue error"><i class="fa-solid fa-circle-xmark"></i><span>${esc(error.message)}</span></div>`; }
+    }
+
+    async function saveGroup(event) {
+        event.preventDefault(); const id = $('#groupEditId').value, payload = {name:$('#groupName').value.trim(), features:$$('input[name="groupFeature"]:checked').map(input => input.value)};
+        try { const result = await api(id ? `groups/${id}` : 'groups', {method:id ? 'PATCH' : 'POST', body:payload}); const saved = result.group; if (id) state.groups = state.groups.map(g => String(g.id) === String(id) ? {...g,...saved} : g); else { state.groups.push(saved); state.activeGroupId = saved.id; sessionStorage.setItem('aiMailGroupId', saved.id); } closeModal('groupModal'); renderGroups(); await loadRecipients(); toast(id ? '작업그룹을 수정했습니다.' : '새 작업그룹을 만들었습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function copyGroup(event) {
+        event.preventDefault(); const payload = {name:$('#copyGroupName').value.trim()};
+        try { const result = await api(`groups/${state.activeGroupId}/copy`, {method:'POST', body:payload}); const saved = result.group; state.groups.push(saved); state.activeGroupId = saved.id; sessionStorage.setItem('aiMailGroupId', saved.id); closeModal('copyGroupModal'); renderGroups(); await loadRecipients(); toast('수신자를 복사해 새 그룹을 만들었습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function archiveGroup() {
+        const group = activeGroup(); if (!group || !confirm(`'${group.name}' 그룹을 삭제할까요? 발송이력이 있는 그룹은 삭제되지 않습니다.`)) return;
+        try { await api(`groups/${group.id}`, {method:'DELETE'}); state.groups = state.groups.filter(g => String(g.id) !== String(group.id)); state.activeGroupId = state.groups[0]?.id ?? null; state.activeGroupId ? sessionStorage.setItem('aiMailGroupId', state.activeGroupId) : sessionStorage.removeItem('aiMailGroupId'); state.recipients = []; renderAll(); if (state.activeGroupId) await loadRecipients(); toast('작업그룹을 삭제했습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function saveRecipient(event) {
+        event.preventDefault(); if (!state.activeGroupId) return toast('먼저 작업그룹을 만들어 주세요.', 'warning');
+        const id = $('#recipientEditId').value, payload = {name:$('#recipientName').value.trim(), recipient_name:$('#recipientName').value.trim(), email:$('#recipientEmail').value.trim(), memo:$('#recipientMemo').value.trim()};
+        try { await api(`groups/${state.activeGroupId}/recipients${id ? `/${id}` : ''}`, {method:id ? 'PATCH' : 'POST', body:payload}); closeModal('recipientModal'); await loadRecipients(); toast(id ? '수신자 정보를 수정했습니다.' : '수신자를 추가했습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function deleteRecipients(ids) {
+        if (!ids.length || !confirm(`${ids.length}명의 수신자를 삭제할까요? 기존 발송이력은 유지됩니다.`)) return;
+        try { for (const id of ids) await api(`groups/${state.activeGroupId}/recipients/${id}`, {method:'DELETE'}); ids.forEach(id => state.selectedRecipients.delete(String(id))); await loadRecipients(); toast('선택한 수신자를 삭제했습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function importRecipients(file) {
+        if (!state.activeGroupId) return toast('먼저 작업그룹을 선택해 주세요.', 'warning'); if (!file) return;
+        const form = new FormData(); form.append('file', file); const label = document.querySelector('label[for="recipientImport"]'); label.style.pointerEvents = 'none';
+        try { const result = await api(`groups/${state.activeGroupId}/recipients/import`, {method:'POST', body:form}); await loadRecipients(); const added = result.imported_count ?? result.added_count ?? result.created ?? 0, skipped = result.skipped_count ?? result.skipped ?? 0; toast(`${added}명 등록 완료${skipped ? ` · ${skipped}건 제외` : ''}`); if (result.errors?.length) toast(result.errors.slice(0,3).map(e => e.message || e).join(' / '), 'warning', 7000); } catch (error) { const rows = error.data?.errors || []; const details = rows.slice(0, 5).map(row => `${row.row || '?'}행 ${row.message || '확인 필요'}`).join(' · '); toast(details ? `${error.message} ${details}` : error.message, 'error', 9000); } finally { $('#recipientImport').value = ''; label.style.pointerEvents = ''; }
+    }
+
+    async function saveSender(event) {
+        event.preventDefault(); const id = $('#senderEditId').value, password = $('#senderPassword').value.replace(/\s+/g,''), payload = {label:$('#senderLabel').value.trim(), name:$('#senderLabel').value.trim(), email:$('#senderEmail').value.trim()}; if (password) { payload.app_password = password; payload.password = password; }
+        if (/@gmai\.com$/i.test(payload.email)) return toast("'gmai.com'은 'gmail.com'의 오타로 보입니다. 메일주소를 다시 확인해 주세요.", 'warning', 7000);
+        try { const result = await api(id ? `senders/${id}` : 'senders', {method:id ? 'PATCH' : 'POST', body:payload}); const saved = result.sender; if (id) state.senders = state.senders.map(s => String(s.id) === String(id) ? {...s,...saved} : s); else state.senders.push(saved); closeModal('senderModal'); renderSenders(); syncCompose(); toast('발송계정을 안전하게 저장했습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    async function testSender(id, useForm = false) {
+        const result = $('#senderTestResult'); if (useForm && !id) { result.innerHTML = '<div class="aim-issue warning"><i class="fa-solid fa-circle-info"></i><span>먼저 계정을 저장한 뒤 연결 테스트를 진행할 수 있습니다.</span></div>'; return; }
+        try { const data = await api(`senders/${id}/test`, {method:'POST', body:{}}); if (useForm) result.innerHTML = `<div class="aim-issue ok"><i class="fa-solid fa-circle-check"></i><span>${esc(data.message || '구글 메일 연결을 확인했습니다.')}</span></div>`; toast(data.message || '발송계정 연결을 확인했습니다.'); await bootstrap(); } catch (error) { if (useForm) result.innerHTML = `<div class="aim-issue error"><i class="fa-solid fa-circle-xmark"></i><span>${esc(error.message)}</span></div>`; else toast(error.message, 'error'); }
+    }
+    async function deleteSender(id) { if (!confirm('이 발송계정을 사용 중지할까요? 기존 발송이력은 유지됩니다.')) return; try { const result = await api(`senders/${id}`, {method:'DELETE'}); state.senders = state.senders.map(s => String(s.id) === String(id) ? {...s,...result.sender} : s); renderSenders(); syncCompose(); toast('발송계정을 사용 중지했습니다.'); } catch (error) { toast(error.message, 'error'); } }
+
+    async function saveTemplate(event) {
+        event.preventDefault(); const id = $('#templateEditId').value, bodyHtml = cleanEditorHtml($('#templateEditor')), payload = {name:$('#templateName').value.trim(), subject:$('#templateSubject').value.trim(), body_html:bodyHtml, html_content:bodyHtml};
+        try { const result = await api(id ? `templates/${id}` : 'templates', {method:id ? 'PATCH' : 'POST', body:payload}); const saved = result.template; if (id) state.templates = state.templates.map(t => String(t.id) === String(id) ? {...t,...saved} : t); else state.templates.push(saved); closeModal('templateModal'); renderTemplates(); syncCompose(); toast('메일 템플릿을 저장했습니다.'); } catch (error) { toast(error.message, 'error'); }
+    }
+    function applyTemplate(id) { const t = state.templates.find(item => String(item.id) === String(id)); if (!t) return; $('#composeTemplate').value = id; $('#composeSubject').value = t.subject || ''; $('#composeEditor').innerHTML = t.preview_html || t.body_html || t.content || ''; $('#subjectLength').textContent = $('#composeSubject').value.length; switchTab('compose'); toast(`'${t.name}' 템플릿을 적용했습니다.`); }
+    async function deleteTemplate(id) { if (!confirm('이 템플릿을 삭제할까요? 기존 발송이력에는 영향을 주지 않습니다.')) return; try { await api(`templates/${id}`, {method:'DELETE'}); state.templates = state.templates.filter(t => String(t.id) !== String(id)); renderTemplates(); syncCompose(); toast('템플릿을 삭제했습니다.'); } catch (error) { toast(error.message, 'error'); } }
+
+    document.addEventListener('click', async event => {
+        const close = event.target.closest('[data-close-modal]'); if (close) return closeModal(close.closest('.aim-modal-backdrop'));
+        const tab = event.target.closest('.aim-tab'); if (tab) return switchTab(tab.dataset.tab);
+        const group = event.target.closest('[data-group-id]'); if (group) return selectGroup(group.dataset.groupId);
+        const featureToggle = event.target.closest('[data-feature-toggle]'); if (featureToggle) return toggleGroupFeature(featureToggle.dataset.featureToggle);
+        const editRecipient = event.target.closest('.edit-recipient'); if (editRecipient) { const r = state.recipients.find(item => String(item.id) === editRecipient.dataset.id); $('#recipientEditId').value = r.id; $('#recipientName').value = r.name ?? r.recipient_name ?? ''; $('#recipientEmail').value = r.email || ''; $('#recipientMemo').value = r.memo || ''; $('#recipientModalTitle').textContent = '수신자 수정'; return openModal('recipientModal'); }
+        const deleteRecipient = event.target.closest('.delete-recipient'); if (deleteRecipient) return deleteRecipients([deleteRecipient.dataset.id]);
+        const removeFile = event.target.closest('.remove-file'); if (removeFile) { state.attachments.splice(Number(removeFile.dataset.index),1); return renderAttachments(); }
+        const editSender = event.target.closest('.edit-sender'); if (editSender) { const s = state.senders.find(item => String(item.id) === editSender.dataset.id); $('#senderEditId').value = s.id; $('#senderLabel').value = s.label || s.name || ''; $('#senderEmail').value = s.email || ''; $('#senderPassword').value = ''; $('#senderPassword').required = false; $('#senderPasswordHint').textContent = '변경할 때만 입력'; $('#senderModalTitle').textContent = '발송계정 수정'; $('#senderTestResult').innerHTML = ''; return openModal('senderModal'); }
+        const deleteSenderBtn = event.target.closest('.delete-sender'); if (deleteSenderBtn) return deleteSender(deleteSenderBtn.dataset.id);
+        const testSenderCard = event.target.closest('.test-sender-card'); if (testSenderCard) return testSender(testSenderCard.dataset.id);
+        const useTemplate = event.target.closest('.use-template'); if (useTemplate) return applyTemplate(useTemplate.dataset.id);
+        const editTemplate = event.target.closest('.edit-template'); if (editTemplate) { const t = state.templates.find(item => String(item.id) === editTemplate.dataset.id); clearTemplateImageSelection(); $('#templateEditId').value = t.id; $('#templateName').value = t.name || ''; $('#templateSubject').value = t.subject || ''; $('#templateEditor').innerHTML = t.preview_html || t.body_html || t.content || ''; $('#templateModalTitle').textContent = '메일 템플릿 수정'; return openModal('templateModal'); }
+        const deleteTemplateBtn = event.target.closest('.delete-template'); if (deleteTemplateBtn) return deleteTemplate(deleteTemplateBtn.dataset.id);
+        const history = event.target.closest('[data-campaign-id]'); if (history) return showHistory(history.dataset.campaignId);
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { const modal = $('.aim-modal-backdrop.open'); if (modal) closeModal(modal); } });
+    $$('.aim-modal-backdrop').forEach(backdrop => backdrop.addEventListener('mousedown', event => { if (event.target === backdrop) closeModal(backdrop); }));
+
+    $('#groupSearch').addEventListener('input', renderGroups); $('#recipientSearch').addEventListener('input', renderRecipients); $('#templateSearch').addEventListener('input', renderTemplates);
+    ['historySearch','historyStatus','historyDateFrom','historyDateTo'].forEach(id => $(`#${id}`).addEventListener(id.includes('Search') ? 'input' : 'change', renderHistory));
+    $('#createGroupBtn').addEventListener('click', () => { $('#groupForm').reset(); $('#groupEditId').value = ''; $('#groupModalTitle').textContent = '새 작업그룹'; openModal('groupModal'); });
+    $('#copyGroupBtn').addEventListener('click', () => { const g = activeGroup(); $('#copyGroupName').value = g ? `${g.name} 복사본` : ''; openModal('copyGroupModal'); });
+    $('#archiveGroupBtn').addEventListener('click', archiveGroup); $('#groupForm').addEventListener('submit', saveGroup); $('#copyGroupForm').addEventListener('submit', copyGroup);
+    $('#addRecipientBtn').addEventListener('click', () => { $('#recipientForm').reset(); $('#recipientEditId').value = ''; $('#recipientModalTitle').textContent = '수신자 추가'; openModal('recipientModal'); });
+    $('#recipientForm').addEventListener('submit', saveRecipient); $('#recipientImport').addEventListener('change', event => importRecipients(event.target.files[0]));
+    $('#selectAllRecipients').addEventListener('change', event => { filteredRecipients().forEach(r => event.target.checked ? state.selectedRecipients.add(String(r.id)) : state.selectedRecipients.delete(String(r.id))); renderRecipients(); syncCompose(); });
+    $('#recipientRows').addEventListener('change', event => { if (!event.target.classList.contains('recipient-check')) return; event.target.checked ? state.selectedRecipients.add(event.target.dataset.id) : state.selectedRecipients.delete(event.target.dataset.id); renderRecipients(); syncCompose(); });
+    $('#bulkDeleteRecipientsBtn').addEventListener('click', () => deleteRecipients([...state.selectedRecipients]));
+    $('#addSenderBtn').addEventListener('click', () => { $('#senderForm').reset(); $('#senderEditId').value = ''; $('#senderPassword').required = true; $('#senderPasswordHint').textContent = '필수'; $('#senderModalTitle').textContent = '발송계정 등록'; $('#senderTestResult').innerHTML = ''; openModal('senderModal'); });
+    $('#senderForm').addEventListener('submit', saveSender); $('#testSenderBtn').addEventListener('click', () => testSender($('#senderEditId').value, true));
+    $('#senderPasswordToggle').addEventListener('click', () => { const input = $('#senderPassword'), show = input.type === 'password'; input.type = show ? 'text' : 'password'; $('#senderPasswordToggle i').className = `fa-regular ${show ? 'fa-eye-slash' : 'fa-eye'}`; });
+    $('#addTemplateBtn').addEventListener('click', () => { $('#templateForm').reset(); clearTemplateImageSelection(); $('#templateEditId').value = ''; $('#templateEditor').innerHTML = ''; $('#templateModalTitle').textContent = '메일 템플릿 저장'; openModal('templateModal'); });
+    $('#templateForm').addEventListener('submit', saveTemplate);
+    $('#composeTemplate').addEventListener('change', event => { if (event.target.value) applyTemplate(event.target.value); });
+    $('#composeSubject').addEventListener('input', event => { $('#subjectLength').textContent = event.target.value.length; });
+    $('#resetComposeBtn').addEventListener('click', async () => { if (!confirm('작성 중인 제목, 내용, 첨부파일을 초기화할까요?')) return; await discardStagedCampaign(); $('#composeSender').value = ''; $('#composeTemplate').value = ''; $('#composeSubject').value = ''; $('#composeEditor').innerHTML = ''; $('#subjectLength').textContent = '0'; state.attachments = []; renderAttachments(); });
+    $$('.aim-editor-tool[data-command]').forEach(btn => btn.addEventListener('click', () => editCommand(btn.dataset.command)));
+    $$('.aim-editor-tool[data-template-command]').forEach(btn => btn.addEventListener('click', () => editCommand(btn.dataset.templateCommand, $('#templateEditor'))));
+    $$('.aim-variable').forEach(btn => btn.addEventListener('click', () => insertAtCursor(btn.dataset.variable)));
+    $('#insertLinkBtn').addEventListener('click', () => { const url = prompt('연결할 주소를 입력하세요.', 'https://'); if (url && /^https?:\/\//i.test(url)) editCommand('createLink', $('#composeEditor'), url); else if (url) toast('http:// 또는 https://로 시작하는 주소를 입력해 주세요.', 'warning'); });
+    $('#insertImageBtn').addEventListener('click', () => $('#editorImageInput').click()); $('#editorImageInput').addEventListener('change', event => { insertImage(event.target.files[0], $('#composeEditor')); event.target.value = ''; });
+    $('#templateInsertImageBtn').addEventListener('click', () => $('#templateImageInput').click()); $('#templateImageInput').addEventListener('change', event => { insertImage(event.target.files[0], $('#templateEditor')); event.target.value = ''; });
+    $('#templateEditor').addEventListener('click', event => event.target.tagName === 'IMG' ? selectTemplateImage(event.target) : clearTemplateImageSelection());
+    $('#templateEditor').addEventListener('input', () => selectedTemplateImage && !$('#templateEditor').contains(selectedTemplateImage) ? clearTemplateImageSelection() : updateTemplateImageHandle());
+    $('#templateEditor').addEventListener('scroll', updateTemplateImageHandle);
+    $('#templateEditor').addEventListener('load', event => { if (event.target === selectedTemplateImage) syncTemplateImageSizeControl(); }, true);
+    $('#templateImageSize').addEventListener('input', event => setTemplateImageWidth(event.target.value));
+    $('#templateImageResizeHandle').addEventListener('pointerdown', event => {
+        if (!selectedTemplateImage) return;
+        event.preventDefault();
+        const handle = event.currentTarget, startX = event.clientX, startPercent = currentTemplateImagePercent(), contentWidth = templateEditorContentWidth();
+        handle.setPointerCapture(event.pointerId);
+        const move = moveEvent => setTemplateImageWidth(startPercent + (moveEvent.clientX - startX) / contentWidth * 100);
+        const stop = stopEvent => { handle.releasePointerCapture?.(stopEvent.pointerId); handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', stop); handle.removeEventListener('pointercancel', stop); };
+        handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
+    });
+    window.addEventListener('resize', updateTemplateImageHandle);
+    $('#attachmentInput').addEventListener('change', event => { addAttachments(event.target.files); event.target.value = ''; });
+    const dropzone = $('#attachmentDropzone'); ['dragenter','dragover'].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.add('dragover'); })); ['dragleave','drop'].forEach(type => dropzone.addEventListener(type, event => { event.preventDefault(); dropzone.classList.remove('dragover'); if (type === 'drop') addAttachments(event.dataTransfer.files); }));
+    $('#prepareSendBtn').addEventListener('click', prepareCampaign); $('#startSendBtn').addEventListener('click', startCampaign); $('#stopSendBtn').addEventListener('click', cancelCampaign); $('#refreshHistoryBtn').addEventListener('click', () => refreshHistory(true));
+
+    bootstrap();
+})();
+</script>
+{% endblock %}

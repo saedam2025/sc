@@ -1,0 +1,999 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* === 다이나믹 테마 변수 (로그인 화면과 동일) === */
+    :root {
+        --body-bg: #f8fafc;
+        --primary-color: #4a90e2;
+        --primary-dark: #357abd;
+        --text-dark: #1e293b;
+        --text-gray: #64748b;
+        
+        --card-bg: rgba(255, 255, 255, 0.6);
+        --card-border: rgba(255, 255, 255, 0.9);
+        --card-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        --card-backdrop: blur(24px);
+        
+        --input-bg: rgba(255, 255, 255, 0.8);
+        --input-text: #1e293b;
+        --widget-bg: rgba(255, 255, 255, 0.7);
+        --widget-hover: rgba(255, 255, 255, 1);
+        --widget-border: rgba(255, 255, 255, 1);
+        
+        --effect-color1: transparent;
+        --effect-color2: transparent;
+        --effect-color3: transparent;
+    }
+
+    /* 상위 base.html의 body 및 navbar 강제 오버라이드 */
+    body {
+        background: var(--body-bg) !important;
+        background-size: 400% 400% !important;
+        animation: gradientBG 20s ease infinite !important;
+        transition: background 1.5s ease;
+        color: var(--text-dark) !important;
+    }
+    
+    .navbar {
+        background: var(--card-bg) !important;
+        backdrop-filter: var(--card-backdrop) !important;
+        -webkit-backdrop-filter: var(--card-backdrop) !important;
+        border-bottom: 1px solid var(--card-border) !important;
+        transition: all 0.5s ease;
+    }
+
+    .navbar .menu-item, .navbar .logo, .navbar .user-profile {
+        color: var(--text-dark) !important;
+    }
+
+    @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+    /* === 배경 애니메이션 효과 (별, 물방울, 블롭 등) === */
+    .stars-small { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 10%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(2px 2px at 90% 30%, #fff, transparent); background-size: 150px 150px; animation: twinkle 4s infinite alternate; }
+    .stars-medium { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(2px 2px at 20% 80%, rgba(255,255,255,0.8), transparent), radial-gradient(2.5px 2.5px at 40% 30%, rgba(255,255,255,0.9), transparent), radial-gradient(2px 2px at 60% 70%, rgba(255,255,255,0.7), transparent), radial-gradient(3px 3px at 80% 20%, #fff, transparent); background-size: 250px 250px; animation: twinkle 3s infinite alternate -1.5s; }
+    .stars-large { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(3px 3px at 15% 40%, #fff, transparent), radial-gradient(4px 4px at 55% 55%, #fff, transparent), radial-gradient(3.5px 3.5px at 85% 85%, #fff, transparent); background-size: 400px 400px; animation: twinkle 5s infinite alternate -3s; }
+    .shooting-star { position: absolute; width: 100px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,1), transparent); border-radius: 50%; transform: rotate(-45deg); animation: shooting 8s infinite linear; opacity: 0; }
+    @keyframes twinkle { 0% { opacity: 0.2; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,255,255,0.5); } }
+    @keyframes shooting { 0% { transform: rotate(-45deg) translateX(0); opacity: 1; } 10% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } 100% { transform: rotate(-45deg) translateX(-100vw); opacity: 0; } }
+
+    .bubble { position: absolute; bottom: -50px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; box-shadow: inset 2px 2px 5px rgba(255,255,255,0.2); animation: rise infinite ease-in; }
+    @keyframes rise { 0% { transform: translateY(0) scale(1) translateX(0); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) scale(1.5) translateX(20px); opacity: 0; } }
+
+    .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.7; animation: morph 15s ease-in-out infinite, spin 25s linear infinite; }
+    .blob-1 { width: 65vw; height: 65vw; top: -10%; left: -10%; animation-duration: 18s, 30s; }
+    .blob-2 { width: 55vw; height: 55vw; bottom: -20%; right: -10%; animation-direction: reverse; animation-duration: 22s, 35s; }
+    .blob-3 { width: 60vw; height: 60vw; top: 20%; left: 30%; animation-duration: 20s, 28s; }
+    @keyframes morph { 0%, 100% { border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; } 34% { border-radius: 70% 30% 50% 50% / 30% 30% 70% 70%; } 67% { border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%; } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .glow-orb { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.5; animation: orbOrbit 20s infinite alternate ease-in-out; }
+    .orb-1 { width: 45vw; height: 45vw; top: -10%; left: -10%; animation-duration: 25s; }
+    .orb-2 { width: 40vw; height: 40vw; bottom: -10%; right: -5%; animation-duration: 22s; animation-direction: alternate-reverse; }
+    .orb-3 { width: 55vw; height: 55vw; top: 30%; left: 30%; animation-duration: 28s; }
+    .cyber-grid { position: absolute; top:0; left:0; width:100%; height:100%; background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 50px 50px; mask-image: radial-gradient(circle at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%); }
+    @keyframes orbOrbit { 0% { transform: translate(0, 0) scale(1); } 33% { transform: translate(10vw, 15vh) scale(1.1); } 66% { transform: translate(-10vw, -10vh) scale(0.9); } 100% { transform: translate(15vw, -5vh) scale(1.2); } }
+
+    .wave { position: absolute; width: 300vw; height: 300vw; left: -100vw; top: 55vh; border-radius: 43%; animation: wave-spin 12s infinite linear; }
+    .wave-2 { top: 58vh; animation-duration: 18s; border-radius: 40%; }
+    .wave-3 { top: 61vh; animation-duration: 25s; border-radius: 45%; }
+    @keyframes wave-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .shape-box { position: absolute; bottom: -150px; background: rgba(255,255,255,0.05); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.3); animation: floatShape linear infinite; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    @keyframes floatShape { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+
+    .glass-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 0 30px rgba(255,255,255,0.1), inset 0 0 20px rgba(255,255,255,0.05); animation: ringPulse infinite ease-in-out alternate; }
+    @keyframes ringPulse { 0% { transform: scale(0.8) rotate(0deg); opacity: 0.2; } 100% { transform: scale(1.1) rotate(15deg); opacity: 0.7; } }
+
+    .polygon { position: absolute; bottom: -150px; opacity: 0.4; animation: floatShape linear infinite; }
+    .poly-triangle { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+    .poly-hexagon { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+
+    .glowing-line { position: absolute; height: 2px; width: 200vw; left: -50vw; opacity: 0; }
+    .line-pos { animation: slideLinePos infinite linear; }
+    .line-neg { animation: slideLineNeg infinite linear; }
+    @keyframes slideLinePos { 0% { transform: translateY(-100vh) rotate(30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(100vh) rotate(30deg); opacity: 0; } }
+    @keyframes slideLineNeg { 0% { transform: translateY(100vh) rotate(-30deg); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.8; } 100% { transform: translateY(-100vh) rotate(-30deg); opacity: 0; } }
+
+    #bg-effect-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; overflow: hidden; transition: opacity 1s ease; }
+
+    /* === 인트라넷 전용 스타일 업데이트 (테마 변수 적용) === */
+    .glass-box {
+        background: var(--card-bg) !important; 
+        backdrop-filter: var(--card-backdrop) !important; 
+        -webkit-backdrop-filter: var(--card-backdrop) !important;
+        border: 1px solid var(--card-border) !important; 
+        box-shadow: var(--card-shadow) !important;
+        border-radius: 20px; 
+        padding: 20px;
+        color: var(--text-dark) !important;
+        transition: background 0.5s ease, border 0.5s ease, box-shadow 0.5s ease, color 0.5s ease;
+    }
+
+    .glass-event-card, .list-item, .widget-box {
+        background: var(--widget-bg) !important; 
+        border: 1px solid var(--widget-border) !important;
+        color: var(--text-dark) !important;
+        transition: all 0.3s ease;
+    }
+    
+    .glass-event-card:hover, .list-item:hover {
+        background: var(--widget-hover) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .list-item { border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--card-border); }
+    .list-item:last-child { margin-bottom: 0; }
+
+    /* 풀캘린더 테마 오버라이드 */
+    .fc { font-size: 0.8em; color: var(--text-dark); }
+    .fc .fc-toolbar-title { font-size: 1.2em !important; font-weight: 800; color: var(--text-dark) !important; transition: color 0.5s; }
+    .fc .fc-daygrid-day-top { display: flex; flex-direction: row !important; justify-content: flex-start !important; align-items: center; padding-left: 5px; }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--card-border) !important; }
+    .fc-day-sun .fc-col-header-cell-cushion, .fc-day-sun .fc-daygrid-day-number { color: #e74c3c !important; text-decoration: none; }
+    .fc-day-sat .fc-col-header-cell-cushion, .fc-day-sat .fc-daygrid-day-number { color: #3498db !important; text-decoration: none; }
+    .holiday-day .fc-daygrid-day-number, .holiday-day .fc-daygrid-day-number a { color: #e74c3c !important; }
+    .holiday-name { font-size: 0.7em; color: #e74c3c; margin-left: 5px; font-weight: normal; }
+    .fc-event { background-color: transparent !important; border: none !important; cursor: pointer; }
+    .fc-event-main { padding: 1px 3px; font-weight: 700; font-size: 0.75em; border-radius: 4px; display: inline-block; color: white; margin: 1px; }
+
+    /* 글꼴 및 타이포그래피 */
+    .card-title { font-size: 0.85rem; font-weight: 700; color: var(--text-dark); }
+    .card-details { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 0.75rem; color: var(--text-gray); line-height: 1.5; }
+    h3, h4 { color: var(--text-dark) !important; transition: color 0.5s ease; }
+    
+    /* 모달 및 폼 스타일 */
+    .modal-content { 
+        background: var(--card-bg) !important; 
+        backdrop-filter: var(--card-backdrop) !important; 
+        -webkit-backdrop-filter: var(--card-backdrop) !important;
+        border: 1px solid var(--card-border) !important; 
+        box-shadow: var(--card-shadow) !important;
+        color: var(--text-dark) !important;
+    }
+    
+    .modal-input { 
+        width: 100%; padding: 12px; margin-bottom: 10px; 
+        border: 1px solid var(--card-border) !important; 
+        border-radius: 10px; box-sizing: border-box; 
+        background: var(--input-bg) !important; 
+        color: var(--input-text) !important; 
+        transition: all 0.3s;
+    }
+    .modal-input:focus { border-color: var(--primary-color) !important; outline: none; box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2); }
+    
+    .task-input-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .task-input-group label { width: 45px; font-weight: bold; font-size: 0.85rem; color: var(--text-gray); text-align: right; }
+    .task-input-group input[type="text"] { flex: 1; margin-bottom: 0; }
+    .task-input-group input[type="time"] { width: 110px; flex: 0 0 110px; margin-bottom: 0; }
+
+    /* 버튼 스타일 */
+    .btn-action { background: var(--widget-bg); color: var(--text-dark); border: 1px solid var(--card-border); padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; font-weight: bold; transition: all 0.2s; }
+    .btn-action:hover { background: var(--widget-hover); }
+    .btn-edit { color: var(--primary-color) !important; }
+    .btn-delete { color: #e74c3c !important; }
+    .btn-primary { background: var(--primary-color) !important; color: white !important; transition: all 0.3s; }
+    .btn-primary:hover { background: var(--primary-dark) !important; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+
+    /* 채팅 및 쪽지 스타일 */
+    .unread-badge { background: #e74c3c; color: white; font-size: 0.65rem; padding: 2px 7px; border-radius: 12px; margin-left: 5px; font-weight: bold; }
+    .msg-unread { font-weight: bold; border-left: 4px solid var(--primary-color) !important; }
+    
+    #chatBox::-webkit-scrollbar { width: 6px; }
+    #chatBox::-webkit-scrollbar-thumb { background-color: var(--primary-color); border-radius: 10px; }
+    .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
+    .emoji-item:hover { background: var(--widget-hover); }
+
+    .chat-sent-bubble { background: var(--primary-color); color: #fff; padding: 10px 14px; border-radius: 15px 15px 0 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .chat-recv-bubble { background: var(--input-bg); color: var(--input-text); border: 1px solid var(--card-border); padding: 10px 14px; border-radius: 0 15px 15px 15px; font-size: 0.9rem; word-break: break-all; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+    /* 랜덤 테마 버튼 */
+    .theme-btn { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); border: 1px solid var(--card-border); color: var(--text-dark); padding: 10px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; cursor: pointer; z-index: 1000; box-shadow: var(--card-shadow); transition: all 0.3s; display: flex; align-items: center; gap: 8px; }
+    .theme-btn:hover { background: var(--widget-hover); transform: translateY(-2px); }
+</style>
+
+<div id="bg-effect-container"></div>
+
+<div class="dashboard-container" style="padding: 0 0 20px 0; background-color: transparent;">
+    <div class="row" style="display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px;">
+        <div class="col-calendar glass-box" style="flex: 7; height: 680px; overflow: hidden;">
+            <div id='calendar'></div>
+        </div>
+
+        <div class="col-today glass-box" style="flex: 3; height: 680px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem; color: var(--primary-color) !important;"><i class="fa-solid fa-calendar-day"></i> TODAY <span style="font-size: 0.7em; color: var(--text-gray); font-weight: 500; margin-left: 5px;">{{ today_str }}</span></h3>
+            </div>
+            
+            <div class="today-list">
+                {% set today_empty = true %}
+                {% for cat in cats %}{% if today_grouped[cat] %}{% set today_empty = false %}
+                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
+                        {% for event in today_grouped[cat] %}
+                        <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
+                            <div class="card-header">
+                                <span class="card-title">{{ event.display_title_detailed }}</span>
+                                <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.7rem; color: var(--text-gray); transition: transform 0.2s;"></i>
+                            </div>
+                            {% if event.extendedProps.note or event.extendedProps.task_time %}
+                            <div class="card-details">
+                                {% if event.extendedProps.task_time %}<div><strong>시간:</strong> {{ event.extendedProps.task_time }}</div>{% endif %}
+                                {% if event.extendedProps.note %}<div style="margin-top:5px;"><strong>비고:</strong> {{ event.extendedProps.note }}</div>{% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                {% endif %}{% endfor %}
+                {% if today_empty %}<p style="color: var(--text-gray); text-align: center; margin-top: 30px; font-size: 0.85rem;">오늘 등록된 일정이 없습니다.</p>{% endif %}
+            </div>
+
+            <hr style="border: 0; border-top: 1px dashed var(--card-border); margin: 20px 0;">
+            
+            <h3 style="margin-bottom: 15px; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-calendar-week"></i> UPCOMING</h3>
+            <div class="weekly-list">
+                {% set weekly_empty = true %}
+                {% for cat in cats %}{% if weekly_grouped[cat] %}{% set weekly_empty = false %}
+                        <h4 style="font-size: 0.85rem; margin: 15px 0 8px; color: var(--text-gray); border-bottom: 1px solid var(--card-border); padding-bottom: 4px;"><strong>{{ cat }}</strong></h4>
+                        {% for event in weekly_grouped[cat] %}
+                        <div class="glass-event-card" style="border-left: 4px solid {{ event.color }};" onclick="toggleDetails(this)">
+                            <div style="font-size: 0.7rem; color: var(--primary-color); margin-bottom: 4px; font-weight: 600;"><i class="fa-regular fa-clock"></i> {{ event.start[:10] }}</div>
+                            <div class="card-header"><span class="card-title">{{ event.display_title_detailed }}</span></div>
+                        </div>
+                        {% endfor %}
+                {% endif %}{% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="display: flex; gap: 20px;">
+        <div class="col-board glass-box" style="flex: 7; height: 350px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; font-weight: 800; font-size: 1.1rem;"><i class="fa-solid fa-clipboard-list"></i> 사내 게시판</h3>
+                <button class="btn-primary" onclick="openBoardForm()" style="border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight:600;"><i class="fa-solid fa-pen"></i> 글쓰기</button>
+            </div>
+            <div style="background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                {% for post in board_posts %}
+                <div class="list-item" style="cursor: pointer; padding: 12px;"
+                     data-id="{{ post.id }}" data-title="{{ post.title }}" data-content="{{ post.content }}" 
+                     data-author="{{ post.author }}" data-date="{{ post.created_at[:16] }}" data-filename="{{ post.filename }}"
+                     onclick="openBoardDetail(this)">
+                    <div style="flex: 1; color: var(--text-dark);">
+                        <strong>{{ post.title }}</strong> 
+                        {% if post.filename %}<i class="fa-solid fa-paperclip" style="color:var(--primary-color); margin-left:5px;"></i>{% endif %}
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-gray);">{{ user_icons.get(post.author, '👤') }} {{ post.author }} &nbsp;|&nbsp; {{ post.created_at[:10] }}</div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">등록된 게시글이 없습니다.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="col-msg glass-box" style="flex: 3; height: 350px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="color: var(--primary-color) !important; margin: 0; font-weight: 800; font-size: 1.1rem;">
+                    <i class="fa-solid fa-envelope"></i> 내 쪽지함
+                </h3>
+                <button class="btn-primary" onclick="document.getElementById('msgModal').style.display='block'" style="background:var(--primary-color); border:none; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:0.85rem; font-weight: 600;"><i class="fa-solid fa-paper-plane"></i> 새 쪽지</button>
+            </div>
+            
+            <div style="display: flex; gap: 15px; border-bottom: 2px solid var(--card-border); padding-bottom: 8px; margin-bottom: 10px;">
+                <span id="tab-partners" style="cursor:pointer; font-weight:bold; color:var(--primary-color); font-size:0.9rem;" onclick="switchMsgTab('partners')">대화 상대</span>
+                <span id="tab-recv" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.9rem;" onclick="switchMsgTab('recv')">받은 쪽지 <span id="unreadBadge" class="unread-badge" style="display:none;">0</span></span>
+                <span id="tab-sent" style="cursor:pointer; font-weight:normal; color:var(--text-gray); font-size:0.9rem;" onclick="switchMsgTab('sent')">보낸 쪽지</span>
+            </div>
+
+            <div id="list-partners" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px;">
+                {% for partner in chat_partners %}
+                <div class="list-item" onclick="openChat('{{ partner.name }}')" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 12px 10px; border:none; border-bottom: 1px solid var(--card-border); border-radius: 0;">
+                    <div style="font-size: 1.8rem;">{{ user_icons.get(partner.name, '👤') }}</div>
+                    <div style="flex: 1;">
+                        <strong style="color: var(--text-dark); font-size: 0.95rem;">{{ partner.name }}</strong>
+                        {% if partner.unread > 0 %}
+                        <span class="unread-badge">{{ partner.unread }}</span>
+                        {% endif %}
+                    </div>
+                    <i class="fa-regular fa-comment-dots" style="color:var(--text-gray);"></i>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">대화 기록이 없습니다.</p>
+                {% endfor %}
+            </div>
+
+            <div id="list-recv" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                {% for msg in received_messages %}
+                <div class="list-item {% if not msg.is_read %}msg-unread{% endif %}" onclick="openChat('{{ msg.sender }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                        <span style="color: var(--text-dark);">From: {{ user_icons.get(msg.sender, '👤') }} <strong>{{ msg.sender }}</strong></span>
+                        <span style="font-size: 0.7rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                    </div>
+                    <div style="color: var(--text-gray); font-size:0.85rem;">
+                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">받은 쪽지가 없습니다.</p>
+                {% endfor %}
+            </div>
+
+            <div id="list-sent" style="flex: 1; overflow-y: auto; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px; display: none;">
+                {% for msg in sent_messages %}
+                <div class="list-item" onclick="openChat('{{ msg.receiver }}')" style="cursor: pointer; flex-direction: column; align-items: flex-start; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 5px;">
+                        <span style="color: var(--text-dark);">To: {{ user_icons.get(msg.receiver, '👤') }} <strong>{{ msg.receiver }}</strong></span>
+                        <span style="font-size: 0.7rem; color: var(--text-gray);">{{ msg.sent_at[5:16] }}</span>
+                    </div>
+                    <div style="color: var(--text-gray); font-size:0.85rem;">
+                        {% if msg.filename %}<i class="fa-solid fa-paperclip"></i> 첨부파일{% else %}{{ msg.content }}{% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-gray); font-size: 0.85rem; padding: 20px 0;">보낸 쪽지가 없습니다.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<button class="theme-btn" onclick="initRandomTheme()">
+    <span id="themeNameBadge" style="font-weight: bold; margin-right: 5px;"></span> <i class="fa-solid fa-dice"></i> 테마 변경
+</button>
+
+<div id="chatModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:5% auto; padding:25px; width:450px; height:600px; border-radius:20px; position:relative; display:flex; flex-direction:column;">
+        <span onclick="closeChat()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
+        <h3 style="color: var(--primary-color) !important; margin-top: 0; margin-bottom: 15px; font-weight:800; display:flex; align-items:center; gap:8px;">
+            <span id="chatPartnerIcon" style="font-size:1.5rem;">👤</span> <span id="chatPartnerName"></span>님과의 대화
+        </h3>
+        
+        <div id="chatBox" style="flex:1; overflow-y:auto; background:var(--widget-bg); border: 1px solid var(--card-border); padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;"></div>
+        
+        <div style="display:flex; gap:8px; align-items:center; position:relative;">
+            <label for="chatFile" style="cursor:pointer; color:var(--primary-color); font-size:1.2rem; padding:5px;"><i class="fa-solid fa-paperclip"></i></label>
+            <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
+            
+            <i class="fa-regular fa-face-smile" style="cursor:pointer; color:#f59e0b; font-size:1.3rem; padding:5px;" onclick="toggleEmojiPicker('chatEmojiPicker')"></i>
+            
+            <div id="chatEmojiPicker" style="display:none; position:absolute; bottom:50px; left:20px; background:var(--card-bg); backdrop-filter: var(--card-backdrop); border:1px solid var(--card-border); border-radius:10px; padding:12px; box-shadow:var(--card-shadow); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                <span class="emoji-item" onclick="addEmoji('chatInput', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('chatInput', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('chatInput', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('chatInput', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('chatInput', '😭')">😭</span><span class="emoji-item" onclick="addEmoji('chatInput', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('chatInput', '👍')">👍</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('chatInput', '🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('chatInput', '💖')">💖</span><span class="emoji-item" onclick="addEmoji('chatInput', '🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('chatInput', '✨')">✨</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('chatInput', '👏')">👏</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '🙌')">🙌</span><span class="emoji-item" onclick="addEmoji('chatInput', '😅')">😅</span><span class="emoji-item" onclick="addEmoji('chatInput', '😋')">😋</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤩')">🤩</span><span class="emoji-item" onclick="addEmoji('chatInput', '😴')">😴</span><span class="emoji-item" onclick="addEmoji('chatInput', '🥳')">🥳</span><span class="emoji-item" onclick="addEmoji('chatInput', '🤫')">🤫</span>
+                <span class="emoji-item" onclick="addEmoji('chatInput', '🤝')">🤝</span><span class="emoji-item" onclick="addEmoji('chatInput', '💪')">💪</span><span class="emoji-item" onclick="addEmoji('chatInput', '📝')">📝</span><span class="emoji-item" onclick="addEmoji('chatInput', '💡')">💡</span><span class="emoji-item" onclick="addEmoji('chatInput', '💯')">💯</span><span class="emoji-item" onclick="addEmoji('chatInput', '📌')">📌</span><span class="emoji-item" onclick="addEmoji('chatInput', '🚀')">🚀</span>
+            </div>
+
+            <div style="flex:1; display:flex; flex-direction:column; position:relative;">
+                <div id="chatFileName" style="font-size:0.75rem; color:var(--primary-color); position:absolute; top:-22px; left:5px; display:none; background:var(--input-bg); padding:3px 8px; border-radius:6px; border: 1px solid var(--card-border);"></div>
+                <input type="text" id="chatInput" class="modal-input" style="margin-bottom:0; width:100%; border-radius:10px;" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()">
+            </div>
+            
+            <button class="btn-primary" onclick="sendChatReply()" style="border:none; padding:12px 18px; border-radius:10px; font-weight:bold; cursor:pointer;"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+    </div>
+</div>
+
+<div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:10% auto; padding:25px; width:400px; border-radius:15px; position:relative;">
+        <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
+        <h3 style="color: var(--primary-color) !important; margin-top: 0;"><i class="fa-solid fa-paper-plane"></i> 새 쪽지 보내기</h3>
+        <form id="msgForm">
+            <select id="msgReceiver" class="modal-input" required style="cursor: pointer;">
+                <option value="" style="color: #666;">수신자를 선택하세요</option>
+                {% for u in user_list %}
+                    {% if u != current_user %}
+                    <option value="{{ u }}" style="color: #000;">{{ u }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+            
+            <div style="position:relative;">
+                <i class="fa-regular fa-face-smile" style="position:absolute; right:10px; top:-25px; cursor:pointer; color:#f59e0b; font-size:1.3rem;" onclick="toggleEmojiPicker('newMsgEmojiPicker')"></i>
+                <div id="newMsgEmojiPicker" style="display:none; position:absolute; top:-120px; right:35px; background:var(--card-bg); backdrop-filter:var(--card-backdrop); border:1px solid var(--card-border); border-radius:10px; padding:12px; box-shadow:var(--card-shadow); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+                     <span class="emoji-item" onclick="addEmoji('msgContent', '😀')">😀</span><span class="emoji-item" onclick="addEmoji('msgContent', '😂')">😂</span><span class="emoji-item" onclick="addEmoji('msgContent', '🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('msgContent', '😎')">😎</span><span class="emoji-item" onclick="addEmoji('msgContent', '😭')">😭</span><span class="emoji-item" onclick="addEmoji('msgContent', '😡')">😡</span><span class="emoji-item" onclick="addEmoji('msgContent', '👍')">👍</span>
+                </div>
+                <textarea id="msgContent" class="modal-input" placeholder="메시지 내용" style="height:120px; resize:none;" required></textarea>
+            </div>
+            
+            <input type="file" id="msgFile" class="modal-input">
+            <button type="button" class="btn-primary" onclick="sendNewMessage()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">전송하기</button>
+        </form>
+    </div>
+</div>
+
+<div id="boardModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:10% auto; padding:25px; width:450px; border-radius:15px; position:relative;">
+        <span onclick="document.getElementById('boardModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
+        <h3 id="boardFormTitle" style="margin-top: 0;"><i class="fa-solid fa-pen"></i> 게시글 작성</h3>
+        <form id="boardForm">
+            <input type="hidden" id="boardId"> 
+            <input type="text" id="boardTitle" class="modal-input" placeholder="제목을 입력하세요" required>
+            <textarea id="boardContent" class="modal-input" placeholder="내용을 입력하세요" style="height:150px; resize:none;" required></textarea>
+            <input type="file" id="boardFile" class="modal-input">
+            <button type="button" class="btn-primary" onclick="saveBoard()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer;">저장하기</button>
+        </form>
+    </div>
+</div>
+
+<div id="boardDetailModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:500px; border-radius:15px; position:relative;">
+        <span onclick="document.getElementById('boardDetailModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
+        <h3 id="detailTitle" style="margin-top: 0; margin-bottom: 5px;"></h3>
+        <div style="font-size: 0.8rem; color: var(--text-gray); margin-bottom: 20px; border-bottom: 1px solid var(--card-border); padding-bottom: 10px;">
+            <i class="fa-solid fa-user"></i> <span id="detailAuthor"></span> &nbsp;|&nbsp;
+            <i class="fa-regular fa-clock"></i> <span id="detailDate"></span>
+        </div>
+        <div id="detailContent" style="min-height: 120px; font-size: 0.95rem; line-height: 1.6; color: var(--text-dark); white-space: pre-wrap; margin-bottom: 20px;"></div>
+        <div id="detailFileWrap" style="display:none; background:var(--input-bg); padding:10px; border-radius:8px; margin-bottom:20px; font-size:0.85rem; border: 1px solid var(--card-border);">
+            <i class="fa-solid fa-paperclip" style="color:var(--primary-color);"></i> 첨부파일: <a id="detailFile" href="#" target="_blank" style="color:var(--primary-color); text-decoration:none; font-weight:bold;"></a>
+        </div>
+        <div id="detailActions" style="display:none; text-align: right; border-top: 1px solid var(--card-border); padding-top: 15px;">
+            <button class="btn-action btn-edit" onclick="editBoardFromDetail()">수정</button>
+            <button class="btn-action btn-delete" onclick="deleteBoardFromDetail()">삭제</button>
+        </div>
+    </div>
+</div>
+
+<div id="taskModal" class="modal" style="display:none; position:fixed; z-index:2000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:8% auto; padding:25px; width:420px; border-radius:20px; position:relative;">
+        <span onclick="closeTaskModal()" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
+        <h3 id="taskModalTitle" style="color: var(--primary-color) !important; margin-top: 0; margin-bottom: 20px;"><i class="fa-solid fa-pen-clip"></i> 새 일정 등록</h3>
+        <form id="taskForm">
+            <input type="hidden" id="taskId">
+            <input type="date" id="taskDate" class="modal-input" required readonly style="opacity: 0.8;">
+            <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="opacity: 0.8;">
+            <div style="background: var(--widget-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--card-border); margin-bottom: 15px;">
+                {% for c in ['회의','면접','미팅','외근','기타'] %}
+                <div class="task-input-group">
+                    <label>{{ c }}</label>
+                    <input type="text" id="cat_{{ c }}_제목" class="modal-input" placeholder="제목">
+                    <input type="time" id="cat_{{ c }}_시간" class="modal-input">
+                </div>
+                {% endfor %}
+            </div>
+            <textarea id="taskNote" class="modal-input" placeholder="비고 및 내용 (전체 항목 공통)" style="height:60px; resize: none;"></textarea>
+            <button type="button" class="btn-primary" onclick="saveTask()" style="width:100%; border:none; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; font-size: 1rem;">일정 저장하기</button>
+        </form>
+    </div>
+</div>
+
+<div id="dayEventsModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
+    <div class="modal-content" style="margin:8% auto; padding:25px; width:380px; border-radius:20px; position:relative;">
+        <span onclick="document.getElementById('dayEventsModal').style.display='none'" style="position:absolute; right:20px; top:15px; cursor:pointer; font-size:24px; color:var(--text-gray);">&times;</span>
+        <h3 id="dayEventsTitle" style="margin-top: 0; margin-bottom: 15px; font-size: 1.1rem; font-weight: 800;"></h3>
+        <div id="dayEventsContent" style="max-height: 450px; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script>
+    // === 다이나믹 테마 엔진 생성 (로그인과 동일 로직) ===
+    const uiStyles = ['glass', 'solid', 'glow'];
+    const effectsList = ['stars', 'bubbles', 'blobs', 'orbs', 'waves', 'geometry', 'rings', 'polygons', 'lines']; 
+    const adjectives = ["미스틱", "네온", "사이버", "오가닉", "코스믹", "딥", "퓨어", "루미너스", "크리스탈", "벨벳", "아스트랄", "스파클링", "글로우", "매직", "아우라", "일루전", "드림", "일렉트릭", "팬텀", "인피니티", "루나", "솔라", "시크릿", "로얄", "엔젤릭", "루비", "사파이어", "에메랄드", "스텔라", "다이내믹", "프리즘", "에테르", "소닉", "루시드", "비비드", "폴리곤", "매트릭스", "헥사곤", "지오메트릭", "라인"];
+    const nouns = ["오션", "블랙홀", "네뷸라", "선셋", "웨이브", "포레스트", "플레어", "갤럭시", "마블", "실버", "골드", "스톰", "이클립스", "클라우드", "라군", "펄", "스타더스트", "메트릭스", "퀘이사", "스페이스", "드롭", "플로우", "오로라", "블리즈", "스카이", "크리스탈", "오아시스", "유니버스", "홀로그램", "미라지", "오디세이", "스펙트럼", "호라이즌", "에코", "포털"];
+
+    const generatedThemes = [];
+
+    for (let i = 0; i < 1100; i++) {
+        const hue = Math.floor((i / 1100) * 360);
+        const useComplementary = (i % 5 === 0);
+        const pointHue = useComplementary ? (hue + 180) % 360 : hue;
+        
+        let effectType = i >= 1000 ? ['geometry', 'rings', 'polygons', 'lines'][i % 4] : effectsList[i % effectsList.length];
+        const isDark = i % 2 === 0;
+        const uiStyle = uiStyles[i % uiStyles.length]; 
+        
+        const styleNameKOR = uiStyle === 'glass' ? "유리" : (uiStyle === 'solid' ? "솔리드" : "네온");
+        const name = `[${styleNameKOR}] ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${nouns[Math.floor(Math.random() * nouns.length)]}`;
+        
+        let vars = {};
+        
+        if (isDark) {
+            const primary = `hsl(${pointHue}, 80%, 60%)`;
+            const primaryDark = `hsl(${pointHue}, 80%, 40%)`;
+            const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 10%), hsl(${(hue + 45) % 360}, 50%, 5%), hsl(${(hue - 45 + 360) % 360}, 40%, 10%))`;
+            
+            vars = {
+                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                "--text-dark": "#ffffff", "--text-gray": "#cbd5e1",
+                "--input-text": "#ffffff",
+                "--effect-color1": `hsl(${hue}, 80%, 50%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 80%, 50%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 80%, 50%)`
+            };
+
+            if (uiStyle === 'glass') {
+                vars["--card-bg"] = "rgba(20, 20, 30, 0.5)"; vars["--card-border"] = "rgba(255, 255, 255, 0.15)";
+                vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.3)";
+                vars["--input-bg"] = "rgba(0, 0, 0, 0.4)"; vars["--widget-bg"] = "rgba(30, 30, 45, 0.5)"; 
+                vars["--widget-hover"] = "rgba(50, 50, 70, 0.8)"; vars["--widget-border"] = "rgba(255, 255, 255, 0.15)";
+            } else if (uiStyle === 'solid') {
+                vars["--card-bg"] = "#1e293b"; vars["--card-border"] = "transparent";
+                vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 50px rgba(0, 0, 0, 0.5)";
+                vars["--input-bg"] = "#0f172a"; vars["--widget-bg"] = "#0f172a"; 
+                vars["--widget-hover"] = "#334155"; vars["--widget-border"] = "transparent";
+            } else if (uiStyle === 'glow') {
+                vars["--card-bg"] = "rgba(0, 0, 0, 0.7)"; vars["--card-border"] = primary;
+                vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 30px ${primaryDark}`;
+                vars["--input-bg"] = "rgba(0,0,0,0.5)"; vars["--widget-bg"] = "rgba(0,0,0,0.5)"; 
+                vars["--widget-hover"] = "rgba(0,0,0,0.8)"; vars["--widget-border"] = primaryDark;
+            }
+        } else {
+            const primary = `hsl(${pointHue}, 70%, 50%)`;
+            const primaryDark = `hsl(${pointHue}, 70%, 40%)`;
+            const bg = `linear-gradient(-45deg, hsl(${hue}, 40%, 95%), hsl(${(hue + 30) % 360}, 50%, 90%), hsl(${(hue - 30 + 360) % 360}, 40%, 95%))`;
+            
+            vars = {
+                "--body-bg": bg, "--primary-color": primary, "--primary-dark": primaryDark,
+                "--text-dark": "#0f172a", "--text-gray": "#64748b",
+                "--input-text": "#1e293b", 
+                "--effect-color1": `hsl(${hue}, 70%, 75%)`, "--effect-color2": `hsl(${(hue + 40) % 360}, 70%, 75%)`, "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, 70%, 75%)`
+            };
+
+            if (uiStyle === 'glass') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
+                vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
+                vars["--input-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; 
+                vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
+            } else if (uiStyle === 'solid') {
+                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
+                vars["--input-bg"] = "#f1f5f9"; vars["--widget-bg"] = "#f1f5f9"; 
+                vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+            } else if (uiStyle === 'glow') {
+                vars["--card-bg"] = "rgba(255, 255, 255, 0.85)"; vars["--card-border"] = primary;
+                vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
+                vars["--input-bg"] = "rgba(255,255,255,0.5)"; vars["--widget-bg"] = "rgba(255,255,255,0.5)"; 
+                vars["--widget-hover"] = "rgba(255,255,255,0.9)"; vars["--widget-border"] = primary;
+            }
+        }
+        
+        generatedThemes.push({ name: name, type: effectType, vars: vars });
+    }
+
+    generatedThemes.sort(() => Math.random() - 0.5);
+    let currentThemeIndex = -1;
+
+    function initRandomTheme() {
+        let newIndex = Math.floor(Math.random() * generatedThemes.length);
+        while (newIndex === currentThemeIndex) { newIndex = Math.floor(Math.random() * generatedThemes.length); }
+        currentThemeIndex = newIndex;
+        
+        const t = generatedThemes[currentThemeIndex];
+        
+        for (const [key, value] of Object.entries(t.vars)) {
+            document.documentElement.style.setProperty(key, value);
+        }
+
+        document.getElementById('themeNameBadge').innerText = t.name;
+
+        const container = document.getElementById('bg-effect-container');
+        container.style.opacity = '0';
+        
+        setTimeout(() => {
+            container.innerHTML = ''; 
+            if (t.type === 'stars') {
+                container.innerHTML = `<div class="stars-small"></div><div class="stars-medium"></div><div class="stars-large"></div><div class="shooting-star" style="top:20%; right:-10%;"></div>`;
+            } else if (t.type === 'bubbles') {
+                for(let i=0; i<20; i++) {
+                    let b = document.createElement('div'); b.className = 'bubble'; b.style.left = Math.random() * 100 + '%'; b.style.width = b.style.height = (Math.random() * 25 + 10) + 'px'; b.style.animationDuration = (Math.random() * 8 + 4) + 's'; b.style.animationDelay = (Math.random() * 5) + 's'; container.appendChild(b);
+                }
+            } else if (t.type === 'blobs') {
+                container.innerHTML = `<div class="blob blob-1" style="background: var(--effect-color1)"></div><div class="blob blob-2" style="background: var(--effect-color2)"></div><div class="blob blob-3" style="background: var(--effect-color3)"></div>`;
+            } else if (t.type === 'orbs') {
+                container.innerHTML = `<div class="glow-orb orb-1" style="background: var(--effect-color1)"></div><div class="glow-orb orb-2" style="background: var(--effect-color2)"></div><div class="glow-orb orb-3" style="background: var(--effect-color3)"></div><div class="cyber-grid"></div>`;
+            } else if (t.type === 'waves') {
+                container.innerHTML = `<div class="wave" style="background: var(--effect-color1); opacity:0.3"></div><div class="wave wave-2" style="background: var(--effect-color2); opacity:0.2"></div><div class="wave wave-3" style="background: var(--effect-color3); opacity:0.1"></div>`;
+            } else if (t.type === 'geometry') {
+                for(let i=0; i<12; i++) {
+                    let el = document.createElement('div'); el.className = 'shape-box'; if(i%3===0) el.style.borderRadius = '50%'; el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 60 + 20; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                }
+            } else if (t.type === 'rings') {
+                for(let i=0; i<5; i++) {
+                    let el = document.createElement('div'); el.className = 'glass-ring'; el.style.left = (Math.random() * 80 + 10) + '%'; el.style.top = (Math.random() * 80 + 10) + '%'; let size = Math.random() * 300 + 150; el.style.width = el.style.height = size + 'px'; el.style.marginLeft = el.style.marginTop = -(size/2) + 'px'; el.style.animationDuration = (Math.random() * 4 + 4) + 's'; el.style.borderColor = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                }
+            } else if (t.type === 'polygons') {
+                for(let i=0; i<10; i++) {
+                    let el = document.createElement('div'); el.className = 'polygon ' + (i%2===0 ? 'poly-triangle' : 'poly-hexagon'); el.style.left = Math.random() * 100 + '%'; let size = Math.random() * 80 + 30; el.style.width = el.style.height = size + 'px'; el.style.animationDuration = (Math.random() * 15 + 10) + 's'; el.style.background = `var(--effect-color${(i%3)+1})`; container.appendChild(el);
+                }
+            } else if (t.type === 'lines') {
+                for(let i=0; i<8; i++) {
+                    let el = document.createElement('div'); el.className = 'glowing-line ' + (i%2===0 ? 'line-pos' : 'line-neg'); el.style.top = (Math.random() * 150 - 25) + '%'; el.style.animationDuration = (Math.random() * 8 + 5) + 's'; el.style.background = `linear-gradient(90deg, transparent, var(--effect-color${(i%3)+1}), transparent)`; container.appendChild(el);
+                }
+            }
+            container.style.opacity = '1';
+        }, 300); 
+    }
+
+    // 초기 테마 설정
+    document.addEventListener('DOMContentLoaded', initRandomTheme);
+
+    // === 기존 달력 및 게시판 스크립트 ===
+    window.taskDataMap = window.taskDataMap || {};
+    const currentUser = '{{ current_user }}';
+    const userIcons = {{ user_icons | tojson | safe }};
+
+    function switchMsgTab(tab) {
+        ['partners', 'recv', 'sent'].forEach(t => {
+            document.getElementById('list-' + t).style.display = (t === tab) ? 'block' : 'none';
+            document.getElementById('tab-' + t).style.fontWeight = (t === tab) ? 'bold' : 'normal';
+            document.getElementById('tab-' + t).style.color = (t === tab) ? 'var(--primary-color)' : 'var(--text-gray)';
+        });
+    }
+
+    let currentChatPartner = null;
+
+    function toggleEmojiPicker(pickerId) {
+        const picker = document.getElementById(pickerId);
+        picker.style.display = (picker.style.display === 'none' || picker.style.display === '') ? 'grid' : 'none';
+    }
+
+    function addEmoji(inputId, emoji) {
+        const input = document.getElementById(inputId);
+        input.value += emoji;
+        input.focus();
+        document.getElementById('chatEmojiPicker').style.display = 'none';
+        document.getElementById('newMsgEmojiPicker').style.display = 'none';
+    }
+
+    function showChatFileName(input) {
+        const nameDiv = document.getElementById('chatFileName');
+        if(input.files && input.files.length > 0) {
+            nameDiv.innerText = "첨부: " + input.files[0].name;
+            nameDiv.style.display = 'block';
+        } else { nameDiv.style.display = 'none'; }
+    }
+
+    async function openChat(partnerName) {
+        currentChatPartner = partnerName;
+        document.getElementById('chatPartnerName').innerText = partnerName;
+        document.getElementById('chatPartnerIcon').innerText = userIcons[partnerName] || '👤';
+        document.getElementById('chatModal').style.display = 'block';
+        await refreshChatBox();
+        checkUnreadMessages();
+    }
+
+    function closeChat() {
+        document.getElementById('chatModal').style.display = 'none';
+        currentChatPartner = null;
+        document.getElementById('chatFile').value = '';
+        document.getElementById('chatFileName').style.display = 'none';
+        location.reload(); 
+    }
+
+    async function refreshChatBox() {
+        if(!currentChatPartner) return;
+        try {
+            const res = await fetch(`/get_chat_history/${currentChatPartner}`);
+            const chats = await res.json();
+            const box = document.getElementById('chatBox');
+            box.innerHTML = '';
+            
+            chats.forEach(c => {
+                const timeStr = c.sent_at.substring(5, 16);
+                let fileHtml = '';
+                
+                if(c.filename) {
+                    const ext = c.filename.split('.').pop().toLowerCase();
+                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                    if(isImage) {
+                        fileHtml = `<div style="margin-top:8px;"><img src="/uploads/${c.filename}" style="max-width:100%; border-radius:8px; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" onclick="window.open(this.src)"></div>`;
+                    } else {
+                        fileHtml = `<div style="margin-top:8px; font-size:0.8rem; background:rgba(0,0,0,0.1); padding:6px; border-radius:5px;"><i class="fa-solid fa-paperclip"></i> <a href="/uploads/${c.filename}" target="_blank" style="color:inherit; text-decoration:none; font-weight:bold;">${c.filename} 다운로드</a></div>`;
+                    }
+                }
+
+                if(c.sender === currentUser) {
+                    box.innerHTML += `
+                    <div style="align-self: flex-end; max-width: 80%; display:flex; flex-direction:column; align-items:flex-end;">
+                        <div class="chat-sent-bubble">
+                            ${c.content}
+                            ${fileHtml}
+                        </div>
+                        <div style="font-size:0.7rem; color:var(--text-gray); margin-top:4px;">
+                            <span style="cursor:pointer; color:#e74c3c;" onclick="deleteChatMsg(${c.id})">삭제</span> · ${timeStr} 
+                            <span style="color:${c.is_read ? 'var(--text-gray)' : 'var(--primary-color)'}">${c.is_read ? '' : '안읽음'}</span>
+                        </div>
+                    </div>`;
+                } else {
+                    box.innerHTML += `
+                    <div style="align-self: flex-start; max-width: 80%; display:flex; gap:10px;">
+                        <div style="font-size: 2rem;">${userIcons[c.sender] || '👤'}</div>
+                        <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                            <div style="font-size:0.8rem; color:var(--text-gray); margin-bottom:3px; font-weight:bold;">${c.sender}</div>
+                            <div class="chat-recv-bubble">
+                                ${c.content}
+                                ${fileHtml}
+                            </div>
+                            <div style="font-size:0.7rem; color:var(--text-gray); margin-top:4px;">${timeStr}</div>
+                        </div>
+                    </div>`;
+                }
+            });
+            box.scrollTop = box.scrollHeight;
+        } catch(e) {}
+    }
+
+    async function sendChatReply() {
+        const input = document.getElementById('chatInput');
+        const fileInput = document.getElementById('chatFile');
+        const content = input.value.trim();
+        
+        if(!content && fileInput.files.length === 0) return;
+        if(!currentChatPartner) return;
+        
+        let formData = new FormData();
+        formData.append('receiver', currentChatPartner);
+        formData.append('content', content);
+        if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/send_message', { method: 'POST', body: formData });
+            if(res.ok) { 
+                input.value = ''; fileInput.value = '';
+                document.getElementById('chatFileName').style.display = 'none';
+                document.getElementById('chatEmojiPicker').style.display = 'none';
+                await refreshChatBox();
+            }
+        } catch (e) { alert("오류 발생"); }
+    }
+
+    async function sendNewMessage() {
+        const receiver = document.getElementById('msgReceiver').value;
+        const content = document.getElementById('msgContent').value;
+        const fileInput = document.getElementById('msgFile');
+
+        if(!receiver) { alert("수신자를 선택해주세요."); return; }
+        if(!content && fileInput.files.length === 0) { alert("내용이나 파일을 입력해주세요."); return; }
+
+        let formData = new FormData();
+        formData.append('receiver', receiver);
+        formData.append('content', content);
+        if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/send_message', { method: 'POST', body: formData });
+            if(res.ok) { 
+                document.getElementById('msgModal').style.display='none'; 
+                document.getElementById('msgForm').reset();
+                openChat(receiver); 
+            }
+        } catch (e) { alert("오류 발생"); }
+    }
+
+    async function deleteChatMsg(msgId) {
+        if(!confirm("이 메시지를 삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_message/${msgId}`, { method: 'DELETE' });
+            if(res.ok) { await refreshChatBox(); }
+        } catch(e) {}
+    }
+
+    async function checkUnreadMessages() {
+        try {
+            const res = await fetch('/check_messages');
+            const data = await res.json();
+            const badge = document.getElementById('unreadBadge');
+            if (data.unread > 0) { badge.innerText = data.unread; badge.style.display = 'inline-block'; } 
+            else { badge.style.display = 'none'; }
+        } catch (e) {}
+    }
+
+    function toggleDetails(card) {
+        const details = card.querySelector('.card-details');
+        const icon = card.querySelector('.toggle-icon');
+        if(details && icon) {
+            if (details.style.display === 'block') { details.style.display = 'none'; icon.style.transform = 'rotate(0deg)'; } 
+            else { details.style.display = 'block'; icon.style.transform = 'rotate(180deg)'; }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        const holidays = {{ holidays_dict | tojson | safe }};
+        
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth', locale: 'ko',
+            events: {{ events | tojson | safe }},
+            height: 640, fixedWeekCount: false, dayMaxEvents: true,
+            eventContent: function(arg) {
+                const props = arg.event.extendedProps;
+                let label = (props.category === "근태/휴가" || !props.owner) ? arg.event.title : props.category;
+                return { html: `<div class="fc-event-main" style="background-color:${arg.event.backgroundColor}">${label}</div>` };
+            },
+            eventDidMount: function(info) {
+                let props = info.event.extendedProps;
+                if (props.owner) {
+                    let tooltip = `[${props.owner}] ${props.category}: ${props.task_title}`;
+                    if (props.task_time) tooltip += ` (${props.task_time})`;
+                    if (props.note) tooltip += `\n비고: ${props.note}`;
+                    info.el.title = tooltip.trim();
+                }
+            },
+            dayCellDidMount: function(arg) {
+                const d = arg.date;
+                const dateStr = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+                if (holidays[dateStr]) {
+                    arg.el.classList.add('holiday-day');
+                    let dayTopEl = arg.el.querySelector('.fc-daygrid-day-top');
+                    if (dayTopEl && !dayTopEl.querySelector('.holiday-name')) {
+                        let span = document.createElement('span'); span.className = 'holiday-name'; span.innerText = holidays[dateStr];
+                        dayTopEl.appendChild(span);
+                    }
+                }
+            },
+            dateClick: function(info) {
+                document.getElementById('taskForm').reset();
+                document.getElementById('taskId').value = ''; 
+                document.getElementById('taskOwner').value = currentUser;
+                document.getElementById('taskDate').value = info.dateStr;
+                document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-clip"></i> 새 일정 등록';
+                document.getElementById('taskModal').style.display = 'block';
+            },
+            eventClick: function(info) {
+                info.jsEvent.preventDefault();
+                const clickDate = info.event.startStr.split('T')[0];
+                const dayEvents = calendar.getEvents().filter(e => {
+                    const s = e.startStr.split('T')[0];
+                    let eDate = e.endStr ? e.endStr.split('T')[0] : s;
+                    if (e.allDay && e.endStr) { let d = new Date(e.endStr); d.setDate(d.getDate() - 1); eDate = d.toISOString().split('T')[0]; }
+                    return clickDate >= s && clickDate <= eDate;
+                });
+
+                document.getElementById('dayEventsTitle').innerText = clickDate + " 상세 일정";
+                let html = '';
+                let renderedTaskIds = new Set(); 
+
+                dayEvents.forEach(ev => {
+                    let p = ev.extendedProps; 
+                    let bgColor = ev.backgroundColor || 'var(--primary-color)';
+                    if(p.task_id) window.taskDataMap[p.task_id] = p; 
+                    
+                    html += `<div style="border-left: 4px solid ${bgColor}; padding: 12px; margin-bottom: 10px; background: var(--widget-bg); border: 1px solid var(--card-border); border-radius: 8px;">`;
+                    
+                    if (p.category === "근태/휴가" || !p.owner) {
+                        html += `<div style="font-weight: bold; color: var(--text-dark);">${ev.title}</div>`;
+                    } else {
+                        html += `<div style="font-weight: bold; color: var(--text-dark); margin-bottom: 6px;">[${p.owner}] ${p.task_title}</div>`;
+                        html += `<div style="font-size: 0.8rem; color: var(--text-gray);"><span style="display:inline-block; background:${bgColor}; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; margin-right:5px; font-weight:700;">${p.category}</span>`;
+                        if(p.task_time) html += ` <strong>시간:</strong> ${p.task_time}`;
+                        html += `</div>`;
+                    }
+                    if (p.note) html += `<div style="font-size: 0.8rem; color: var(--text-gray); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);"><strong>비고:</strong> ${p.note}</div>`;
+                    
+                    if (p.owner === currentUser && p.task_id && !renderedTaskIds.has(p.task_id)) {
+                        html += `<div style="text-align:right; margin-top:10px; border-top:1px dashed var(--card-border); padding-top:10px;">
+                                      <button class="btn-action btn-edit" onclick="editTask(${p.task_id}, '${clickDate}')" style="margin-right:5px;">내 일정 수정</button>
+                                      <button class="btn-action btn-delete" onclick="deleteTask(${p.task_id})">삭제</button>
+                                 </div>`;
+                        renderedTaskIds.add(p.task_id);
+                    }
+                    html += `</div>`;
+                });
+                document.getElementById('dayEventsContent').innerHTML = html || '<p style="color:var(--text-gray); text-align:center;">일정이 없습니다.</p>';
+                document.getElementById('dayEventsModal').style.display = 'block';
+            }
+        });
+        calendar.render();
+
+        setInterval(checkUnreadMessages, 10000);
+        checkUnreadMessages();
+    });
+
+    function editTask(taskId, dateStr) {
+        document.getElementById('dayEventsModal').style.display = 'none'; 
+        const props = window.taskDataMap[taskId];
+        document.getElementById('taskForm').reset();
+        
+        document.getElementById('taskId').value = taskId; 
+        document.getElementById('taskDate').value = dateStr;
+        document.getElementById('taskOwner').value = props.owner;
+        
+        document.getElementById('cat_회의_제목').value = props.cat_회의_제목 || '';
+        document.getElementById('cat_회의_시간').value = props.cat_회의_시간 || '';
+        document.getElementById('cat_면접_제목').value = props.cat_면접_제목 || '';
+        document.getElementById('cat_면접_시간').value = props.cat_면접_시간 || '';
+        document.getElementById('cat_미팅_제목').value = props.cat_미팅_제목 || '';
+        document.getElementById('cat_미팅_시간').value = props.cat_미팅_시간 || '';
+        document.getElementById('cat_외근_제목').value = props.cat_외근_제목 || '';
+        document.getElementById('cat_외근_시간').value = props.cat_외근_시간 || '';
+        document.getElementById('cat_기타_제목').value = props.cat_기타_제목 || '';
+        document.getElementById('cat_기타_시간').value = props.cat_기타_시간 || '';
+        document.getElementById('taskNote').value = props.note || '';
+        
+        document.getElementById('taskModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 일정 수정';
+        document.getElementById('taskModal').style.display = 'block';
+    }
+
+    async function deleteTask(taskId) {
+        if(!confirm("이 일정을 정말 삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_task/${taskId}`, { method: 'DELETE' });
+            if(res.ok) { alert("일정이 삭제되었습니다."); location.reload(); }
+        } catch(e) {}
+    }
+
+    function closeTaskModal() { document.getElementById('taskModal').style.display = 'none'; }
+    
+    async function saveTask() {
+        const taskId = document.getElementById('taskId').value;
+        const taskDate = document.getElementById('taskDate').value;
+        if (!taskDate) { alert('날짜를 선택해주세요.'); return; }
+        
+        const data = { date: taskDate, owner: document.getElementById('taskOwner').value, note: document.getElementById('taskNote').value || '' };
+        ['회의','면접','미팅','외근','기타'].forEach(c => {
+            data[c+'_제목'] = document.getElementById('cat_'+c+'_제목').value || '';
+            data[c+'_시간'] = document.getElementById('cat_'+c+'_시간').value || '';
+        });
+
+        const url = taskId ? `/update_task/${taskId}` : '/save_task';
+
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+            if(res.ok) { alert(taskId ? "수정되었습니다." : "등록되었습니다."); location.reload(); } 
+        } catch (e) {}
+    }
+
+    let currentBoardId = null;
+
+    function openBoardForm() {
+        document.getElementById('boardForm').reset();
+        document.getElementById('boardId').value = '';
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen"></i> 게시글 작성';
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    function openBoardDetail(element) {
+        currentBoardId = element.getAttribute('data-id');
+        const author = element.getAttribute('data-author');
+        const filename = element.getAttribute('data-filename');
+
+        document.getElementById('detailTitle').innerText = element.getAttribute('data-title');
+        document.getElementById('detailAuthor').innerText = author;
+        document.getElementById('detailDate').innerText = element.getAttribute('data-date');
+        document.getElementById('detailContent').innerText = element.getAttribute('data-content');
+
+        const fileWrap = document.getElementById('detailFileWrap');
+        if(filename && filename !== 'None' && filename !== '') {
+            document.getElementById('detailFile').innerText = filename;
+            document.getElementById('detailFile').href = '/uploads/' + filename;
+            fileWrap.style.display = 'block';
+        } else { fileWrap.style.display = 'none'; }
+
+        if(author === currentUser) { document.getElementById('detailActions').style.display = 'block'; } 
+        else { document.getElementById('detailActions').style.display = 'none'; }
+
+        document.getElementById('boardDetailModal').style.display = 'block';
+    }
+
+    function editBoardFromDetail() {
+        document.getElementById('boardDetailModal').style.display = 'none';
+        document.getElementById('boardId').value = currentBoardId;
+        document.getElementById('boardTitle').value = document.getElementById('detailTitle').innerText;
+        document.getElementById('boardContent').value = document.getElementById('detailContent').innerText;
+        document.getElementById('boardFormTitle').innerHTML = '<i class="fa-solid fa-pen-to-square"></i> 게시글 수정';
+        document.getElementById('boardModal').style.display = 'block';
+    }
+
+    async function deleteBoardFromDetail() {
+        if(!confirm("삭제하시겠습니까?")) return;
+        try {
+            const res = await fetch(`/delete_board/${currentBoardId}`, { method: 'DELETE' });
+            if(res.ok) { alert("삭제되었습니다."); location.reload(); }
+        } catch (e) {}
+    }
+
+    async function saveBoard() {
+        let id = document.getElementById('boardId').value;
+        let formData = new FormData();
+        formData.append('title', document.getElementById('boardTitle').value);
+        formData.append('content', document.getElementById('boardContent').value);
+        let fileInput = document.getElementById('boardFile');
+        if (fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+        let url = id ? `/update_board/${id}` : '/save_board'; 
+        try {
+            const res = await fetch(url, { method: 'POST', body: formData });
+            if(res.ok) { alert(id ? "수정되었습니다." : "등록되었습니다."); location.reload(); }
+        } catch (e) {}
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,5 @@
+<div style="width: 300px; height: 400px;"> {% include 'components/chat_widget.html' %}
+</div>
+
+{% include 'components/chat_modals.html' %}
+<script src="{{ url_for('static', filename='js/chat_module.js') }}"></script>

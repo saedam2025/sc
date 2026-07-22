@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ partner }}님과의 대화 - 새담 인트라넷</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        
+        :root {
+            --primary-color: #3b82f6; 
+            --text-dark: #1e293b;
+            --text-gray: #64748b;
+            --bg-color: #b2c7d9; 
+            --card-bg: #ffffff;
+            --card-border: #e2e8f0;
+            --input-bg: #f1f5f9;
+        }
+
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background: var(--bg-color);
+            margin: 0; 
+            padding: 20px;
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            box-sizing: border-box;
+            color: var(--text-dark);
+        }
+
+        .chat-input-area { width: 100%; border: none !important; background: transparent !important; padding: 10px 5px !important; font-size: 1.05rem; outline: none !important; box-shadow: none !important; font-family: inherit; color: var(--text-dark); }
+        .chat-input-area::placeholder { color: #94a3b8; }
+
+        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 0 20px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: background 0.2s; height: 45px; }
+        .btn-primary:hover { filter: brightness(0.9); }
+        
+        .emoji-item { font-size: 1.4rem; cursor: pointer; padding: 5px; text-align: center; border-radius: 5px; transition: background 0.2s; }
+        .emoji-item:hover { background: var(--input-bg); }
+        .action-icon { cursor: pointer; font-size: 1.4rem; padding: 8px; transition: transform 0.2s; }
+        .action-icon:hover { transform: scale(1.1); }
+
+        #chatBox::-webkit-scrollbar, #orgChartListContainerPopup::-webkit-scrollbar { width: 6px; }
+        #chatBox::-webkit-scrollbar-thumb, #orgChartListContainerPopup::-webkit-scrollbar-thumb { background-color: #94a3b8; border-radius: 10px; }
+        .chat-context-menu { display:none; position:fixed; z-index:5000; width:min(238px, calc(100vw - 24px)); background:#fff; border:1px solid var(--card-border); border-radius:12px; box-shadow:0 10px 28px rgba(15,23,42,0.18); padding:8px; box-sizing:border-box; }
+        .chat-context-menu button { border:0; background:transparent; border-radius:8px; cursor:pointer; color:var(--text-dark); font-family:inherit; }
+        .chat-context-menu button:hover { background:var(--input-bg); }
+        .chat-context-reactions { display:flex; flex-wrap:wrap; gap:6px; padding:4px 2px 8px; border-bottom:1px solid var(--card-border); margin-bottom:6px; }
+        .chat-context-reactions button { width:34px; height:34px; padding:0; text-align:center; font-size:1.05rem; }
+        .chat-context-action { width:100%; display:flex; align-items:center; gap:8px; padding:9px 10px; text-align:left; font-size:0.9rem; }
+        .chat-message-row { display:flex; align-items:flex-end; }
+        .chat-message-row.me { justify-content:flex-end; }
+        .chat-message-row.other { justify-content:flex-start; gap:10px; }
+        .chat-bubble-wrap { position:relative; display:flex; flex-direction:column; align-items:flex-start; max-width:250px; }
+        .chat-message-row.me .chat-bubble-wrap { align-items:flex-end; }
+        .chat-bubble { color:#1e293b; padding:8px 12px; border-radius:12px; max-width:250px; word-break:break-word; box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+        .chat-bubble-wrap.has-attachment, .chat-bubble.has-attachment { width:min(300px, calc(100vw - 110px)); max-width:min(300px, calc(100vw - 110px)); }
+        .chat-bubble.me { background:#fef01b; border-top-right-radius:2px; }
+        .chat-bubble.other { background:#fff; border:1px solid #e2e8f0; border-top-left-radius:2px; }
+        .message-meta { display:flex; flex-direction:column; font-size:0.7rem; color:#64748b; }
+        .message-meta.me { align-items:flex-end; margin-right:6px; }
+        .message-meta.other { align-items:flex-start; margin-left:6px; }
+        .message-reactions { display:flex; flex-wrap:wrap; gap:4px; margin-top:-2px; max-width:230px; }
+        .chat-message-row.me .message-reactions { justify-content:flex-end; margin-right:8px; }
+        .chat-message-row.other .message-reactions { margin-left:8px; }
+        .message-reaction-chip { border:1px solid rgba(148,163,184,0.45); background:rgba(255,255,255,0.92); border-radius:999px; padding:2px 7px; font-size:0.72rem; line-height:1.2; cursor:pointer; box-shadow:0 1px 3px rgba(15,23,42,0.12); }
+        .message-reaction-chip.mine { background:#eff6ff; border-color:#93c5fd; }
+        .message-comments { display:flex; flex-direction:column; gap:3px; margin-top:4px; max-width:250px; }
+        .message-comment-item { background:rgba(255,255,255,0.68); border:1px solid rgba(226,232,240,0.9); border-radius:8px; padding:4px 7px; font-size:0.74rem; color:#334155; }
+        .message-comment-user { color:#475569; font-weight:700; margin-right:4px; }
+        .chat-file-retention-note { margin:0 4px 7px; color:#475569; font-size:0.75rem; line-height:1.4; }
+        .chat-file-retention-note i { color:#64748b; margin-right:4px; }
+        .chat-attachment-link { display:flex; align-items:center; gap:6px; min-width:0; margin-top:7px; padding:7px 9px; border-radius:7px; background:rgba(15,23,42,0.08); color:inherit; text-decoration:none; font-size:0.78rem; font-weight:700; }
+        .chat-attachment-info { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
+        .chat-attachment-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-attachment-meta { color:#64748b; font-size:0.68rem; font-weight:500; line-height:1.3; white-space:nowrap; }
+        .chat-attachment-preview { display:block; max-width:100%; max-height:220px; border-radius:8px; cursor:pointer; object-fit:contain; background:rgba(255,255,255,0.35); }
+        .chat-file-drop-overlay { position:fixed; inset:12px; z-index:4500; display:flex; align-items:center; justify-content:center; border:3px dashed var(--primary-color); border-radius:18px; background:rgba(239,246,255,0.94); color:var(--primary-color); opacity:0; visibility:hidden; pointer-events:none; transition:opacity 0.15s ease, visibility 0.15s ease; }
+        .chat-file-drop-overlay-inner { display:flex; flex-direction:column; align-items:center; gap:8px; padding:28px 36px; text-align:center; font-weight:800; }
+        .chat-file-drop-overlay-inner i { font-size:2.4rem; }
+        .chat-file-drop-overlay-inner small { color:#64748b; font-size:0.78rem; font-weight:600; }
+        body.chat-file-dragging .chat-file-drop-overlay { opacity:1; visibility:visible; }
+    </style>
+</head>
+<body>
+    <div id="chatFileDropOverlay" class="chat-file-drop-overlay" role="status" aria-live="polite">
+        <div class="chat-file-drop-overlay-inner">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>파일을 놓아 바로 전송</span>
+            <small>한 번에 1개 · 10MB 미만</small>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; position:relative;">
+        <h3 style="color: var(--text-dark); margin: 0; font-weight:800; display:flex; align-items:center; gap:8px; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <span id="chatPartnerIcon" style="font-size:1.5rem; flex-shrink: 0;">👤</span> 
+            <span id="headerTitleText" style="overflow: hidden; text-overflow: ellipsis;" title="{{ partner }}">{{ partner }}님과의 대화</span>
+        </h3>
+        
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="position: relative; display: inline-block;">
+                <button onclick="toggleChatMenu()" style="background:none; border:none; color:var(--text-dark); cursor:pointer; font-size:1.2rem; padding:5px;">
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                </button>
+                <div id="chatMenuDropdown" style="display:none; position:absolute; right:0; top:35px; background:#fff; border:1px solid var(--card-border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:150px; z-index: 100;">
+                    <div onclick="inviteMember()" style="padding:12px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:0.9rem; transition:background 0.2s;">
+                        <i class="fa-solid fa-user-plus" style="margin-right:5px; color:var(--primary-color);"></i> 멤버 초대하기
+                    </div>
+                    <div onclick="leaveChat()" style="padding:12px 10px; cursor:pointer; color:#e74c3c; font-size:0.9rem; transition:background 0.2s;">
+                        <i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:5px;"></i> 채팅방 나가기
+                    </div>
+                </div>
+            </div>
+            <button onclick="window.close()" style="background:none; border:none; color:var(--text-dark); cursor:pointer; font-size:1.4rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+    
+    <div id="chatBox" style="flex:1; overflow-y:auto; background: #b2c7d9; border: none; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
+    </div>
+    
+    <div class="chat-file-retention-note"><i class="fa-regular fa-clock"></i>첨부파일을 올리면 최대 30일까지만 저장됩니다. (개당 10MB 미만)</div>
+
+    <div style="display:flex; gap:12px; align-items:center; position:relative; background: var(--card-bg); padding: 12px 15px; border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        
+        <label for="chatFile" class="action-icon" style="color:var(--primary-color); display:flex; align-items:center;">
+            <i class="fa-solid fa-paperclip"></i>
+        </label>
+        <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
+        
+        <div class="action-icon" style="color:#f59e0b; display:flex; align-items:center;" onclick="toggleEmojiPicker()">
+            <i class="fa-regular fa-face-smile"></i>
+        </div>
+        
+        <div id="chatEmojiPicker" style="display:none; position:absolute; bottom:70px; left:10px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
+            <span class="emoji-item" onclick="addEmoji('😀')">😀</span><span class="emoji-item" onclick="addEmoji('😂')">😂</span><span class="emoji-item" onclick="addEmoji('🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('😎')">😎</span><span class="emoji-item" onclick="addEmoji('😭')">😭</span><span class="emoji-item" onclick="addEmoji('😡')">😡</span><span class="emoji-item" onclick="addEmoji('👍')">👍</span>
+            <span class="emoji-item" onclick="addEmoji('🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('💖')">💖</span><span class="emoji-item" onclick="addEmoji('🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('✨')">✨</span><span class="emoji-item" onclick="addEmoji('🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('👏')">👏</span>
+        </div>
+
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
+            <div id="chatFileName" style="font-size:0.8rem; color:var(--primary-color); display:none; padding:2px 5px 0; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+            <input type="text" id="chatInput" class="chat-input-area" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()" autocomplete="off">
+        </div>
+        
+        <button class="btn-primary" onclick="sendChatReply()"><i class="fa-solid fa-paper-plane" style="font-size: 1.1rem;"></i></button>
+    </div>
+
+    <div id="orgChartModalPopup" class="modal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
+        <div class="modal-content" style="margin:4% auto; padding:25px; width:360px; height: 500px; max-height: 80vh; position:relative; display:flex; flex-direction:column; background:var(--card-bg); border-radius: 16px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+            <span onclick="document.getElementById('orgChartModalPopup').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-gray);">&times;</span>
+            <h3 style="color: var(--text-dark); margin-top: 0; margin-bottom:15px; font-weight:800;"><i class="fa-solid fa-sitemap" style="color:var(--primary-color); margin-right:8px;"></i>멤버 초대 (조직도)</h3>
+            <div id="orgChartListContainerPopup" style="flex:1; overflow-y:auto; padding-right:5px; display: flex; flex-direction: column; gap:4px; padding-bottom:10px;">
+                <div style="text-align:center; padding:30px; color:var(--text-gray); font-size:0.85rem;"><i class="fa-solid fa-spinner fa-spin"></i> 조직도 로딩중...</div>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--card-border); display:flex; gap: 10px;">
+                <button type="button" style="flex:1; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; cursor:pointer; font-weight:bold; color:#475569;" onclick="clearOrgChartSelectionPopup()">선택 해제</button>
+                <button type="button" class="btn-primary" style="flex:2; padding: 12px; font-size: 0.95rem;" onclick="submitInviteMembers()"><i class="fa-solid fa-user-plus" style="margin-right:6px;"></i>선택 대상 초대</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="messageContextMenu" class="chat-context-menu"></div>
+
+    <script>
+        const partnerName = "{{ partner }}";
+        const currentUser = "{{ current_user }}"; 
+        const isGroupChat = partnerName.includes(','); 
+        const CHAT_MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+        const reactionOptions = [
+            { key: 'heart', label: '&#10084;&#65039;' },
+            { key: 'like', label: '&#128077;' },
+            { key: 'laugh', label: '&#128514;' },
+            { key: 'love', label: '&#128525;' },
+            { key: 'clap', label: '&#128079;' }
+        ];
+
+        function reactionLabel(key) {
+            const item = reactionOptions.find(function(r) { return r.key === key; });
+            return item ? item.label : key;
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+            });
+        }
+
+        function reactionText(key) {
+            const temp = document.createElement('span');
+            temp.innerHTML = reactionLabel(key);
+            return temp.textContent || key;
+        }
+
+        function renderMessageReactions(messageId, reactions) {
+            if (!Array.isArray(reactions) || reactions.length === 0) return '';
+            return '<div class="message-reactions">' + reactions.map(function(r) {
+                const mineClass = r.mine ? ' mine' : '';
+                const users = Array.isArray(r.users) ? r.users : [];
+                const encodedUsers = encodeURIComponent(JSON.stringify(users));
+                const title = users.length ? escapeHtml(users.join(', ')) : '&#49324;&#50857;&#51088; &#50630;&#51020;';
+                return '<button type="button" class="message-reaction-chip' + mineClass + '" title="' + title + '" onclick="event.stopPropagation(); showReactionUsers(\'' + encodedUsers + '\',\'' + r.reaction + '\')">' + reactionLabel(r.reaction) + ' ' + r.count + '</button>';
+            }).join('') + '</div>';
+        }
+
+        function renderMessageComments(comments) {
+            if (!Array.isArray(comments) || comments.length === 0) return '';
+            return '<div class="message-comments">' + comments.map(function(c) {
+                return '<div class="message-comment-item"><span class="message-comment-user">' + escapeHtml(c.user_name || '') + '</span>' + escapeHtml(c.comment || '') + '</div>';
+            }).join('') + '</div>';
+        }
+
+        function showReactionUsers(encodedUsers, reaction) {
+            let users = [];
+            try { users = JSON.parse(decodeURIComponent(encodedUsers || '%5B%5D')); } catch (e) { users = []; }
+            alert(reactionText(reaction) + ' ' + (users.length ? users.join(', ') : '\ub204\uac00 \ub20c\ub800\ub294\uc9c0 \uc815\ubcf4\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.'));
+        }
+
+        function hideMessageContextMenu() {
+            const menu = document.getElementById('messageContextMenu');
+            if (menu) menu.style.display = 'none';
+        }
+
+        function openMessageContextMenu(event, messageId, isMe) {
+            event.preventDefault();
+            const menu = document.getElementById('messageContextMenu');
+            if (!menu) return;
+            const reactionButtons = reactionOptions.map(function(r) { return '<button type="button" title="reaction" onclick="toggleMessageReaction(' + messageId + ',\'' + r.key + '\')">' + r.label + '</button>'; }).join('');
+            const commentButton = '<button type="button" class="chat-context-action" onclick="addMessageComment(' + messageId + ')"><i class="fa-regular fa-comment" style="color:#3b82f6;"></i>&#45843;&#44544;</button>';
+            const deleteButton = isMe ? '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ')"><i class="fa-regular fa-trash-can" style="color:#ef4444;"></i>&#49325;&#51228;</button>' : '';
+            menu.innerHTML = '<div class="chat-context-reactions">' + reactionButtons + '</div>' + commentButton + deleteButton;
+            menu.style.display = 'block';
+            const rect = menu.getBoundingClientRect();
+            const left = Math.min(Math.max(8, event.clientX), window.innerWidth - rect.width - 8);
+            const top = Math.min(Math.max(8, event.clientY), window.innerHeight - rect.height - 8);
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+        }
+
+        async function deleteChatMessage(messageId) {
+            hideMessageContextMenu();
+            if(!confirm('\uc774 \uba54\uc2dc\uc9c0\ub97c \uc0ad\uc81c\ud560\uae4c\uc694?')) return;
+            const res = await fetch('/delete_message/' + messageId, { method: 'DELETE' });
+            if (res.ok) {
+                await refreshChatBox();
+                notifyOpenerUnreadChanged();
+            }
+        }
+
+        async function toggleMessageReaction(messageId, reaction) {
+            hideMessageContextMenu();
+            reaction = String(reaction || '').trim();
+            const res = await fetch('/api/message_reaction', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message_id: messageId, reaction: reaction })
+            });
+            if (res.ok) await refreshChatBox();
+        }
+
+        async function addMessageComment(messageId) {
+            hideMessageContextMenu();
+            const comment = prompt('\ub313\uae00\uc744 \uc785\ub825\ud558\uc138\uc694.');
+            if (comment === null) return;
+            const cleanComment = comment.trim();
+            if (!cleanComment) return;
+            const res = await fetch('/api/message_comment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message_id: messageId, comment: cleanComment })
+            });
+            if (res.ok) await refreshChatBox();
+        }
+
+        document.addEventListener('click', hideMessageContextMenu);
+        window.addEventListener('scroll', hideMessageContextMenu, true);
+
+        function notifyOpenerUnreadChanged() {
+            if (window.opener && !window.opener.closed && typeof window.opener.updateMessageBadge === 'function') {
+                window.opener.updateMessageBadge();
+            }
+        }
+
+        function initHeader() {
+            if(isGroupChat) {
+                document.getElementById('chatPartnerIcon').innerText = '👥';
+                const members = partnerName.split(',').map(s => s.trim()).filter(s => s !== currentUser);
+                let displayTitle = members.join(', ');
+                if (members.length > 2) displayTitle = members.slice(0, 2).join(', ') + ` 외 ${members.length - 2}명`;
+                document.getElementById('headerTitleText').innerText = displayTitle + " (그룹채팅)";
+            } 
+            else if (partnerName === currentUser) {
+                document.getElementById('chatPartnerIcon').innerText = '👤';
+                document.getElementById('headerTitleText').innerText = "나와의 채팅방";
+            }
+        }
+        
+        function toggleChatMenu() { const menu = document.getElementById('chatMenuDropdown'); menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; }
+        document.addEventListener('click', function(event) {
+            const menu = document.getElementById('chatMenuDropdown');
+            const btn = document.querySelector('button[onclick="toggleChatMenu()"]');
+            if (menu && btn && menu.style.display === 'block' && !menu.contains(event.target) && !btn.contains(event.target)) menu.style.display = 'none';
+        });
+
+        function inviteMember() { document.getElementById('chatMenuDropdown').style.display = 'none'; document.getElementById('orgChartModalPopup').style.display = 'block'; if (!document.getElementById('orgChartListContainerPopup').dataset.loaded) loadOrgChartPopup(); }
+        
+        async function loadOrgChartPopup() {
+            try {
+                const res = await fetch('/user/list');
+                const users = await res.json();
+                const filteredUsers = users.filter(u => (u.이름||'').toLowerCase() !== 'admin');
+                const groups = { '본부': [], '센터장': [], '강사': [], '기타': [] };
+                
+                filteredUsers.forEach(u => {
+                    const pos = u.직급 || '';
+                    if (['대표이사', '팀장', '사원', '계약직'].includes(pos)) groups['본부'].push(u);
+                    else if (['센터장', '안전코디', '센터장(팀장)'].includes(pos)) groups['센터장'].push(u);
+                    else if (['강사'].includes(pos)) groups['강사'].push(u);
+                    else groups['기타'].push(u);
+                });
+                
+                let html = '';
+                const currentMembers = partnerName.split(',').map(s => s.trim());
+                currentMembers.push(currentUser);
+                
+                ['본부', '센터장', '강사', '기타'].forEach(gName => {
+                    const members = groups[gName];
+                    if (members.length === 0) return; 
+                    const groupId = 'popup_org_group_' + gName;
+                    html += `<div style="margin-bottom: 8px;"><div style="padding:8px 12px; background:var(--input-bg); border-radius:8px; display:flex; align-items:center; gap:8px; border:1px solid var(--card-border);"><i class="fa-solid fa-chevron-down" id="icon_${groupId}" onclick="toggleOrgGroupPopup('${groupId}')" style="cursor:pointer; font-size:0.8rem; color:var(--primary-color); width: 12px;"></i><input type="checkbox" class="org-group-checkbox-popup" data-group="${groupId}" onclick="toggleGroupCheckboxPopup(this, event)" style="cursor:pointer; width:16px; height:16px;"><div onclick="toggleOrgGroupPopup('${groupId}')" style="cursor:pointer; flex:1; display:flex; align-items:center; gap:8px; font-weight:700; color:var(--text-dark);"><i class="fa-regular fa-folder-open" style="color:#f59e0b;"></i> ${gName} <span style="font-size:0.75rem; color:var(--text-gray); font-weight:500;">(${members.length})</span></div></div><div id="${groupId}" style="display:block; padding-left:10px; margin-top:6px; border-left:2px dashed var(--card-border); margin-left:14px; padding-bottom: 4px;">`;
+                    members.forEach(u => {
+                        const name = u.이름 || '-';
+                        const dept = u.소속 || '소속미지정';
+                        const pos = u.직급 || '직급미지정';
+                        const icon = u.아이콘 || '👤';
+                        const isAlreadyMember = currentMembers.includes(name);
+                        const disabledAttr = isAlreadyMember ? 'disabled' : '';
+                        const checkedAttr = isAlreadyMember ? 'checked' : '';
+                        const opacityStyle = isAlreadyMember ? 'opacity:0.5; pointer-events:none;' : '';
+                        
+                        html += `<div style="margin-top:6px; padding:4px 0; display:flex; align-items:center; ${opacityStyle}"><input type="checkbox" class="org-member-checkbox-popup" value="${name}" data-group="${groupId}" onclick="event.stopPropagation(); syncGroupCheckboxPopup('${groupId}')" ${disabledAttr} ${checkedAttr} style="margin-right:10px; cursor:pointer; width:16px; height:16px; accent-color:var(--primary-color);"><div style="flex:1; display:flex; align-items:center;"><div style="font-size:1.3rem; margin-right:10px; flex-shrink:0;">${icon}</div><div style="display: flex; flex-direction:column; justify-content:center;"><div style="font-size: 0.85rem; font-weight: 700; color: var(--text-dark); margin:0;">${name}</div><div style="font-size: 0.7rem; color: #9ca3af; font-weight: 500; margin:0;">${dept} / ${pos}</div></div></div></div>`;
+                    });
+                    html += `</div></div>`;
+                });
+                document.getElementById('orgChartListContainerPopup').innerHTML = html;
+                document.getElementById('orgChartListContainerPopup').dataset.loaded = 'true';
+            } catch(e) { console.error(e); }
+        }
+
+        window.toggleOrgGroupPopup = function(groupId) {
+            const content = document.getElementById(groupId);
+            const icon = document.getElementById('icon_' + groupId);
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+            icon.className = content.style.display === 'none' ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down';
+        };
+
+        function toggleGroupCheckboxPopup(headerCb, event) {
+            event.stopPropagation();
+            const container = document.getElementById(headerCb.getAttribute('data-group'));
+            if(container) container.querySelectorAll('.org-member-checkbox-popup:not([disabled])').forEach(cb => cb.checked = headerCb.checked);
+        }
+        function syncGroupCheckboxPopup(groupId) {
+            const container = document.getElementById(groupId);
+            const headerCb = document.querySelector(`.org-group-checkbox-popup[data-group="${groupId}"]`);
+            if(!container || !headerCb) return;
+            const memberCbs = Array.from(container.querySelectorAll('.org-member-checkbox-popup:not([disabled])'));
+            if(memberCbs.length === 0) return;
+            headerCb.checked = memberCbs.every(cb => cb.checked);
+            headerCb.indeterminate = memberCbs.some(cb => cb.checked) && !headerCb.checked;
+        }
+        function clearOrgChartSelectionPopup() { document.querySelectorAll('.org-member-checkbox-popup:not([disabled]), .org-group-checkbox-popup').forEach(cb => { cb.checked = false; cb.indeterminate = false; }); }
+
+        function submitInviteMembers() {
+            const checkboxes = document.querySelectorAll('.org-member-checkbox-popup:checked:not([disabled])');
+            if(checkboxes.length === 0) return alert("새로 초대할 멤버를 선택해주세요.");
+            const combined = Array.from(new Set([...partnerName.split(',').map(s => s.trim()), ...Array.from(checkboxes).map(cb => cb.value), currentUser])).sort();
+            if(window.opener && !window.opener.closed && typeof window.opener.renderChatList === 'function') window.opener.renderChatList();
+            window.location.href = `/chat_popup/${encodeURIComponent(combined.join(','))}`;
+        }
+        async function leaveChat() {
+            if(!confirm("채팅방을 나가시겠습니까?")) return;
+            try {
+                const res = await fetch('/api/leave_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partner: partnerName }) });
+                if(res.ok) { alert("채팅방에서 나갔습니다."); if(window.opener) window.opener.location.reload(); window.close(); }
+            } catch(e) { console.error(e); }
+        }
+        function toggleEmojiPicker() { const picker = document.getElementById('chatEmojiPicker'); picker.style.display = picker.style.display === 'none' || !picker.style.display ? 'grid' : 'none'; }
+        function addEmoji(emoji) { const input = document.getElementById('chatInput'); input.value += emoji; input.focus(); document.getElementById('chatEmojiPicker').style.display = 'none'; }
+        function showChatFileName(input) {
+            const nameDiv = document.getElementById('chatFileName');
+            if(input.files && input.files.length > 0) {
+                const file = input.files[0];
+                if(file.size >= CHAT_MAX_FILE_BYTES) {
+                    alert('첨부파일은 개당 10MB 미만만 업로드할 수 있습니다.');
+                    input.value = '';
+                    nameDiv.textContent = '';
+                    nameDiv.style.display = 'none';
+                    return false;
+                }
+                const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+                nameDiv.textContent = '📎 ' + file.name + ' (' + sizeMb + 'MB · 30일 보관)';
+                nameDiv.title = file.name;
+                nameDiv.style.display = 'block';
+                return true;
+            }
+            nameDiv.textContent = '';
+            nameDiv.style.display = 'none';
+            return true;
+        }
+
+        let chatFileDragDepth = 0;
+
+        function isFileDrag(event) {
+            return !!(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'));
+        }
+
+        function clearChatFileDragState() {
+            chatFileDragDepth = 0;
+            document.body.classList.remove('chat-file-dragging');
+        }
+
+        async function sendDroppedChatFile(fileList) {
+            if(!fileList || fileList.length === 0) return;
+            if(fileList.length > 1) {
+                alert('첨부파일은 한 번에 1개씩 전송할 수 있습니다.');
+                return;
+            }
+
+            const fileInput = document.getElementById('chatFile');
+            const transfer = new DataTransfer();
+            transfer.items.add(fileList[0]);
+            fileInput.files = transfer.files;
+            if(!showChatFileName(fileInput)) return;
+            await sendChatReply();
+        }
+
+        function initializeChatFileDrop() {
+            document.addEventListener('dragenter', function(event) {
+                if(!isFileDrag(event)) return;
+                event.preventDefault();
+                chatFileDragDepth += 1;
+                document.body.classList.add('chat-file-dragging');
+            });
+            document.addEventListener('dragover', function(event) {
+                if(!isFileDrag(event)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+            });
+            document.addEventListener('dragleave', function(event) {
+                if(!isFileDrag(event)) return;
+                event.preventDefault();
+                chatFileDragDepth = Math.max(0, chatFileDragDepth - 1);
+                if(chatFileDragDepth === 0) clearChatFileDragState();
+            });
+            document.addEventListener('drop', async function(event) {
+                if(!isFileDrag(event)) return;
+                event.preventDefault();
+                const droppedFiles = event.dataTransfer.files;
+                clearChatFileDragState();
+                await sendDroppedChatFile(droppedFiles);
+            });
+            window.addEventListener('dragend', clearChatFileDragState);
+            window.addEventListener('blur', clearChatFileDragState);
+        }
+
+        function formatChatFileSize(bytes) {
+            const size = Number(bytes);
+            if(!Number.isFinite(size) || size < 0) return '용량 확인 불가';
+            if(size < 1024) return size + ' B';
+            if(size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+            return (size / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function formatChatFileExpiry(value) {
+            if(!value) return '유효기간 확인 불가';
+            let dateValue = String(value);
+            if(!dateValue.endsWith('Z')) dateValue = dateValue.replace(' ', 'T') + 'Z';
+            const expiry = new Date(dateValue);
+            if(Number.isNaN(expiry.getTime())) return '유효기간 확인 불가';
+            return '유효기간 ' + expiry.toLocaleDateString('ko-KR') + '까지';
+        }
+
+        async function refreshChatBox() {
+            try {
+                const res = await fetch(`/get_chat_history/${encodeURIComponent(partnerName)}?t=${new Date().getTime()}`);
+                const chats = await res.json();
+                const box = document.getElementById('chatBox');
+                box.innerHTML = '';
+                
+                chats.forEach(c => {
+                    const isMe = (String(c.sender).trim() === String(currentUser).trim());
+                    
+                    let dateStr = c.sent_at;
+                    if (dateStr && !dateStr.endsWith('Z')) dateStr = dateStr.replace(' ', 'T') + 'Z'; 
+                    const d = new Date(dateStr || Date.now());
+                    const timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                    
+                    // 🚀 [수정] 백엔드에서 100% 보장하는 숫자를 받아오며, 말풍선 배경(#fef01b)에 어우러지는 강력한 그림자 스타일 적용
+                    let unreadNum = parseInt(c.unread_count, 10);
+                    if (isNaN(unreadNum)) unreadNum = 0;
+                    if (partnerName === currentUser) unreadNum = 0; // 나와의 채팅방은 카운트 무시
+
+                    const unreadHtml = (unreadNum > 0 && (isMe || isGroupChat))
+                        ? `<span style="color: #fef01b; font-size: 0.85rem; margin-bottom: 2px;">${unreadNum}</span>` 
+                        : '';
+
+                    let fileHtml = '';
+                    if(c.filename) {
+                        const ext = c.filename.split('.').pop().toLowerCase();
+                        const attachmentUrl = '/chat/attachment/' + encodeURIComponent(c.id);
+                        const safeFilename = escapeHtml(c.filename);
+                        const fileMeta = escapeHtml(formatChatFileSize(c.file_size) + ' · ' + formatChatFileExpiry(c.expires_at));
+                        const downloadLink = `<a class="chat-attachment-link" href="${attachmentUrl}?download=1" title="${safeFilename}"><i class="fa-solid fa-paperclip"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span><i class="fa-solid fa-download" style="margin-left:auto;"></i></a>`;
+                        if(['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                            fileHtml = `<div style="margin-top:8px;"><img src="${attachmentUrl}" alt="${safeFilename}" class="chat-attachment-preview" onclick="window.open('${attachmentUrl}', '_blank')">${downloadLink}</div>`;
+                        } else {
+                            fileHtml = downloadLink;
+                        }
+                    }
+
+                    const reactionHtml = renderMessageReactions(c.id, c.reactions || []);
+                    const commentsHtml = renderMessageComments(c.comments || []);
+                    const messageContent = escapeHtml(c.content || '').replace(/\n/g, '<br>');
+                    const attachmentBubbleClass = c.filename ? ' has-attachment' : '';
+                    const msgDiv = document.createElement('div');
+                    msgDiv.style.display = 'flex';
+                    msgDiv.style.flexDirection = 'column';
+                    msgDiv.style.alignItems = isMe ? 'flex-end' : 'flex-start';
+                    msgDiv.style.marginBottom = '12px';
+                    msgDiv.oncontextmenu = function(event) { openMessageContextMenu(event, c.id, isMe); };
+
+                    if (isMe) { 
+                        msgDiv.style.justifyContent = 'flex-end';
+                        msgDiv.innerHTML = `
+                            <div class="chat-message-row me">
+                                <div class="message-meta me">
+                                    ${unreadHtml} 
+                                    <span style="font-size: 0.7rem; color: #64748b;">${timeStr}</span>
+                                </div>
+                                <div class="chat-bubble-wrap${attachmentBubbleClass}">
+                                    <div class="chat-bubble me${attachmentBubbleClass}">
+                                        ${messageContent}${fileHtml}
+                                    </div>
+                                    ${reactionHtml}
+                                    ${commentsHtml}
+                                </div>
+                            </div>
+                        `;
+                    } else { 
+                        msgDiv.style.justifyContent = 'flex-start';
+                        msgDiv.innerHTML = `
+                            <div class="chat-message-row other">
+                                <div style="font-size: 2.2rem; margin-top: 5px;">👤</div>
+                                <div style="display: flex; flex-direction: column; align-items: flex-start; min-width:0;">
+                                    <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 3px; font-weight: bold;">${c.sender}</div>
+                                    <div style="display: flex; align-items: flex-end;">
+                                        <div class="chat-bubble-wrap${attachmentBubbleClass}">
+                                            <div class="chat-bubble other${attachmentBubbleClass}">
+                                                ${messageContent}${fileHtml}
+                                            </div>
+                                            ${reactionHtml}
+                                            ${commentsHtml}
+                                        </div>
+                                        <div class="message-meta other">
+                                            ${unreadHtml}
+                                            <span style="font-size: 0.7rem; color: #64748b;">${timeStr}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    box.appendChild(msgDiv);
+                });
+                box.scrollTop = box.scrollHeight;
+                notifyOpenerUnreadChanged();
+            } catch (e) { console.error("채팅 로드 실패:", e); }
+        }
+
+        async function sendChatReply() {
+            const input = document.getElementById('chatInput');
+            const fileInput = document.getElementById('chatFile');
+            const content = input.value.trim();
+            if(!content && fileInput.files.length === 0) return;
+            if(fileInput.files.length > 0 && fileInput.files[0].size >= CHAT_MAX_FILE_BYTES) {
+                showChatFileName(fileInput);
+                return;
+            }
+            
+            let formData = new FormData();
+            if (isGroupChat) formData.append('room_id', partnerName);
+            formData.append('receiver', partnerName);
+            formData.append('content', content);
+            if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/send_message', { method: 'POST', body: formData });
+                if(res.ok) { 
+                    input.value = ''; fileInput.value = '';
+                    showChatFileName(fileInput);
+                    document.getElementById('chatEmojiPicker').style.display = 'none';
+                    await refreshChatBox();
+                } else {
+                    const error = await res.json().catch(() => ({}));
+                    alert(error.message || '메시지를 전송하지 못했습니다.');
+                }
+            } catch (e) { alert("메시지 전송 중 오류가 발생했습니다."); }
+        }
+
+        window.onload = function() { initHeader(); initializeChatFileDrop(); refreshChatBox(); document.getElementById('chatInput').focus(); };
+        setInterval(refreshChatBox, 5000);
+    </script>
+</body>
+</html>

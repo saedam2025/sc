@@ -1,0 +1,1532 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/tinymce@8/tinymce.min.js"></script>
+
+<style>
+    /* base.html의 컨테이너 z-index 종속 강제 탈피 */
+    .content-container { z-index: auto !important; }
+
+    /* 전체 배경 및 폰트 */
+    .dashboard-container { padding: 20px 0; background-color: transparent; color: var(--text-dark, #334155); letter-spacing: 0; }
+    
+    /* 메인 컨테이너 */
+    .glass-box { 
+        background: var(--card-bg, #ffffff); 
+        border: 1px solid var(--card-border, #e2e8f0); 
+        border-top: 5px solid var(--primary-color, #1e3a8a); 
+        border-radius: 12px; 
+        box-shadow: var(--card-shadow, 0 4px 15px rgba(0, 0, 0, 0.03)); 
+        padding: 25px; min-height: 950px; width: 100%; max-width: none; margin: 0 auto; box-sizing: border-box; 
+    }
+    
+    .approval-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 25px; border-bottom: 2px solid var(--border-light, #f1f5f9); padding-bottom: 15px; }
+    .approval-header h2 { margin: 0; color: var(--primary-color, #1e3a8a); font-size: 1.5rem; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+
+    /* 컨트롤 패널 */
+    .control-panel { display: flex; flex-direction: column; gap: 15px; background: var(--widget-bg, #f8fafc); padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid var(--widget-border, #e2e8f0); }
+    
+    .draft-menu-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+    .draft-menu-label { font-size: 0.85rem; font-weight: 700; color: var(--text-gray, #64748b); white-space: nowrap; margin-right: 5px; }
+    .draft-pill { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 6px; padding: 10px 8px; background: var(--input-bg, white); border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; font-size: 0.85rem; font-weight: 700; color: var(--text-dark, #475569); cursor: pointer; transition: all 0.2s; box-shadow: none; }
+    .draft-pill i { color: var(--primary-color, #3b82f6); font-size: 1rem; }
+    .draft-pill:hover { background: var(--widget-hover, #eff6ff); border-color: var(--primary-color, #93c5fd); color: var(--primary-dark, #1d4ed8); transform: translateY(-1px); }
+
+    .document-type-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .document-type-card {
+        min-height: 82px;
+        border: 1px solid var(--border-color, #cbd5e1);
+        border-radius: 8px;
+        background: var(--input-bg, #ffffff);
+        color: var(--text-dark, #334155);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.92rem;
+        font-weight: 800;
+        transition: 0.2s;
+    }
+    .document-type-card i { color: var(--text-gray, #64748b); font-size: 1.35rem; }
+    .document-type-card:hover { border-color: var(--primary-color, #93c5fd); background: var(--widget-hover, #f8fbff); color: var(--primary-dark, #1d4ed8); transform: translateY(-1px); }
+    .document-type-card.active { border-color: var(--primary-color, #2563eb); background: var(--primary-light, #eff6ff); color: var(--primary-dark, #1e3a8a); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 12%, transparent) inset; }
+    .document-type-card.active i { color: var(--primary-color, #2563eb); }
+
+    /* 게시판 상단 탭 및 검색 영역 */
+    .board-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; border-bottom: 1px solid var(--border-color, #cbd5e1); }
+    .tab-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: -1px; } 
+    .tab-btn { padding: 10px 20px; border: 1px solid transparent; background: var(--border-light, #f1f5f9); border-radius: 8px 8px 0 0; font-size: 0.85rem; font-weight: 700; color: var(--text-gray, #64748b); cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+    .tab-btn:hover { background: var(--border-color, #e2e8f0); color: var(--text-dark, #334155); }
+    .tab-btn.active { background: var(--card-bg, white); color: var(--text-dark, #0f172a); border: 1px solid var(--border-color, #cbd5e1); border-bottom: 1px solid var(--card-bg, white); border-top: 3px solid var(--primary-color, #3b82f6); z-index: 1; }
+    
+    .tab-btn.completed-tab.active { border-top: 3px solid #22c55e; color: #15803d; }
+    
+    .search-container { padding-bottom: 10px; }
+    
+    /* 요약 카운트 뱃지 */
+    .count-badge { background: var(--primary-color, #3b82f6); color: white; padding: 2px 6px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
+    .tab-btn.completed-tab .count-badge { background: #22c55e; }
+    .tab-btn:not(.active) .count-badge { background: var(--text-gray, #94a3b8); }
+    .tab-btn.archive-tab { position: relative; margin-left: 12px; background: var(--widget-bg, #f8fafc); border-color: var(--border-color, #e2e8f0); color: var(--text-dark, #475569); }
+    .tab-btn.archive-tab::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 1px; background: var(--border-color, #cbd5e1); }
+    .tab-btn.archive-tab i { color: var(--text-gray, #64748b); }
+    .tab-btn.archive-tab:hover { background: var(--border-light, #f1f5f9); border-color: var(--border-color, #cbd5e1); color: var(--text-dark, #334155); }
+    .tab-btn.archive-tab.active { background: var(--widget-bg, #f8fafc); color: var(--text-dark, #334155); border-color: var(--border-color, #cbd5e1); border-bottom-color: var(--widget-bg, #f8fafc); border-top: 3px solid var(--text-gray, #64748b); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.08); }
+    .tab-btn.archive-tab .count-badge,
+    .tab-btn.archive-tab:not(.active) .count-badge { background: var(--text-gray, #64748b); }
+    .tab-btn.archive-tab.active .count-badge { background: var(--text-dark, #475569); }
+    .archive-tab-note { padding: 1px 6px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 999px; background: var(--border-color, #e2e8f0); color: var(--text-gray, #64748b); font-size: 0.68rem; font-weight: 800; line-height: 1.35; }
+    .tab-btn.archive-tab.active .archive-tab-note { background: var(--input-bg, #ffffff); color: var(--text-dark, #475569); }
+
+    /* 검색창 */
+    .search-input { padding: 8px 16px 8px 36px; width: 240px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 6px; font-size: 0.8rem; outline: none; transition: 0.3s; background: var(--input-bg, white) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="%2394a3b8"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>') no-repeat 12px center; background-size: 13px; color: var(--text-dark, #0f172a);}
+    .search-input:focus { border-color: var(--primary-color, #3b82f6); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 15%, transparent); }
+
+    /* 테이블 스타일 */
+    .approval-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--input-bg, white); border-radius: 0 0 8px 8px; overflow: hidden; border: 1px solid var(--border-color, #cbd5e1); border-top: none; }
+    .approval-table th { background: var(--border-light, #f1f5f9); padding: 10px 8px; color: var(--primary-color, #1e3a8a); font-size: 0.75rem; font-weight: 700; text-align: center; border-bottom: 1px solid var(--border-color, #cbd5e1); }
+    .approval-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-light, #f1f5f9); font-size: 0.8rem; color: var(--text-dark, #334155); cursor: pointer; transition: 0.2s; vertical-align: middle; text-align: center; }
+    .approval-table tbody tr:hover td { background: var(--widget-hover, #f8fafc); }
+    .approval-table tbody tr:last-child td { border-bottom: none; }
+
+    /* 진행상태 미니 프로세스 바 */
+    .mini-progress { display: flex; align-items: center; justify-content: flex-start; gap: 4px; font-size: 0.75rem; font-weight: 600; }
+    .mp-step { padding: 3px 8px; border-radius: 4px; background: var(--input-bg, #ffffff); color: var(--text-gray, #94a3b8); border: 1px solid var(--border-color, #cbd5e1); white-space: nowrap; }
+    .mp-step.done { color: var(--primary-color, #3b82f6); border-color: var(--primary-color, #3b82f6); }
+    .mp-step.active { color: #d97706; border-color: #f59e0b; }
+    .mp-step.reject { color: #dc2626; border-color: #ef4444; }
+    .mp-arrow { color: var(--border-color, #cbd5e1); font-size: 0.75rem; margin: 0 2px; }
+
+    /* 상태 뱃지 */
+    .status-badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; display: inline-block; text-align: center; min-width: 55px; margin: 0; background: var(--input-bg, #ffffff); }
+    .st-대기 { color: #d97706; border: 1px solid #f59e0b; }
+    .st-1차승인 { color: #0284c7; border: 1px solid #0ea5e9; }
+    .st-완료 { color: #15803d; border: 1px solid #22c55e; }
+    .st-반려 { color: #dc2626; border: 1px solid #ef4444; }
+
+    /* 모달 기본 스타일 */
+    .modal { display: none; position: fixed; z-index: 9999999 !important; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
+    
+    .modal-content { 
+        background: var(--card-bg, white); 
+        margin: 3% auto; 
+        padding: 30px; 
+        width: 850px; 
+        max-width: 95vw; 
+        border-radius: 16px; 
+        position: relative; 
+        height: 80vh; 
+        overflow-y: scroll; 
+        box-shadow: var(--card-shadow, 0 20px 40px -10px rgba(0,0,0,0.25)); 
+        z-index: 9999999 !important;
+        color: var(--text-dark, #0f172a);
+    }
+
+    .draft-modal-content { padding-bottom: 0; }
+
+    .draft-modal-footer {
+        position: sticky;
+        bottom: -30px;
+        z-index: 20;
+        display: flex;
+        gap: 10px;
+        margin: 25px -30px -30px;
+        padding: 14px 30px;
+        background: var(--card-bg, rgba(255, 255, 255, 0.96));
+        border-top: 1px solid var(--card-border, #e2e8f0);
+        box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.08);
+        backdrop-filter: var(--card-backdrop, blur(8px));
+    }
+
+    .draft-footer-btn {
+        border: none;
+        padding: 14px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: 0.2s;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .draft-footer-btn:hover { transform: translateY(-1px); }
+    .draft-footer-primary { flex: 2; background: var(--primary-color, #2563eb); }
+    .draft-footer-dark { width: 100%; background: var(--primary-dark, #1e3a8a); }
+    .draft-footer-secondary { flex: 1; background: var(--text-gray, #94a3b8); }
+
+    .submit-review-modal { z-index: 10000020 !important; }
+    .submit-review-content {
+        width: 560px;
+        max-width: 92vw;
+        height: auto;
+        max-height: 82vh;
+        overflow-y: auto;
+        padding: 28px;
+    }
+
+    .submit-review-list {
+        border: 1px solid var(--card-border, #e2e8f0);
+        border-radius: 10px;
+        overflow: hidden;
+        margin-top: 16px;
+        background: var(--input-bg, #ffffff);
+    }
+
+    .submit-review-row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        border-bottom: 1px solid var(--border-light, #f1f5f9);
+        font-size: 0.88rem;
+    }
+
+    .submit-review-row:last-child { border-bottom: none; }
+    .submit-review-label { background: var(--widget-bg, #f8fafc); color: var(--text-dark, #475569); font-weight: 800; padding: 12px; }
+    .submit-review-value { color: var(--text-dark, #0f172a); font-weight: 600; padding: 12px; word-break: break-all; }
+    .submit-review-warning { margin-top: 14px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; font-size: 0.82rem; font-weight: 700; }
+    
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: 700; color: var(--primary-color, #1e3a8a); margin-bottom: 6px; font-size: 0.85rem; }
+    .form-control { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: var(--input-bg, #fdfdfd); font-size: 0.85rem; transition: 0.2s; color: var(--text-dark, #0f172a); box-sizing: border-box; }
+    .form-control:focus { outline: none; border-color: var(--primary-color, #3b82f6); background: var(--input-bg, white); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 10%, transparent); }
+    .vacation-date-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .vacation-date-field { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: #ffffff; }
+    .vacation-date-field span { flex: 0 0 auto; color: #475569; font-size: 0.8rem; font-weight: 800; }
+    .vacation-date-field input { min-width: 0; padding: 7px 9px; background: #ffffff; color: #0f172a; }
+    .vacation-date-help { margin: 7px 0 0; color: var(--text-gray, #64748b); font-size: 0.76rem; }
+
+    /* 결재자 커스텀 드롭다운 스타일 */
+    .custom-select { position: relative; width: 100%; }
+    .select-selected { width: 100%; padding: 10px 14px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; background: var(--input-bg, #fdfdfd); font-size: 0.85rem; color: var(--text-dark, #0f172a); cursor: pointer; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; transition: 0.2s; }
+    .select-selected:after { content: '\f0d7'; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 0.8em; color: var(--text-gray, #94a3b8); transition: 0.3s; }
+    .select-selected.active:after { transform: rotate(180deg); }
+    .select-items { position: absolute; top: 100%; left: 0; right: 0; background: var(--input-bg, white); border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; margin-top: 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 9999; max-height: 220px; overflow-y: auto; display: none; }
+    .select-items div { padding: 10px 14px; font-size: 0.85rem; cursor: pointer; border-bottom: 1px solid var(--border-light, #f1f5f9); color: var(--text-dark, #334155); }
+    .select-items div:last-child { border-bottom: none; }
+    .select-items div:hover { background: var(--widget-hover, #f8fafc); color: var(--primary-color, #1e3a8a); }
+    .select-items div.option-disabled { color: var(--border-color, #cbd5e1); background: var(--widget-bg, #f8fafc); cursor: not-allowed; }
+    .select-items div.option-disabled:hover { color: var(--border-color, #cbd5e1); background: var(--widget-bg, #f8fafc); }
+    .select-show { display: block !important; }
+
+    #draftModal .select-selected,
+    #draftModal .select-items {
+        background: #ffffff !important;
+        background-image: none !important;
+        color: #172033 !important;
+        opacity: 1 !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    #draftModal .select-items { isolation: isolate; }
+    #draftModal .select-items div {
+        background: #ffffff !important;
+        color: #334155 !important;
+        opacity: 1 !important;
+    }
+    #draftModal .select-items div span { color: #64748b !important; }
+    #draftModal .select-items div:hover {
+        background: #fff7ed !important;
+        color: #c2410c !important;
+    }
+    #draftModal .select-items div.option-disabled,
+    #draftModal .select-items div.option-disabled:hover {
+        background: #f8fafc !important;
+        color: #94a3b8 !important;
+    }
+
+    @media (max-width: 720px) {
+        .document-type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .document-type-card { min-height: 74px; }
+        .vacation-date-grid { grid-template-columns: 1fr; }
+    }
+
+    /* 메신저 조직도형(트리) UI 스타일 */
+    .org-chart-box { border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; max-height: 300px; overflow-y: auto; padding: 12px; background: var(--input-bg, white); }
+    .org-dept { margin-bottom: 6px; }
+    .org-dept summary { font-size: 0.9rem; font-weight: 700; color: var(--primary-color, #1e3a8a); cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; transition: 0.2s; background: var(--widget-bg, #f8fafc); border: 1px solid var(--card-border, #e2e8f0); }
+    .org-dept summary::-webkit-details-marker { display: none; }
+    .org-dept summary:hover { background: var(--primary-light, #eff6ff); border-color: var(--primary-color, #bfdbfe); }
+    .dept-count { font-size: 0.75rem; color: var(--text-gray, #64748b); font-weight: normal; margin-left: auto; background: var(--input-bg, white); padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border-color, #cbd5e1); }
+    .org-users { margin-left: 14px; padding-left: 14px; border-left: 2px solid var(--card-border, #e2e8f0); display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+    .org-user-label { display: flex; align-items: center; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: var(--text-dark, #334155); margin: 0; padding: 6px 8px; border-radius: 6px; transition: 0.2s; }
+    .org-user-label:hover { background: var(--border-light, #f1f5f9); color: var(--primary-color, #3b82f6); }
+    .org-user-label input[type="checkbox"] { margin-right: 10px; width: 15px; height: 15px; accent-color: var(--primary-color, #3b82f6); cursor: pointer; }
+    .org-role { font-size: 0.8em; color: var(--text-gray, #94a3b8); font-weight: 500; margin-left: 6px; }
+    
+    details[open] > summary i.fa-folder { display: none; }
+    details[open] > summary i.fa-folder-open { display: inline-block !important; }
+    details:not([open]) > summary i.fa-folder-open { display: none; }
+    details:not([open]) > summary i.fa-folder { display: inline-block !important; }
+
+    .action-btn { padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-approve { background: var(--primary-dark, #1e3a8a); color: #ffffff; border: 1px solid var(--primary-dark, #1e3a8a); }
+    .btn-approve:hover { transform: translateY(-2px); box-shadow: 0 6px 12px -3px color-mix(in srgb, var(--primary-dark) 20%, transparent); }
+    .btn-reject { background: var(--input-bg, #ffffff); color: var(--primary-color, #3b82f6); border: 1px solid var(--primary-color, #3b82f6); }
+    .btn-reject:hover { background: var(--primary-light, #eff6ff); transform: translateY(-2px); }
+    
+    .detail-box { background: var(--input-bg, white); padding: 30px; border-radius: 12px; border: 1px solid var(--card-border, #e2e8f0); margin-bottom: 20px; line-height: 1.6; overflow-x: auto; min-height: 400px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+    .detail-box table { border-collapse: collapse; width: 100%; margin-bottom: 15px; table-layout: fixed; }
+    .detail-box table td, .detail-box table th { border: 1px solid var(--border-color, #cbd5e1); padding: 10px; font-size: 0.85rem; }
+
+    .tox-tinymce { border-color: var(--border-color, #cbd5e1) !important; border-radius: 0 0 8px 8px !important; }
+    #draft-step-2 .tox-tinymce { border-radius: 0 0 8px 8px !important; }
+    .tox .tox-toolbar__primary,
+    .tox .tox-toolbar-overlord,
+    .tox .tox-toolbar__overflow { background: var(--widget-bg, #f8fafc) !important; }
+    .tox .tox-menubar,
+    .tox .tox-statusbar { display: none !important; }
+    .tox .tox-toolbar__group { padding: 0 3px !important; }
+    .tox .tox-tbtn { width: 30px !important; height: 30px !important; margin: 1px !important; }
+    .tox .tox-tbtn--select { width: auto !important; max-width: 135px !important; }
+    .tox .tox-split-button { margin: 1px !important; }
+    .tox-dialog-wrap { z-index: 10000000 !important; }
+    .tox-tinymce-aux { z-index: 10000001 !important; }
+    .approval-document-editor-shell { width: 100%; }
+    .approval-document-header {
+        padding: 10px 10px 0;
+        background: var(--input-bg, #ffffff);
+        color: var(--text-dark, #0f172a);
+        border: 1px solid var(--border-color, #cbd5e1);
+        border-bottom: 0;
+        border-radius: 8px 8px 0 0;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .approval-document-header:empty { display: none; }
+    .approval-document-header table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .approval-document-header td,
+    .approval-document-header th { border: 1px solid var(--border-color, #cbd5e1); }
+
+    /* 페이징 */
+    .page-btn { padding: 6px 12px; margin: 0 4px; border: 1px solid var(--card-border, #e2e8f0); border-radius: 6px; background: var(--input-bg, white); cursor: pointer; color: var(--text-dark, #475569); font-size: 0.8rem; font-weight: 700; transition: 0.2s; }
+    .page-btn:hover { background: var(--border-light, #f1f5f9); }
+    .page-btn.active { background: var(--primary-dark, #1e3a8a); color: white; border-color: var(--primary-dark, #1e3a8a); }
+
+    /* 파일 드래그 앤 드롭 영역 스타일 */
+    .drop-zone { border: 2px dashed var(--border-color, #cbd5e1); border-radius: 10px; padding: 25px; text-align: center; background: var(--widget-bg, #f8fafc); cursor: pointer; margin-top: 10px; transition: 0.3s; }
+    .drop-zone.dragover { background: var(--primary-light, #eff6ff); border-color: var(--primary-color, #3b82f6); }
+    
+    /* 파일 리스트 영역 CSS 정렬 완벽 맞춤 */
+    .file-list { margin-top: 10px; display: flex; flex-direction: column; align-items: flex-start; }
+
+    /* 상세내용 및 비고란 등 표 내부 텍스트 자동 줄바꿈 처리 */
+    .detail-box td {
+        word-wrap: break-word;
+        word-break: break-all;
+        white-space: normal; 
+    }
+
+    .detail-box {
+        line-height: 1.5;
+    }
+
+    .detail-box p,
+    .detail-box div {
+        margin-top: 0;
+        margin-bottom: 0;
+        line-height: 1.5;
+    }
+
+    .approval-edit-area {
+        width: 100%;
+        outline: none;
+        line-height: 1.5;
+        white-space: normal;
+        word-break: break-all;
+    }
+
+    .approval-edit-area p,
+    .approval-edit-area div {
+        margin: 0;
+        line-height: 1.5;
+    }
+</style>
+
+<div class="dashboard-container">
+    <div class="glass-box">
+        <div class="approval-header">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <h2 style="display:flex; align-items:center; gap:10px;">
+                    <i class="fa-solid fa-signature" style="color:var(--primary-color);"></i> 사내 전자결재 시스템
+                    <i class="fa-solid fa-circle-question" style="color:var(--text-gray); font-size: 0.65em; cursor: pointer; transition: 0.2s;" title="이용 매뉴얼 보기" onclick="openManualModal()" onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='var(--text-gray)'"></i>
+                </h2>
+                <div style="font-size: 0.85rem; color: var(--text-gray); font-weight: 600;">
+                    <i class="fa-solid fa-user-shield"></i> 
+                    현재 관리자: <span style="color: var(--primary-dark);">{{ current_user }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="draft-menu-row">
+                <div class="draft-pill" onclick="openDraftModal('기안서')"><i class="fa-solid fa-file-signature"></i> 기안서</div>
+                <div class="draft-pill" onclick="openDraftModal('보고서')"><i class="fa-solid fa-chart-pie"></i> 보고서</div>
+                <div class="draft-pill" onclick="openDraftModal('업무일지')"><i class="fa-solid fa-clipboard-list"></i> 업무일지</div>
+                <div class="draft-pill" onclick="openDraftModal('회의록')"><i class="fa-solid fa-users-viewfinder"></i> 회의록</div>
+                <div class="draft-pill" onclick="openDraftModal('휴가원')"><i class="fa-solid fa-plane-departure"></i> 휴가원</div>
+                <div class="draft-pill" onclick="openDraftModal('퇴직원')"><i class="fa-solid fa-door-open"></i> 퇴직원</div>
+            </div>
+        </div>
+
+        <div class="board-toolbar">
+            <div class="tab-group">
+                <button class="tab-btn active" id="tab-pending" onclick="switchTab('pending')">
+                    진행: 수신 대기함 <span class="count-badge" id="count-pending">0</span>
+                </button>
+                <button class="tab-btn" id="tab-draft" onclick="switchTab('draft')">
+                    진행: 내 기안함 <span class="count-badge" id="count-draft">0</span>
+                </button>
+                <button class="tab-btn completed-tab" id="tab-completed" onclick="switchTab('completed')">
+                    결재/수신 완료 <span class="count-badge" id="count-completed">0</span>
+                </button>
+                <button class="tab-btn archive-tab" id="tab-archive" onclick="switchTab('archive')" title="완료된 문서를 모아두는 보관함">
+                    <i class="fa-solid fa-box-archive"></i> 완료 문서함 <span class="archive-tab-note">보관함</span> <span class="count-badge" id="count-archive">0</span>
+                </button>
+            </div>
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="문서제목, 작성자 등 검색" onkeyup="handleSearch()">
+            </div>
+        </div>
+
+        <table class="approval-table">
+            <thead id="thead-data"></thead>
+            <tbody id="tbody-data"></tbody>
+        </table>
+        <div id="pagination" style="text-align:center; margin-top:25px;"></div>
+    </div>
+</div>
+
+<div id="draftModal" class="modal">
+    <div id="draftModalContent" class="modal-content draft-modal-content">
+        <span onclick="closeDraftModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        <h3 id="draftModalTitle" style="color:var(--primary-dark); margin-top:0; margin-bottom:20px; font-size:1.2rem; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-pen-to-square" style="color:var(--primary-color);"></i> 새 문서 기안하기</h3>
+        
+        <div id="draft-step-1">
+            <div class="form-group">
+                <label>문서 종류</label>
+                <input type="hidden" id="draftType" value="기안서">
+                <div class="document-type-grid">
+                    <button type="button" class="document-type-card" data-doc-type="기안서" onclick="selectDraftType('기안서')"><i class="fa-solid fa-file-signature"></i>기안서</button>
+                    <button type="button" class="document-type-card" data-doc-type="보고서" onclick="selectDraftType('보고서')"><i class="fa-solid fa-chart-pie"></i>보고서</button>
+                    <button type="button" class="document-type-card" data-doc-type="업무일지" onclick="selectDraftType('업무일지')"><i class="fa-solid fa-clipboard-list"></i>업무일지</button>
+                    <button type="button" class="document-type-card" data-doc-type="회의록" onclick="selectDraftType('회의록')"><i class="fa-solid fa-users-viewfinder"></i>회의록</button>
+                    <button type="button" class="document-type-card" data-doc-type="휴가원" onclick="selectDraftType('휴가원')"><i class="fa-solid fa-plane-departure"></i>휴가원</button>
+                    <button type="button" class="document-type-card" data-doc-type="퇴직원" onclick="selectDraftType('퇴직원')"><i class="fa-solid fa-door-open"></i>퇴직원</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>문서 제목</label>
+                <input type="text" id="draftTitle" class="form-control" placeholder="문서 종류에 맞는 제목을 입력하세요." required>
+            </div>
+
+            <div id="vacation-date-line" class="form-group" style="display:none;">
+                <label>휴가 기간</label>
+                <div class="vacation-date-grid">
+                    <div class="vacation-date-field">
+                        <span>시작일</span>
+                        <input type="date" id="vacationStartDate" class="form-control" onchange="syncVacationDateRange()">
+                    </div>
+                    <div class="vacation-date-field">
+                        <span>종료일</span>
+                        <input type="date" id="vacationEndDate" class="form-control">
+                    </div>
+                </div>
+                <p class="vacation-date-help"><i class="fa-solid fa-calendar-check"></i> 결재가 완료되면 선택한 기간이 메인 일정표에 자동 등록됩니다.</p>
+            </div>
+
+            <div id="approval-line" style="display:flex; gap:15px;">
+                <div class="form-group" style="flex:1;">
+                    <label>1차 결재자 (필수)</label>
+                    <div class="custom-select" id="custom-app1">
+                        <div class="select-selected">선택하세요 (필수)</div>
+                        <div class="select-items">
+                            <div data-value="">선택하세요 (필수)</div>
+                            {% for u in user_list %}
+                            <div data-value="{{ u.name }}"><span style="font-size: 0.75em; color: var(--text-gray); margin-right: 4px;">{{ u.role }}</span>{{ u.name }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <input type="hidden" id="app1" value="">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>2차 결재자 (선택)</label>
+                    <div class="custom-select" id="custom-app2">
+                        <div class="select-selected">없음 (1차 승인 시 즉시 완료)</div>
+                        <div class="select-items">
+                            <div data-value="">없음 (1차 승인 시 즉시 완료)</div>
+                            {% for u in user_list %}
+                            <div data-value="{{ u.name }}"><span style="font-size: 0.75em; color: var(--text-gray); margin-right: 4px;">{{ u.role }}</span>{{ u.name }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <input type="hidden" id="app2" value="">
+                </div>
+            </div>
+
+            <div id="receiver-line" class="form-group" style="display:none;">
+                <label>수신자 지정 (최소 1명 이상 필수 지정)</label>
+                <div class="org-chart-box">
+                    {% for g in grouped_users %}
+                    <details class="org-dept" open>
+                        <summary>
+                            <i class="fa-solid fa-folder" style="color:#f59e0b;"></i>
+                            <i class="fa-solid fa-folder-open" style="color:#f59e0b; display:none;"></i>
+                            {{ g.group }} <span class="dept-count">{{ g.users|length }}명</span>
+                        </summary>
+                        <div class="org-users">
+                            {% for u in g.users %}
+                            <label class="org-user-label">
+                                <input type="checkbox" class="recv-cb" value="{{ u.name }}">
+                                <i class="fa-solid fa-user" style="color:var(--border-color); margin-right:4px;"></i>{{ u.name }} <span class="org-role">{{ u.role }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="cc-line" class="form-group">
+                <label onclick="toggleCcBox()" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; background:var(--border-light); padding:8px 12px; border-radius:6px; border:1px solid var(--border-color); user-select:none; margin-bottom:0;">
+                    <i class="fa-solid fa-users" style="color:var(--text-gray);"></i> 참조자 지정 (선택) 
+                    <i id="cc-toggle-icon" class="fa-solid fa-chevron-down" style="font-size:0.8em; margin-left:5px; transition:0.3s;"></i>
+                </label>
+                
+                <div class="org-chart-box" id="cc-box" style="display:none; margin-top:8px;">
+                    {% for g in grouped_users %}
+                    <details class="org-dept">
+                        <summary>
+                            <i class="fa-solid fa-folder" style="color:#f59e0b;"></i>
+                            <i class="fa-solid fa-folder-open" style="color:#f59e0b; display:none;"></i>
+                            {{ g.group }} <span class="dept-count">{{ g.users|length }}명</span>
+                        </summary>
+                        <div class="org-users">
+                            {% for u in g.users %}
+                            <label class="org-user-label">
+                                <input type="checkbox" class="cc-cb" value="{{ u.name }}">
+                                <i class="fa-solid fa-user" style="color:var(--border-color); margin-right:4px;"></i>{{ u.name }} <span class="org-role">{{ u.role }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="draft-modal-footer">
+                <button type="button" onclick="goToStep2()" class="draft-footer-btn draft-footer-dark">
+                    문서 본문 작성하기 <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="draft-step-2" style="display:none;">
+            <div style="margin-bottom: 10px; font-size:0.85rem; font-weight: 700; color: var(--primary-dark);">본문 양식 수정 및 작성</div>
+            <div class="approval-document-editor-shell">
+                <div id="approvalDocumentHeader" class="approval-document-header" aria-label="전자결재 문서 머리글"></div>
+                <textarea id="approvalEditor"></textarea>
+            </div>
+            
+            <div id="attachment-title" style="margin-top: 20px; font-size:0.85rem; font-weight: 700; color: var(--primary-dark);">증빙 파일 첨부 (선택)</div>
+            <div id="drop-zone" class="drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2em; color: var(--text-gray); margin-bottom: 8px;"></i>
+                <p id="attachment-help" style="margin:0; font-size:0.85rem; color:var(--text-gray);">이곳에 파일을 드래그하거나 클릭하여 업로드하세요.<br><span style="font-size:0.8rem; font-weight: 500; color:var(--text-gray);">(최대 10개, 총 15MB 이하)</span></p>
+                <input type="file" id="draftFile" multiple style="display:none;">
+            </div>
+            <div id="file-list" class="file-list"></div>
+
+            <div class="draft-modal-footer">
+                <button type="button" onclick="goToStep1()" class="draft-footer-btn draft-footer-secondary">
+                    <i class="fa-solid fa-arrow-left"></i> 이전설정
+                </button>
+                <button type="button" onclick="submitApproval()" class="draft-footer-btn draft-footer-primary">
+                    <i class="fa-solid fa-paper-plane"></i> 최종 결재 상신
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="submitReviewModal" class="modal submit-review-modal">
+    <div class="modal-content submit-review-content">
+        <span onclick="closeSubmitReviewModal()" style="position:absolute; right:22px; top:18px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        <h3 style="color:var(--primary-dark); margin:0; font-size:1.2rem; display:flex; align-items:center; gap:10px;">
+            <i class="fa-solid fa-clipboard-check" style="color:var(--primary-color);"></i> 상신 전 최종 확인
+        </h3>
+        <div id="submitReviewBody" class="submit-review-list"></div>
+        <div id="submitReviewWarning" class="submit-review-warning" style="display:none;"></div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button type="button" onclick="closeSubmitReviewModal()" class="draft-footer-btn draft-footer-secondary" style="flex:1;">
+                다시 확인
+            </button>
+            <button type="button" id="confirmSubmitBtn" onclick="confirmSubmitApproval()" class="draft-footer-btn draft-footer-primary" style="flex:2;">
+                <i class="fa-solid fa-paper-plane"></i> 확인 후 상신
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="detailModal" class="modal">
+    <div id="detailModalContent" class="modal-content">
+        <span onclick="closeDetailModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        
+        <div style="display:flex; justify-content:flex-start; align-items:center; gap:12px; margin-bottom:20px;">
+            <h3 id="dt_type" style="color:var(--primary-dark); margin:0; font-size:1.3rem; font-weight:800;"></h3>
+            <span id="dt_status" class="status-badge" style="padding: 5px 12px;"></span>
+        </div>
+
+        <div class="detail-box" id="dt_dynamic_box"></div>
+        
+        <div id="actionArea" style="display:none; text-align:center; margin-top:25px; border-top:1px dashed var(--border-color); padding-top:25px;">
+            <button class="action-btn btn-reject" onclick="processApproval('reject')"><i class="fa-solid fa-xmark"></i> 결재 반려</button>
+            <button class="action-btn btn-approve" onclick="processApproval('approve')" style="margin-left:10px;"><i class="fa-solid fa-check"></i> 결재 승인</button>
+        </div>
+        <div id="referenceArea" style="display:none; text-align:center; margin-top:18px; border-top:1px dashed var(--border-color); padding-top:18px;">
+            <button class="action-btn btn-approve" onclick="createDraftFromReference()" style="background:#0f766e; border-color:#0f766e;">
+                <i class="fa-solid fa-copy"></i> 이 문서 참고해 새로 기안
+            </button>
+        </div>
+        <input type="hidden" id="currentDocId">
+    </div>
+</div>
+
+<div id="manualModal" class="modal">
+    <div id="manualModalContent" class="modal-content" style="max-width: 800px; height: 70vh; padding: 35px 30px;">
+        <span onclick="closeManualModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1; z-index: 10;">&times;</span>
+        
+        {% include 'manual/approval_manual.html' %}
+        
+    </div>
+</div>
+
+<script>
+const currentUser = '{{ current_user }}';
+const docsData = {
+    'pending': {{ pending_docs | tojson | safe }},
+    'draft': {{ my_drafts | tojson | safe }},
+    'completed': {{ completed_docs | tojson | safe }},
+    'archive': {{ archive_docs | tojson | safe }}
+};
+const nextDocId = {{ next_id }};
+
+let currentTab = 'pending';
+let currentPage = 1;
+const itemsPerPage = 10;
+let searchTerm = '';
+
+let selectedFiles = [];
+let currentDetailDoc = null;
+let referenceDraftContent = '';
+let pendingEditorHeaderContent = '';
+let pendingEditorContent = null;
+const MAX_FILES = 10;
+const MAX_TOTAL_SIZE = 15 * 1024 * 1024;
+
+function getApprovalEditor() {
+    return window.tinymce ? tinymce.get('approvalEditor') : null;
+}
+
+function setEditorContent(html) {
+    pendingEditorContent = html || '';
+    const editor = getApprovalEditor();
+    if (editor && editor.initialized) {
+        editor.setContent(pendingEditorContent);
+    } else {
+        document.getElementById('approvalEditor').value = pendingEditorContent;
+    }
+}
+
+function setEditorHeaderContent(html) {
+    pendingEditorHeaderContent = html || '';
+    const header = document.getElementById('approvalDocumentHeader');
+    if (header) header.innerHTML = pendingEditorHeaderContent;
+}
+
+function getEditorContent() {
+    const editor = getApprovalEditor();
+    const bodyContent = editor && editor.initialized
+        ? editor.getContent()
+        : (pendingEditorContent !== null ? pendingEditorContent : (document.getElementById('approvalEditor').value || ''));
+    return pendingEditorHeaderContent + bodyContent;
+}
+
+function getEditorCells(editor) {
+    const selectedCells = Array.from(editor.getDoc().querySelectorAll('td[data-mce-selected], th[data-mce-selected]'));
+    if (selectedCells.length > 0) return selectedCells;
+
+    const node = editor.selection.getNode();
+    const cell = node && node.closest ? node.closest('td, th') : null;
+    return cell ? [cell] : [];
+}
+
+function getEditorTable(editor) {
+    const node = editor.selection.getNode();
+    return node && node.closest ? node.closest('table') : null;
+}
+
+function normalizeEditorSize(value) {
+    if (value === null) return null;
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+    if (/^\d+(\.\d+)?$/.test(trimmed)) return `${trimmed}px`;
+    if (/^\d+(\.\d+)?(px|%|em|rem|cm|mm)$/i.test(trimmed)) return trimmed;
+    alert('숫자 또는 px, %, cm 같은 단위를 입력해주세요. 예: 120, 30%, 3cm');
+    return null;
+}
+
+function applyEditorTablePadding(editor, padding) {
+    const table = getEditorTable(editor);
+    if (!table) {
+        alert('간격을 조정할 표 안에 커서를 놓고 다시 눌러주세요.');
+        return;
+    }
+
+    editor.undoManager.transact(() => {
+        table.querySelectorAll('td, th').forEach(cell => {
+            cell.style.padding = padding;
+            cell.style.lineHeight = '1.35';
+        });
+        table.style.marginTop = '8px';
+        table.style.marginBottom = '8px';
+    });
+    editor.nodeChanged();
+}
+
+function setEditorCellSize(editor, property) {
+    const cells = getEditorCells(editor);
+    if (cells.length === 0) {
+        alert('표 셀 안에 커서를 놓고 다시 눌러주세요.');
+        return;
+    }
+
+    const firstCell = cells[0];
+    const current = property === 'height'
+        ? (firstCell.style.height || firstCell.parentElement.style.height || '')
+        : (firstCell.style.width || '');
+    const label = property === 'height' ? '높이' : '폭';
+    const example = property === 'height' ? '40, 1.5cm' : '120, 30%, 3cm';
+    const size = normalizeEditorSize(prompt(`선택한 셀/행의 ${label}을 입력하세요. 예: ${example}`, current));
+    if (!size) return;
+
+    editor.undoManager.transact(() => {
+        cells.forEach(cell => {
+            cell.style[property] = size;
+            if (property === 'height') cell.parentElement.style.height = size;
+            if (property === 'width') {
+                const table = cell.closest('table');
+                if (table) table.style.tableLayout = 'fixed';
+            }
+        });
+    });
+    editor.nodeChanged();
+}
+
+function initApprovalEditor() {
+    tinymce.init({
+        selector: '#approvalEditor',
+        base_url: 'https://cdn.jsdelivr.net/npm/tinymce@8',
+        suffix: '.min',
+        license_key: 'gpl',
+        height: 500,
+        menubar: false,
+        statusbar: false,
+        branding: false,
+        promotion: false,
+        placeholder: '',
+        plugins: 'advlist autolink lists link image noneditable table',
+        toolbar_mode: 'sliding',
+        toolbar_sticky: true,
+        toolbar: 'undo redo | fontfamily fontsize lineheight | bold italic underline forecolor backcolor removeformat | alignleft aligncenter alignright bullist numlist outdent indent | table tableprops tablerowprops tablecellprops tablecellbackgroundcolor tablecellbordercolor tablecellborderwidth tablecellborderstyle tableinsertrowafter tableinsertcolafter tabledeleterow tabledeletecol tablemergecells tablesplitcells tabledelete tabletuning',
+        font_family_formats: '맑은 고딕=Malgun Gothic,맑은 고딕,sans-serif;굴림=Gulim,굴림,sans-serif;돋움=Dotum,돋움,sans-serif;바탕=Batang,바탕,serif;궁서=Gungsuh,궁서,serif;Arial=arial,helvetica,sans-serif;Arial Black=arial black,avant garde;Courier New=courier new,courier,monospace;Helvetica=helvetica,arial,sans-serif;Times New Roman=times new roman,times,serif;Verdana=verdana,geneva,sans-serif',
+        font_size_formats: '10px 11px 12px 13px 14px 16px 18px 20px 24px 28px 36px',
+        line_height_formats: '1 1.15 1.3 1.5 1.8 2',
+        table_advtab: true,
+        table_cell_advtab: true,
+        table_row_advtab: true,
+        table_appearance_options: true,
+        table_style_by_css: true,
+        table_resize_bars: true,
+        table_column_resizing: 'resizetable',
+        table_sizing_mode: 'fixed',
+        object_resizing: 'img,table',
+        table_default_attributes: { border: '1' },
+        table_default_styles: { width: '100%', 'border-collapse': 'collapse' },
+        table_border_widths: [
+            { title: '1px', value: '1px' },
+            { title: '2px', value: '2px' },
+            { title: '3px', value: '3px' },
+            { title: '4px', value: '4px' },
+            { title: '5px', value: '5px' }
+        ],
+        table_border_styles: [
+            { title: '실선', value: 'solid' },
+            { title: '점선', value: 'dotted' },
+            { title: '파선', value: 'dashed' },
+            { title: '겹선', value: 'double' },
+            { title: '없음', value: 'none' }
+        ],
+        table_toolbar: '',
+        content_style: `
+            body {
+                font-family: "Malgun Gothic", "맑은 고딕", sans-serif;
+                font-size: 14px;
+                line-height: 1.5;
+                color: #0f172a;
+                padding: 10px;
+            }
+            p { margin: 0 0 6px; line-height: 1.5; }
+            table { border-collapse: collapse; width: 100%; table-layout: fixed; margin: 8px 0 15px; }
+            td, th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; word-break: break-all; }
+            .approval-edit-area { width: 100%; min-height: 24px; line-height: 1.5; }
+        `,
+        setup: function(editor) {
+            editor.ui.registry.addMenuButton('tabletuning', {
+                text: '표 조정',
+                tooltip: '표 간격과 셀 크기 조정',
+                fetch: function(callback) {
+                    callback([
+                        {
+                            type: 'menuitem',
+                            text: '표 간격 좁게',
+                            onAction: () => applyEditorTablePadding(editor, '4px 6px')
+                        },
+                        {
+                            type: 'menuitem',
+                            text: '표 간격 기본',
+                            onAction: () => applyEditorTablePadding(editor, '8px 10px')
+                        },
+                        {
+                            type: 'separator'
+                        },
+                        {
+                            type: 'menuitem',
+                            text: '선택 셀/열 폭 지정',
+                            onAction: () => setEditorCellSize(editor, 'width')
+                        },
+                        {
+                            type: 'menuitem',
+                            text: '선택 셀/행 높이 지정',
+                            onAction: () => setEditorCellSize(editor, 'height')
+                        }
+                    ]);
+                }
+            });
+            editor.on('init', function() {
+                const initialContent = pendingEditorContent !== null
+                    ? pendingEditorContent
+                    : (document.getElementById('approvalEditor').value || '');
+                editor.setContent(initialContent);
+            });
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initApprovalEditor();
+    updateCounts();
+    renderTable();
+    initDragAndDrop();
+    initCustomSelects();
+});
+
+function initCustomSelects() {
+    const wrappers = document.querySelectorAll('.custom-select');
+    wrappers.forEach(wrapper => {
+        const selected = wrapper.querySelector('.select-selected');
+        const items = wrapper.querySelector('.select-items');
+        const hiddenInput = wrapper.nextElementSibling; 
+
+        selected.addEventListener('click', function(e) {
+            e.stopPropagation();
+            closeAllSelect(this);
+            items.classList.toggle('select-show');
+            this.classList.toggle('active');
+        });
+
+        const options = items.querySelectorAll('div[data-value]');
+        options.forEach(opt => {
+            opt.addEventListener('click', function(e) {
+                if (this.classList.contains('option-disabled')) {
+                    alert('1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.');
+                    return;
+                }
+                selected.innerHTML = this.innerHTML;
+                hiddenInput.value = this.getAttribute('data-value');
+                items.classList.remove('select-show');
+                selected.classList.remove('active');
+                if (!validateApproverSelection(hiddenInput.id)) return;
+                updateApproverOptionStates();
+            });
+        });
+    });
+
+    document.addEventListener("click", function() {
+        closeAllSelect(null);
+    });
+}
+
+function resetCustomSelect(inputId) {
+    const input = document.getElementById(inputId);
+    const wrapper = input ? input.previousElementSibling : null;
+    if (!input || !wrapper) return;
+    input.value = '';
+    wrapper.querySelector('.select-selected').innerHTML = inputId === 'app1' ? '선택하세요 (필수)' : '없음 (1차 승인 시 즉시 완료)';
+    updateApproverOptionStates();
+}
+
+function validateApproverSelection(changedInputId) {
+    const app1 = document.getElementById('app1').value;
+    const app2 = document.getElementById('app2').value;
+    if (app1 && app2 && app1 === app2) {
+        alert('1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.');
+        resetCustomSelect(changedInputId || 'app2');
+        return false;
+    }
+    return true;
+}
+
+function updateApproverOptionStates() {
+    const app1 = document.getElementById('app1').value;
+    const app2 = document.getElementById('app2').value;
+    document.querySelectorAll('#custom-app1 .select-items div[data-value]').forEach(opt => {
+        const value = opt.getAttribute('data-value');
+        opt.classList.toggle('option-disabled', Boolean(value && value === app2));
+    });
+    document.querySelectorAll('#custom-app2 .select-items div[data-value]').forEach(opt => {
+        const value = opt.getAttribute('data-value');
+        opt.classList.toggle('option-disabled', Boolean(value && value === app1));
+    });
+}
+
+function closeAllSelect(elmnt) {
+    const items = document.querySelectorAll('.select-items');
+    const selecteds = document.querySelectorAll('.select-selected');
+    items.forEach((item, index) => {
+        if (elmnt !== selecteds[index]) {
+            item.classList.remove('select-show');
+            selecteds[index].classList.remove('active');
+        }
+    });
+}
+
+function toggleCcBox() {
+    const box = document.getElementById('cc-box');
+    const icon = document.getElementById('cc-toggle-icon');
+    if (box.style.display === 'none' || box.style.display === '') {
+        box.style.display = 'block'; 
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        box.style.display = 'none'; 
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+function initDragAndDrop() {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('draftFile');
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if(e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files);
+    });
+    dropZone.addEventListener('click', () => {
+        fileInput.click();
+    });
+    fileInput.addEventListener('change', function() {
+        if(this.files.length) handleFileSelect(this.files);
+        this.value = ''; 
+    });
+}
+
+function handleFileSelect(files) {
+    let currentSize = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    let newFiles = Array.from(files);
+
+    for (let f of newFiles) {
+        if (selectedFiles.length >= MAX_FILES) {
+            alert(`파일은 최대 ${MAX_FILES}개까지만 첨부할 수 있습니다.`);
+            break;
+        }
+        if (currentSize + f.size > MAX_TOTAL_SIZE) {
+            alert("총 첨부파일 용량이 제한(15MB)을 초과할 수 없습니다.");
+            break;
+        }
+        selectedFiles.push(f);
+        currentSize += f.size;
+    }
+    renderFileList();
+}
+
+// 🚀 기안 작성 창 첨부파일 리스트 (수평 정렬, 배경/테두리 제거, 용량 텍스트 유지)
+function renderFileList() {
+    const listContainer = document.getElementById('file-list');
+    listContainer.innerHTML = '';
+    selectedFiles.forEach((f, index) => {
+        const sizeMB = (f.size / (1024 * 1024)).toFixed(2);
+        listContainer.innerHTML += `
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; width:100%;">
+                <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:var(--text-dark, #475569);">
+                    <i class="fa-solid fa-file" style="color:var(--text-gray, #64748b); font-size:1rem; line-height:1;"></i>
+                    <span style="font-weight:600; line-height:1;">${f.name}</span>
+                    <span style="color:var(--text-gray, #94a3b8); font-weight:normal; line-height:1;">(${sizeMB}MB)</span>
+                </div>
+                <span class="remove-file" onclick="removeFile(${index})" style="color:#ef4444; cursor:pointer; padding:0 5px;"><i class="fa-solid fa-xmark"></i></span>
+            </div>
+        `;
+    });
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    renderFileList();
+}
+
+function updateCounts() {
+    document.getElementById('count-pending').innerText = docsData['pending'].length;
+    document.getElementById('count-draft').innerText = docsData['draft'].length;
+    document.getElementById('count-completed').innerText = docsData['completed'].length;
+    document.getElementById('count-archive').innerText = docsData['archive'].length;
+}
+
+function renderProgressBar(doc) {
+    const isReceiverType = ['보고서', '업무일지', '회의록'].includes(doc.doc_type);
+    let html = `<div class="mini-progress">`;
+    
+    if (isReceiverType) {
+        if (doc.status === '완료') {
+            html += `<span class="mp-step done">발송</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step done">수신확인</span>`;
+        } else {
+            html += `<span class="mp-step done">발송</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step active">수신대기</span>`;
+        }
+    } else {
+        if (doc.status === '대기') {
+            html += `<span class="mp-step done">상신</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step active">1차 대기</span>`;
+            if(doc.approver_2) html += ` <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step">2차 대기</span>`;
+        } else if (doc.status === '1차승인') {
+            html += `<span class="mp-step done">상신</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step done">1차 승인</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step active">2차 대기</span>`;
+        } else if (doc.status === '완료') {
+            html += `<span class="mp-step done">상신</span> <i class="fa-solid fa-chevron-right mp-arrow"></i> <span class="mp-step done">결재 완료</span>`;
+        } else if (doc.status === '반려') {
+            html += `<span class="mp-step reject"><i class="fa-solid fa-ban"></i> 반려됨</span>`;
+        }
+    }
+    html += `</div>`;
+    return html;
+}
+
+function formatDocDate(value) {
+    return value ? String(value).substring(0, 16) : '';
+}
+
+function renderTable() {
+    const headers = {
+        'pending': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">수신일시</th><th style="width:15%;">상태</th></tr>`,
+        'draft': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">결재/수신자</th><th style="width:15%;">기안일시</th><th style="width:15%; text-align:left; padding-left:25px;">진행 상황</th></tr>`,
+        'completed': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
+        'archive': `<tr><th style="width:12%;">문서종류</th><th style="width:34%;">제목</th><th style="width:15%;">기안자</th><th style="width:19%;">결재/수신자</th><th style="width:12%;">완료일시</th><th style="width:8%;">상태</th></tr>`
+    };
+    document.getElementById('thead-data').innerHTML = headers[currentTab];
+
+    const data = docsData[currentTab].filter(doc => 
+        String(doc.title || '').toLowerCase().includes(searchTerm) || 
+        String(doc.drafter || '').toLowerCase().includes(searchTerm) ||
+        String(doc.doc_type || '').toLowerCase().includes(searchTerm) ||
+        (doc.approver_1 || '').toLowerCase().includes(searchTerm) ||
+        (doc.approver_2 || '').toLowerCase().includes(searchTerm) ||
+        (doc.receivers || '').toLowerCase().includes(searchTerm)
+    );
+
+    const totalPages = Math.ceil(data.length / itemsPerPage) || 1;
+    const start = (currentPage - 1) * itemsPerPage;
+    const paginatedData = data.slice(start, start + itemsPerPage);
+
+    let html = '';
+    if(paginatedData.length === 0) {
+        const emptyColspan = currentTab === 'archive' ? 6 : 5;
+        html = `<tr><td colspan="${emptyColspan}" style="text-align:center; padding:60px; color:var(--text-gray, #94a3b8); font-size:0.9rem;"><i class="fa-regular fa-folder-open" style="font-size:2em; display:block; margin-bottom:10px;"></i>문서가 없습니다.</td></tr>`;
+    } else {
+        paginatedData.forEach(doc => {
+            const receiverText = String(doc.receivers || '');
+            const approver1 = String(doc.approver_1 || '');
+            const approver2 = String(doc.approver_2 || '전결');
+            const approverText = receiverText ? receiverText.substring(0,15) + (receiverText.length > 15 ? '...' : '') : `${approver1} / ${approver2}`;
+            const displayCol = currentTab === 'pending' ? doc.drafter :
+                               currentTab === 'draft' ? approverText : doc.drafter;
+            const dateCol = ['completed', 'archive'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
+            
+            const statusCell = currentTab === 'draft' ? renderProgressBar(doc) : `<span class="status-badge st-${doc.status}">${doc.status}</span>`;
+
+            if (currentTab === 'archive') {
+                html += `<tr onclick="openDetailModal(${doc.id})">
+                    <td><span style="font-weight:700; color:var(--text-dark, #475569);">${doc.doc_type || ''}</span></td>
+                    <td style="font-weight:600; font-size:0.85rem; text-align:left; padding-left:20px;">${doc.title || ''}</td>
+                    <td style="color:var(--text-dark, #475569);">${doc.drafter || ''}</td>
+                    <td style="color:var(--text-dark, #475569);">${approverText}</td>
+                    <td style="color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
+                    <td>${statusCell}</td>
+                </tr>`;
+            } else {
+                html += `<tr onclick="openDetailModal(${doc.id})">
+                    <td><span style="font-weight:700; color:var(--text-dark, #475569);">${doc.doc_type || ''}</span></td>
+                    <td style="font-weight:600; font-size:0.85rem; text-align:left; padding-left:20px;">${doc.title || ''}</td>
+                    <td style="color:var(--text-dark, #475569);">${displayCol || ''}</td>
+                    <td style="color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
+                    <td style="${currentTab === 'draft' ? 'text-align:left; padding-left:25px;' : ''}">${statusCell}</td>
+                </tr>`;
+            }
+        });
+    }
+    document.getElementById('tbody-data').innerHTML = html;
+
+    let pageHtml = '';
+    for(let i=1; i<=totalPages; i++) {
+        pageHtml += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+    }
+    document.getElementById('pagination').innerHTML = pageHtml;
+}
+
+function switchTab(tab) {
+    currentTab = tab; currentPage = 1;
+    document.getElementById('searchInput').value = ''; searchTerm = '';
+    
+    ['pending', 'draft', 'completed', 'archive'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    });
+    renderTable();
+}
+
+function handleSearch() { searchTerm = document.getElementById('searchInput').value.toLowerCase(); currentPage = 1; renderTable(); }
+function changePage(p) { currentPage = p; renderTable(); }
+
+function closeDraftModal() { document.getElementById('draftModal').style.display = 'none'; }
+function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; }
+function closeManualModal() { document.getElementById('manualModal').style.display = 'none'; }
+
+function openManualModal() {
+    const manualModal = document.getElementById('manualModal');
+    manualModal.style.display = 'block';
+    document.getElementById('manualModalContent').scrollTop = 0;
+}
+
+function selectDraftType(docType) {
+    document.getElementById('draftType').value = docType;
+    document.querySelectorAll('.document-type-card').forEach(card => {
+        card.classList.toggle('active', card.getAttribute('data-doc-type') === docType);
+    });
+    toggleReceiverMode();
+    if (typeof renderFileList === 'function') renderFileList();
+}
+
+function syncVacationDateRange() {
+    const startInput = document.getElementById('vacationStartDate');
+    const endInput = document.getElementById('vacationEndDate');
+    endInput.min = startInput.value || '';
+    if (startInput.value && (!endInput.value || endInput.value < startInput.value)) {
+        endInput.value = startInput.value;
+    }
+}
+
+function openDraftModal(docType = '기안서', keepReferenceContent = false) {
+    const modalContent = document.getElementById('draftModalContent');
+    modalContent.scrollTop = 0;
+
+    if (!keepReferenceContent) referenceDraftContent = '';
+    setEditorHeaderContent('');
+    setEditorContent('');
+    selectDraftType(docType);
+    document.getElementById('draftTitle').value = '';
+    document.getElementById('vacationStartDate').value = '';
+    document.getElementById('vacationEndDate').value = '';
+    document.getElementById('vacationEndDate').min = '';
+    
+    document.getElementById('app1').value = '';
+    document.querySelector('#custom-app1 .select-selected').innerHTML = '선택하세요 (필수)';
+    document.getElementById('app2').value = '';
+    document.querySelector('#custom-app2 .select-selected').innerHTML = '없음 (1차 승인 시 즉시 완료)';
+    updateApproverOptionStates();
+    
+    document.getElementById('cc-box').style.display = 'none';
+    document.getElementById('cc-toggle-icon').style.transform = 'rotate(0deg)';
+
+    selectedFiles = [];
+    renderFileList();
+
+    document.querySelectorAll('.recv-cb, .cc-cb').forEach(cb => cb.checked = false);
+    
+    toggleReceiverMode();
+    document.getElementById('draft-step-1').style.display = 'block';
+    document.getElementById('draft-step-2').style.display = 'none';
+    document.getElementById('draftModal').style.display = 'block';
+}
+
+function toggleReceiverMode() {
+    const type = document.getElementById('draftType').value;
+    const isReceiverType = ['보고서', '업무일지', '회의록'].includes(type);
+    document.getElementById('approval-line').style.display = isReceiverType ? 'none' : 'flex';
+    document.getElementById('receiver-line').style.display = isReceiverType ? 'block' : 'none';
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const day = today.getDate();
+    const titlePlaceholders = {
+        '기안서': `예: ${year}년 ${month}월 비품 구매 기안`,
+        '보고서': `예: ${year}년 ${month}월 사업 운영 결과 보고`,
+        '업무일지': `예: ${year}년 ${month}월 ${day}일 업무일지`,
+        '회의록': `예: ${year}년 ${month}월 정기회의 회의록`,
+        '휴가원': `예: ${year}년 ${month}월 ${day}일 연차 휴가원`,
+        '퇴직원': `예: ${year}년 ${month}월 ${day}일자 퇴직원`
+    };
+    document.getElementById('draftTitle').placeholder = titlePlaceholders[type] || '문서 제목을 입력하세요.';
+    document.getElementById('vacation-date-line').style.display = type === '휴가원' ? 'block' : 'none';
+
+    const attachmentTitle = document.getElementById('attachment-title');
+    const attachmentHelp = document.getElementById('attachment-help');
+    const fileInput = document.getElementById('draftFile');
+    if (attachmentTitle && attachmentHelp && fileInput) {
+        attachmentTitle.innerText = '증빙 파일 첨부 (선택)';
+        attachmentHelp.innerHTML = '이곳에 파일을 드래그하거나 클릭하여 업로드하세요.<br><span style="font-size:0.8rem; font-weight: 500; color:var(--text-gray, #94a3b8);">(최대 10개, 총 15MB 이하)</span>';
+        fileInput.setAttribute('accept', '');
+    }
+}
+
+function goToStep1() {
+    document.getElementById('draft-step-1').style.display = 'block';
+    document.getElementById('draft-step-2').style.display = 'none';
+}
+
+function goToStep2() {
+    let title = document.getElementById('draftTitle').value.trim();
+    const type = document.getElementById('draftType').value;
+    const app1 = document.getElementById('app1').value;
+    const app2 = document.getElementById('app2').value || '';
+    const todayStr = new Date().toISOString().split('T')[0];
+    const docYear = todayStr.substring(0, 4);
+
+    if (!title) return alert("문서 제목을 입력하세요.");
+    const vacationStart = document.getElementById('vacationStartDate').value;
+    const vacationEnd = document.getElementById('vacationEndDate').value;
+    if (type === '휴가원') {
+        if (!vacationStart || !vacationEnd) return alert("휴가 시작일과 종료일을 선택하세요.");
+        if (vacationEnd < vacationStart) return alert("휴가 종료일은 시작일보다 빠를 수 없습니다.");
+    }
+    if (['보고서', '업무일지', '회의록'].includes(type)) {
+        const recs = Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value);
+        if (recs.length === 0) return alert("수신자를 최소 1명 이상 지정해주세요.");
+    } else {
+        if (!app1) return alert("1차 결재자는 필수입니다.");
+        if (app2 && app1 === app2) return alert("1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.");
+    }
+
+    const labelDrafter = (type === '보고서') ? '보고자' : '기안자';
+    const labelDocNum = (type === '보고서') ? '보고서번호' : '문서번호';
+    const paddedId = String(nextDocId).padStart(4, '0');
+    const expectedDocNum = `${docYear}-${type}-${paddedId}`;
+
+    let headerHtml = `<div contenteditable="false">
+        <div style="text-align: center; margin-bottom: 25px;"><h1 style="margin: 0; padding: 10px; font-size: 24px; letter-spacing: 0; color:var(--text-dark, #0f172a);">${type}</h1></div>`;
+
+    const ccs = Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value);
+    const ccHtmlRow = ccs.length > 0 ? `<tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">참조자</th><td style="padding: 8px;">${ccs.join(', ')}</td></tr>` : '';
+    const vacationHtmlRow = type === '휴가원'
+        ? `<tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">휴가기간</th><td style="padding: 8px;">${vacationStart} ~ ${vacationEnd}</td></tr>`
+        : '';
+
+    if (['보고서', '업무일지', '회의록'].includes(type)) {
+        const recs = Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value);
+        headerHtml += `
+        <table style="width: 100%; border: none; margin-bottom: 15px;">
+            <tr>
+                <td style="width: 40%; vertical-align: top; padding: 0; border: none;">
+                    <table border="1" style="width: 100%; border-collapse: collapse; text-align: left; font-size:0.85rem;">
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px; width: 35%;">${labelDrafter}</th><td style="padding: 8px;">${currentUser}</td></tr>
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">기안일자</th><td style="padding: 8px;">${todayStr}</td></tr>
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">${labelDocNum}</th><td style="padding: 8px;">${expectedDocNum}</td></tr>
+                        ${ccHtmlRow}
+                    </table>
+                </td>
+                <td style="width: 20%; border: none;"></td>
+                <td style="width: 40%; vertical-align: top; text-align: right; padding: 0; border: none;">
+                    <table border="1" style="width: 100%; border-collapse: collapse; text-align: left; font-size:0.85rem;">
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px; width: 30%;">수신자</th><td style="padding: 8px; line-height: 1.5;">${recs.join(', ')}</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>`;
+    } else {
+        const app2StampText = app2 || '<span style="font-weight:800; color:#b45309;">전결</span>';
+        headerHtml += `
+        <table style="width: 100%; border: none; margin-bottom: 15px;">
+            <tr>
+                <td style="width: 40%; vertical-align: top; border: none; padding: 0;">
+                    <table border="1" style="width: 100%; border-collapse: collapse; text-align: left; font-size:0.85rem;">
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px; width: 35%;">${labelDrafter}</th><td style="padding: 8px;">${currentUser}</td></tr>
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">기안일자</th><td style="padding: 8px;">${todayStr}</td></tr>
+                        <tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">${labelDocNum}</th><td style="padding: 8px;">${expectedDocNum}</td></tr>
+                        ${vacationHtmlRow}
+                        ${ccHtmlRow}
+                    </table>
+                </td>
+                <td style="width: 20%; border: none;"></td>
+                <td style="width: 40%; vertical-align: top; text-align: right; border: none; padding: 0;">
+                    <table border="1" style="width: 100%; border-collapse: collapse; text-align: center; font-size:0.85rem;">
+                        <tr><th rowspan="2" style="background: var(--widget-bg, #f8fafc); width: 10%;">결<br><br>재</th><th style="background: var(--widget-bg, #f8fafc); padding: 6px; width: 30%;">기안</th><th style="background: var(--widget-bg, #f8fafc); padding: 6px; width: 30%;">1차 승인</th><th style="background: var(--widget-bg, #f8fafc); padding: 6px; width: 30%;">2차 승인</th></tr>
+                        <tr><td id="stamp_drafter" style="height: 70px; vertical-align: middle;">${currentUser}</td><td id="stamp_app1" style="height: 70px; vertical-align: middle;">${app1}</td><td id="stamp_app2" style="height: 70px; vertical-align: middle;">${app2StampText}</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>`;
+    }
+
+    headerHtml += `<table border="1" style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size:0.85rem;"><tr><th style="background: var(--widget-bg, #f8fafc); padding: 12px; width: 15%; text-align: center;">제 목</th><td style="padding: 12px; font-size: 1rem;"><b>${title}</b></td></tr></table><br></div>`;
+
+    const detailContentHtml = referenceDraftContent || '<p><br></p>';
+    let bodyHtml = `
+    <table border="1" style="width:100%; border-collapse:collapse;">
+        <tr>
+            <th style="background:var(--widget-bg, #f8fafc); padding:12px; width:15%; text-align:center;">상세내용</th>
+            <td style="padding:12px; height: 350px; vertical-align: top;">
+                <div class="approval-edit-area">${detailContentHtml}</div>
+            </td>
+        </tr>
+        <tr>
+            <th style="background:var(--widget-bg, #f8fafc); padding:12px; text-align:center;">비고</th>
+            <td style="padding:12px;">
+                <div contenteditable="true" style="width: 100%; min-height: 30px; outline: none; white-space: pre-wrap; word-break: break-all;"></div>
+            </td>
+        </tr>
+        <tr>
+            <th style="background:var(--widget-bg, #f8fafc); padding:12px; text-align:center;">첨부파일</th>
+            <td style="padding:12px; color:var(--text-gray, #64748b);">하단 파일 첨부 영역에 별도 등록</td>
+        </tr>
+    </table>`;
+
+    setEditorHeaderContent(headerHtml);
+    setEditorContent(bodyHtml);
+    document.getElementById('draft-step-1').style.display = 'none';
+    document.getElementById('draft-step-2').style.display = 'block';
+    requestAnimationFrame(() => {
+        const editor = getApprovalEditor();
+        if (editor && editor.initialized) {
+            editor.focus();
+            editor.nodeChanged();
+        }
+    });
+}
+
+async function submitApproval() {
+    const type = document.getElementById('draftType').value;
+    const title = document.getElementById('draftTitle').value;
+    let formData = new FormData();
+    formData.append('doc_type', type);
+    formData.append('title', title);
+    
+    const fullContent = getEditorContent();
+    const docData = { "본문": fullContent };
+    if (type === '휴가원') {
+        const vacationStart = document.getElementById('vacationStartDate').value;
+        const vacationEnd = document.getElementById('vacationEndDate').value;
+        if (!vacationStart || !vacationEnd) return alert('휴가 시작일과 종료일을 선택하세요.');
+        if (vacationEnd < vacationStart) return alert('휴가 종료일은 시작일보다 빠를 수 없습니다.');
+        docData.vacation_start_date = vacationStart;
+        docData.vacation_end_date = vacationEnd;
+        formData.append('vacation_start_date', vacationStart);
+        formData.append('vacation_end_date', vacationEnd);
+    }
+    formData.append('doc_data', JSON.stringify(docData));
+    
+    const ccs = Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value);
+    formData.append('cc_receivers', ccs.join(','));
+
+    if (['보고서', '업무일지', '회의록'].includes(type)) {
+        const recs = Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value);
+        formData.append('receivers', recs.join(','));
+        formData.append('approver_1', ''); formData.append('approver_2', '');
+    } else {
+        const app1 = document.getElementById('app1').value;
+        const app2 = document.getElementById('app2').value;
+        if (!app1) return alert("1차 결재자는 필수입니다.");
+        if (app2 && app1 === app2) return alert("1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.");
+        formData.append('approver_1', app1);
+        formData.append('approver_2', app2);
+        formData.append('receivers', '');
+    }
+
+    selectedFiles.forEach(file => {
+        formData.append('file', file);
+    });
+
+    try {
+        const res = await fetch('/approval/submit', { method: 'POST', body: formData });
+        const d = await res.json();
+        alert(d.message); if(res.ok) location.reload();
+    } catch(e) { alert("상신 중 오류가 발생했습니다."); }
+}
+
+async function openDetailModal(docId) {
+    try {
+        const res = await fetch(`/approval/detail/${docId}`);
+        if(!res.ok) return alert("문서를 불러올 수 없습니다.");
+        const doc = await res.json();
+        const parsed = doc.doc_data ? JSON.parse(doc.doc_data) : {};
+        currentDetailDoc = { ...doc, parsed };
+
+        const docYear = formatDocDate(doc.created_at).substring(0, 4) || new Date().getFullYear();
+        const docNumberStr = `${docYear}-${doc.doc_type}-${String(doc.id).padStart(4, '0')}`;
+        const docDate = formatDocDate(doc.created_at).substring(5, 10);
+
+        document.getElementById('currentDocId').value = doc.id;
+        document.getElementById('dt_type').innerText = `문서번호: ${docNumberStr}`;
+        document.getElementById('dt_status').innerText = doc.status;
+        document.getElementById('dt_status').className = `status-badge st-${doc.status}`;
+
+        let bodyHtml = (parsed['본문'] || "").replace(/자동채번/g, docNumberStr);
+        
+        // 🚀 결재 완료 상세창 첨부파일 렌더링
+        if(doc.filename) {
+            const fileNames = doc.filename.split(',').map(f => f.trim()).filter(f => f);
+            const filePaths = doc.filepath ? doc.filepath.split(',').map(p => p.trim()).filter(p => p) : fileNames;
+            
+            // 향후 서버(백엔드)에서 filesize 데이터를 보내준다면 이 부분에서 처리되어 즉시 나타납니다.
+            const fileSizes = doc.filesize ? String(doc.filesize).split(',').map(s => s.trim()) : [];
+            
+            let fileLinksHtml = `<div style="display:flex; flex-direction:column; gap:8px;">`;
+            
+            fileLinksHtml += fileNames.map((fname, idx) => {
+                // 경로 에러(404) 100% 해결: 
+                // 원본 DB에 저장된 어떠한 경로 형식(/uploads/경로 등)이든 순수 파일명만 정확히 추출하여 절대 경로(/uploads/파일명)로 연결
+                const safeName = (filePaths[idx] || fname).split(/[\/\\]/).pop();
+                const fUrl = `/uploads/${safeName}`;
+                
+                // 백엔드에서 서버 용량 정보가 들어오면 화면에 바로 붙이도록 준비
+                const sizeStr = fileSizes[idx] ? ` <span style="color:var(--text-gray, #94a3b8); font-weight:normal; line-height:1;">(${fileSizes[idx]})</span>` : '';
+                
+                return `
+                    <div style="display:flex; align-items:center;">
+                        <a href="${fUrl}" target="_blank" style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:var(--text-dark, #475569); text-decoration:none; transition:0.2s;" onmouseover="this.style.color='var(--primary-color)';" onmouseout="this.style.color='var(--text-dark)';">
+                            <i class="fa-solid fa-file" style="color:var(--text-gray, #64748b); font-size:1rem; line-height:1;"></i>
+                            <span style="font-weight:600; line-height:1;">${fname}</span>${sizeStr}
+                        </a>
+                    </div>
+                `;
+            }).join('');
+            
+            fileLinksHtml += `</div>`;
+
+            // 과거 문서의 이전 디자인 찌꺼기를 완벽히 날려버리고 새 디자인 코드를 삽입하는 정규식
+            const regex = /(<th[^>]*>첨부파일<\/th>\s*<td[^>]*>)([\s\S]*?)(<\/td>)/;
+            if (regex.test(bodyHtml)) {
+                bodyHtml = bodyHtml.replace(regex, `$1${fileLinksHtml}$3`);
+            } else {
+                bodyHtml = bodyHtml.replace('하단 파일 첨부 영역에 별도 등록', fileLinksHtml);
+                bodyHtml = bodyHtml.replace('상신 시 자동 첨부됨', fileLinksHtml);
+            }
+        } else {
+            const noFileHtml = '<span style="color:var(--text-gray, #94a3b8); font-size:0.85rem; font-weight:700;">첨부파일 없음</span>';
+            const regex = /(<th[^>]*>첨부파일<\/th>\s*<td[^>]*>)([\s\S]*?)(<\/td>)/;
+            if (regex.test(bodyHtml)) {
+                bodyHtml = bodyHtml.replace(regex, `$1${noFileHtml}$3`);
+            } else {
+                bodyHtml = bodyHtml.replace('하단 파일 첨부 영역에 별도 등록', noFileHtml);
+                bodyHtml = bodyHtml.replace('상신 시 자동 첨부됨', noFileHtml);
+            }
+        }
+
+        const box = document.getElementById('dt_dynamic_box');
+        box.innerHTML = `<div>${bodyHtml}</div>`;
+
+        const stampStyle = "color:#dc2626; border:3px solid #dc2626; padding:4px 6px; border-radius:6px; display:inline-block; line-height:1.2; font-weight:bold; background:var(--input-bg, white); font-size: 0.75rem; margin-top:5px; white-space:nowrap;";
+        
+        const drafterNodes = document.querySelectorAll('#stamp_drafter');
+        if (drafterNodes.length > 1) {
+            drafterNodes[0].innerHTML = doc.drafter;
+            drafterNodes[1].innerHTML = `<div style="${stampStyle}">${doc.drafter}<br><span style="font-size:0.75rem; font-weight:normal;">${docDate}</span></div>`;
+        } else if (drafterNodes.length === 1) {
+            drafterNodes[0].innerHTML = `<div style="${stampStyle}">${doc.drafter}<br><span style="font-size:0.75rem; font-weight:normal;">${docDate}</span></div>`;
+        }
+
+        ['app1', 'app2'].forEach((key, idx) => {
+            const td = document.getElementById(`stamp_${key}`);
+            const appName = doc[`approver_${idx+1}`];
+            if(td && appName) {
+                if(doc.status === (idx === 0 ? '1차승인' : '완료') || doc.status === '완료') {
+                    let d = parsed[`${key}_date`] || formatDocDate(doc.updated_at || doc.created_at);
+                    td.innerHTML = `<div style="${stampStyle}">${appName}<br><span style="font-size:0.75rem; font-weight:normal;">${d.substring(5,10)}</span></div>`;
+                }
+            }
+        });
+
+        const secondStampCell = document.getElementById('stamp_app2');
+        if (secondStampCell && !doc.approver_2 && !['보고서', '업무일지', '회의록'].includes(doc.doc_type)) {
+            secondStampCell.innerHTML = '<span style="font-weight:800; color:#b45309;">전결</span>';
+        }
+
+        const isApp1 = (doc.status === '대기' && doc.approver_1 === currentUser);
+        const isApp2 = (doc.status === '1차승인' && doc.approver_2 === currentUser);
+        document.getElementById('actionArea').style.display = (isApp1 || isApp2) ? 'block' : 'none';
+        document.getElementById('referenceArea').style.display = doc.status === '완료' ? 'block' : 'none';
+        
+        const detailModal = document.getElementById('detailModal');
+        detailModal.style.display = 'block';
+        
+        document.getElementById('detailModalContent').scrollTop = 0;
+        
+    } catch(e) {}
+}
+
+function extractReferenceDetailContent(html) {
+    const fallback = '<p><br></p>';
+    if (!html) return fallback;
+
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const rows = Array.from(doc.querySelectorAll('tr'));
+    const detailRow = rows.find(row => {
+        const header = row.querySelector('th');
+        return header && header.textContent.trim() === '상세내용';
+    });
+
+    if (!detailRow) return fallback;
+    const detailCell = detailRow.querySelector('td');
+    if (!detailCell) return fallback;
+
+    const editableArea = detailCell.querySelector('.approval-edit-area');
+    const content = editableArea ? editableArea.innerHTML.trim() : detailCell.innerHTML.trim();
+    return content || fallback;
+}
+
+function createDraftFromReference() {
+    if (!currentDetailDoc || currentDetailDoc.status !== '완료') return;
+
+    const originalBody = currentDetailDoc.parsed ? currentDetailDoc.parsed['본문'] : '';
+    referenceDraftContent = extractReferenceDetailContent(originalBody);
+
+    closeDetailModal();
+    openDraftModal(currentDetailDoc.doc_type || '기안서', true);
+    document.getElementById('draftTitle').value = currentDetailDoc.title || '';
+    document.getElementById('draftModalContent').scrollTop = 0;
+}
+
+async function processApproval(actionStr) {
+    const docId = document.getElementById('currentDocId').value;
+    if(!confirm(actionStr === 'approve' ? "결재를 승인하시겠습니까?" : "결재를 반려하시겠습니까?")) return;
+    try {
+        const res = await fetch(`/approval/action/${docId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionStr }) });
+        if(res.ok) { alert("처리되었습니다."); location.reload(); }
+    } catch(e) {}
+}
+</script>
+{% endblock %}

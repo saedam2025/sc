@@ -1,0 +1,1198 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.ckeditor.com/4.22.1/standard-all/ckeditor.js"></script>
+
+<style>
+    /* 💡 기존 로컬 변수를 로그인/글로벌 테마 변수로 매핑 */
+    :root {
+        --saedam-blue: var(--primary-color, #004ea2);
+        --saedam-navy: var(--primary-dark, #002c63);
+        --saedam-green: #28a745; /* 고정 색상 유지 (완료 건수 등) */
+        --bg-light: var(--widget-bg, #f4f7fa);
+        --border-color: var(--card-border, #d1d8e0);
+        --text-dark: var(--text-dark, #333);
+    }
+
+    .admin-container {
+        width: 100%;
+        max-width: none;
+        margin: 20px auto;
+        background: var(--card-bg, #fff);
+        padding: 25px;
+        box-shadow: var(--card-shadow, 0 4px 20px rgba(0, 0, 0, 0.08));
+        border: 1px solid var(--card-border, transparent);
+        border-top: 5px solid var(--saedam-navy);
+        border-radius: 12px;
+        color: var(--text-dark);
+        box-sizing: border-box;
+    }
+
+    .admin-header {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color, #f1f3f5);
+    }
+    .admin-header h2 { margin: 0; color: var(--saedam-navy); font-size: 1.5rem; font-weight: 800; }
+
+   .btn-add-toggle {
+        background: var(--input-bg, #ffffff);
+        color: var(--text-dark, #475569); 
+        padding: 9px 18px; 
+        border-radius: 8px;
+        font-size: 0.9rem; 
+        font-weight: 700; 
+        border: 1px solid var(--border-color, #cbd5e1); 
+        cursor: pointer; 
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .btn-add-toggle:hover { 
+        background: var(--widget-hover, #f8fafc);
+        border-color: var(--saedam-blue);
+        color: var(--saedam-blue);
+        transform: translateY(-1px); 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+    }
+
+    .input-section { 
+        background: var(--card-bg, #fdfdfd); 
+        border: 1px solid var(--saedam-blue); 
+        border-radius: 12px; 
+        padding: 25px; 
+        margin-bottom: 25px; 
+        display: none; 
+    }
+    .input-grid { 
+        display: grid; 
+        grid-template-columns: repeat(5, 1fr); 
+        gap: 15px 20px; 
+        margin-bottom: 20px; 
+    }
+    .input-group { display: flex; flex-direction: column; gap: 6px; }
+    .input-group label { font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); }
+    .input-group input, .input-group select { 
+        padding: 10px; 
+        background: var(--input-bg, #fff);
+        color: var(--text-dark);
+        border: 1px solid var(--border-color); 
+        border-radius: 6px; 
+        font-size: 0.85rem;
+    }
+
+    .table-wrapper { width: 100%; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg, #fff); margin-bottom: 20px; overflow-x: auto;}
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1000px; }
+    th, td { padding: 10px 4px; font-size: 0.75rem; border-bottom: 1px solid var(--border-color); text-align: center; color: var(--text-dark); }
+    th { background: var(--widget-bg, #f1f5f9); color: var(--saedam-navy); font-weight: 700; }
+
+    .col-chk { width: 35px; }
+    .col-num { width: 45px; }
+    .col-year { width: 55px; }
+    .col-cat { width: 95px; }
+    .col-school { width: 110px; }
+    .col-dept { width: 100px; }
+    .col-name { width: 80px; }
+    .col-ssn { width: 110px; }
+    .col-date { width: 140px; }
+
+    .name-click {
+        color: var(--saedam-blue); font-weight: 700; cursor: pointer; text-decoration: underline;
+        padding: 4px 8px; border-radius: 4px;
+    }
+    .name-click:hover { background-color: var(--primary-light, #e7f1ff); }
+
+    .detail-row { display: none; background-color: var(--card-bg, #fcfdfe); }
+    .detail-content-box { padding: 20px; border-bottom: 2px solid var(--border-color, #eee); }
+
+    .inner-detail-table { 
+        width: 100%; 
+        table-layout: auto; 
+        border: 2px solid var(--saedam-navy); 
+        background: var(--input-bg, #fff);
+    }
+    .inner-detail-table th, .inner-detail-table td {
+        padding: 8px 12px; border: 1px solid var(--border-color, #e2e8f0); text-align: left;
+    }
+    .inner-detail-table th { background: var(--widget-bg, #f8fafc); color: var(--text-gray, #475569); font-size: 0.72rem; width: 15%; }
+    .inner-detail-table td { color: var(--text-dark, #1e293b); font-weight: 600; font-size: 0.75rem; width: 35%; }
+
+    tbody tr:hover:not(.detail-row) { background-color: var(--widget-hover, #f8faff); }
+    .status-off { color: #dc3545; background: #fff5f5; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; }
+    .status-preview { color: #137333; background: #e6f4ea; padding: 4px 6px; border-radius: 4px; font-weight: bold; font-size: 0.7rem; text-decoration: none; margin-left: 4px; display: inline-block; }
+    .pdf-link { color: var(--saedam-blue); text-decoration: underline; font-weight: 600; }
+    
+    .filter-bar { background: var(--card-bg, #fff); padding: 12px; margin-bottom: 20px; border: 1px solid var(--border-color); display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; border-radius: 8px; }
+    .filter-group { display: flex; flex-direction: column; gap: 4px; }
+    .filter-group label { font-size: 0.7rem; font-weight: bold; color: var(--text-gray, #666); }
+    .filter-bar select, .filter-bar input { background: var(--input-bg, #fff); color: var(--text-dark); padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.8rem; min-width: 100px; height: 32px; box-sizing: border-box; }
+    
+    .pagination { margin-top: 25px; display: flex; justify-content: center; gap: 5px; }
+    .pagination a { padding: 6px 12px; text-decoration: none; color: var(--saedam-navy); border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; }
+    .pagination a.active { background: var(--saedam-navy); color: #fff; }
+
+    .dashboard-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 25px;
+    }
+    .stat-card {
+        background: var(--card-bg, #fff);
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    }
+    .stat-card h4 { margin: 0; color: var(--text-gray, #64748b); font-size: 0.85rem; font-weight: 600; }
+    .stat-card .value { font-size: 1.8rem; font-weight: 800; margin: 10px 0; color: var(--saedam-navy); }
+    .stat-card .percent-bar { height: 8px; background: var(--border-color, #e2e8f0); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .stat-card .percent-fill { height: 100%; background: var(--saedam-blue); width: 0%; transition: width 1s ease-in-out; }
+    .color-green { color: var(--saedam-green) !important; }
+    .color-red { color: #dc3545 !important; }
+
+    .modal-overlay {
+        display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+        background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; align-items:center;
+    }
+    .modal-box {
+        background: var(--card-bg, #fff); color: var(--text-dark); width:450px; padding:30px; border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2); border: 1px solid var(--border-color);
+    }
+    .cat-list-wrap { max-height: 250px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border-color, #ddd); padding: 10px; border-radius: 8px; }
+    .cat-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color, #eee); }
+    .cat-item:last-child { border-bottom: none; }
+    .btn-del { background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+    .cat-add-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .cat-add-row input { flex: 1; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 6px; background: var(--input-bg, #fff); color: var(--text-dark); }
+    .btn-add-cat { background: var(--saedam-navy); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+    
+    .company-setting-card { background: var(--widget-bg, #f8fbff); border: 1px solid var(--border-color, #cfe2ff); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+    .company-setting-title { margin: 0 0 12px 0; color: var(--saedam-navy); font-size: 0.98rem; font-weight: 800; }
+    .stamp-preview-box { display: flex; align-items: center; justify-content: center; width: 110px; height: 80px; border: 1px dashed var(--border-color, #9db6d8); border-radius: 8px; background: var(--input-bg, #fff); overflow: hidden; font-size: 0.75rem; color: var(--text-gray, #64748b); }
+    .stamp-preview-box img { max-width: 95px; max-height: 70px; display: none; }
+    .company-setting-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .company-setting-sub { font-size: 0.78rem; color: var(--text-gray, #64748b); line-height: 1.45; font-weight: 500; }
+    .company-profile-table-wrap { border: 1px solid var(--border-color, #dbe6f3); border-radius: 10px; overflow: hidden; background: var(--card-bg, #fff); margin-bottom: 14px; }
+    .company-profile-table { width: 100%; min-width: 780px; border-collapse: collapse; table-layout: fixed; }
+    .company-profile-table th { background: var(--widget-bg, #f1f5f9); color: var(--saedam-navy); font-size: 0.74rem; padding: 9px 8px; border-bottom: 1px solid var(--border-color, #dbe6f3); text-align: center; }
+    .company-profile-table td { font-size: 0.78rem; padding: 9px 8px; border-bottom: 1px solid var(--border-color, #eef2f7); text-align: center; color: var(--text-dark, #1e293b); vertical-align: middle; word-break: break-all; }
+    .company-profile-table tr:last-child td { border-bottom: none; }
+    .company-profile-row { cursor: pointer; transition: background 0.15s ease; }
+    .company-profile-row:hover { background: var(--widget-hover, #f8fbff); }
+    .company-profile-row.active { background: color-mix(in srgb, var(--saedam-blue) 10%, transparent); }
+    .company-profile-row.active td:first-child { box-shadow: inset 4px 0 0 var(--saedam-blue); }
+    .company-stamp-thumb { width: 54px; height: 42px; object-fit: contain; border: 1px solid var(--border-color, #e2e8f0); border-radius: 6px; background: var(--input-bg, #fff); padding: 3px; }
+    .company-stamp-empty { display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 42px; border: 1px dashed var(--border-color, #cbd5e1); border-radius: 6px; color: var(--text-gray, #94a3b8); font-size: 0.68rem; background: var(--input-bg, #fff); }
+    .company-form-panel { background: var(--input-bg, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 10px; padding: 14px; }
+    .company-form-title { font-size: 0.84rem; font-weight: 800; color: var(--saedam-navy); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .company-btn-row { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 12px; }
+    .company-mini-btn { border: none; border-radius: 6px; padding: 7px 10px; font-size: 0.72rem; font-weight: 700; cursor: pointer; color: #fff; }
+</style>
+
+<div class="admin-container">
+    <div class="admin-header">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+            <h2>📝 새담 인재 계약관리 시스템</h2>
+            <div style="font-size: 0.85rem; color: var(--text-gray, #64748b); font-weight: 600;">
+                <i class="fa-solid fa-user-shield"></i> 
+                현재 관리자: <span style="color: var(--saedam-navy);">{{ session.get('user_name') }} ({{ session.get('role') }})</span>
+            </div>
+        </div>
+
+     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+            <input type="file" id="excelFile" accept=".xlsx, .xls" style="display: none;" onchange="uploadExcelFile()">
+            <button type="button" class="btn-add-toggle" onclick="document.getElementById('excelFile').click()">📂 엑셀 업로드</button>
+            <button type="button" class="btn-add-toggle" onclick="toggleInputForm()">+ 신규 등록</button>
+            <button type="button" class="btn-add-toggle" onclick="openCategoryModal()">⚙️ 계약구분 관리</button>
+            <button type="button" class="btn-add-toggle" onclick="toggleTermsForm()">📝 양식 관리</button>
+            <button type="button" class="btn-add-toggle" onclick="window.open('/contract', '_blank')">📝 계약로그인</button>
+        </div>
+    </div>
+
+    <div class="dashboard-container" id="statsDashboard">
+        <div class="stat-card">
+            <h4>총 계약 대상</h4>
+            <div class="value">{{ total_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>계약 완료</h4>
+            <div class="value color-green">{{ completed_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>미작성 대기</h4>
+            <div class="value color-red">{{ pending_count }}건</div>
+        </div>
+        <div class="stat-card">
+            <h4>전체 완료율</h4>
+            <div class="value">{{ completion_rate }}%</div>
+            <div class="percent-bar">
+                <div class="percent-fill" style="width: {{ completion_rate }}%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="inputForm" class="input-section">
+        <h3 style="margin-top:0; margin-bottom:15px; font-size: 1.05rem; color: var(--saedam-navy);">새로운 계약 정보 입력</h3>
+        <div class="input-grid">
+            <div class="input-group">
+                <label>계약구분</label>
+                <select id="new-category">
+                    {% for cat in categories_list %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="input-group"><label>수탁학교명</label><input type="text" id="new-school" placeholder="학교명"></div>
+            <div class="input-group"><label>부서명</label><input type="text" id="new-dept" placeholder="과목/직책"></div>
+            <div class="input-group"><label>강사명</label><input type="text" id="new-name" placeholder="성함"></div>
+            <div class="input-group"><label>주민번호</label><input type="text" id="new-ssn" placeholder="주민번호"></div>
+            
+            <div class="input-group"><label>수수료/급여</label><input type="text" id="new-fee" placeholder="0"></div>
+            <div class="input-group"><label>비고1 (수수료)</label><input type="text" id="new-note1" placeholder="비고1"></div>
+            
+            <div class="input-group"><label>보조금</label><input type="text" id="new-subsidy" placeholder="0"></div>
+            <div class="input-group"><label>비고2 (보조금)</label><input type="text" id="new-note2" placeholder="비고2"></div>
+            
+            <div class="input-group"><label>경력수당</label><input type="text" id="new-career" placeholder="0"></div>
+            <div class="input-group"><label>비고3 (경력)</label><input type="text" id="new-note3" placeholder="비고3"></div>
+            
+            <div class="input-group"><label>직책수당</label><input type="text" id="new-position" placeholder="0"></div>
+            <div class="input-group"><label>비고4 (직책)</label><input type="text" id="new-note4" placeholder="비고4"></div>
+            
+            <div class="input-group"><label>기타</label><input type="text" id="new-etc" placeholder="0"></div>
+            <div class="input-group"><label>근무시간</label><input type="text" id="new-work-time" placeholder="예: 주 5일"></div>
+            <div class="input-group"><label>계약기간</label><input type="text" id="new-period" placeholder="예: 2026.03.01~"></div>
+        </div>
+        <button type="button" style="background:var(--saedam-navy); color:white; border:none; width:100%; height:42px; border-radius:6px; cursor:pointer; font-weight:600; font-size: 0.9rem;" onclick="addNewLecturer()">계약 정보 저장하기</button>
+    </div>
+
+    <div id="termsForm" class="input-section" style="border-color: var(--saedam-blue);">
+        <h3 style="margin-top:0; margin-bottom:15px; font-size: 1.05rem; color: var(--saedam-navy);">계약서 양식 편집 및 미리보기</h3>
+
+        <div class="company-setting-card">
+            <div class="company-setting-head">
+                <div>
+                    <div class="company-setting-title">회사 정보 / 도장 설정</div>
+                    <div class="company-setting-sub">등록된 회사 정보를 한눈에 보고 선택할 수 있습니다. 선택된 세트가 새로 작성되는 계약서 PDF에 적용됩니다.</div>
+                </div>
+                <button type="button" style="background:var(--text-gray, #475569); color:white; border:none; padding:9px 14px; border-radius:7px; font-weight:700; cursor:pointer;" onclick="addCompanyProfile()">+ 새 회사 세트</button>
+            </div>
+
+            <select id="company-profile-select" onchange="onCompanyProfileChange()" style="display:none;"></select>
+
+            <div class="company-profile-table-wrap">
+                <table class="company-profile-table">
+                    <colgroup>
+                        <col style="width: 72px;">
+                        <col style="width: 150px;">
+                        <col style="width: 260px;">
+                        <col style="width: 120px;">
+                        <col style="width: 120px;">
+                        <col style="width: 90px;">
+                        <col style="width: 140px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>선택</th>
+                            <th>세트명</th>
+                            <th>회사명</th>
+                            <th>대표직함</th>
+                            <th>대표자명</th>
+                            <th>도장</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="company-profile-table-body">
+                        <tr>
+                            <td colspan="7" style="padding:18px; color:var(--text-gray, #64748b);">회사 정보를 불러오는 중입니다.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="company-form-panel">
+                <div class="company-form-title">
+                    <span id="company-form-title-text">선택한 회사 정보 수정</span>
+                    <span style="font-size:0.72rem; color:var(--text-gray, #64748b); font-weight:600;">최대 3세트 등록 가능 · 도장 저장 위치: /mnt/data/company_stamps</span>
+                </div>
+
+                <div class="input-grid" style="grid-template-columns: 1fr 1.5fr 1fr 1fr; align-items: end; margin-bottom: 12px;">
+                    <div class="input-group">
+                        <label>세트명</label>
+                        <input type="text" id="company-profile-label" placeholder="예: 새담 본원">
+                    </div>
+                    <div class="input-group">
+                        <label>계약서 회사명</label>
+                        <input type="text" id="company-name" placeholder="예: (사)새담청소년교육문화원">
+                    </div>
+                    <div class="input-group">
+                        <label>대표 직함</label>
+                        <input type="text" id="representative-title" placeholder="예: 이사장">
+                    </div>
+                    <div class="input-group">
+                        <label>대표자명</label>
+                        <input type="text" id="representative-name" placeholder="선택 입력">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <div class="stamp-preview-box">
+                            <span id="stamp-empty-text">등록된 도장 없음</span>
+                            <img id="stamp-preview" src="" alt="도장 미리보기">
+                        </div>
+                        <div class="input-group" style="min-width:260px;">
+                            <label>회사 도장 이미지 변경</label>
+                            <input type="file" id="company-stamp-file" accept="image/png,image/jpeg">
+                        </div>
+                    </div>
+
+                    <div class="company-btn-row">
+                        <button type="button" class="company-mini-btn" style="background:var(--saedam-blue);" onclick="saveCompanySettings('save')">저장 / 선택 적용</button>
+                        <button type="button" class="company-mini-btn" style="background:#dc3545;" onclick="deleteCompanyProfile()">선택 세트 삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display:grid; grid-template-columns: 260px 1fr; gap:14px; align-items:end; margin-bottom:15px;">
+            <div>
+                <label style="display:block; font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); margin-bottom:5px;">계약구분 선택</label>
+                <select id="term-category" onchange="loadTerms()" style="width:100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-dark);">
+                    {% for cat in categories_list %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label style="display:block; font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); margin-bottom:5px;">계약서 제목</label>
+                <input type="text" id="contract-title" placeholder="계약서 제목" style="width:100%; padding:8px; border-radius:4px; border:1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-dark); box-sizing:border-box;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 20px;">
+            <div style="flex: 1; max-width: 50%;">
+                <label style="display:block; font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); margin-bottom: 5px;">내용 1 (첫 번째 페이지)</label>
+                <textarea id="term-content1" name="term-content1"></textarea>
+            </div>
+            <div style="flex: 1; max-width: 50%;">
+                <label style="display:block; font-size: 0.8rem; font-weight: 700; color: var(--saedam-navy); margin-bottom: 5px;">내용 2 (두 번째 페이지)</label>
+                <textarea id="term-content2" name="term-content2"></textarea>
+            </div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px dashed var(--border-color, #ccc); margin: 20px 0;">
+        
+        <h4 style="margin-top:0; font-size: 0.95rem; color: var(--text-gray, #555);">미리보기용 가상 데이터 입력</h4>
+        <div class="input-grid">
+            <div class="input-group"><label>성명</label><input type="text" id="preview-name" value="배호영"></div>
+            <div class="input-group"><label>주민번호</label><input type="text" id="preview-ssn" value="720130-*******"></div>
+            <div class="input-group"><label>수탁학교명</label><input type="text" id="preview-school" value="용인 청곡초등학교"></div>
+            <div class="input-group"><label>부서명/직책</label><input type="text" id="preview-dept" value="소프트웨어/파이썬"></div>
+            
+            <div class="input-group"><label>수수료/급여</label><input type="text" id="preview-fee" value="3000000"></div>
+            <div class="input-group"><label>비고1 (수수료)</label><input type="text" id="preview-note1" placeholder="비고1"></div>
+            
+            <div class="input-group"><label>보조금</label><input type="text" id="preview-subsidy" value="0"></div>
+            <div class="input-group"><label>비고2 (보조금)</label><input type="text" id="preview-note2" placeholder="비고2"></div>
+            
+            <div class="input-group"><label>경력수당</label><input type="text" id="preview-career" value="0"></div>
+            <div class="input-group"><label>비고3 (경력)</label><input type="text" id="preview-note3" placeholder="비고3"></div>
+            
+            <div class="input-group"><label>직책수당</label><input type="text" id="preview-position" value="0"></div>
+            <div class="input-group"><label>비고4 (직책)</label><input type="text" id="preview-note4" placeholder="비고4"></div>
+            
+            <div class="input-group"><label>기타</label><input type="text" id="preview-etc" value="0"></div>
+            <div class="input-group"><label>계약기간</label><input type="text" id="preview-period" value="2026.03.01 ~ 2027.02.28"></div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+            <button type="button" style="flex: 1; background: var(--saedam-blue); color: white; border: none; height: 42px; border-radius: 6px; font-weight: 600; cursor: pointer;" onclick="previewTerms()">새 창에서 미리보기</button>
+            <button type="button" style="flex: 1; background: var(--saedam-navy); color: white; border: none; height: 42px; border-radius: 6px; font-weight: 600; cursor: pointer;" onclick="saveTerms()">양식 저장하기</button>
+        </div>
+    </div>
+
+    <form class="filter-bar" method="GET" action="/contract/admin">
+        <div class="filter-group">
+            <label>연도</label>
+            <select name="year">
+                <option value="">전체</option>
+                {% for y in years %}
+                <option value="{{y}}" {% if request.args.get('year') == y %}selected{% endif %}>{{y}}년</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>계약구분</label>
+            <select name="category">
+                <option value="">전체 구분</option>
+                <option value="미작성" {% if request.args.get('category') == '미작성' %}selected{% endif %}>🔴 미작성</option>
+                <option disabled>──────────</option>
+                {% for cat in categories_list %}
+                <option value="{{cat}}" {% if request.args.get('category') == cat %}selected{% endif %}>{{cat}}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>수탁학교명</label>
+            <select name="school">
+                <option value="">전체 학교</option>
+                {% for s in schools %}
+                <option value="{{s}}" {% if request.args.get('school') == s %}selected{% endif %}>{{s}}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>부서명/직책</label>
+            <select name="dept">
+                <option value="">부서명/직책</option>
+                {% for d in depts %}
+                <option value="{{d}}" {% if request.args.get('dept') == d %}selected{% endif %}>{{d}}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>성명</label>
+            <input type="text" name="name" placeholder="성명 입력" value="{{ request.args.get('name', '') }}">
+        </div>
+
+        <div style="display: flex; gap: 5px; align-items: center; height: 32px; box-sizing: border-box;">
+            <button type="submit" style="background: var(--saedam-blue); color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; height: 100%;">조회</button>
+            <button type="button" onclick="location.href='/contract/admin'" style="background: var(--text-gray, #64748b); color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; height: 100%;">초기화</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-left: auto; align-items: center; height: 32px;">
+            <button type="button" onclick="sendRemindMail()" style="background:#f39c12; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: bold; height: 100%;">📧 독촉메일전송</button>
+            <button type="button" onclick="deleteSelected()" style="background:#dc3545; color: white; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; height: 100%;">선택 삭제</button>
+            
+            <select id="download-page-range" style="padding: 0 5px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.8rem; height: 100%; background: var(--input-bg, #fff); color: var(--text-dark);">
+                <option value="all">전체 페이지</option>
+                <option value="1-2">1~2번 페이지만</option>
+            </select>
+            <button type="button" onclick="downloadSelected()" class="btn-download" style="background:#28a745; color:white; border:none; padding:0 15px; border-radius:4px; cursor:pointer; font-weight: bold; font-size: 0.8rem; height: 100%;">선택 항목 다운로드(ZIP)</button>
+        </div>
+    </form>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-chk"><input type="checkbox" id="check-all"></th>
+                    <th class="col-num">번호</th>
+                    <th class="col-year">연도</th>
+                    <th class="col-cat">계약구분</th>
+                    <th class="col-school">수탁학교명</th>
+                    <th class="col-dept">부서명</th>
+                    <th class="col-name">성명 (클릭)</th>
+                    <th class="col-ssn">주민번호</th>
+                    <th class="col-date">완료일</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td><input type="checkbox" class="chk" value="{{ item.orig_idx }}"></td>
+                    <td>{{ loop.index + (current_page - 1) * 10 }}</td>
+                    <td>
+                        {% set display_year = item.연도 | string | replace(".0", "") | trim %}
+                        {{ display_year if display_year and display_year != "" else "-" }}
+                    </td>
+                    <td>{{ item.계약구분 }}</td>
+                    <td>{{ item.수탁학교명 }}</td>
+                    <td>{{ item.부서명 }}</td>
+                    <td><span class="name-click" onclick="toggleRowDetail('detail-{{ loop.index }}')">{{ item.성명 }}</span></td>
+                    <td>{{ item.주민번호 }}</td>
+                    <td>
+                        {% if item.계약완료일시 %}
+                        <a href="{{ url_for('contract.download_pdf', idx=item.orig_idx) }}" target="_blank" class="pdf-link">{{ item.계약완료일시 }}</a>
+                        {% else %}
+                        <span class="status-off">미작성</span>
+                        <a href="{{ url_for('contract.preview_pdf', idx=item.orig_idx) }}" target="_blank" class="status-preview">미리보기</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr id="detail-{{ loop.index }}" class="detail-row">
+                    <td colspan="9">
+                        <div class="detail-content-box">
+                            #{{ item.성명 }}님의 상세정보
+                            <table class="inner-detail-table">
+                                <tr>
+                                    <th>수수료</th><td>{{ item.수수료 or '0' }}</td>
+                                    <th>보조금</th><td>{{ item.보조금 or '0' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>경력수당</th><td>{{ item.경력수당 or '0' }}</td>
+                                    <th>직책수당</th><td>{{ item.직책수당 or '0' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>기타</th><td>{{ item.기타 or '0' }}</td>
+                                    <th>근무시간</th><td>{{ item.근무시간 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>계약기간</th><td>{{ item.계약기간 or '-' }}</td>
+                                    <th>이메일</th><td>{{ item.email or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>비고1</th><td>{{ item.비고1 or '-' }}</td>
+                                    <th>비고2</th><td>{{ item.비고2 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>비고3</th><td>{{ item.비고3 or '-' }}</td>
+                                    <th>비고4</th><td>{{ item.비고4 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>연락처</th><td>{{ item.연락처 or '-' }}</td>
+                                    <th>거주지</th><td>{{ item.거주지 or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th>접속 IP</th>
+                                    <td colspan="3">{{ item.IP or '-' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div id="customModalOverlay" class="modal-overlay">
+        <div class="modal-box" style="text-align:center; width:380px;">
+            <div style="font-size: 50px; margin-bottom: 20px;">🚨</div>
+            <h3 style="margin:0 0 15px 0; font-size: 1.2rem; color: var(--text-dark, #1e293b);">데이터 삭제 최종 확인</h3>
+            <p id="modalMessage" style="color: var(--text-gray, #64748b); line-height: 1.6; margin-bottom: 25px; font-size: 0.95rem;">
+                정말로 삭제하시겠습니까?<br>삭제된 데이터는 복구할 수 없습니다.
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeDeleteModal()" style="flex:1; padding:12px; border:none; border-radius:12px; background:var(--widget-bg, #f1f3f5); color:var(--text-dark, #495057); font-weight:600; cursor:pointer;">취소</button>
+                <button id="finalDeleteBtn" style="flex:1; padding:12px; border:none; border-radius:12px; background:var(--saedam-blue); color:#fff; font-weight:600; cursor:pointer;">확인했어요</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="categoryModalOverlay" class="modal-overlay">
+        <div class="modal-box">
+            <h3 style="margin-top:0; color: var(--saedam-navy);">계약구분 항목 관리</h3>
+            <div class="cat-list-wrap" id="categoryListContainer"></div>
+            <div class="cat-add-row">
+                <input type="text" id="newCategoryName" placeholder="새 계약구분 입력">
+                <button type="button" class="btn-add-cat" onclick="addCategory()">추가</button>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="closeCategoryModal()" style="flex:1; padding:10px; border:none; border-radius:8px; background:var(--widget-bg, #f1f3f5); font-weight:600; cursor:pointer; color: var(--text-dark);">취소</button>
+                <button onclick="saveCategories()" style="flex:1; padding:10px; border:none; border-radius:8px; background:var(--saedam-blue); color:#fff; font-weight:600; cursor:pointer;">저장 및 적용</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="pagination">
+        <a href="{{ url_for('contract.admin_page', page=1, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">«</a>
+        <a href="{{ url_for('contract.admin_page', page=prev_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:var(--widget-bg, #f8f9fa); font-weight:bold;">Prev 10</a>
+        {% for p in range(start_page, end_page + 1) %}
+        <a href="{{ url_for('contract.admin_page', page=p, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" class="{{ 'active' if p == current_page else '' }}">{{p}}</a>
+        {% endfor %}
+        <a href="{{ url_for('contract.admin_page', page=next_block, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}" style="background:var(--widget-bg, #f8f9fa); font-weight:bold;">Next 10</a>
+        <a href="{{ url_for('contract.admin_page', page=total_pages, year=request.args.get('year'), category=request.args.get('category'), school=request.args.get('school'), dept=request.args.get('dept'), name=request.args.get('name')) }}">»</a>
+    </div>
+</div>
+
+<script>
+    // --- [통계 대시보드 토글 함수 추가] ---
+    function toggleStatsDashboard() {
+        const dashboard = document.getElementById('statsDashboard');
+        if (dashboard.style.display === 'none' || dashboard.style.display === '') {
+            dashboard.style.display = 'grid';
+        } else {
+            dashboard.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('contextmenu', function(e) { 
+        if (e.target.closest && e.target.closest('.cke')) return true;
+        e.preventDefault(); 
+        alert('보안 정책에 따라 우클릭을 사용할 수 없습니다.'); 
+    });
+    document.onkeydown = function(e) {
+        if (e.keyCode == 123 || 
+           (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74)) || 
+           (e.ctrlKey && (e.keyCode == 85 || e.keyCode == 83))) { return false; }
+    };
+    document.onselectstart = function(e) { 
+        if (e.target) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'IFRAME' || e.target.isContentEditable) {
+                return true;
+            }
+            if (e.target.closest && e.target.closest('.cke')) {
+                return true;
+            }
+        }
+        return false; 
+    };
+
+    function toggleRowDetail(rowId) {
+        const row = document.getElementById(rowId);
+        const allDetailRows = document.querySelectorAll('.detail-row');
+        allDetailRows.forEach(r => { if (r.id !== rowId) r.style.display = 'none'; });
+        row.style.display = (row.style.display === 'table-row') ? 'none' : 'table-row';
+    }
+
+    const checkAll = document.getElementById('check-all');
+    if (checkAll) { checkAll.onclick = function() { document.querySelectorAll('.chk').forEach(c => c.checked = this.checked); }; }
+
+    function toggleInputForm() {
+        const form = document.getElementById('inputForm');
+        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
+        document.getElementById('termsForm').style.display = 'none';
+    }
+
+    function addNewLecturer() {
+        const payload = {
+            계약구분: document.getElementById('new-category').value,
+            수탁학교명: document.getElementById('new-school').value,
+            부서명: document.getElementById('new-dept').value,
+            성명: document.getElementById('new-name').value,
+            주민번호: document.getElementById('new-ssn').value,
+            수수료: document.getElementById('new-fee').value || 0,
+            보조금: document.getElementById('new-subsidy').value || 0,
+            경력수당: document.getElementById('new-career').value || 0,
+            직책수당: document.getElementById('new-position').value || 0,
+            기타: document.getElementById('new-etc').value || 0,
+            근무시간: document.getElementById('new-work-time').value,
+            계약기간: document.getElementById('new-period').value,
+            비고1: document.getElementById('new-note1').value,
+            비고2: document.getElementById('new-note2').value,
+            비고3: document.getElementById('new-note3').value,
+            비고4: document.getElementById('new-note4').value
+        };
+
+        if (!payload.성명) { alert("성명을 입력해주세요."); return; }
+
+        fetch('/contract/admin/add', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(payload) 
+        })
+        .then(res => res.json())
+        .then(data => { if (data.status === 'success') location.reload(); });
+    }
+
+    let selectedIdsForDelete = [];
+
+    function deleteSelected() {
+        const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+        if (selected.length === 0) { alert("삭제할 항목을 선택해 주세요."); return; }
+        selectedIdsForDelete = selected;
+        openDeleteModal(selected.length);
+    }
+
+    function openDeleteModal(count) {
+        document.getElementById('customModalOverlay').style.display = 'flex';
+        document.getElementById('modalMessage').innerHTML = `선택하신 <b>${count}건</b>의 정보를 삭제합니다.<br>이 작업은 되돌릴 수 없으니 신중히 결정해 주세요.`;
+        document.getElementById('finalDeleteBtn').onclick = executeDeleteAction;
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('customModalOverlay').style.display = 'none';
+        selectedIdsForDelete = [];
+    }
+
+    function executeDeleteAction() {
+        fetch('/contract/admin/delete', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ indices: selectedIdsForDelete }) 
+        })
+        .then(res => res.json())
+        .then(data => { 
+            if (data.status === 'success') location.reload(); 
+            else { alert("삭제 실패: " + data.message); closeDeleteModal(); }
+        });
+    }
+
+    function uploadExcelFile() {
+        const fileInput = document.getElementById('excelFile');
+        if (!fileInput.files[0]) return;
+        if (!confirm("선택한 엑셀 파일의 데이터를 추가하시겠습니까?")) { fileInput.value = ''; return; }
+
+        const formData = new FormData();
+        formData.append('excel_file', fileInput.files[0]);
+
+        fetch('/contract/admin/upload_excel', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') { alert(data.message); location.reload(); }
+            else { alert("오류 발생: " + data.message); fileInput.value = ''; }
+        });
+    }
+
+    function downloadSelected() {
+        const selectedCheckboxes = document.querySelectorAll('.chk:checked');
+        if (selectedCheckboxes.length === 0) { alert("다운로드할 항목을 선택해 주세요."); return; }
+
+        const range = document.getElementById('download-page-range').value;
+        const ids = Array.from(selectedCheckboxes).map(cb => cb.value);
+        
+        let rangeText = range === 'all' ? "전체 페이지" : "1~2번 페이지만";
+        if(confirm(ids.length + `건의 계약서(${rangeText})를 ZIP파일로 다운로드하시겠습니까?`)) {
+            location.href = `/contract/admin/download_selected?ids=${ids.join(',')}&range=${range}`;
+        }
+    }
+
+    function sendRemindMail() {
+        const selected = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+        if (selected.length === 0) { alert("메일을 발송할 대상을 선택해 주세요."); return; }
+        if (!confirm(`선택한 ${selected.length}명에게 계약 독촉 메일을 발송하시겠습니까?`)) return;
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "발송 중...";
+        btn.disabled = true;
+
+        fetch('/contract/admin/send_remind_mail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ indices: selected })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') { alert(data.message); } 
+            else { alert("발송 실패: " + data.message); }
+        })
+        .catch(err => alert("서버 통신 오류가 발생했습니다."))
+        .finally(() => { btn.innerText = originalText; btn.disabled = false; });
+    }
+
+    let ckeditorInit = false;
+
+    function toggleTermsForm() {
+        const form = document.getElementById('termsForm');
+        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
+        document.getElementById('inputForm').style.display = 'none';
+        
+        if(form.style.display === 'block') {
+            if(!ckeditorInit) {
+                CKEDITOR.replace('term-content1', {
+                    height: 400,
+                    extraPlugins: 'colorbutton,colordialog,table,tabletools,font',
+                    removeButtons: 'PasteFromWord',
+                    allowedContent: true,
+                    versionCheck: false,
+                    font_names: '맑은 고딕/Malgun Gothic;굴림/Gulim;돋움/Dotum;바탕/Batang;Pretendard/Pretendard;Arial/Arial;Times New Roman/Times New Roman',
+                    fontSize_sizes: '10/10px;11/11px;12/12px;13/13px;14/14px;15/15px;16/16px;18/18px;20/20px;22/22px;24/24px;',
+                    enterMode: CKEDITOR.ENTER_BR,
+                    shiftEnterMode: CKEDITOR.ENTER_BR
+                });
+
+                CKEDITOR.replace('term-content2', {
+                    height: 400,
+                    extraPlugins: 'colorbutton,colordialog,table,tabletools,font',
+                    removeButtons: 'PasteFromWord',
+                    allowedContent: true,
+                    versionCheck: false,
+                    font_names: '맑은 고딕/Malgun Gothic;굴림/Gulim;돋움/Dotum;바탕/Batang;Pretendard/Pretendard;Arial/Arial;Times New Roman/Times New Roman',
+                    fontSize_sizes: '10/10px;11/11px;12/12px;13/13px;14/14px;15/15px;16/16px;18/18px;20/20px;22/22px;24/24px;',
+                    enterMode: CKEDITOR.ENTER_BR,
+                    shiftEnterMode: CKEDITOR.ENTER_BR
+                });
+                ckeditorInit = true;
+            }
+            loadTerms();
+            loadCompanySettings();
+        }
+    }
+
+    let companyProfiles = [];
+    let activeCompanyProfileId = '';
+
+    function getSelectedCompanyProfile() {
+        const select = document.getElementById('company-profile-select');
+        const id = select ? select.value : activeCompanyProfileId;
+        return companyProfiles.find(p => p.id === id) || companyProfiles[0] || null;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderCompanyProfileOptions() {
+        const select = document.getElementById('company-profile-select');
+        if (select) {
+            select.innerHTML = '';
+            companyProfiles.forEach((profile, index) => {
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = profile.label || profile.company_name || `회사 ${index + 1}`;
+                if (profile.id === activeCompanyProfileId) option.selected = true;
+                select.appendChild(option);
+            });
+        }
+        renderCompanyProfilesTable();
+    }
+
+    function renderCompanyProfilesTable() {
+        const tbody = document.getElementById('company-profile-table-body');
+        if (!tbody) return;
+
+        if (!companyProfiles || companyProfiles.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:18px; color:var(--text-gray, #64748b);">등록된 회사 정보가 없습니다. [+ 새 회사 세트]를 눌러 등록하세요.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = companyProfiles.map((profile, index) => {
+            const isActive = profile.id === activeCompanyProfileId;
+            const stampHtml = profile.stamp_url
+                ? `<img class="company-stamp-thumb" src="${profile.stamp_url}?t=${new Date().getTime()}" alt="도장">`
+                : '<span class="company-stamp-empty">없음</span>';
+            const label = profile.label || `회사 ${index + 1}`;
+            const companyName = profile.company_name || '-';
+            const title = profile.representative_title || '-';
+            const repName = profile.representative_name || '-';
+
+            return `
+                <tr class="company-profile-row ${isActive ? 'active' : ''}" onclick="selectCompanyProfile('${profile.id}')">
+                    <td><input type="radio" name="company-profile-radio" ${isActive ? 'checked' : ''} onclick="event.stopPropagation(); selectCompanyProfile('${profile.id}')"></td>
+                    <td><b>${escapeHtml(label)}</b></td>
+                    <td>${escapeHtml(companyName)}</td>
+                    <td>${escapeHtml(title)}</td>
+                    <td>${escapeHtml(repName)}</td>
+                    <td>${stampHtml}</td>
+                    <td>
+                        <button type="button" class="company-mini-btn" style="background:var(--saedam-blue);" onclick="event.stopPropagation(); selectCompanyProfile('${profile.id}')">선택</button>
+                        <button type="button" class="company-mini-btn" style="background:#dc3545;" onclick="event.stopPropagation(); deleteCompanyProfileById('${profile.id}')">삭제</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function fillCompanyProfileForm(profile) {
+        if (!profile) return;
+
+        const titleText = document.getElementById('company-form-title-text');
+        if (titleText) titleText.textContent = '선택한 회사 정보 수정';
+
+        document.getElementById('company-profile-label').value = profile.label || '';
+        document.getElementById('company-name').value = profile.company_name || '';
+        document.getElementById('representative-title').value = profile.representative_title || '';
+        document.getElementById('representative-name').value = profile.representative_name || '';
+
+        const img = document.getElementById('stamp-preview');
+        const emptyText = document.getElementById('stamp-empty-text');
+
+        if (profile.stamp_url) {
+            img.src = profile.stamp_url + '?t=' + new Date().getTime();
+            img.style.display = 'block';
+            emptyText.style.display = 'none';
+        } else {
+            img.removeAttribute('src');
+            img.style.display = 'none';
+            emptyText.style.display = 'inline';
+        }
+    }
+
+    function selectCompanyProfile(profileId) {
+        const profile = companyProfiles.find(p => p.id === profileId);
+        if (!profile) return;
+
+        activeCompanyProfileId = profile.id;
+        const select = document.getElementById('company-profile-select');
+        if (select) select.value = profile.id;
+
+        fillCompanyProfileForm(profile);
+        renderCompanyProfilesTable();
+    }
+
+    function onCompanyProfileChange() {
+        const profile = getSelectedCompanyProfile();
+        if (profile) {
+            selectCompanyProfile(profile.id);
+        }
+    }
+
+    function loadCompanySettings() {
+        fetch('/contract/admin/company_settings')
+        .then(res => res.json())
+        .then(data => {
+            if (data.status !== 'success') return;
+
+            companyProfiles = data.profiles || [];
+            activeCompanyProfileId = data.active_profile_id || (companyProfiles[0] ? companyProfiles[0].id : '');
+
+            renderCompanyProfileOptions();
+            fillCompanyProfileForm(getSelectedCompanyProfile());
+        })
+        .catch(err => console.log('회사 정보 불러오기 오류:', err));
+    }
+
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'company-stamp-file') {
+            const file = e.target.files[0];
+            if (!file) return;
+            const img = document.getElementById('stamp-preview');
+            const emptyText = document.getElementById('stamp-empty-text');
+            img.src = URL.createObjectURL(file);
+            img.style.display = 'block';
+            emptyText.style.display = 'none';
+        }
+    });
+
+    function addCompanyProfile() {
+        if (companyProfiles.length >= 3) {
+            alert('회사 정보는 최대 3세트까지만 등록할 수 있습니다.');
+            return;
+        }
+
+        activeCompanyProfileId = '';
+        const select = document.getElementById('company-profile-select');
+        if (select) select.value = '';
+        renderCompanyProfilesTable();
+
+        const titleText = document.getElementById('company-form-title-text');
+        if (titleText) titleText.textContent = '새 회사 정보 등록';
+
+        document.getElementById('company-profile-label').value = `회사 ${companyProfiles.length + 1}`;
+        document.getElementById('company-name').value = '';
+        document.getElementById('representative-title').value = '이사장';
+        document.getElementById('representative-name').value = '';
+        document.getElementById('company-stamp-file').value = '';
+
+        const img = document.getElementById('stamp-preview');
+        const emptyText = document.getElementById('stamp-empty-text');
+        img.removeAttribute('src');
+        img.style.display = 'none';
+        emptyText.style.display = 'inline';
+    }
+
+    function saveCompanySettings(action = 'save') {
+        const formData = new FormData();
+        const select = document.getElementById('company-profile-select');
+        const selectedId = select ? select.value : activeCompanyProfileId;
+
+        formData.append('action', action);
+        if (selectedId && action !== 'add') {
+            formData.append('profile_id', selectedId);
+        }
+        formData.append('label', document.getElementById('company-profile-label').value.trim());
+        formData.append('company_name', document.getElementById('company-name').value.trim());
+        formData.append('representative_title', document.getElementById('representative-title').value.trim());
+        formData.append('representative_name', document.getElementById('representative-name').value.trim());
+
+        const stampFile = document.getElementById('company-stamp-file').files[0];
+        if (stampFile) {
+            formData.append('stamp_file', stampFile);
+        }
+
+        fetch('/contract/admin/company_settings', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            if (data.status === 'success') {
+                activeCompanyProfileId = data.active_profile_id || activeCompanyProfileId;
+                document.getElementById('company-stamp-file').value = '';
+                loadCompanySettings();
+                loadTerms();
+            }
+        })
+        .catch(err => alert('회사 정보 저장 중 서버 통신 오류가 발생했습니다.'));
+    }
+
+    function deleteCompanyProfile() {
+        const select = document.getElementById('company-profile-select');
+        const selectedId = select ? select.value : activeCompanyProfileId;
+        deleteCompanyProfileById(selectedId);
+    }
+
+    function deleteCompanyProfileById(profileId) {
+        const profile = companyProfiles.find(p => p.id === profileId);
+
+        if (!profileId || !profile) {
+            alert('삭제할 회사 정보 세트를 선택해 주세요.');
+            return;
+        }
+        if (companyProfiles.length <= 1) {
+            alert('회사 정보는 최소 1개 이상 필요합니다.');
+            return;
+        }
+        if (!confirm(`선택한 회사 정보 세트 [${profile.label || profile.company_name}]를 삭제할까요?`)) {
+            return;
+        }
+
+        fetch('/contract/admin/company_settings', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: profileId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            if (data.status === 'success') {
+                loadCompanySettings();
+                loadTerms();
+            }
+        })
+        .catch(err => alert('회사 정보 삭제 중 서버 통신 오류가 발생했습니다.'));
+    }
+
+    function loadTerms() {
+        const type = document.getElementById('term-category').value;
+        fetch(`/contract/admin/terms?type=${encodeURIComponent(type)}`)
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                let c1 = data.content1 || "";
+                let c2 = data.content2 || "";
+                if(c1 && !c1.includes('<p>') && !c1.includes('<br') && !c1.includes('<table')) {
+                    c1 = c1.replace(/\n/g, '<br>');
+                }
+                if(c2 && !c2.includes('<p>') && !c2.includes('<br') && !c2.includes('<table')) {
+                    c2 = c2.replace(/\n/g, '<br>');
+                }
+                
+                const setEditorData = (id, html) => {
+                    if (CKEDITOR.instances[id]) {
+                        if (CKEDITOR.instances[id].status === 'ready') {
+                            CKEDITOR.instances[id].setData(html);
+                        } else {
+                            CKEDITOR.instances[id].on('instanceReady', function() {
+                                this.setData(html);
+                            });
+                        }
+                    }
+                };
+                
+                setEditorData('term-content1', c1);
+                setEditorData('term-content2', c2);
+                document.getElementById('contract-title').value = data.title || '';
+            }
+        });
+    }
+
+    function saveTerms() {
+        const type = document.getElementById('term-category').value;
+        const content1 = CKEDITOR.instances['term-content1'].getData();
+        const content2 = CKEDITOR.instances['term-content2'].getData();
+        const title = document.getElementById('contract-title').value.trim();
+
+        fetch('/contract/admin/terms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, title, content1, content2 })
+        })
+        .then(res => res.json())
+        .then(data => { alert(data.message); })
+        .catch(err => alert("서버 통신 오류가 발생했습니다."));
+    }
+
+    function previewTerms() {
+        const form = document.createElement('form');
+        form.target = '_blank';
+        form.method = 'POST';
+        form.action = '/contract/admin/preview';
+
+        const addField = (name, value) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        };
+
+        addField('type', document.getElementById('term-category').value);
+        addField('title', document.getElementById('contract-title').value.trim());
+        addField('content1', CKEDITOR.instances['term-content1'].getData());
+        addField('content2', CKEDITOR.instances['term-content2'].getData());
+        
+        addField('name', document.getElementById('preview-name').value);
+        addField('ssn', document.getElementById('preview-ssn').value);
+        addField('school', document.getElementById('preview-school').value);
+        addField('dept', document.getElementById('preview-dept').value);
+        addField('fee', document.getElementById('preview-fee').value);
+        addField('period', document.getElementById('preview-period').value);
+        addField('etc', document.getElementById('preview-etc').value);
+        addField('subsidy', document.getElementById('preview-subsidy').value);
+        addField('career', document.getElementById('preview-career').value);
+        addField('position', document.getElementById('preview-position').value);
+        addField('note1', document.getElementById('preview-note1').value);
+        addField('note2', document.getElementById('preview-note2').value);
+        addField('note3', document.getElementById('preview-note3').value);
+        addField('note4', document.getElementById('preview-note4').value);
+
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+
+    let currentCategories = [];
+
+    function openCategoryModal() {
+        document.getElementById('categoryModalOverlay').style.display = 'flex';
+        fetch('/contract/admin/categories')
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                currentCategories = data.categories;
+                renderCategoryList();
+            }
+        });
+    }
+
+    function closeCategoryModal() {
+        document.getElementById('categoryModalOverlay').style.display = 'none';
+        document.getElementById('newCategoryName').value = '';
+    }
+
+    function renderCategoryList() {
+        const container = document.getElementById('categoryListContainer');
+        container.innerHTML = '';
+        currentCategories.forEach((cat, index) => {
+            const div = document.createElement('div');
+            div.className = 'cat-item';
+            div.innerHTML = `<span>${cat}</span> <button class="btn-del" onclick="deleteCategory(${index})">삭제</button>`;
+            container.appendChild(div);
+        });
+    }
+
+    function addCategory() {
+        const input = document.getElementById('newCategoryName');
+        const val = input.value.trim();
+        if(!val) { alert("항목명을 입력하세요."); return; }
+        if(currentCategories.includes(val)) { alert("이미 존재하는 항목입니다."); return; }
+        
+        currentCategories.push(val);
+        input.value = '';
+        renderCategoryList();
+    }
+
+    function deleteCategory(index) {
+        if(confirm(`[${currentCategories[index]}] 항목을 삭제하시겠습니까?`)) {
+            currentCategories.splice(index, 1);
+            renderCategoryList();
+        }
+    }
+
+    function saveCategories() {
+        fetch('/contract/admin/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ categories: currentCategories })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.status === 'success') {
+                alert(data.message);
+                location.reload(); 
+            }
+        });
+    }
+</script>
+{% endblock %}

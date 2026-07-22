@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
+    <title>경력증명서 신청 본인인증 | 새담청소년교육문화원</title>
+    <style>
+        :root {
+            --saedam-blue: #004ea2;
+            --saedam-navy: #002c63; /* 강사 시스템 공통 진한 네이비 */
+            --border-color: #d1d8e0;
+        }
+
+        body {
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            background-color: var(--saedam-navy); /* 전자계약 시스템과 동일한 배경색 */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .login-wrapper {
+            width: 92%;
+            max-width: 450px; /* 신청 로그인은 가로폭을 좀 더 컴팩트하게 설정 */
+            background: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .login-header h2 {
+            font-size: 24px;
+            color: var(--saedam-navy);
+            margin-bottom: 10px;
+            font-weight: 800;
+        }
+
+        .login-header p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* 캐릭터 및 말풍선 스타일 */
+        .character-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .speech-bubble {
+            position: absolute;
+            top: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ffffff;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .speech-bubble::after {
+            content: "";
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 8px 0 8px;
+            border-style: solid;
+            border-color: #ddd transparent transparent transparent;
+        }
+
+        .character {
+            max-height: 120px;
+            object-fit: contain;
+        }
+
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: #444;
+            margin-bottom: 8px;
+        }
+
+        input[type="password"] {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            letter-spacing: 5px; /* 비밀번호 도트 간격 */
+            text-align: center;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            box-sizing: border-box;
+            transition: all 0.3s;
+        }
+
+        input[type="password"]:focus {
+            border-color: var(--saedam-blue);
+            background-color: #fff;
+            outline: none;
+            box-shadow: 0 0 8px rgba(0, 78, 162, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--saedam-blue);
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .btn-login:hover {
+            background-color: var(--saedam-navy);
+        }
+
+        .footer-info {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .guide-text {
+            font-size: 12px;
+            color: #888;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-wrapper">
+        <div class="login-header">
+            <h2>본인인증</h2>
+            <p>경력증명서 신청을 위해 아래 비밀번호를 입력해주세요.</p>
+        </div>
+
+        <div class="character-wrapper">
+            {% set flashed = get_flashed_messages() %}
+            <div class="speech-bubble" style="color: {{ 'red' if flashed else '#004ea2' }};">
+                {{ flashed[0] if flashed else '비밀번호 4자리를 입력해주세요.' }}
+            </div>
+            <img src="https://www.saedam.org/img_sub/{{ 'girl2.png' if flashed else 'girl.png' }}" class="character" alt="안내 캐릭터">
+        </div>
+
+        <form method="POST">
+            <div class="form-group">
+                <label>비밀번호 <span style="font-weight: normal; color: #888;">(숫자 4자리)</span></label>
+                <input type="password" name="password" maxlength="4" pattern="\d{4}" placeholder="••••" required autofocus>
+            </div>
+
+            <button type="submit" class="btn-login">인증 후 신청하기</button>
+        </form>
+
+        <footer class="footer-info">
+            <div class="guide-text">
+                발급문의: 📞 031-8016-1900<br>
+                Copyright©(사)새담청소년교육문화원. All Rights Reserved.
+            </div>
+            <img src="https://www.saedam.org/img_sub/logo.gif" alt="로고" style="height: 35px; margin-top: 15px; opacity: 0.8;">
+        </footer>
+    </div>
+
+    <script>
+        // 비밀번호 필드에 숫자만 입력되도록 강제 (모바일 대응)
+        document.querySelector('input[name="password"]').addEventListener('input', function (e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    </script>
+</body>
+</html>
