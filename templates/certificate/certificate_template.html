@@ -26,13 +26,19 @@
       margin: 0 auto;
     }
     .page-wrapper.excellent-certificate {
-      background-color: #fff;
-      background-image: url("{{ 인증서배경 }}");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 100% 100%;
+      position: relative;
+      z-index: 1;
+      background: transparent;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+    }
+    .certificate-background-image {
+      position: fixed;
+      z-index: 0;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
     }
     /* 고급스러운 이중 테두리 */
     .cert-border {
@@ -64,7 +70,7 @@
     }
     .excellent-certificate .issuer-box {
       position: relative;
-      top: 35px;
+      top: 50px;
     }
     .excellent-certificate .issuer-name {
       font-size: 25px;
@@ -74,6 +80,10 @@
     .excellent-certificate .seal {
       right: -175px;
       top: -65px;
+    }
+    .excellent-certificate .footer-info {
+      position: relative;
+      top: 15px;
     }
     
     /* 상단~직인까지의 컨텐츠 영역 */
@@ -180,7 +190,7 @@
     }
   </style>
 </head>
-<body>{% if not 우수강사인증서여부 %}<br>{% endif %}    <!------- 마진으로 조절안되는 상단여백은 여기서 br태그로 조절--------->
+<body>{% if 우수강사인증서여부 %}<img class="certificate-background-image" src="{{ 인증서배경 }}" alt="">{% else %}<br>{% endif %}    <!------- 마진으로 조절안되는 상단여백은 여기서 br태그로 조절--------->
   <div class="page-wrapper{% if 우수강사인증서여부 %} excellent-certificate{% endif %}">
     <div class="cert-border">
      
