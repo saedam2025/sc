@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ partner }}님과의 대화 - 새담 인트라넷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         
@@ -12,7 +13,7 @@
             --primary-color: #3b82f6; 
             --text-dark: #1e293b;
             --text-gray: #64748b;
-            --bg-color: #b2c7d9; 
+            --bg-color: #f0f9ff;
             --card-bg: #ffffff;
             --card-border: #e2e8f0;
             --input-bg: #f1f5f9;
@@ -49,15 +50,47 @@
         .chat-context-reactions { display:flex; flex-wrap:wrap; gap:6px; padding:4px 2px 8px; border-bottom:1px solid var(--card-border); margin-bottom:6px; }
         .chat-context-reactions button { width:34px; height:34px; padding:0; text-align:center; font-size:1.05rem; }
         .chat-context-action { width:100%; display:flex; align-items:center; gap:8px; padding:9px 10px; text-align:left; font-size:0.9rem; }
+        .chat-toolbar-btn { background:none; border:none; color:var(--text-dark); cursor:pointer; font-size:1.05rem; padding:6px; border-radius:7px; }
+        .chat-toolbar-btn:hover { background:var(--input-bg); }
+        .chat-menu-item { padding:11px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:0.86rem; transition:background 0.2s; }
+        .chat-menu-item:hover { background:var(--input-bg); }
+        .chat-search-panel { display:none; position:relative; margin:-4px 0 10px; }
+        .chat-search-row { display:flex; gap:7px; padding:8px; background:#fff; border:1px solid var(--card-border); border-radius:10px; }
+        .chat-search-row input { min-width:0; flex:1; border:0; outline:0; font-family:inherit; }
+        .chat-search-results { display:none; position:absolute; left:0; right:0; top:48px; z-index:2500; max-height:260px; overflow-y:auto; background:#fff; border:1px solid var(--card-border); border-radius:10px; box-shadow:0 10px 25px rgba(15,23,42,0.16); }
+        .chat-search-result { padding:9px 11px; border-bottom:1px solid #eef2f7; cursor:pointer; }
+        .chat-search-result:hover { background:#eff6ff; }
+        .chat-search-result strong { display:block; font-size:0.78rem; color:#334155; margin-bottom:3px; }
+        .chat-search-result span { display:block; font-size:0.76rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .chat-load-older { align-self:center; border:1px solid #bfdbfe; background:#fff; color:#2563eb; border-radius:999px; padding:6px 12px; cursor:pointer; font-size:0.75rem; }
+        .chat-reply-preview { border-left:3px solid #60a5fa; background:rgba(255,255,255,0.58); border-radius:6px; padding:5px 7px; margin-bottom:6px; font-size:0.72rem; color:#475569; cursor:pointer; }
+        .chat-reply-preview strong { display:block; color:#1e40af; margin-bottom:2px; }
+        .chat-reply-bar { display:none; align-items:center; gap:8px; margin:0 4px 7px; padding:8px 10px; border:1px solid #bfdbfe; border-radius:9px; background:#eff6ff; font-size:0.78rem; color:#334155; }
+        .chat-reply-bar-text { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .chat-typing-indicator { min-height:18px; margin:-8px 4px 3px; color:#64748b; font-size:0.74rem; }
+        .chat-deleted-message { color:#94a3b8; font-style:italic; font-size:0.78rem; }
+        .chat-edited-label { color:#64748b; font-size:0.64rem; margin-left:4px; }
+        .chat-highlight { animation:chatHighlight 1.8s ease; }
+        @keyframes chatHighlight { 0%,45% { outline:3px solid #f59e0b; } 100% { outline:0 solid transparent; } }
+        .chat-settings-list { flex:1; overflow-y:auto; border:1px solid var(--card-border); border-radius:10px; }
+        .chat-settings-member { display:flex; align-items:center; gap:8px; padding:9px 10px; border-bottom:1px solid #eef2f7; font-size:0.84rem; }
+        .chat-settings-member-name { flex:1; min-width:0; font-weight:700; }
+        .chat-settings-badge { color:#1d4ed8; background:#dbeafe; border-radius:999px; padding:2px 7px; font-size:0.68rem; }
+        .chat-mini-btn { border:1px solid #cbd5e1; background:#fff; border-radius:6px; padding:4px 7px; cursor:pointer; font-size:0.7rem; }
         .chat-message-row { display:flex; align-items:flex-end; }
         .chat-message-row.me { justify-content:flex-end; }
         .chat-message-row.other { justify-content:flex-start; gap:10px; }
         .chat-bubble-wrap { position:relative; display:flex; flex-direction:column; align-items:flex-start; max-width:250px; }
         .chat-message-row.me .chat-bubble-wrap { align-items:flex-end; }
         .chat-bubble { color:#1e293b; padding:8px 12px; border-radius:12px; max-width:250px; word-break:break-word; box-shadow:0 1px 2px rgba(0,0,0,0.05); }
-        .chat-bubble-wrap.has-attachment, .chat-bubble.has-attachment { width:min(300px, calc(100vw - 110px)); max-width:min(300px, calc(100vw - 110px)); }
-        .chat-bubble.me { background:#fef01b; border-top-right-radius:2px; }
-        .chat-bubble.other { background:#fff; border:1px solid #e2e8f0; border-top-left-radius:2px; }
+        .chat-bubble-wrap.has-attachment, .chat-bubble.has-attachment { width:min(240px, calc(100vw - 110px)); max-width:min(300px, calc(100vw - 110px)); }
+
+/* 내 말풍선:  */
+        .chat-bubble.me { --chat-bubble-bg:#bfdbfe; background:var(--chat-bubble-bg); border-top-right-radius:2px; }
+
+/* 상대방 말풍선: 화이트 */
+        .chat-bubble.other { --chat-bubble-bg:#fff; background:var(--chat-bubble-bg); border:1px solid #e2e8f0; border-top-left-radius:2px; }
+
         .message-meta { display:flex; flex-direction:column; font-size:0.7rem; color:#64748b; }
         .message-meta.me { align-items:flex-end; margin-right:6px; }
         .message-meta.other { align-items:flex-start; margin-left:6px; }
@@ -81,7 +114,32 @@
         .chat-file-drop-overlay-inner i { font-size:2.4rem; }
         .chat-file-drop-overlay-inner small { color:#64748b; font-size:0.78rem; font-weight:600; }
         body.chat-file-dragging .chat-file-drop-overlay { opacity:1; visibility:visible; }
+
+/* 텍스트 없이 파일만 첨부되었을 때 바깥 말풍선(테두리/배경) 숨김 */
+.chat-bubble.only-file {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* 바깥 말풍선이 없어졌으므로 파일 박스의 불필요한 위쪽 여백 제거 */
+.chat-bubble.only-file .chat-attachment-link {
+    margin-top: 0 !important;
+    background: var(--chat-bubble-bg);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* 파일 말풍선도 일반 말풍선과 동일한 발신자별 색상 사용 */
+.chat-bubble.me.only-file .chat-attachment-link {
+    border: none;
+}
+
+.chat-bubble.other.only-file .chat-attachment-link {
+    border: 1px solid #e2e8f0;
+}
     </style>
+
 </head>
 <body>
     <div id="chatFileDropOverlay" class="chat-file-drop-overlay" role="status" aria-live="polite">
@@ -100,14 +158,21 @@
         
         <div style="display:flex; align-items:center; gap:12px;">
             <div style="position: relative; display: inline-block;">
-                <button onclick="toggleChatMenu()" style="background:none; border:none; color:var(--text-dark); cursor:pointer; font-size:1.2rem; padding:5px;">
+                <button class="chat-toolbar-btn" onclick="toggleSearchPanel()" title="대화 검색"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <button class="chat-toolbar-btn" onclick="toggleChatMenu()" title="대화방 메뉴" style="font-size:1.2rem;">
                     <i class="fa-solid fa-ellipsis-vertical"></i>
                 </button>
-                <div id="chatMenuDropdown" style="display:none; position:absolute; right:0; top:35px; background:#fff; border:1px solid var(--card-border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:150px; z-index: 100;">
-                    <div onclick="inviteMember()" style="padding:12px 10px; cursor:pointer; border-bottom:1px solid #eee; font-size:0.9rem; transition:background 0.2s;">
+                <div id="chatMenuDropdown" style="display:none; position:absolute; right:0; top:35px; background:#fff; border:1px solid var(--card-border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:180px; z-index: 100;">
+                    <div id="chatMuteMenuItem" class="chat-menu-item" onclick="toggleRoomMute()">
+                        <i class="fa-regular fa-bell-slash" style="margin-right:6px; color:#64748b;"></i> 알림 끄기
+                    </div>
+                    <div id="groupSettingsMenuItem" class="chat-menu-item" onclick="openGroupSettings()" style="display:none;">
+                        <i class="fa-solid fa-users-gear" style="margin-right:6px; color:#2563eb;"></i> 그룹 설정
+                    </div>
+                    <div id="inviteMemberMenuItem" class="chat-menu-item" onclick="inviteMember()">
                         <i class="fa-solid fa-user-plus" style="margin-right:5px; color:var(--primary-color);"></i> 멤버 초대하기
                     </div>
-                    <div onclick="leaveChat()" style="padding:12px 10px; cursor:pointer; color:#e74c3c; font-size:0.9rem; transition:background 0.2s;">
+                    <div onclick="leaveChat()" class="chat-menu-item" style="color:#e74c3c; border-bottom:0;">
                         <i class="fa-solid fa-arrow-right-from-bracket" style="margin-right:5px;"></i> 채팅방 나가기
                     </div>
                 </div>
@@ -117,10 +182,26 @@
             </button>
         </div>
     </div>
-    
-    <div id="chatBox" style="flex:1; overflow-y:auto; background: #b2c7d9; border: none; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
+
+    <div id="chatSearchPanel" class="chat-search-panel">
+        <div class="chat-search-row">
+            <input id="chatSearchInput" type="search" placeholder="대화 내용 또는 첨부파일 검색" onkeydown="if(event.key==='Enter') searchChatMessages()">
+            <button type="button" class="chat-mini-btn" onclick="searchChatMessages()">검색</button>
+            <button type="button" class="chat-mini-btn" onclick="toggleSearchPanel(false)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="chatSearchResults" class="chat-search-results"></div>
     </div>
     
+    <div id="chatBox" style="flex:1; overflow-y:auto; background: var(--bg-color); border: none; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
+    </div>
+
+    <div id="chatTypingIndicator" class="chat-typing-indicator"></div>
+    <div id="chatReplyBar" class="chat-reply-bar">
+        <i class="fa-solid fa-reply" style="color:#2563eb;"></i>
+        <span id="chatReplyBarText" class="chat-reply-bar-text"></span>
+        <button type="button" class="chat-toolbar-btn" onclick="cancelReply()" title="답장 취소"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
     <div class="chat-file-retention-note"><i class="fa-regular fa-clock"></i>첨부파일을 올리면 최대 30일까지만 저장됩니다. (개당 10MB 미만)</div>
 
     <div style="display:flex; gap:12px; align-items:center; position:relative; background: var(--card-bg); padding: 12px 15px; border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
@@ -161,13 +242,45 @@
         </div>
     </div>
 
+    <div id="groupSettingsModal" class="modal" style="display:none; position:fixed; z-index:3100; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px);">
+        <div style="margin:5% auto; padding:22px; width:min(380px, calc(100vw - 42px)); height:min(520px, 82vh); box-sizing:border-box; display:flex; flex-direction:column; gap:12px; background:#fff; border-radius:16px; box-shadow:0 12px 35px rgba(0,0,0,0.22);">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:1.05rem;"><i class="fa-solid fa-users-gear" style="color:#2563eb; margin-right:7px;"></i>그룹 설정</h3>
+                <button type="button" class="chat-toolbar-btn" onclick="closeGroupSettings()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="groupNameEditor" style="display:flex; gap:7px;">
+                <input id="groupNameInput" maxlength="50" placeholder="그룹방 이름" style="flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:8px; padding:9px; font-family:inherit;">
+                <button type="button" class="chat-mini-btn" onclick="saveGroupName()">저장</button>
+            </div>
+            <div style="font-size:0.78rem; color:#64748b;">멤버 <span id="groupMemberCount">0</span>명</div>
+            <div id="groupSettingsMemberList" class="chat-settings-list"></div>
+        </div>
+    </div>
+
     <div id="messageContextMenu" class="chat-context-menu"></div>
 
     <script>
-        const partnerName = "{{ partner }}";
-        const currentUser = "{{ current_user }}"; 
+        const partnerName = {{ partner | tojson }};
+        const currentUser = {{ current_user | tojson }};
         const isGroupChat = partnerName.includes(','); 
         const CHAT_MAX_FILE_BYTES = 10 * 1024 * 1024;
+        let roomInfo = {
+            is_group: isGroupChat,
+            display_name: partnerName,
+            members: [],
+            is_admin: false,
+            notifications_muted: false
+        };
+        let loadedMessages = [];
+        let oldestMessageId = null;
+        let lastMessageId = 0;
+        let hasOlderMessages = false;
+        let messageLoadInProgress = false;
+        let replyTarget = null;
+        let chatSocket = null;
+        let typingStopTimer = null;
+        let typingDisplayTimer = null;
+        let lastTypingSentAt = 0;
 
         const reactionOptions = [
             { key: 'heart', label: '&#10084;&#65039;' },
@@ -199,7 +312,7 @@
             return '<div class="message-reactions">' + reactions.map(function(r) {
                 const mineClass = r.mine ? ' mine' : '';
                 const users = Array.isArray(r.users) ? r.users : [];
-                const encodedUsers = encodeURIComponent(JSON.stringify(users));
+                const encodedUsers = encodeURIComponent(JSON.stringify(users)).replace(/'/g, '%27');
                 const title = users.length ? escapeHtml(users.join(', ')) : '&#49324;&#50857;&#51088; &#50630;&#51020;';
                 return '<button type="button" class="message-reaction-chip' + mineClass + '" title="' + title + '" onclick="event.stopPropagation(); showReactionUsers(\'' + encodedUsers + '\',\'' + r.reaction + '\')">' + reactionLabel(r.reaction) + ' ' + r.count + '</button>';
             }).join('') + '</div>';
@@ -225,12 +338,21 @@
 
         function openMessageContextMenu(event, messageId, isMe) {
             event.preventDefault();
+            event.stopPropagation();
             const menu = document.getElementById('messageContextMenu');
-            if (!menu) return;
-            const reactionButtons = reactionOptions.map(function(r) { return '<button type="button" title="reaction" onclick="toggleMessageReaction(' + messageId + ',\'' + r.key + '\')">' + r.label + '</button>'; }).join('');
-            const commentButton = '<button type="button" class="chat-context-action" onclick="addMessageComment(' + messageId + ')"><i class="fa-regular fa-comment" style="color:#3b82f6;"></i>&#45843;&#44544;</button>';
-            const deleteButton = isMe ? '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ')"><i class="fa-regular fa-trash-can" style="color:#ef4444;"></i>&#49325;&#51228;</button>' : '';
-            menu.innerHTML = '<div class="chat-context-reactions">' + reactionButtons + '</div>' + commentButton + deleteButton;
+            const message = loadedMessages.find(item => Number(item.id) === Number(messageId));
+            if (!menu || !message) return;
+            isMe = message.sender === currentUser;
+            const reactionButtons = message.is_deleted ? '' : reactionOptions.map(function(r) {
+                return '<button type="button" title="reaction" onclick="toggleMessageReaction(' + messageId + ',\'' + r.key + '\')">' + r.label + '</button>';
+            }).join('');
+            const reactions = reactionButtons ? '<div class="chat-context-reactions">' + reactionButtons + '</div>' : '';
+            const replyButton = message.is_deleted ? '' : '<button type="button" class="chat-context-action" onclick="setReply(' + messageId + ')"><i class="fa-solid fa-reply" style="color:#2563eb;"></i>답장</button>';
+            const commentButton = message.is_deleted ? '' : '<button type="button" class="chat-context-action" onclick="addMessageComment(' + messageId + ')"><i class="fa-regular fa-comment" style="color:#3b82f6;"></i>댓글</button>';
+            const editButton = isMe && !message.is_deleted ? '<button type="button" class="chat-context-action" onclick="editChatMessage(' + messageId + ')"><i class="fa-regular fa-pen-to-square" style="color:#0f766e;"></i>수정</button>' : '';
+            const deleteMineButton = '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ',\'me\')"><i class="fa-regular fa-eye-slash" style="color:#64748b;"></i>나에게만 삭제</button>';
+            const deleteAllButton = isMe && !message.is_deleted ? '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ',\'all\')"><i class="fa-regular fa-trash-can" style="color:#ef4444;"></i>모두에게 삭제</button>' : '';
+            menu.innerHTML = reactions + replyButton + commentButton + editButton + deleteMineButton + deleteAllButton;
             menu.style.display = 'block';
             const rect = menu.getBoundingClientRect();
             const left = Math.min(Math.max(8, event.clientX), window.innerWidth - rect.width - 8);
@@ -239,13 +361,54 @@
             menu.style.top = top + 'px';
         }
 
-        async function deleteChatMessage(messageId) {
+        function setReply(messageId) {
             hideMessageContextMenu();
-            if(!confirm('\uc774 \uba54\uc2dc\uc9c0\ub97c \uc0ad\uc81c\ud560\uae4c\uc694?')) return;
-            const res = await fetch('/delete_message/' + messageId, { method: 'DELETE' });
+            const message = loadedMessages.find(item => Number(item.id) === Number(messageId));
+            if (!message || message.is_deleted) return;
+            replyTarget = message;
+            const preview = message.content || (message.filename ? '📎 ' + message.filename : '메시지');
+            document.getElementById('chatReplyBarText').textContent = `${message.sender}: ${preview}`;
+            document.getElementById('chatReplyBar').style.display = 'flex';
+            document.getElementById('chatInput').focus();
+        }
+
+        function cancelReply() {
+            replyTarget = null;
+            document.getElementById('chatReplyBar').style.display = 'none';
+            document.getElementById('chatReplyBarText').textContent = '';
+        }
+
+        async function editChatMessage(messageId) {
+            hideMessageContextMenu();
+            const message = loadedMessages.find(item => Number(item.id) === Number(messageId));
+            if (!message) return;
+            const edited = prompt('수정할 메시지를 입력하세요.', message.content || '');
+            if (edited === null || edited.trim() === (message.content || '').trim()) return;
+            const res = await fetch('/api/messages/' + messageId, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: edited })
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                return alert(error.message || '메시지를 수정하지 못했습니다.');
+            }
+            await loadChatMessages({ reset: true, preserveScroll: true });
+        }
+
+        async function deleteChatMessage(messageId, mode) {
+            hideMessageContextMenu();
+            const question = mode === 'all'
+                ? '이 메시지를 모든 참여자에게서 삭제할까요?'
+                : '이 메시지를 내 화면에서만 삭제할까요?';
+            if(!confirm(question)) return;
+            const res = await fetch('/delete_message/' + messageId + '?mode=' + encodeURIComponent(mode), { method: 'DELETE' });
             if (res.ok) {
-                await refreshChatBox();
+                await loadChatMessages({ reset: true, preserveScroll: true });
                 notifyOpenerUnreadChanged();
+            } else {
+                const error = await res.json().catch(() => ({}));
+                alert(error.message || '메시지를 삭제하지 못했습니다.');
             }
         }
 
@@ -257,7 +420,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message_id: messageId, reaction: reaction })
             });
-            if (res.ok) await refreshChatBox();
+            if (res.ok) await loadChatMessages({ reset: true, preserveScroll: true });
         }
 
         async function addMessageComment(messageId) {
@@ -271,7 +434,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message_id: messageId, comment: cleanComment })
             });
-            if (res.ok) await refreshChatBox();
+            if (res.ok) await loadChatMessages({ reset: true, preserveScroll: true });
         }
 
         document.addEventListener('click', hideMessageContextMenu);
@@ -284,17 +447,169 @@
         }
 
         function initHeader() {
-            if(isGroupChat) {
+            applyRoomInfo(roomInfo);
+        }
+
+        function applyRoomInfo(info) {
+            roomInfo = Object.assign({}, roomInfo, info || {});
+            const title = document.getElementById('headerTitleText');
+            const groupMenu = document.getElementById('groupSettingsMenuItem');
+            const inviteMenu = document.getElementById('inviteMemberMenuItem');
+            const muteMenu = document.getElementById('chatMuteMenuItem');
+            if (roomInfo.is_group) {
                 document.getElementById('chatPartnerIcon').innerText = '👥';
-                const members = partnerName.split(',').map(s => s.trim()).filter(s => s !== currentUser);
-                let displayTitle = members.join(', ');
-                if (members.length > 2) displayTitle = members.slice(0, 2).join(', ') + ` 외 ${members.length - 2}명`;
-                document.getElementById('headerTitleText').innerText = displayTitle + " (그룹채팅)";
-            } 
-            else if (partnerName === currentUser) {
+                title.innerText = `${roomInfo.display_name || '그룹채팅'} (${roomInfo.member_count || (roomInfo.members || []).length}명)`;
+                title.title = roomInfo.display_name || '그룹채팅';
+                groupMenu.style.display = 'block';
+                inviteMenu.style.display = roomInfo.is_admin ? 'block' : 'none';
+            } else {
                 document.getElementById('chatPartnerIcon').innerText = '👤';
-                document.getElementById('headerTitleText').innerText = "나와의 채팅방";
+                title.innerText = partnerName === currentUser ? '나와의 채팅방' : `${roomInfo.display_name || partnerName}님과의 대화`;
+                groupMenu.style.display = 'none';
+                inviteMenu.style.display = 'block';
             }
+            muteMenu.innerHTML = roomInfo.notifications_muted
+                ? '<i class="fa-regular fa-bell" style="margin-right:6px;color:#64748b;"></i> 알림 켜기'
+                : '<i class="fa-regular fa-bell-slash" style="margin-right:6px;color:#64748b;"></i> 알림 끄기';
+        }
+
+        async function loadRoomInfo() {
+            const res = await fetch('/api/chat/room?partner=' + encodeURIComponent(partnerName));
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.room) applyRoomInfo(data.room);
+        }
+
+        function toggleSearchPanel(forceOpen) {
+            const panel = document.getElementById('chatSearchPanel');
+            const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.style.display !== 'block';
+            panel.style.display = shouldOpen ? 'block' : 'none';
+            if (shouldOpen) document.getElementById('chatSearchInput').focus();
+            else document.getElementById('chatSearchResults').style.display = 'none';
+        }
+
+        async function searchChatMessages() {
+            const query = document.getElementById('chatSearchInput').value.trim();
+            const resultsBox = document.getElementById('chatSearchResults');
+            if (!query) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+            resultsBox.style.display = 'block';
+            resultsBox.innerHTML = '<div class="chat-search-result"><span>검색 중...</span></div>';
+            const res = await fetch('/api/chat/search?partner=' + encodeURIComponent(partnerName) + '&q=' + encodeURIComponent(query));
+            const data = await res.json().catch(() => ({}));
+            const results = data.results || [];
+            if (!res.ok) {
+                resultsBox.innerHTML = `<div class="chat-search-result"><span>${escapeHtml(data.message || '검색하지 못했습니다.')}</span></div>`;
+                return;
+            }
+            resultsBox.innerHTML = results.length ? results.map(item => {
+                const text = item.content || (item.filename ? '📎 ' + item.filename : '메시지');
+                return `<div class="chat-search-result" onclick="openSearchResult(${Number(item.id)})"><strong>${escapeHtml(item.sender)} · ${escapeHtml(String(item.sent_at || '').slice(0,16))}</strong><span>${escapeHtml(text)}</span></div>`;
+            }).join('') : '<div class="chat-search-result"><span>검색 결과가 없습니다.</span></div>';
+        }
+
+        async function openSearchResult(messageId) {
+            document.getElementById('chatSearchResults').style.display = 'none';
+            await loadChatMessages({ reset: true, aroundId: messageId });
+            requestAnimationFrame(() => scrollToMessage(messageId, true));
+        }
+
+        function scrollToMessage(messageId, highlight) {
+            const element = document.querySelector(`[data-message-id="${Number(messageId)}"]`);
+            if (!element) return;
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (highlight) {
+                element.classList.remove('chat-highlight');
+                void element.offsetWidth;
+                element.classList.add('chat-highlight');
+            }
+        }
+
+        async function toggleRoomMute() {
+            document.getElementById('chatMenuDropdown').style.display = 'none';
+            const muted = !roomInfo.notifications_muted;
+            const res = await fetch('/api/chat/room/mute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partner: partnerName, muted })
+            });
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                return alert(error.message || '알림 설정을 변경하지 못했습니다.');
+            }
+            applyRoomInfo({ notifications_muted: muted });
+        }
+
+        function openGroupSettings() {
+            document.getElementById('chatMenuDropdown').style.display = 'none';
+            renderGroupSettings();
+            document.getElementById('groupSettingsModal').style.display = 'block';
+        }
+
+        function closeGroupSettings() {
+            document.getElementById('groupSettingsModal').style.display = 'none';
+        }
+
+        function renderGroupSettings() {
+            document.getElementById('groupNameInput').value = roomInfo.display_name || '';
+            document.getElementById('groupNameEditor').style.display = roomInfo.is_admin ? 'flex' : 'none';
+            const members = Array.isArray(roomInfo.members) ? roomInfo.members : [];
+            document.getElementById('groupMemberCount').textContent = members.length;
+            document.getElementById('groupSettingsMemberList').innerHTML = members.map(member => {
+                const name = typeof member === 'string' ? member : member.name;
+                const role = typeof member === 'string' ? 'member' : member.role;
+                const encodedName = encodeURIComponent(name).replace(/'/g, '%27');
+                const adminBadge = role === 'admin' ? '<span class="chat-settings-badge">관리자</span>' : '';
+                const controls = roomInfo.is_admin && name !== currentUser
+                    ? `<button type="button" class="chat-mini-btn" onclick="makeGroupAdmin('${encodedName}')">관리자 지정</button><button type="button" class="chat-mini-btn" style="color:#dc2626;" onclick="removeGroupMember('${encodedName}')">내보내기</button>`
+                    : '';
+                return `<div class="chat-settings-member"><span>👤</span><span class="chat-settings-member-name">${escapeHtml(name)}</span>${adminBadge}${controls}</div>`;
+            }).join('');
+        }
+
+        async function saveGroupName() {
+            const displayName = document.getElementById('groupNameInput').value.trim();
+            const res = await fetch('/api/chat/room/name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partner: partnerName, display_name: displayName })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '그룹 이름을 변경하지 못했습니다.');
+            applyRoomInfo(data.room);
+            renderGroupSettings();
+            notifyOpenerUnreadChanged();
+        }
+
+        async function makeGroupAdmin(encodedName) {
+            const name = decodeURIComponent(encodedName);
+            if (!confirm(`${name}님을 새 그룹 관리자로 지정할까요?`)) return;
+            const res = await fetch('/api/chat/room/admin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partner: partnerName, admin_user: name })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '관리자를 변경하지 못했습니다.');
+            applyRoomInfo(data.room);
+            renderGroupSettings();
+        }
+
+        async function removeGroupMember(encodedName) {
+            const name = decodeURIComponent(encodedName);
+            if (!confirm(`${name}님을 그룹에서 내보낼까요?`)) return;
+            const res = await fetch('/api/chat/room/remove-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partner: partnerName, member: name })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '멤버를 내보내지 못했습니다.');
+            applyRoomInfo(data.room);
+            renderGroupSettings();
+            notifyOpenerUnreadChanged();
         }
         
         function toggleChatMenu() { const menu = document.getElementById('chatMenuDropdown'); menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; }
@@ -322,8 +637,12 @@
                 });
                 
                 let html = '';
-                const currentMembers = partnerName.split(',').map(s => s.trim());
-                currentMembers.push(currentUser);
+                const roomMembers = Array.isArray(roomInfo.members)
+                    ? roomInfo.members.map(member => typeof member === 'string' ? member : member.name)
+                    : [];
+                const currentMembers = roomInfo.is_group
+                    ? roomMembers
+                    : [partnerName, currentUser];
                 
                 ['본부', '센터장', '강사', '기타'].forEach(gName => {
                     const members = groups[gName];
@@ -372,18 +691,35 @@
         }
         function clearOrgChartSelectionPopup() { document.querySelectorAll('.org-member-checkbox-popup:not([disabled]), .org-group-checkbox-popup').forEach(cb => { cb.checked = false; cb.indeterminate = false; }); }
 
-        function submitInviteMembers() {
+        async function submitInviteMembers() {
             const checkboxes = document.querySelectorAll('.org-member-checkbox-popup:checked:not([disabled])');
             if(checkboxes.length === 0) return alert("새로 초대할 멤버를 선택해주세요.");
-            const combined = Array.from(new Set([...partnerName.split(',').map(s => s.trim()), ...Array.from(checkboxes).map(cb => cb.value), currentUser])).sort();
-            if(window.opener && !window.opener.closed && typeof window.opener.renderChatList === 'function') window.opener.renderChatList();
+            const selectedMembers = Array.from(checkboxes).map(cb => cb.value);
+            if (roomInfo.is_group) {
+                const res = await fetch('/api/chat/room/members', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ partner: partnerName, members: selectedMembers })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) return alert(data.message || '멤버를 초대하지 못했습니다.');
+                applyRoomInfo(data.room);
+                document.getElementById('orgChartModalPopup').style.display = 'none';
+                document.getElementById('orgChartListContainerPopup').dataset.loaded = '';
+                notifyOpenerUnreadChanged();
+                return;
+            }
+            const combined = Array.from(new Set([partnerName, ...selectedMembers, currentUser])).sort();
             window.location.href = `/chat_popup/${encodeURIComponent(combined.join(','))}`;
         }
         async function leaveChat() {
-            if(!confirm("채팅방을 나가시겠습니까?")) return;
+            const message = roomInfo.is_group
+                ? "그룹채팅에서 나가시겠습니까? 기존 메시지는 다른 참여자에게 유지됩니다."
+                : "대화를 목록에서 숨기시겠습니까? 상대방의 대화 기록은 삭제되지 않습니다.";
+            if(!confirm(message)) return;
             try {
                 const res = await fetch('/api/leave_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ partner: partnerName }) });
-                if(res.ok) { alert("채팅방에서 나갔습니다."); if(window.opener) window.opener.location.reload(); window.close(); }
+                if(res.ok) { if(window.opener && typeof window.opener.updateMessageBadge === 'function') window.opener.updateMessageBadge(); window.close(); }
             } catch(e) { console.error(e); }
         }
         function toggleEmojiPicker() { const picker = document.getElementById('chatEmojiPicker'); picker.style.display = picker.style.display === 'none' || !picker.style.display ? 'grid' : 'none'; }
@@ -482,101 +818,157 @@
             return '유효기간 ' + expiry.toLocaleDateString('ko-KR') + '까지';
         }
 
-        async function refreshChatBox() {
+        function mergeLoadedMessages(messages, reset) {
+            if (reset) {
+                loadedMessages = messages.slice();
+            } else {
+                const byId = new Map(loadedMessages.map(item => [Number(item.id), item]));
+                messages.forEach(item => byId.set(Number(item.id), item));
+                loadedMessages = Array.from(byId.values()).sort((a, b) => Number(a.id) - Number(b.id));
+            }
+            oldestMessageId = loadedMessages.length ? Number(loadedMessages[0].id) : null;
+            lastMessageId = loadedMessages.length ? Number(loadedMessages[loadedMessages.length - 1].id) : 0;
+        }
+
+        function renderLoadedMessages() {
+            const box = document.getElementById('chatBox');
+            box.innerHTML = '';
+            if (hasOlderMessages && oldestMessageId) {
+                const olderButton = document.createElement('button');
+                olderButton.type = 'button';
+                olderButton.className = 'chat-load-older';
+                olderButton.textContent = '이전 대화 불러오기';
+                olderButton.onclick = loadOlderMessages;
+                box.appendChild(olderButton);
+            }
+            if (!loadedMessages.length) {
+                const empty = document.createElement('div');
+                empty.style.cssText = 'text-align:center;padding:35px 0;color:#94a3b8;font-size:0.82rem;';
+                empty.textContent = '아직 대화가 없습니다.';
+                box.appendChild(empty);
+                return;
+            }
+
+            loadedMessages.forEach(c => {
+                const isMe = String(c.sender).trim() === String(currentUser).trim();
+                let dateStr = c.sent_at;
+                if (dateStr && !dateStr.endsWith('Z')) dateStr = dateStr.replace(' ', 'T') + 'Z';
+                const d = new Date(dateStr || Date.now());
+                const timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+                let unreadNum = parseInt(c.unread_count, 10);
+                if (isNaN(unreadNum) || partnerName === currentUser) unreadNum = 0;
+                const unreadHtml = unreadNum > 0 && (isMe || roomInfo.is_group)
+                    ? `<span style="color:#004ea2;font-size:0.70rem;margin-bottom:2px;">${unreadNum}</span>`
+                    : '';
+                const editedHtml = c.edited_at ? '<span class="chat-edited-label">(수정됨)</span>' : '';
+
+                let fileHtml = '';
+                if(c.filename && !c.is_deleted) {
+                    const ext = c.filename.split('.').pop().toLowerCase();
+                    const attachmentUrl = '/chat/attachment/' + encodeURIComponent(c.id);
+                    const safeFilename = escapeHtml(c.filename);
+                    const fileMeta = escapeHtml(formatChatFileSize(c.file_size) + ' · ' + formatChatFileExpiry(c.expires_at));
+                    const downloadLink = `<a class="chat-attachment-link" href="${attachmentUrl}?download=1" title="${safeFilename}"><i class="fa-solid fa-paperclip"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span><i class="fa-solid fa-download" style="margin-left:auto;"></i></a>`;
+                    fileHtml = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)
+                        ? `<div style="margin-top:8px;"><img src="${attachmentUrl}" alt="${safeFilename}" class="chat-attachment-preview" onclick="window.open('${attachmentUrl}', '_blank')">${downloadLink}</div>`
+                        : downloadLink;
+                }
+                const replyHtml = c.reply
+                    ? `<div class="chat-reply-preview" onclick="event.stopPropagation(); ${loadedMessages.some(item => Number(item.id) === Number(c.reply.id)) ? `scrollToMessage(${Number(c.reply.id)}, true)` : `openSearchResult(${Number(c.reply.id)})`}"><strong>${escapeHtml(c.reply.sender || '메시지')}</strong>${escapeHtml(c.reply.content || (c.reply.filename ? '📎 ' + c.reply.filename : '메시지'))}</div>`
+                    : '';
+                const reactionHtml = c.is_deleted ? '' : renderMessageReactions(c.id, c.reactions || []);
+                const commentsHtml = c.is_deleted ? '' : renderMessageComments(c.comments || []);
+                const messageContent = c.is_deleted
+                    ? '<span class="chat-deleted-message">삭제된 메시지입니다.</span>'
+                    : escapeHtml(c.content || '').replace(/\n/g, '<br>');
+                const attachmentBubbleClass = c.filename ? ' has-attachment' : '';
+                const fileOnlyBubbleClass = c.filename && !String(c.content || '').trim() ? ' only-file' : '';
+                const msgDiv = document.createElement('div');
+                msgDiv.dataset.messageId = c.id;
+                msgDiv.style.display = 'flex';
+                msgDiv.style.flexDirection = 'column';
+                msgDiv.style.alignItems = isMe ? 'flex-end' : 'flex-start';
+                msgDiv.style.marginBottom = '12px';
+                msgDiv.oncontextmenu = event => openMessageContextMenu(event, c.id, isMe);
+
+                const bubbleHtml = `${replyHtml}${messageContent}${fileHtml}`;
+                if (isMe) {
+                    msgDiv.innerHTML = `
+                        <div class="chat-message-row me">
+                            <div class="message-meta me">${unreadHtml}<span style="font-size:0.7rem;color:#64748b;">${timeStr}${editedHtml}</span></div>
+                            <div class="chat-bubble-wrap${attachmentBubbleClass}">
+                                <div class="chat-bubble me${attachmentBubbleClass}${fileOnlyBubbleClass}">${bubbleHtml}</div>
+                                ${reactionHtml}${commentsHtml}
+                            </div>
+                        </div>`;
+                } else {
+                    msgDiv.innerHTML = `
+                        <div class="chat-message-row other">
+                            <div style="font-size:2.2rem;margin-top:5px;">👤</div>
+                            <div style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;">
+                                <div style="font-size:0.85rem;color:#64748b;margin-bottom:3px;font-weight:bold;">${escapeHtml(c.sender)}</div>
+                                <div style="display:flex;align-items:flex-end;">
+                                    <div class="chat-bubble-wrap${attachmentBubbleClass}">
+                                        <div class="chat-bubble other${attachmentBubbleClass}${fileOnlyBubbleClass}">${bubbleHtml}</div>
+                                        ${reactionHtml}${commentsHtml}
+                                    </div>
+                                    <div class="message-meta other">${unreadHtml}<span style="font-size:0.7rem;color:#64748b;">${timeStr}${editedHtml}</span></div>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+                box.appendChild(msgDiv);
+            });
+        }
+
+        async function loadChatMessages(options = {}) {
+            if (messageLoadInProgress) return;
+            messageLoadInProgress = true;
+            const box = document.getElementById('chatBox');
+            const oldHeight = box.scrollHeight;
+            const oldTop = box.scrollTop;
+            const wasNearBottom = oldHeight - oldTop - box.clientHeight < 90;
+            const params = new URLSearchParams({ limit: '50', t: String(Date.now()) });
+            if (options.beforeId) params.set('before_id', String(options.beforeId));
+            if (options.afterId) params.set('after_id', String(options.afterId));
+            if (options.aroundId) params.set('around_id', String(options.aroundId));
             try {
-                const res = await fetch(`/get_chat_history/${encodeURIComponent(partnerName)}?t=${new Date().getTime()}`);
-                const chats = await res.json();
-                const box = document.getElementById('chatBox');
-                box.innerHTML = '';
-                
-                chats.forEach(c => {
-                    const isMe = (String(c.sender).trim() === String(currentUser).trim());
-                    
-                    let dateStr = c.sent_at;
-                    if (dateStr && !dateStr.endsWith('Z')) dateStr = dateStr.replace(' ', 'T') + 'Z'; 
-                    const d = new Date(dateStr || Date.now());
-                    const timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                    
-                    // 🚀 [수정] 백엔드에서 100% 보장하는 숫자를 받아오며, 말풍선 배경(#fef01b)에 어우러지는 강력한 그림자 스타일 적용
-                    let unreadNum = parseInt(c.unread_count, 10);
-                    if (isNaN(unreadNum)) unreadNum = 0;
-                    if (partnerName === currentUser) unreadNum = 0; // 나와의 채팅방은 카운트 무시
-
-                    const unreadHtml = (unreadNum > 0 && (isMe || isGroupChat))
-                        ? `<span style="color: #fef01b; font-size: 0.85rem; margin-bottom: 2px;">${unreadNum}</span>` 
-                        : '';
-
-                    let fileHtml = '';
-                    if(c.filename) {
-                        const ext = c.filename.split('.').pop().toLowerCase();
-                        const attachmentUrl = '/chat/attachment/' + encodeURIComponent(c.id);
-                        const safeFilename = escapeHtml(c.filename);
-                        const fileMeta = escapeHtml(formatChatFileSize(c.file_size) + ' · ' + formatChatFileExpiry(c.expires_at));
-                        const downloadLink = `<a class="chat-attachment-link" href="${attachmentUrl}?download=1" title="${safeFilename}"><i class="fa-solid fa-paperclip"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span><i class="fa-solid fa-download" style="margin-left:auto;"></i></a>`;
-                        if(['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
-                            fileHtml = `<div style="margin-top:8px;"><img src="${attachmentUrl}" alt="${safeFilename}" class="chat-attachment-preview" onclick="window.open('${attachmentUrl}', '_blank')">${downloadLink}</div>`;
-                        } else {
-                            fileHtml = downloadLink;
-                        }
+                const res = await fetch(`/get_chat_history/${encodeURIComponent(partnerName)}?${params.toString()}`);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || '대화를 불러오지 못했습니다.');
+                const messages = Array.isArray(data) ? data : (data.messages || []);
+                mergeLoadedMessages(messages, !!options.reset);
+                if (!options.afterId) hasOlderMessages = !!data.has_more;
+                if (data.room) applyRoomInfo(data.room);
+                renderLoadedMessages();
+                requestAnimationFrame(() => {
+                    if (options.beforeId) {
+                        box.scrollTop = box.scrollHeight - oldHeight + oldTop;
+                    } else if (options.aroundId) {
+                        scrollToMessage(options.aroundId, true);
+                    } else if (!options.preserveScroll && (options.reset || wasNearBottom)) {
+                        box.scrollTop = box.scrollHeight;
+                    } else {
+                        box.scrollTop = Math.min(oldTop, box.scrollHeight - box.clientHeight);
                     }
-
-                    const reactionHtml = renderMessageReactions(c.id, c.reactions || []);
-                    const commentsHtml = renderMessageComments(c.comments || []);
-                    const messageContent = escapeHtml(c.content || '').replace(/\n/g, '<br>');
-                    const attachmentBubbleClass = c.filename ? ' has-attachment' : '';
-                    const msgDiv = document.createElement('div');
-                    msgDiv.style.display = 'flex';
-                    msgDiv.style.flexDirection = 'column';
-                    msgDiv.style.alignItems = isMe ? 'flex-end' : 'flex-start';
-                    msgDiv.style.marginBottom = '12px';
-                    msgDiv.oncontextmenu = function(event) { openMessageContextMenu(event, c.id, isMe); };
-
-                    if (isMe) { 
-                        msgDiv.style.justifyContent = 'flex-end';
-                        msgDiv.innerHTML = `
-                            <div class="chat-message-row me">
-                                <div class="message-meta me">
-                                    ${unreadHtml} 
-                                    <span style="font-size: 0.7rem; color: #64748b;">${timeStr}</span>
-                                </div>
-                                <div class="chat-bubble-wrap${attachmentBubbleClass}">
-                                    <div class="chat-bubble me${attachmentBubbleClass}">
-                                        ${messageContent}${fileHtml}
-                                    </div>
-                                    ${reactionHtml}
-                                    ${commentsHtml}
-                                </div>
-                            </div>
-                        `;
-                    } else { 
-                        msgDiv.style.justifyContent = 'flex-start';
-                        msgDiv.innerHTML = `
-                            <div class="chat-message-row other">
-                                <div style="font-size: 2.2rem; margin-top: 5px;">👤</div>
-                                <div style="display: flex; flex-direction: column; align-items: flex-start; min-width:0;">
-                                    <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 3px; font-weight: bold;">${c.sender}</div>
-                                    <div style="display: flex; align-items: flex-end;">
-                                        <div class="chat-bubble-wrap${attachmentBubbleClass}">
-                                            <div class="chat-bubble other${attachmentBubbleClass}">
-                                                ${messageContent}${fileHtml}
-                                            </div>
-                                            ${reactionHtml}
-                                            ${commentsHtml}
-                                        </div>
-                                        <div class="message-meta other">
-                                            ${unreadHtml}
-                                            <span style="font-size: 0.7rem; color: #64748b;">${timeStr}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    box.appendChild(msgDiv);
                 });
-                box.scrollTop = box.scrollHeight;
                 notifyOpenerUnreadChanged();
-            } catch (e) { console.error("채팅 로드 실패:", e); }
+            } catch (error) {
+                console.error('채팅 로드 실패:', error);
+                if (!loadedMessages.length) box.innerHTML = `<div style="padding:30px;text-align:center;color:#ef4444;">${escapeHtml(error.message)}</div>`;
+            } finally {
+                messageLoadInProgress = false;
+            }
+        }
+
+        async function loadOlderMessages() {
+            if (!oldestMessageId || !hasOlderMessages) return;
+            await loadChatMessages({ beforeId: oldestMessageId });
+        }
+
+        async function refreshChatBox() {
+            if (!loadedMessages.length) return loadChatMessages({ reset: true });
+            return loadChatMessages({ afterId: lastMessageId });
         }
 
         async function sendChatReply() {
@@ -590,9 +982,10 @@
             }
             
             let formData = new FormData();
-            if (isGroupChat) formData.append('room_id', partnerName);
+            if (roomInfo.is_group) formData.append('room_id', partnerName);
             formData.append('receiver', partnerName);
             formData.append('content', content);
+            if (replyTarget) formData.append('reply_to_id', String(replyTarget.id));
             if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
 
             try {
@@ -601,6 +994,8 @@
                     input.value = ''; fileInput.value = '';
                     showChatFileName(fileInput);
                     document.getElementById('chatEmojiPicker').style.display = 'none';
+                    cancelReply();
+                    sendTypingState(false);
                     await refreshChatBox();
                 } else {
                     const error = await res.json().catch(() => ({}));
@@ -609,8 +1004,78 @@
             } catch (e) { alert("메시지 전송 중 오류가 발생했습니다."); }
         }
 
-        window.onload = function() { initHeader(); initializeChatFileDrop(); refreshChatBox(); document.getElementById('chatInput').focus(); };
-        setInterval(refreshChatBox, 5000);
+        function sendTypingState(isTyping) {
+            if (!chatSocket || !chatSocket.connected) return;
+            chatSocket.emit('typing', { partner: partnerName, is_typing: !!isTyping });
+            if (!isTyping) lastTypingSentAt = 0;
+        }
+
+        function handleChatInput() {
+            if (!document.getElementById('chatInput').value) {
+                clearTimeout(typingStopTimer);
+                sendTypingState(false);
+                return;
+            }
+            const now = Date.now();
+            if (now - lastTypingSentAt > 450) {
+                sendTypingState(true);
+                lastTypingSentAt = now;
+            }
+            clearTimeout(typingStopTimer);
+            typingStopTimer = setTimeout(() => sendTypingState(false), 1800);
+        }
+
+        function initializeChatSocket() {
+            if (typeof io !== 'function') return;
+            chatSocket = io('/chat', {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionDelay: 1000
+            });
+            chatSocket.on('connect', () => {
+                chatSocket.emit('join_chat', { partner: partnerName });
+                refreshChatBox();
+            });
+            chatSocket.on('chat_event', async event => {
+                if (!event || event.partner !== partnerName) return;
+                if (event.type === 'message') {
+                    await refreshChatBox();
+                } else if (['message_changed', 'message_hidden'].includes(event.type)) {
+                    await loadChatMessages({ reset: true, preserveScroll: true });
+                } else if (event.type === 'room_changed') {
+                    await loadRoomInfo();
+                    if (document.getElementById('groupSettingsModal').style.display === 'block') renderGroupSettings();
+                    notifyOpenerUnreadChanged();
+                } else if (event.type === 'room_removed') {
+                    alert('그룹 관리자에 의해 채팅방에서 제외되었습니다.');
+                    window.close();
+                }
+            });
+            chatSocket.on('chat_typing', event => {
+                if (!event || event.user === currentUser) return;
+                const indicator = document.getElementById('chatTypingIndicator');
+                clearTimeout(typingDisplayTimer);
+                indicator.textContent = event.is_typing ? `${event.user}님이 입력 중...` : '';
+                if (event.is_typing) {
+                    typingDisplayTimer = setTimeout(() => { indicator.textContent = ''; }, 3000);
+                }
+            });
+        }
+
+        window.addEventListener('beforeunload', () => {
+            sendTypingState(false);
+            if (chatSocket && chatSocket.connected) chatSocket.emit('leave_chat_room', { partner: partnerName });
+        });
+
+        window.onload = async function() {
+            initHeader();
+            initializeChatFileDrop();
+            document.getElementById('chatInput').addEventListener('input', handleChatInput);
+            await loadChatMessages({ reset: true });
+            initializeChatSocket();
+            document.getElementById('chatInput').focus();
+        };
+        setInterval(refreshChatBox, 30000);
     </script>
 </body>
 </html>

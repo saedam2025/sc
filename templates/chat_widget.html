@@ -1,3 +1,4 @@
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
     .chat-rank-badge {
         display: none;
@@ -54,6 +55,7 @@
 </div>
             
             <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
+                <i id="chatNotificationButton" class="fa-regular fa-bell" onclick="requestChatNotifications()" title="메신저 데스크톱 알림" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
                 <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
                 <i class="fa-solid fa-plus" onclick="document.getElementById('expandedChatModal').style.display='block'" title="메신저 크게 보기" style="font-size: 1.25rem; color: var(--blue-primary); cursor:pointer; padding: 5px;"></i>
             </div>
@@ -180,6 +182,13 @@
     let selectedChatReceivers = [];
     let chatUnreadDetails = null;
     let chatRoomsFromApi = null;
+    let chatWidgetSocket = null;
+
+    function chatEscapeHtml(value) {
+        const temp = document.createElement('span');
+        temp.textContent = String(value ?? '');
+        return temp.innerHTML;
+    }
 
     function parseChatTime(dateValue) {
         const normalized = String(dateValue || '').replace(' ', 'T');
@@ -219,6 +228,8 @@
                 unread: Number(c.unread_count || 0),
                 is_pinned: !!c.is_pinned,
                 pin_order: Number(c.pin_order || 0),
+                displayName: c.display_name || '',
+                notificationsMuted: !!c.notifications_muted,
             })).sort(sortChatRooms);
         } else {
             const recentChats = {};
@@ -253,10 +264,14 @@
                 // 그룹채팅 시 카카오톡처럼 표시
                 if (c.is_group) {
                     avatar = '👥';
-                    const members = c.partner.split(',').map(s => s.trim()).filter(s => s !== chatWidgetCurrentUser);
-                    displayName = members.join(', ');
-                    if (members.length > 2) {
-                        displayName = members.slice(0, 2).join(', ') + ` 외 ${members.length - 2}명`;
+                    if (c.displayName) {
+                        displayName = c.displayName;
+                    } else {
+                        const members = c.partner.split(',').map(s => s.trim()).filter(s => s !== chatWidgetCurrentUser);
+                        displayName = members.join(', ');
+                        if (members.length > 2) {
+                            displayName = members.slice(0, 2).join(', ') + ` 외 ${members.length - 2}명`;
+                        }
                     }
                 }
                 
@@ -268,10 +283,10 @@
                     </div>
                     <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
                         <div style="display:flex; justify-content:space-between; margin-bottom:2px; align-items:center;">
-                            <span class="msg-list-name" style="font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">${displayName}</span>
+                            <span class="msg-list-name" style="font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">${chatEscapeHtml(displayName)}${c.notificationsMuted ? ' <i class="fa-solid fa-bell-slash" style="font-size:0.65rem;color:#94a3b8;"></i>' : ''}</span>
                             <span class="msg-list-date" style="font-size:0.7rem;">${dateStr}</span>
                         </div>
-                        <div style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.lastMsg}</div>
+                        <div style="font-size:0.75rem; color:var(--text-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${chatEscapeHtml(c.lastMsg)}</div>
                     </div>
                     ${c.unread > 0 ? `<div style="background:#ef4444; color:#fff; font-size:0.65rem; font-weight:bold; border-radius:10px; padding:2px 5px; margin-left:6px; align-self:center;">${c.unread}</div>` : ''}
                     <div class="pin-controls" onclick="event.stopPropagation();" style="display:none; gap:4px; margin-left:6px; align-self:center; align-items:center;">
@@ -556,16 +571,69 @@
         }
     }
 
+    async function requestChatNotifications() {
+        if (!('Notification' in window)) {
+            return alert('이 브라우저는 데스크톱 알림을 지원하지 않습니다.');
+        }
+        const permission = await Notification.requestPermission();
+        const button = document.getElementById('chatNotificationButton');
+        if (button) {
+            button.className = permission === 'granted' ? 'fa-solid fa-bell' : 'fa-regular fa-bell-slash';
+            button.title = permission === 'granted' ? '데스크톱 알림 사용 중' : '데스크톱 알림이 차단됨';
+        }
+        if (permission !== 'granted') alert('브라우저 설정에서 알림 권한을 허용해주세요.');
+    }
+
+    function initializeChatWidgetSocket() {
+        if (typeof io !== 'function') return;
+        chatWidgetSocket = io('/chat', {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000
+        });
+        chatWidgetSocket.on('chat_event', event => {
+            if (!event) return;
+            updateMessageBadge();
+            if (
+                event.type === 'message'
+                && event.actor !== chatWidgetCurrentUser
+                && 'Notification' in window
+                && Notification.permission === 'granted'
+                && document.visibilityState !== 'visible'
+            ) {
+                const room = Array.isArray(chatRoomsFromApi)
+                    ? chatRoomsFromApi.find(item => item.partner === event.partner)
+                    : null;
+                if (!room || !room.notifications_muted) {
+                    const title = room?.display_name || event.actor || '새담 사내메신저';
+                    const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');
+                    const notification = new Notification(title, { body, tag: 'chat-' + event.partner });
+                    notification.onclick = () => {
+                        window.focus();
+                        openChat(event.partner);
+                        notification.close();
+                    };
+                }
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         renderChatList();
         updateMessageBadge();
         loadOrgChart();
+        initializeChatWidgetSocket();
+        const notificationButton = document.getElementById('chatNotificationButton');
+        if (notificationButton && 'Notification' in window && Notification.permission === 'granted') {
+            notificationButton.className = 'fa-solid fa-bell';
+            notificationButton.title = '데스크톱 알림 사용 중';
+        }
         const unreadItems = document.querySelectorAll('.unread-msg-item');
         if(unreadItems.length === 0) {
             const emptyDiv = document.getElementById('unreadMsgEmpty');
             if(emptyDiv) emptyDiv.style.display = 'block';
         }
-        setInterval(updateMessageBadge, 10000); 
+        setInterval(updateMessageBadge, 60000);
         window.addEventListener('focus', updateMessageBadge);
     });
 </script>
