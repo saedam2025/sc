@@ -25,6 +25,7 @@ BASE_DIR = "/mnt/data" if os.path.exists("/mnt/data") else os.getcwd()
 DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")  # 엑셀 DB 파일
 PDF_FOLDER = os.path.join(BASE_DIR, "output_pdfs")       # 생성된 PDF 보관 폴더
 SEAL_IMAGE = os.path.join(os.getcwd(), "static", "seal.gif") # 도장 이미지
+CERT_BACKGROUND_IMAGE = os.path.join(os.getcwd(), "static", "cer_bg.png")
 
 # 템플릿 경로 설정
 TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certificate_template.html")
@@ -278,6 +279,9 @@ def create_pdf_file(row, issue_no):
 
     data['발급번호'] = issue_no
     data['발급일자'] = now_kst().strftime("%Y년 %m월 %d일")
+    cert_type = ''.join(str(data.get('증명서종류', '')).split())
+    data['우수강사인증서여부'] = cert_type == '우수강사인증서'
+    data['인증서배경'] = f"file:///{os.path.abspath(CERT_BACKGROUND_IMAGE).replace(os.sep, '/')}"
 
     html_content = template.render(**data)
 
@@ -288,7 +292,8 @@ def create_pdf_file(row, issue_no):
     output_path = os.path.join(PDF_FOLDER, file_name)
     
     options = {
-        'enable-local-file-access': None, 
+        'enable-local-file-access': None,
+        'background': None,
         'encoding': 'UTF-8',
         'margin-top': '0', 'margin-bottom': '0', 'margin-left': '0', 'margin-right': '0'
     }
