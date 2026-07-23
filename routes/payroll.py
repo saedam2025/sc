@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -723,6 +724,18 @@ def _wrapped_email_image(image_url, alt):
     )
 
 
+def _sender_from_header(sender):
+    sender_email = str(sender.get('email') or '').strip()
+    sender_label = str(sender.get('label') or '').strip()
+    duplicate_email = re.compile(
+        rf'\s*<\s*{re.escape(sender_email)}\s*>\s*$',
+        re.IGNORECASE,
+    )
+    while sender_label and duplicate_email.search(sender_label):
+        sender_label = duplicate_email.sub('', sender_label).strip()
+    return formataddr((sender_label, sender_email), charset='utf-8') if sender_label else sender_email
+
+
 def _build_message(row, group, sender, password, send_date, base_url):
     target_name = _recipient_name(row)
     target_email = str(row.get('이메일', '')).strip()
@@ -757,7 +770,7 @@ def _build_message(row, group, sender, password, send_date, base_url):
     alternative = MIMEMultipart('alternative')
     message.attach(alternative)
     message['Subject'] = subject
-    message['From'] = f"{sender['label']} <{sender['email']}>"
+    message['From'] = _sender_from_header(sender)
     message['To'] = target_email
     alternative.attach(MIMEText(_plain_from_html(body), 'plain', 'utf-8'))
     alternative.attach(MIMEText(body, 'html', 'utf-8'))
