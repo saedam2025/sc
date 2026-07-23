@@ -138,9 +138,9 @@
 
             <div class="modal-field"><label>성명</label><input type="text" id="name" class="glass-input" placeholder="실명 입력" required></div>
             <div class="modal-field"><label>주민등록번호</label><input type="text" id="rrn" class="glass-input" placeholder="000000-0000000" required></div>
-            <div class="modal-field"><label>비밀번호 (영문, 숫자, 특수문자 조합 10자 이내)</label><input type="password" id="password" class="glass-input" maxlength="10" placeholder="로그인 비밀번호" required></div>
+            <div class="modal-field"><label>비밀번호 (영문, 숫자, 특수문자 조합 12자 이내)</label><input type="password" id="password" class="glass-input" maxlength="12" placeholder="로그인 비밀번호" required></div>
             <div class="modal-field"><label>비밀번호 확인</label><input type="password" id="password_confirm" class="glass-input" maxlength="10" placeholder="비밀번호 재입력" required></div>
-            <div class="modal-field"><label>연락처</label><input type="text" id="phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
+            <div class="modal-field"><label>개인연락처 ( - 하이픈 자동입력 됨)</label><input type="text" id="phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
             <div class="modal-field"><label>이메일</label><input type="email" id="email" class="glass-input readonly-field" value="{{ invite_email }}" readonly></div>
             <div class="modal-field full-width"><label>주소지</label><input type="text" id="address" class="glass-input" placeholder="전체 주소 입력"></div>
             <div class="modal-field full-width"><label>급여통장번호</label><input type="text" id="bank_account" class="glass-input" placeholder="00은행 000-0000-0000"></div>
