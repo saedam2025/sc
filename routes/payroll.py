@@ -564,7 +564,9 @@ def _load_excel(file_storage):
         if not holder_column:
             missing.append('예금주')
         if missing:
-            invalid_sheets.append(f"{file_storage.filename} / {sheet_name}: {', '.join(missing)}")
+            invalid_sheets.append(
+                f"{file_storage.filename} / {sheet_name}: 필수 제목 누락 ({', '.join(missing)})"
+            )
             continue
 
         first_frame = first_rows.get(sheet_name)
@@ -603,18 +605,13 @@ def _load_excel(file_storage):
         if sheet_targets:
             target_frames.append(pd.DataFrame(sheet_targets))
 
-    if invalid_sheets:
-        details = '; '.join(invalid_sheets)
-        raise ValueError(
-            f'모든 시트의 {EXCEL_HEADER_ROW}번째 행에서 필수 제목을 확인해주세요. {details}'
-        )
-
     if target_frames:
         frame = pd.concat(target_frames, ignore_index=True, sort=False).fillna('')
     else:
         frame = pd.DataFrame()
     frame.attrs['sheet_names'] = list(sheets.keys())
     frame.attrs['sheet_count'] = len(sheets)
+    frame.attrs['invalid_sheets'] = invalid_sheets
     frame.attrs['skipped_count'] = skipped_count
     frame.attrs['file_names'] = [file_storage.filename]
     frame.attrs['file_count'] = 1
@@ -629,6 +626,11 @@ def _load_excels(file_storages):
     non_empty = [frame for frame in frames if len(frame)]
     combined = pd.concat(non_empty, ignore_index=True, sort=False).fillna('') if non_empty else pd.DataFrame()
     combined.attrs['sheet_count'] = sum(int(frame.attrs.get('sheet_count', 0)) for frame in frames)
+    combined.attrs['invalid_sheets'] = [
+        invalid_sheet
+        for frame in frames
+        for invalid_sheet in frame.attrs.get('invalid_sheets', [])
+    ]
     combined.attrs['skipped_count'] = sum(int(frame.attrs.get('skipped_count', 0)) for frame in frames)
     combined.attrs['file_names'] = [file_storage.filename for file_storage in files]
     combined.attrs['file_count'] = len(files)
@@ -1563,9 +1565,15 @@ def _preflight(group, sender, frame, forms, form_errors=None):
     valid_count = sum(1 for row in rows if row['status'] == 'ready')
     file_count = int(frame.attrs.get('file_count', 0))
     sheet_count = int(frame.attrs.get('sheet_count', 0))
+    invalid_sheets = frame.attrs.get('invalid_sheets', [])
     skipped_count = int(frame.attrs.get('skipped_count', 0))
     if sheet_count:
         infos.append(f'엑셀 {file_count}개, 전체 {sheet_count}개 시트에서 발송 대상 {len(rows)}건을 확인했습니다.')
+    for invalid_sheet in invalid_sheets:
+        warnings.append(
+            f'{invalid_sheet}: 형식에 맞지 않아 발송 대상에서 제외했습니다. '
+            f'{EXCEL_HEADER_ROW}번째 행의 필수 제목을 확인해주세요.'
+        )
     if group['form_type'] == AUTO_FORM_KEY and forms:
         counts = {}
         for _, row in frame.iterrows():
