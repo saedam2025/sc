@@ -25,6 +25,15 @@
       padding: 75px 15px 5px 15px;
       margin: 0 auto;
     }
+    .page-wrapper.excellent-certificate {
+      background-color: #fff;
+      background-image: url("{{ 인증서배경 }}");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100% 100%;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     /* 고급스러운 이중 테두리 */
     .cert-border {
       width: 100%;
@@ -36,6 +45,35 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+    }
+    .excellent-certificate .cert-border {
+      border-color: transparent;
+    }
+    .excellent-certificate .info-table th,
+    .excellent-certificate .info-table td {
+      padding-top: 15px;
+      padding-bottom: 15px;
+    }
+    .excellent-certificate .declaration {
+      margin-top: 15px;
+      margin-bottom: 210px;
+    }
+    .excellent-certificate .date {
+      position: relative;
+      top: 55px;
+    }
+    .excellent-certificate .issuer-box {
+      position: relative;
+      top: 35px;
+    }
+    .excellent-certificate .issuer-name {
+      font-size: 25px;
+      letter-spacing: 3px;
+      white-space: nowrap;
+    }
+    .excellent-certificate .seal {
+      right: -175px;
+      top: -65px;
     }
     
     /* 상단~직인까지의 컨텐츠 영역 */
@@ -142,8 +180,8 @@
     }
   </style>
 </head>
-<body><br>    <!------- 마진으로 조절안되는 상단여백은 여기서 br태그로 조절--------->
-  <div class="page-wrapper">
+<body>{% if not 우수강사인증서여부 %}<br>{% endif %}    <!------- 마진으로 조절안되는 상단여백은 여기서 br태그로 조절--------->
+  <div class="page-wrapper{% if 우수강사인증서여부 %} excellent-certificate{% endif %}">
     <div class="cert-border">
      
       <div class="content-area">
