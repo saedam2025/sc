@@ -74,7 +74,12 @@ def init_db():
         sender TEXT, receiver TEXT, content TEXT, 
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         is_read INTEGER DEFAULT 0,
-        filename TEXT, filepath TEXT
+        filename TEXT, filepath TEXT,
+        message_uid TEXT,
+        reply_to_uid TEXT,
+        edited_at DATETIME,
+        deleted_for_all INTEGER DEFAULT 0,
+        deleted_at DATETIME
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS chat_rooms (
@@ -563,6 +568,11 @@ def init_db():
         "ALTER TABLE messages ADD COLUMN filepath TEXT",
         "ALTER TABLE messages ADD COLUMN room_id TEXT", 
         "ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0",
+        "ALTER TABLE messages ADD COLUMN message_uid TEXT",
+        "ALTER TABLE messages ADD COLUMN reply_to_uid TEXT",
+        "ALTER TABLE messages ADD COLUMN edited_at DATETIME",
+        "ALTER TABLE messages ADD COLUMN deleted_for_all INTEGER DEFAULT 0",
+        "ALTER TABLE messages ADD COLUMN deleted_at DATETIME",
         "ALTER TABLE daily_attendance ADD COLUMN reason TEXT",
         "ALTER TABLE daily_attendance ADD COLUMN position TEXT",
         "ALTER TABLE gallery ADD COLUMN tab_id INTEGER DEFAULT 1",

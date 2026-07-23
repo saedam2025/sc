@@ -5,6 +5,7 @@ import yagmail
 import smtplib
 import shutil
 import platform
+import hmac
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
@@ -33,6 +34,12 @@ TEMPLATE_PATH = os.path.join(os.getcwd(), "templates", "certificate", "certifica
 os.makedirs(PDF_FOLDER, exist_ok=True)
 
 ADMIN_NOTIFICATION_EMAIL = "edu197@naver.com"
+CERTIFICATE_FORM_PASSWORD = "0070"
+CERTIFICATE_FORM_SESSION_KEYS = {
+    "document.apply": "certificate_apply_verified",
+    "document.apply2": "certificate_apply2_verified",
+}
+CERTIFICATE_FORM_AUTH_TOKEN = "certificate-form-v2"
 
 # =====================================================================
 # [수정된 부분: PDF 엔진 설정] - 윈도우 에러 방지 처리 추가
@@ -56,6 +63,54 @@ def get_email_credentials():
     email = os.environ.get("MAIL_USERNAME", "")
     pw = os.environ.get("MAIL_PASSWORD", "")
     return email.strip(), pw.strip()
+
+
+def require_certificate_form_password():
+    if session.get("emp_no"):
+        return None
+
+    session_key = CERTIFICATE_FORM_SESSION_KEYS.get(
+        request.endpoint,
+        "certificate_form_verified",
+    )
+    if session.get(session_key) == CERTIFICATE_FORM_AUTH_TOKEN:
+        return None
+
+    if request.method == "POST":
+        supplied_password = str(request.form.get("password", ""))
+        if hmac.compare_digest(supplied_password, CERTIFICATE_FORM_PASSWORD):
+            session[session_key] = CERTIFICATE_FORM_AUTH_TOKEN
+            return redirect(request.path)
+        flash("비밀번호가 올바르지 않습니다.")
+
+    return render_template("certificate/form_login.html")
+
+
+def clear_certificate_form_password():
+    if session.get("emp_no"):
+        return
+    session_key = CERTIFICATE_FORM_SESSION_KEYS.get(request.endpoint)
+    if session_key:
+        session.pop(session_key, None)
+
+
+def certificate_form_template_context():
+    is_intranet_user = bool(session.get("emp_no"))
+    try:
+        user_level = int(session.get("user_level", 99))
+    except (TypeError, ValueError):
+        user_level = 99
+    use_intranet_layout = is_intranet_user and user_level <= 5
+    return {
+        "certificate_layout": (
+            "base.html"
+            if use_intranet_layout
+            else "certificate/form_standalone_base.html"
+        ),
+        "intranet_layout": use_intranet_layout,
+        "current_user_level": user_level,
+    }
+
 
 # --- [내부 데이터베이스 관리 함수] ---
 def ensure_db_initialized():
@@ -88,6 +143,10 @@ def get_next_issue_number():
 # --- [외부 라우트: 강사 신청용] ---
 @document_bp.route('/apply', methods=['GET', 'POST'])
 def apply():
+    login_response = require_certificate_form_password()
+    if login_response is not None:
+        return login_response
+
     ensure_db_initialized()
     if request.method == 'POST':
         try:
@@ -109,15 +168,23 @@ def apply():
             df.to_excel(DATA_PATH, index=False)
 
             send_admin_alert(form_data['성명'], form_data['증명서종류'], role="강사님")
+            clear_certificate_form_password()
             return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
             
-    return render_template('certificate/form.html')
+    return render_template(
+        'certificate/form.html',
+        **certificate_form_template_context(),
+    )
 
 # --- [외부 라우트: 임직원 신청용] ---
 @document_bp.route('/apply2', methods=['GET', 'POST'])
 def apply2():
+    login_response = require_certificate_form_password()
+    if login_response is not None:
+        return login_response
+
     ensure_db_initialized()
     if request.method == 'POST':
         try:
@@ -140,11 +207,15 @@ def apply2():
 
             # 관리자 알림 시 임직원임을 명시
             send_admin_alert(form_data['성명'], form_data['증명서종류'], role="임직원")
+            clear_certificate_form_password()
             return render_template('certificate/success.html', data=form_data)
         except Exception as e:
             return f"신청 중 오류가 발생했습니다: {str(e)}", 500
             
-    return render_template('certificate/form2.html')
+    return render_template(
+        'certificate/form2.html',
+        **certificate_form_template_context(),
+    )
 
 
 # --- [내부 라우트: 관리자용] ---
