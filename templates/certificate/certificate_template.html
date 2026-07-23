@@ -75,13 +75,13 @@
       top: 50px;
     }
     .excellent-certificate .issuer-name {
-      font-size: 25px;
+      font-size: 28px;
       letter-spacing: 3px;
       white-space: nowrap;
     }
     .excellent-certificate .seal {
-      right: -175px;
-      top: -65px;
+      right: -155px;
+      top: -45px;
     }
     .excellent-certificate .footer-info {
       position: relative;
@@ -260,9 +260,13 @@
           </tr>
         </table>
 
-        <div class="declaration">
-          위와 같이 증명합니다.
-        </div>
+<div class="declaration">
+  {% if 우수강사인증서여부 %}
+    우수강사로 선정되었기에 이 인증서를 수여합니다.
+  {% else %}
+    위와 같이 증명합니다.
+  {% endif %}
+</div>
 
         <div class="date">
           {{ 발급일자 }}
