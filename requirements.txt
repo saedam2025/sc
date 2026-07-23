@@ -1,5 +1,7 @@
 flask
 gunicorn
+Flask-SocketIO>=5.3,<6
+simple-websocket>=1.0,<2
 pandas
 openpyxl
 fpdf2

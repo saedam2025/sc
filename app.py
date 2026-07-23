@@ -3,6 +3,7 @@ from datetime import datetime
 import os
 import sys
 import traceback
+from extensions import socketio
 
 # 배포 환경에서 모듈 임포트 에러 방지를 위해 현재 디렉토리를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -38,6 +39,7 @@ from routes.chat import chat_bp
 from routes.database import get_db, init_db
 
 app = Flask(__name__)
+socketio.init_app(app)
 
 # =====================================================================
 # [DB 초기화 로직] 배포 환경에서도 안전하게 실행
@@ -73,6 +75,7 @@ EXEMPT_ROUTES = [
     'contract.contract', 
     'contract.save_contract', 
     'document.apply',
+    'document.apply2',
     'expense.submit_expense',
     'expense.expense_template',
 ]
@@ -93,6 +96,18 @@ LEVEL_8_ALLOWED_PATHS = [
     '/user/upload',          # 💡 공통 메인메뉴 프로필 사진 업로드 허용
     '/user/api',             # 💡 기타 유저 관련 API 허용
     '/chat_popup',
+    '/chat/attachment',
+    '/send_message',
+    '/get_chat_history',
+    '/delete_message',
+    '/api/chat',
+    '/api/unread_messages',
+    '/api/message_',
+    '/api/messages',
+    '/api/leave_chat',
+    '/api/toggle_pin',
+    '/api/move_pin',
+    '/socket.io',
     '/gall2',
     '/api/activity_feed',
 ]
@@ -614,4 +629,4 @@ def internal_server_error(e):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=True, allow_unsafe_werkzeug=True)
