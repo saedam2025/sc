@@ -70,7 +70,7 @@ def send_real_email(target_email, invite_link):
         <tr>
             <td style="padding: 30px; vertical-align: middle;">
                 <h2 style="color: #4a90e2; margin: 0 0 10px 0; font-size: 22px;">새담 인트라넷 초대</h2>
-                <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.5;">안녕하세요. 새담 청소년 교육문화원입니다.<br>가입을 위한 보안 링크를 보내드립니다. 우측 버튼을 클릭하여 진행해주세요.</p>
+                <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.5;">안녕하세요. (사)새담청소년교육문화원입니다.<br>인트라넷 회원가입을 위한 보안 링크를 보내드립니다. 우측 버튼을 클릭하여 진행해주세요.</p>
             </td>
             <td style="padding: 30px; text-align: right; vertical-align: middle; width: 160px; background-color: #f8fbff; border-left: 1px solid #eee;">
                 <a href="{invite_link}" target="_blank" style="display: inline-block; background: #4a90e2; color: white; padding: 14px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; white-space: nowrap; font-size: 15px; box-shadow: 0 2px 4px rgba(74, 144, 226, 0.3);">가입 신청하기</a>
