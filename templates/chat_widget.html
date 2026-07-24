@@ -1,4 +1,5 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/chat_notifications.js') }}"></script>
 <style>
     .chat-rank-badge {
         display: none;
@@ -55,7 +56,7 @@
 </div>
             
             <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
-                <i id="chatNotificationButton" class="fa-regular fa-bell" onclick="requestChatNotifications()" title="메신저 데스크톱 알림" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
+                <i id="chatNotificationButton" class="fa-solid fa-bell" role="button" tabindex="0" aria-pressed="true" onclick="toggleChatAlerts()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChatAlerts();}" title="메시지 알림음 켜짐 · 눌러서 끄기" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
                 <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
                 <i class="fa-solid fa-plus" onclick="document.getElementById('expandedChatModal').style.display='block'" title="메신저 크게 보기" style="font-size: 1.25rem; color: var(--blue-primary); cursor:pointer; padding: 5px;"></i>
             </div>
@@ -470,8 +471,11 @@
         if (res.ok) updateMessageBadge();
     }
 
-    function updateMessageBadge() {
-        fetch('/api/unread_messages').then(r => r.json()).then(data => {
+    async function updateMessageBadge() {
+        try {
+            const response = await fetch('/api/unread_messages');
+            if (!response.ok) return null;
+            const data = await response.json();
             const totalUnread = Number(data.total_unread || 0);
             chatUnreadDetails = data.details || {};
 
@@ -482,7 +486,11 @@
                 tabBadge.style.display = totalUnread > 0 ? 'inline-block' : 'none';
             }
             renderChatList();
-        });
+            return data;
+        } catch (error) {
+            console.error('메신저 목록 갱신 실패:', error);
+            return null;
+        }
     }
 
     window.toggleOrgGroup = function(groupId) {
@@ -571,17 +579,57 @@
         }
     }
 
-    async function requestChatNotifications() {
-        if (!('Notification' in window)) {
-            return alert('이 브라우저는 데스크톱 알림을 지원하지 않습니다.');
-        }
-        const permission = await Notification.requestPermission();
+    function updateChatAlertButton() {
         const button = document.getElementById('chatNotificationButton');
-        if (button) {
-            button.className = permission === 'granted' ? 'fa-solid fa-bell' : 'fa-regular fa-bell-slash';
-            button.title = permission === 'granted' ? '데스크톱 알림 사용 중' : '데스크톱 알림이 차단됨';
+        if (!button || !window.ChatMessageAlerts) return;
+        const enabled = window.ChatMessageAlerts.isEnabled();
+        button.className = enabled ? 'fa-solid fa-bell' : 'fa-regular fa-bell-slash';
+        button.title = enabled ? '메시지 알림음 켜짐 · 눌러서 끄기' : '메시지 알림음 꺼짐 · 눌러서 켜기';
+        button.setAttribute('aria-label', button.title);
+        button.setAttribute('aria-pressed', String(enabled));
+        button.style.color = enabled ? 'var(--blue-primary)' : '#94a3b8';
+    }
+
+    async function toggleChatAlerts() {
+        if (!window.ChatMessageAlerts) return;
+        const enabled = window.ChatMessageAlerts.toggle();
+        updateChatAlertButton();
+        if (
+            enabled
+            && 'Notification' in window
+            && Notification.permission === 'default'
+        ) {
+            await Notification.requestPermission();
         }
-        if (permission !== 'granted') alert('브라우저 설정에서 알림 권한을 허용해주세요.');
+    }
+
+    window.handleIncomingChatAlert = function(event, roomOverride) {
+        if (!event || event.type !== 'message' || event.actor === chatWidgetCurrentUser) return false;
+        const room = roomOverride || (
+            Array.isArray(chatRoomsFromApi)
+                ? chatRoomsFromApi.find(item => item.partner === event.partner)
+                : null
+        );
+        const muted = !!(room && room.notifications_muted);
+        if (!window.ChatMessageAlerts || !window.ChatMessageAlerts.notifyIncoming(event, { muted })) {
+            return false;
+        }
+
+        if (
+            'Notification' in window
+            && Notification.permission === 'granted'
+            && document.visibilityState !== 'visible'
+        ) {
+            const title = room?.display_name || event.actor || '새담 사내메신저';
+            const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');
+            const notification = new Notification(title, { body, tag: 'chat-' + event.partner });
+            notification.onclick = () => {
+                window.focus();
+                openChat(event.partner);
+                notification.close();
+            };
+        }
+        return true;
     }
 
     function initializeChatWidgetSocket() {
@@ -591,29 +639,14 @@
             reconnection: true,
             reconnectionDelay: 1000
         });
-        chatWidgetSocket.on('chat_event', event => {
+        chatWidgetSocket.on('chat_event', async event => {
             if (!event) return;
-            updateMessageBadge();
-            if (
-                event.type === 'message'
-                && event.actor !== chatWidgetCurrentUser
-                && 'Notification' in window
-                && Notification.permission === 'granted'
-                && document.visibilityState !== 'visible'
-            ) {
+            await updateMessageBadge();
+            if (event.type === 'message' && event.actor !== chatWidgetCurrentUser) {
                 const room = Array.isArray(chatRoomsFromApi)
                     ? chatRoomsFromApi.find(item => item.partner === event.partner)
                     : null;
-                if (!room || !room.notifications_muted) {
-                    const title = room?.display_name || event.actor || '새담 사내메신저';
-                    const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');
-                    const notification = new Notification(title, { body, tag: 'chat-' + event.partner });
-                    notification.onclick = () => {
-                        window.focus();
-                        openChat(event.partner);
-                        notification.close();
-                    };
-                }
+                window.handleIncomingChatAlert(event, room);
             }
         });
     }
@@ -623,11 +656,8 @@
         updateMessageBadge();
         loadOrgChart();
         initializeChatWidgetSocket();
-        const notificationButton = document.getElementById('chatNotificationButton');
-        if (notificationButton && 'Notification' in window && Notification.permission === 'granted') {
-            notificationButton.className = 'fa-solid fa-bell';
-            notificationButton.title = '데스크톱 알림 사용 중';
-        }
+        updateChatAlertButton();
+        window.addEventListener('chat-alert-setting-changed', updateChatAlertButton);
         const unreadItems = document.querySelectorAll('.unread-msg-item');
         if(unreadItems.length === 0) {
             const emptyDiv = document.getElementById('unreadMsgEmpty');

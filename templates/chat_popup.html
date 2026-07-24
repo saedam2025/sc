@@ -6,6 +6,7 @@
     <title>{{ partner }}님과의 대화 - 새담 인트라넷</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/chat_notifications.js') }}"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         
@@ -540,6 +541,33 @@
                 return alert(error.message || '알림 설정을 변경하지 못했습니다.');
             }
             applyRoomInfo({ notifications_muted: muted });
+            notifyOpenerUnreadChanged();
+        }
+
+        function notifyIncomingChatMessage(event) {
+            if (!event || event.actor === currentUser || roomInfo.notifications_muted) return;
+            const room = {
+                partner: partnerName,
+                display_name: roomInfo.display_name || partnerName,
+                notifications_muted: !!roomInfo.notifications_muted
+            };
+            try {
+                if (
+                    window.opener
+                    && !window.opener.closed
+                    && typeof window.opener.handleIncomingChatAlert === 'function'
+                ) {
+                    window.opener.handleIncomingChatAlert(event, room);
+                    return;
+                }
+            } catch (error) {
+                // 다른 창 접근이 제한되면 현재 팝업에서 직접 재생한다.
+            }
+            if (window.ChatMessageAlerts) {
+                window.ChatMessageAlerts.notifyIncoming(event, {
+                    muted: !!roomInfo.notifications_muted
+                });
+            }
         }
 
         function openGroupSettings() {
@@ -1039,6 +1067,7 @@
             chatSocket.on('chat_event', async event => {
                 if (!event || event.partner !== partnerName) return;
                 if (event.type === 'message') {
+                    notifyIncomingChatMessage(event);
                     await refreshChatBox();
                 } else if (['message_changed', 'message_hidden'].includes(event.type)) {
                     await loadChatMessages({ reset: true, preserveScroll: true });
