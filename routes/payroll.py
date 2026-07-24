@@ -3,7 +3,9 @@ import html
 import json
 import os
 import re
+import smtplib
 import sqlite3
+import ssl
 import threading
 import time
 import uuid
@@ -32,7 +34,6 @@ from .ai_mail import (
     _owner_emp_no,
     _plain_from_html,
     _sanitize_html,
-    _sender_dict,
     _smtp_error_info,
     _smtp_login,
 )
@@ -82,6 +83,28 @@ EXCEL_META_TYPE = '__detected_type'
 AUTO_FORM_KEY = 'auto'
 AUTO_FORM_NAME = '자동적용 (엑셀 1행 구분 기준)'
 
+
+SENDER_PROVIDERS = {
+    'gmail': {
+        'label': 'Google Gmail',
+        'short_label': 'Gmail',
+        'smtp_host': 'smtp.gmail.com',
+        'smtp_port': 465,
+        'smtp_security': 'ssl',
+        'smtp_username': None,
+        'credential_name': '구글 앱 비밀번호',
+    },
+    'zeptomail': {
+        'label': 'Zoho ZeptoMail',
+        'short_label': 'ZeptoMail',
+        'smtp_host': 'smtp.zeptomail.com',
+        'smtp_port': 587,
+        'smtp_security': 'tls',
+        'smtp_username': 'emailapikey',
+        'credential_name': 'ZeptoMail SMTP 토큰',
+    },
+}
+
 NAME_COLUMN_ALIASES = (
     '수신자명', '직원명', '강사명', '퇴직자명', '근로자명', '사원명',
     '성명', '이름', '대상자명', '수령인명', '수령인', '예금주',
@@ -103,6 +126,162 @@ def _db():
     conn = get_db()
     conn.execute('PRAGMA busy_timeout=5000')
     return conn
+
+
+
+def _ensure_sender_schema(conn):
+    """기존 Gmail 발송계정 테이블을 ZeptoMail도 저장할 수 있게 확장합니다."""
+    table = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='ai_mail_senders'"
+    ).fetchone()
+    if not table:
+        return
+    columns = {row['name'] if hasattr(row, 'keys') else row[1] for row in conn.execute('PRAGMA table_info(ai_mail_senders)').fetchall()}
+    additions = {
+        'provider': "TEXT NOT NULL DEFAULT 'gmail'",
+        'smtp_host': 'TEXT',
+        'smtp_port': 'INTEGER',
+        'smtp_security': 'TEXT',
+        'smtp_username': 'TEXT',
+    }
+    changed = False
+    for name, ddl in additions.items():
+        if name not in columns:
+            conn.execute(f'ALTER TABLE ai_mail_senders ADD COLUMN {name} {ddl}')
+            changed = True
+    conn.execute("UPDATE ai_mail_senders SET provider='gmail' WHERE provider IS NULL OR TRIM(provider)='' OR provider NOT IN ('gmail','zeptomail')")
+    conn.execute("""
+        UPDATE ai_mail_senders
+        SET smtp_host=CASE WHEN provider='zeptomail' THEN 'smtp.zeptomail.com' ELSE 'smtp.gmail.com' END
+        WHERE smtp_host IS NULL OR TRIM(smtp_host)=''
+    """)
+    conn.execute("""
+        UPDATE ai_mail_senders
+        SET smtp_port=CASE WHEN provider='zeptomail' THEN 587 ELSE 465 END
+        WHERE smtp_port IS NULL OR smtp_port<=0
+    """)
+    conn.execute("""
+        UPDATE ai_mail_senders
+        SET smtp_security=CASE WHEN provider='zeptomail' THEN 'tls' ELSE 'ssl' END
+        WHERE smtp_security IS NULL OR TRIM(smtp_security)=''
+    """)
+    conn.execute("""
+        UPDATE ai_mail_senders
+        SET smtp_username=CASE WHEN provider='zeptomail' THEN 'emailapikey' ELSE email END
+        WHERE smtp_username IS NULL OR TRIM(smtp_username)=''
+    """)
+    conn.commit()
+
+
+def _provider_config(provider):
+    key = str(provider or 'gmail').strip().lower()
+    config = SENDER_PROVIDERS.get(key)
+    if not config:
+        raise ValueError('지원하지 않는 메일 서비스입니다.')
+    return key, config
+
+
+def _mapping_value(row, key, default=None):
+    try:
+        return row[key] if key in row.keys() else default
+    except (AttributeError, KeyError, TypeError):
+        return row.get(key, default) if hasattr(row, 'get') else default
+
+
+def _payroll_sender_dict(row):
+    item = dict(row)
+    provider, config = _provider_config(item.get('provider') or 'gmail')
+    item.pop('encrypted_app_password', None)
+    item['provider'] = provider
+    item['provider_label'] = config['label']
+    item['provider_short_label'] = config['short_label']
+    item['smtp_host'] = item.get('smtp_host') or config['smtp_host']
+    item['smtp_port'] = int(item.get('smtp_port') or config['smtp_port'])
+    item['smtp_security'] = item.get('smtp_security') or config['smtp_security']
+    item['smtp_username'] = item.get('smtp_username') or (item.get('email') if provider == 'gmail' else config['smtp_username'])
+    item['credential_name'] = config['credential_name']
+    item['is_active'] = bool(item.get('is_active'))
+    return item
+
+
+def _sender_connection_values(provider, email):
+    provider, config = _provider_config(provider)
+    return {
+        'provider': provider,
+        'smtp_host': config['smtp_host'],
+        'smtp_port': config['smtp_port'],
+        'smtp_security': config['smtp_security'],
+        'smtp_username': email if provider == 'gmail' else config['smtp_username'],
+    }
+
+
+def _validate_sender_address(provider, email):
+    """ZeptoMail은 Agent에 연결된 인증 도메인의 From 주소만 허용합니다."""
+    provider, _ = _provider_config(provider)
+    email = str(email or '').strip().lower()
+    if provider != 'zeptomail':
+        return
+    allowed_domain = str(os.getenv('ZEPTOMAIL_SENDER_DOMAIN', 'saedam.org')).strip().lower().lstrip('@')
+    email_domain = email.rsplit('@', 1)[-1] if '@' in email else ''
+    if not allowed_domain or email_domain == allowed_domain or email_domain.endswith('.' + allowed_domain):
+        return
+    raise ValueError(
+        f'ZeptoMail 발신 이메일은 인증된 도메인 @{allowed_domain} 주소여야 합니다. '
+        f'현재 입력값: {email}'
+    )
+
+
+def _verify_smtp_sender(smtp, sender):
+    """로그인 성공뿐 아니라 실제 MAIL FROM 주소가 허용되는지도 확인합니다."""
+    provider, _ = _provider_config(_mapping_value(sender, 'provider', 'gmail'))
+    if provider != 'zeptomail':
+        return
+    sender_email = str(_mapping_value(sender, 'email') or '').strip().lower()
+    _validate_sender_address(provider, sender_email)
+    code, response = smtp.mail(sender_email)
+    try:
+        smtp.rset()
+    except Exception:
+        pass
+    if int(code or 0) >= 400:
+        raise smtplib.SMTPSenderRefused(code, response, sender_email)
+
+
+def _smtp_login_for_sender(sender, password=None):
+    provider, config = _provider_config(_mapping_value(sender, 'provider', 'gmail'))
+    host = str(_mapping_value(sender, 'smtp_host') or config['smtp_host']).strip()
+    port = int(_mapping_value(sender, 'smtp_port') or config['smtp_port'])
+    security = str(_mapping_value(sender, 'smtp_security') or config['smtp_security']).strip().lower()
+    email = str(_mapping_value(sender, 'email') or '').strip().lower()
+    username = str(_mapping_value(sender, 'smtp_username') or (email if provider == 'gmail' else config['smtp_username'])).strip()
+    password = password if password is not None else _decrypt_password(_mapping_value(sender, 'encrypted_app_password'))
+    # 기존 Gmail 계정은 기존 공용 로그인 함수를 그대로 사용해 동작을 보존합니다.
+    if provider == 'gmail':
+        return _smtp_login(email, password)
+    context = ssl.create_default_context()
+    smtp = None
+    try:
+        if security == 'ssl':
+            smtp = smtplib.SMTP_SSL(host, port, timeout=35, context=context)
+        elif security == 'tls':
+            smtp = smtplib.SMTP(host, port, timeout=35)
+            smtp.ehlo()
+            smtp.starttls(context=context)
+            smtp.ehlo()
+        else:
+            raise ValueError('SMTP 보안 방식이 올바르지 않습니다.')
+        smtp.login(username, password)
+        return smtp
+    except Exception:
+        if smtp is not None:
+            try:
+                smtp.quit()
+            except Exception:
+                try:
+                    smtp.close()
+                except Exception:
+                    pass
+        raise
 
 
 def _ok(message='', **payload):
@@ -895,7 +1074,8 @@ def payroll_worker(app, owner, campaign_id, frame, recipient_ids, send_date, int
         _campaign_update(owner, campaign_id, status)
         try:
             password = _decrypt_password(sender['encrypted_app_password'])
-            smtp = _smtp_login(sender['email'], password)
+            smtp = _smtp_login_for_sender(sender, password)
+            _verify_smtp_sender(smtp, sender)
         except Exception as exc:
             status['errors'] = [f'발송계정 연결 실패: {exc}']
             status['failed_count'] = status['total_count']
@@ -1033,6 +1213,7 @@ def bootstrap():
     conn = _db()
     try:
         owner = _owner_emp_no()
+        _ensure_sender_schema(conn)
         _ensure_default_forms(conn, owner)
         _migrate_legacy_banners(conn, owner)
         assets, assets_by_id = _asset_map(conn, owner)
@@ -1056,7 +1237,7 @@ def bootstrap():
             csrf_token=_csrf_token(),
             groups=[_group_dict(row, assets_by_id) for row in groups],
             assets=assets,
-            senders=[_sender_dict(row) for row in senders],
+            senders=[_payroll_sender_dict(row) for row in senders],
             templates=forms,
             history=history_page['items'],
             history_pagination={key: value for key, value in history_page.items() if key != 'items'},
@@ -1295,22 +1476,44 @@ def asset_content(asset_id):
 @_mutating
 def create_sender():
     data = _json_data()
+    try:
+        provider, config = _provider_config(data.get('provider'))
+    except ValueError as exc:
+        return _error(str(exc))
     email = _clean_text(data.get('email'), 254).lower()
     label = _clean_text(data.get('label'), 120) or email
     if not _is_valid_email(email):
-        return _error('구글 계정 메일주소 형식이 올바르지 않습니다.')
+        return _error('발신 이메일 주소 형식이 올바르지 않습니다.')
+    try:
+        _validate_sender_address(provider, email)
+    except ValueError as exc:
+        return _error(str(exc))
     try:
         encrypted = _encrypt_password(data.get('app_password'))
     except (ValueError, RuntimeError) as exc:
         return _error(str(exc))
+    connection = _sender_connection_values(provider, email)
     conn = _db()
     try:
-        cursor = conn.execute('INSERT INTO ai_mail_senders (owner_emp_no, label, email, encrypted_app_password, is_active) VALUES (?, ?, ?, ?, 1)', (_owner_emp_no(), label, email, encrypted))
+        _ensure_sender_schema(conn)
+        cursor = conn.execute('''
+            INSERT INTO ai_mail_senders (
+                owner_emp_no, label, email, encrypted_app_password, is_active,
+                provider, smtp_host, smtp_port, smtp_security, smtp_username
+            ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+        ''', (
+            _owner_emp_no(), label, email, encrypted,
+            connection['provider'], connection['smtp_host'], connection['smtp_port'],
+            connection['smtp_security'], connection['smtp_username'],
+        ))
         conn.commit()
-        return _ok('메일 발송 계정이 등록되었습니다.', sender=_sender_dict(_owned(conn, 'ai_mail_senders', cursor.lastrowid)))
+        return _ok(
+            f"{config['short_label']} 발송계정이 등록되었습니다.",
+            sender=_payroll_sender_dict(_owned(conn, 'ai_mail_senders', cursor.lastrowid)),
+        )
     except sqlite3.IntegrityError:
         conn.rollback()
-        return _error('같은 구글 계정이 이미 등록되어 있습니다.', 409)
+        return _error('같은 발신 이메일 주소가 이미 등록되어 있습니다.', 409)
     finally:
         conn.close()
 
@@ -1321,22 +1524,49 @@ def update_sender(sender_id):
     data = _json_data()
     conn = _db()
     try:
+        _ensure_sender_schema(conn)
         current = _owned(conn, 'ai_mail_senders', sender_id)
         if not current:
             return _error('발송계정을 찾을 수 없습니다.', 404)
+        current_provider = _mapping_value(current, 'provider', 'gmail') or 'gmail'
+        try:
+            provider, config = _provider_config(data.get('provider', current_provider))
+        except ValueError as exc:
+            return _error(str(exc))
         email = _clean_text(data.get('email', current['email']), 254).lower()
         label = _clean_text(data.get('label', current['label']), 120) or email
         if not _is_valid_email(email):
-            return _error('구글 계정 메일주소 형식이 올바르지 않습니다.')
+            return _error('발신 이메일 주소 형식이 올바르지 않습니다.')
+        try:
+            _validate_sender_address(provider, email)
+        except ValueError as exc:
+            return _error(str(exc))
+        new_password = data.get('app_password')
+        if provider != current_provider and not new_password:
+            return _error(f"메일 서비스를 변경할 때는 새 {config['credential_name']}를 입력해주세요.")
         encrypted = current['encrypted_app_password']
-        if data.get('app_password'):
-            encrypted = _encrypt_password(data['app_password'])
-        conn.execute('''UPDATE ai_mail_senders SET label=?, email=?, encrypted_app_password=?, last_test_status=NULL, last_test_error=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_emp_no=?''', (label, email, encrypted, sender_id, _owner_emp_no()))
+        if new_password:
+            encrypted = _encrypt_password(new_password)
+        connection = _sender_connection_values(provider, email)
+        conn.execute('''
+            UPDATE ai_mail_senders
+            SET label=?, email=?, encrypted_app_password=?, provider=?, smtp_host=?, smtp_port=?,
+                smtp_security=?, smtp_username=?, last_test_status=NULL, last_test_error=NULL,
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=? AND owner_emp_no=?
+        ''', (
+            label, email, encrypted, connection['provider'], connection['smtp_host'],
+            connection['smtp_port'], connection['smtp_security'], connection['smtp_username'],
+            sender_id, _owner_emp_no(),
+        ))
         conn.commit()
-        return _ok('발송계정이 수정되었습니다.', sender=_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)))
+        return _ok(
+            f"{config['short_label']} 발송계정이 수정되었습니다.",
+            sender=_payroll_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)),
+        )
     except sqlite3.IntegrityError:
         conn.rollback()
-        return _error('같은 구글 계정이 이미 등록되어 있습니다.', 409)
+        return _error('같은 발신 이메일 주소가 이미 등록되어 있습니다.', 409)
     except (ValueError, RuntimeError) as exc:
         conn.rollback()
         return _error(str(exc))
@@ -1349,21 +1579,31 @@ def update_sender(sender_id):
 def test_sender(sender_id):
     conn = _db()
     try:
+        _ensure_sender_schema(conn)
         sender = _owned(conn, 'ai_mail_senders', sender_id)
         if not sender:
             return _error('발송계정을 찾을 수 없습니다.', 404)
+        provider, config = _provider_config(_mapping_value(sender, 'provider', 'gmail'))
         try:
-            smtp = _smtp_login(sender['email'], _decrypt_password(sender['encrypted_app_password']))
+            smtp = _smtp_login_for_sender(sender)
+            _verify_smtp_sender(smtp, sender)
             smtp.quit()
             conn.execute("UPDATE ai_mail_senders SET last_tested_at=CURRENT_TIMESTAMP, last_test_status='success', last_test_error=NULL, updated_at=CURRENT_TIMESTAMP WHERE id=?", (sender_id,))
             conn.commit()
-            return _ok('구글 SMTP 인증에 성공했습니다.', sender=_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)))
+            return _ok(
+                f"{config['short_label']} SMTP 인증에 성공했습니다.",
+                sender=_payroll_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)),
+            )
         except Exception as exc:
             code, friendly, _, detail, _ = _smtp_error_info(exc)
             message = f'{friendly} ({detail})' if detail else friendly
+            message = f"{config['short_label']} 연결 실패: {message}"
             conn.execute("UPDATE ai_mail_senders SET last_tested_at=CURRENT_TIMESTAMP, last_test_status='error', last_test_error=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (_clean_text(message, 1000), sender_id))
             conn.commit()
-            return _error(message, 400, code=code, sender=_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)))
+            return _error(
+                message, 400, code=code,
+                sender=_payroll_sender_dict(_owned(conn, 'ai_mail_senders', sender_id)),
+            )
     finally:
         conn.close()
 
@@ -1617,6 +1857,7 @@ def _preflight(group, sender, frame, forms, form_errors=None):
 def preflight():
     conn = _db()
     try:
+        _ensure_sender_schema(conn)
         group_row = _owned(conn, 'payroll_workgroups', request.form.get('group_id', type=int))
         sender = _owned(conn, 'ai_mail_senders', request.form.get('sender_id', type=int))
         if not group_row or not sender:
@@ -1644,6 +1885,7 @@ def start_send():
         return _error('이미 다른 명세서 발송 작업이 진행 중입니다.', 409)
     conn = _db()
     try:
+        _ensure_sender_schema(conn)
         group_row = _owned(conn, 'payroll_workgroups', request.form.get('group_id', type=int))
         sender_row = _owned(conn, 'ai_mail_senders', request.form.get('sender_id', type=int))
         if not group_row or not sender_row:

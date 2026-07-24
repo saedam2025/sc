@@ -1192,17 +1192,24 @@ def get_chat_history(other_user):
             conn.close()
             return jsonify({"status": "error", "message": "다른 대화방의 메시지입니다."}), 400
 
+    # 변경 사항: 안 읽은 메시지가 있을 때만 업데이트를 진행하고, 변경이 일어나면 소켓 이벤트를 발송합니다.
     if ',' in other_user:
-        conn.execute('''
+        cursor = conn.execute('''
             UPDATE messages SET is_read=1
-            WHERE receiver=? AND room_id=? AND id>?
+            WHERE receiver=? AND room_id=? AND id>? AND (is_read IN (0, '0', 'False', 'false') OR is_read IS NULL)
         ''', (current_user, other_user, cutoff_id))
     else:
-        conn.execute('''
+        cursor = conn.execute('''
             UPDATE messages SET is_read=1
-            WHERE receiver=? AND sender=? AND room_id IS NULL AND id>?
+            WHERE receiver=? AND sender=? AND room_id IS NULL AND id>? AND (is_read IN (0, '0', 'False', 'false') OR is_read IS NULL)
         ''', (current_user, other_user, cutoff_id))
+    
+    rows_updated = cursor.rowcount
     conn.commit()
+
+    # DB에 읽음 처리 업데이트가 실제로 일어났다면 프론트엔드에 상태 변경 알림 전송
+    if rows_updated > 0:
+        _emit_chat_event(conn, other_user, current_user, 'message_changed')
 
     rows, has_more = _fetch_logical_messages(
         conn,
