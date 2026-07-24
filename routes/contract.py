@@ -30,26 +30,83 @@ contract_bp = Blueprint('contract', __name__)
 
 hashids = Hashids(salt="saedam_secret_salt", min_length=8)
 
-# --- [저장 경로 설정: 인트라넷 구조에 맞춤] ---
-if os.path.exists('/mnt/data'):
+# --- [저장 경로 설정: Windows + Render 동시 대응] ---
+# contract.py가 routes 폴더에 있으므로 한 단계 위가 프로젝트 루트이다.
+APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Render Persistent Disk 경로는 환경변수 DATA_DIR로 지정할 수 있다.
+# 환경변수가 없으면 /mnt/data가 실제로 존재할 때 사용하고,
+# 그 외(Windows 로컬 등)에는 프로젝트 루트를 사용한다.
+DATA_DIR_ENV = os.environ.get('DATA_DIR', '').strip()
+if DATA_DIR_ENV:
+    MOUNT_PATH = os.path.abspath(DATA_DIR_ENV)
+elif os.path.isdir('/mnt/data'):
     MOUNT_PATH = '/mnt/data'
 else:
-    MOUNT_PATH = os.getcwd()
+    MOUNT_PATH = APP_ROOT
+
+# GitHub/프로젝트에 포함된 기본 계약 양식 폴더
+BUNDLED_TERMS_DIR = os.path.join(APP_ROOT, 'terms')
 
 # 기존 엑셀 대신 SQLite 파이썬 DB 사용
 DB_FILE = os.path.join(MOUNT_PATH, 'contracts.db')
 CONTRACTS_DIR = os.path.join(MOUNT_PATH, 'contracts')
-TERMS_DIR = os.path.join(MOUNT_PATH, 'terms') # 수정: 서버 렌더 환경에 맞추어 MOUNT_PATH로 이동
+TERMS_DIR = os.path.join(MOUNT_PATH, 'terms')
 CATEGORIES_FILE = os.path.join(MOUNT_PATH, 'categories.json')
 COMPANY_SETTINGS_FILE = os.path.join(MOUNT_PATH, 'company_settings.json')
 COMPANY_STAMP_DIR = os.path.join(MOUNT_PATH, 'company_stamps')
 
-if not os.path.exists(CONTRACTS_DIR):
-    os.makedirs(CONTRACTS_DIR)
-if not os.path.exists(TERMS_DIR):
-    os.makedirs(TERMS_DIR)
-if not os.path.exists(COMPANY_STAMP_DIR):
-    os.makedirs(COMPANY_STAMP_DIR)
+os.makedirs(MOUNT_PATH, exist_ok=True)
+os.makedirs(CONTRACTS_DIR, exist_ok=True)
+os.makedirs(TERMS_DIR, exist_ok=True)
+os.makedirs(COMPANY_STAMP_DIR, exist_ok=True)
+
+
+def initialize_terms_storage():
+    """
+    Render의 /mnt/data/terms가 처음에는 비어 있으므로,
+    GitHub에 포함된 프로젝트 terms/*.txt를 Persistent Disk로 1회 복사한다.
+
+    이미 /mnt/data/terms에 내용이 저장된 파일은 덮어쓰지 않으므로
+    관리자 화면에서 수정한 계약 양식은 그대로 유지된다.
+    단, 0바이트 빈 파일은 초기화 실패로 보고 기본 양식으로 복구한다.
+    """
+    bundled_abs = os.path.abspath(BUNDLED_TERMS_DIR)
+    persistent_abs = os.path.abspath(TERMS_DIR)
+
+    # Windows 로컬에서는 두 경로가 같을 수 있으므로 복사 불필요
+    if bundled_abs == persistent_abs:
+        print(f'[계약양식] 로컬 terms 경로 사용: {TERMS_DIR}')
+        return
+
+    if not os.path.isdir(BUNDLED_TERMS_DIR):
+        print(f'[계약양식 경고] 프로젝트 기본 양식 폴더가 없습니다: {BUNDLED_TERMS_DIR}')
+        return
+
+    copied = []
+    for filename in os.listdir(BUNDLED_TERMS_DIR):
+        if not filename.lower().endswith('.txt'):
+            continue
+
+        source_path = os.path.join(BUNDLED_TERMS_DIR, filename)
+        target_path = os.path.join(TERMS_DIR, filename)
+
+        target_missing_or_empty = (
+            not os.path.exists(target_path)
+            or (os.path.isfile(target_path) and os.path.getsize(target_path) == 0)
+        )
+
+        if os.path.isfile(source_path) and target_missing_or_empty:
+            shutil.copy2(source_path, target_path)
+            copied.append(filename)
+
+    if copied:
+        print(f'[계약양식] Persistent Disk로 기본 양식 {len(copied)}개 복사 완료: {TERMS_DIR}')
+    else:
+        print(f'[계약양식] 저장된 양식 사용: {TERMS_DIR}')
+
+
+initialize_terms_storage()
 
 # [설정] wkhtmltopdf 경로 설정 (배포 환경 대응)
 # [설정] wkhtmltopdf 경로 설정 (로컬 Windows + Render/Linux 동시 대응)
