@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <title>계약서 작성 | (사)새담</title>
 
@@ -17,7 +17,7 @@
         }
 
         body {
-            font-family: 'Pretendard', sans-serif;
+            font-family: 'Noto Sans KR', 'Pretendard', 'Malgun Gothic', sans-serif;
             background-color: var(--saedam-navy);
             margin: 0;
             padding: 20px 0;
@@ -88,7 +88,8 @@
             color: #111;
             min-height: 20px;
             box-sizing: border-box;
-            word-break: break-all;
+            word-break: keep-all;
+            overflow-wrap: break-word;
             font-weight: 500;
         }
 
@@ -117,9 +118,48 @@
             box-sizing: border-box;
         }
 
+        /* 계약서 양식의 윈도우/렌더 출력 차이 방지 */
+        .terms-area,
+        .content-box {
+            font-family: 'Noto Sans KR', 'Pretendard', 'Malgun Gothic', sans-serif !important;
+            font-size: 16px;
+            line-height: 1.8;
+            letter-spacing: 0;
+            word-spacing: 0;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* CKEditor에 저장된 윈도우 전용 글꼴/과도한 자간을 무시 */
+        .content-box * {
+            font-family: inherit !important;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .content-box p,
+        .content-box div,
+        .content-box li {
+            line-height: 1.8 !important;
+            letter-spacing: 0 !important;
+            word-spacing: 0 !important;
+            word-break: keep-all !important;
+            overflow-wrap: break-word !important;
+        }
+
+        /* 일반 HTML에서는 사라지는 연속 공백과 직접 입력한 줄바꿈을 보존 */
+        .content-box p {
+            margin: 0 0 10px;
+            white-space: pre-wrap;
+        }
+
         /* [추가] 에디터에서 삽입한 표(Table) 스타일 보강 */
         .content-box table {
             width: 100% !important;
+            white-space: normal !important;
             border-collapse: collapse !important;
             margin: 15px 0 !important;
             border: 1px solid #333 !important;
@@ -127,10 +167,12 @@
 
         .content-box th,
         .content-box td {
+            white-space: normal !important;
             border: 1px solid #333 !important;
             padding: 8px !important;
             text-align: left;
-            word-break: break-all;
+            word-break: keep-all;
+            overflow-wrap: break-word;
         }
 
         .content-box th {
@@ -375,13 +417,13 @@
     <h3>계약 조항</h3>
 
     <div class="terms-area" style="background: #fff; padding: 20px; border: 1px solid var(--border-color); border-radius: 8px;">
-        <div class="content-box" style="font-family: 'Pretendard', sans-serif; font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 10px;">
+        <div class="content-box" style="font-family: 'Noto Sans KR', 'Pretendard', 'Malgun Gothic', sans-serif; font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 10px;">
             {{ data.terms_content1 | safe }}
         </div>
 
         <hr style="border: 0; border-top: 1px dashed #ddd; margin: 10px 0;">
 
-        <div class="content-box" style="font-family: 'Pretendard', sans-serif; font-size: 16px; line-height: 1.8; color: #333;">
+        <div class="content-box" style="font-family: 'Noto Sans KR', 'Pretendard', 'Malgun Gothic', sans-serif; font-size: 16px; line-height: 1.8; color: #333;">
             {{ data.terms_content2 | safe }}
         </div>
     </div>
