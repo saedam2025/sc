@@ -1588,9 +1588,11 @@ def update_chat_room_mute():
     current_user = session.get('user_name')
     data = request.get_json(silent=True) or {}
     room_key = str(data.get('partner') or '').strip()
-    muted = bool(data.get('muted'))
+    muted = data.get('muted')
     if not current_user:
         return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+    if not isinstance(muted, bool):
+        return jsonify({"status": "error", "message": "알림 설정 값이 올바르지 않습니다."}), 400
 
     conn = get_db()
     _ensure_chat_tables(conn)
