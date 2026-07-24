@@ -15,6 +15,7 @@ import mimetypes
 from datetime import datetime, timedelta, timezone
 from hashids import Hashids
 from html import escape
+from urllib.request import Request, urlopen
 
 # PDF 페이지 분할을 위한 라이브러리 (서버에 pip install PyPDF2 필요)
 try:
@@ -157,6 +158,114 @@ SENDER_EMAIL = os.environ.get('MAIL_USERNAME')
 SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD')
 ADMIN_PASSWORD = 'school97$$'
 KST = timezone(timedelta(hours=9))
+
+
+# --- [Render/Linux PDF 한글 폰트 자동 준비] ---
+# wkhtmltopdf는 서버에 한글 폰트가 없으면 숫자와 문장부호만 남기고
+# 한글 글리프를 비워 버릴 수 있다. 공개 배포된 나눔고딕 TTF를
+# 최초 PDF 생성 시 /mnt/data/pdf_fonts에 내려받아 HTML 안에 base64로 삽입한다.
+PDF_FONT_DIR = os.path.join(MOUNT_PATH, 'pdf_fonts')
+os.makedirs(PDF_FONT_DIR, exist_ok=True)
+
+PDF_FONT_FILES = {
+    'regular': {
+        'filename': 'NanumGothic-Regular.ttf',
+        'urls': [
+            'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Regular.ttf',
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf'
+        ]
+    },
+    'bold': {
+        'filename': 'NanumGothic-Bold.ttf',
+        'urls': [
+            'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Bold.ttf',
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Bold.ttf'
+        ]
+    }
+}
+
+_PDF_FONT_CSS_CACHE = None
+
+
+def _download_pdf_font(urls, target_path):
+    """폰트를 한 번만 내려받는다. 실패하면 다음 URL을 시도한다."""
+    temp_path = target_path + '.part'
+    for url in urls:
+        try:
+            req = Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urlopen(req, timeout=40) as response, open(temp_path, 'wb') as out:
+                shutil.copyfileobj(response, out)
+
+            # HTML이나 오류 페이지가 저장되는 경우를 막기 위한 최소 크기 확인
+            if os.path.getsize(temp_path) < 100_000:
+                raise ValueError('다운로드된 폰트 파일 크기가 너무 작습니다.')
+
+            os.replace(temp_path, target_path)
+            print(f'[PDF폰트] 다운로드 완료: {target_path}')
+            return True
+        except Exception as e:
+            print(f'[PDF폰트] 다운로드 실패 ({url}): {e}')
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
+    return False
+
+
+def _font_file_data_uri(font_path):
+    with open(font_path, 'rb') as font_file:
+        encoded = base64.b64encode(font_file.read()).decode('ascii')
+    return f'data:font/ttf;base64,{encoded}'
+
+
+def get_pdf_font_css():
+    """
+    PDF에 실제 한글 폰트를 포함하는 CSS를 반환한다.
+    서버 폰트 설치 여부와 관계없이 미리보기와 최종 PDF가 동일하게 출력된다.
+    """
+    global _PDF_FONT_CSS_CACHE
+    if _PDF_FONT_CSS_CACHE is not None:
+        return _PDF_FONT_CSS_CACHE
+
+    paths = {}
+    for weight, info in PDF_FONT_FILES.items():
+        font_path = os.path.join(PDF_FONT_DIR, info['filename'])
+        if not os.path.exists(font_path) or os.path.getsize(font_path) < 100_000:
+            _download_pdf_font(info['urls'], font_path)
+        if os.path.exists(font_path) and os.path.getsize(font_path) >= 100_000:
+            paths[weight] = font_path
+
+    if 'regular' in paths:
+        regular_uri = _font_file_data_uri(paths['regular'])
+        bold_uri = _font_file_data_uri(paths.get('bold', paths['regular']))
+        _PDF_FONT_CSS_CACHE = f"""
+            @font-face {{
+                font-family: 'SaedamPdfFont';
+                src: url('{regular_uri}') format('truetype');
+                font-weight: 400;
+                font-style: normal;
+            }}
+            @font-face {{
+                font-family: 'SaedamPdfFont';
+                src: url('{bold_uri}') format('truetype');
+                font-weight: 700;
+                font-style: normal;
+            }}
+            html, body, body * {{
+                font-family: 'SaedamPdfFont', 'Noto Sans CJK KR', 'NanumGothic', sans-serif !important;
+            }}
+        """
+    else:
+        # 다운로드가 막힌 경우에도 서버에 설치된 한글 폰트를 최대한 찾는다.
+        _PDF_FONT_CSS_CACHE = """
+            html, body, body * {
+                font-family: 'Noto Sans CJK KR', 'NanumGothic', 'UnDotum', sans-serif !important;
+            }
+        """
+        print('[PDF폰트 경고] 한글 폰트를 준비하지 못했습니다. Render의 외부 접속 여부를 확인하세요.')
+
+    return _PDF_FONT_CSS_CACHE
 
 # 계약구분 동적 관리 함수
 DEFAULT_CATEGORIES = ['방과후강사', '맞춤형강사', '코디사업자', '코디근로자', '안전코디', '직원근로자', '직원사업자', '원어민근로자', '원어민사업자']
@@ -1278,17 +1387,45 @@ def save_contract():
 
         content1 = get_cleaned_content(f"{contract_type}.txt")
         content2 = get_cleaned_content(f"{contract_type}2.txt")
+        pdf_font_css = get_pdf_font_css()
 
         html_content = f"""
         <html>
         <head>
             <meta charset="UTF-8">
             <style>
+                {pdf_font_css}
+
+                html {{ -webkit-text-size-adjust: 100%; }}
                 body {{
-                    font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
                     color: #111;
                     font-size: 16px;
-                    line-height: 1.7;
+                    line-height: 1.75;
+                    letter-spacing: 0;
+                    word-spacing: 0;
+                    word-break: keep-all;
+                    overflow-wrap: break-word;
+                }}
+
+                .contract-body {{
+                    white-space: pre-wrap;
+                    word-break: keep-all;
+                    overflow-wrap: break-word;
+                }}
+
+                .contract-body p,
+                .contract-body div,
+                .contract-body li {{
+                    line-height: 1.75 !important;
+                    letter-spacing: 0 !important;
+                    word-spacing: 0 !important;
+                    word-break: keep-all !important;
+                    overflow-wrap: break-word !important;
+                }}
+
+                .contract-body p {{
+                    margin: 0 0 9px 0;
+                    white-space: pre-wrap;
                 }}
 
                 .pdf-title {{
@@ -1325,13 +1462,15 @@ def save_contract():
                     vertical-align: middle;
                     border: none;
                     border-bottom: 1px solid #dcdcdc;
-                    word-break: break-all;
+                    word-break: keep-all;
+                    overflow-wrap: break-word;
                 }}
 
                 /* 계약조항 내부 표 스타일만 따로 적용 */
                 .contract-body table {{
                     width: 100%;
                     border-collapse: collapse;
+                    white-space: normal !important;
                     margin-top: 15px;
                     margin-bottom: 15px;
                 }}
@@ -1340,7 +1479,8 @@ def save_contract():
                 .contract-body td {{
                     border: 1px solid #333;
                     padding: 8px;
-                    word-break: break-all;
+                    word-break: keep-all;
+                    overflow-wrap: break-word;
                 }}
 
                 .contract-body tr {{
@@ -1381,6 +1521,9 @@ def save_contract():
                 options={
                     'encoding': "UTF-8",
                     'enable-local-file-access': None,
+                    'print-media-type': None,
+                    'disable-smart-shrinking': None,
+                    'dpi': '96',
                     'page-size': 'A4',
                     'margin-top': '20mm',
                     'margin-right': '18mm',
@@ -1562,19 +1705,25 @@ def preview_pdf(idx):
 
         content1 = get_cleaned_content(f"{contract_type}.txt")
         content2 = get_cleaned_content(f"{contract_type}2.txt")
+        pdf_font_css = get_pdf_font_css()
 
         html_content = f"""
         <html>
         <head>
             <meta charset="UTF-8">
             <style>
-                body {{ font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif; color: #111; font-size: 16px; line-height: 1.7; }}
+                {pdf_font_css}
+                html {{ -webkit-text-size-adjust: 100%; }}
+                body {{ color: #111; font-size: 16px; line-height: 1.75; letter-spacing: 0; word-spacing: 0; word-break: keep-all; overflow-wrap: break-word; }}
+                .contract-body {{ white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word; }}
+                .contract-body p, .contract-body div, .contract-body li {{ line-height: 1.75 !important; letter-spacing: 0 !important; word-spacing: 0 !important; word-break: keep-all !important; overflow-wrap: break-word !important; }}
+                .contract-body p {{ margin: 0 0 9px 0; white-space: pre-wrap; }}
                 .pdf-title {{ text-align: center; font-size: 24px; font-weight: 900; text-decoration: underline; margin: 20px 0 35px; }}
                 .pdf-info-table {{ width: 100%; border-collapse: collapse; margin: 0 0 30px 0; table-layout: fixed; }}
                 .pdf-info-table th {{ text-align: left; font-weight: 800; font-size: 14px; padding: 8px 8px 8px 0; white-space: nowrap; vertical-align: middle; border: none; }}
-                .pdf-info-table td {{ text-align: left; font-size: 14px; font-weight: 500; padding: 8px 6px; vertical-align: middle; border: none; border-bottom: 1px solid #dcdcdc; word-break: break-all; }}
-                .contract-body table {{ width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }}
-                .contract-body th, .contract-body td {{ border: 1px solid #333; padding: 8px; word-break: break-all; }}
+                .pdf-info-table td {{ text-align: left; font-size: 14px; font-weight: 500; padding: 8px 6px; vertical-align: middle; border: none; border-bottom: 1px solid #dcdcdc; word-break: keep-all; overflow-wrap: break-word; }}
+                .contract-body table {{ width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; white-space: normal !important; }}
+                .contract-body th, .contract-body td {{ border: 1px solid #333; padding: 8px; word-break: keep-all; overflow-wrap: break-word; }}
                 .contract-body tr {{ page-break-inside: avoid; }}
                 tr[class*="display:none"] {{ display: none !important; }}
                 [data-show-if] {{ display: table-row; }}
@@ -1597,6 +1746,7 @@ def preview_pdf(idx):
                 configuration=PDF_CONFIG,
                 options={
                     'encoding': "UTF-8", 'enable-local-file-access': None,
+                    'print-media-type': None, 'disable-smart-shrinking': None, 'dpi': '96',
                     'page-size': 'A4', 'margin-top': '20mm', 'margin-right': '18mm',
                     'margin-bottom': '20mm', 'margin-left': '18mm'
                 }
