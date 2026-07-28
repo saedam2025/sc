@@ -24,12 +24,29 @@
     .panel-title { font-size: 17px; font-weight: 900; margin: 0; display: flex; gap: 8px; align-items: center; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .stats-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     .stat-box { border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 14px; background: rgba(255,255,255,.55); }
     .stat-label { color: var(--text-gray, #64748b); font-weight: 800; font-size: 12px; }
     .stat-value { margin-top: 8px; font-size: 22px; font-weight: 900; color: var(--primary-color, #4a90e2); }
+    .stat-hint { margin-top: 5px; color: var(--text-gray, #64748b); font-size: 11px; font-weight: 700; }
+    .stat-icon { float: right; color: var(--primary-color, #4a90e2); opacity: .72; font-size: 15px; }
     .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th, .data-table td { padding: 10px 9px; border-bottom: 1px solid var(--border-color, #e2e8f0); text-align: left; vertical-align: middle; }
     .data-table th { color: var(--text-gray, #64748b); font-size: 12px; font-weight: 900; background: rgba(248,250,252,.7); }
+    .table-scroll { overflow-x: auto; }
+    .stats-table-wrap { max-height: 520px; overflow: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; }
+    .stats-table-wrap .data-table th { position: sticky; top: 0; z-index: 1; }
+    .stats-click-row { cursor: pointer; transition: background .18s ease; }
+    .stats-click-row:hover, .stats-click-row:focus { background: rgba(74,144,226,.09); outline: none; }
+    .stats-click-row[aria-expanded="true"] { background: rgba(74,144,226,.13); }
+    .expand-icon { display: inline-block; margin-right: 7px; color: var(--primary-color, #4a90e2); transition: transform .18s ease; }
+    .stats-click-row[aria-expanded="true"] .expand-icon { transform: rotate(90deg); }
+    .stats-detail-row[hidden] { display: none; }
+    .stats-detail-row > td { padding: 0 10px 14px; background: rgba(248,250,252,.62); }
+    .stats-detail-box { border: 1px solid var(--border-color, #dbe4ee); border-radius: 8px; padding: 13px; background: var(--card-bg, #fff); }
+    .detail-title { margin: 0 0 10px; font-size: 13px; font-weight: 900; color: var(--primary-color, #4a90e2); }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .retention-note { display: flex; align-items: center; gap: 7px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 700; }
     
     /* 게시판 생성용 새로운 와이드 그리드 시스템 */
     .create-form-section { display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color, #e2e8f0); }
@@ -153,8 +170,13 @@
     .empty-note { padding: 34px; text-align: center; color: var(--text-gray, #64748b); font-weight: 700; }
     
     @media (max-width: 980px) {
-        .admin-shell, .disk-layout, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        .admin-shell, .disk-layout, .grid-2, .grid-3, .detail-grid { grid-template-columns: 1fr; }
+        .stats-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+        .stats-summary-grid { grid-template-columns: 1fr; }
     }
 
     /* 상단 메뉴 테마 색상 띠 (테두리를 덮으며 둥글게) */
@@ -395,33 +417,77 @@
         <div class="admin-header">
             <div>
                 <h1 class="admin-title"><i class="fa-solid fa-chart-line"></i> 이용통계</h1>
-                <div class="admin-subtitle">일별 로그인/로그아웃, 메뉴별, 회원별 이용 현황을 확인합니다.</div>
+                <div class="admin-subtitle">화면 접속만 정확히 집계하고 회원·메뉴별 누계와 최근 3개월 상세 기록을 확인합니다.</div>
             </div>
+            <div class="retention-note"><i class="fa-solid fa-database"></i> 상세 로그 3개월 보관 · 누계 영구 유지</div>
         </div>
-        <div class="grid-3">
-            {% for label, value in content_counts.items() %}
-            <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ value }}</div></div>
+        <div class="stats-summary-grid">
+            {% for card in summary_cards %}
+            <div class="stat-box">
+                <i class="fa-solid {{ card.icon }} stat-icon"></i>
+                <div class="stat-label">{{ card.label }}</div>
+                <div class="stat-value">{{ "{:,}".format(card.value or 0) }}</div>
+                <div class="stat-hint">{{ card.hint }}</div>
+            </div>
             {% endfor %}
+        </div>
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-boxes-stacked"></i> DB 콘텐츠 현황</h2>
+            <div class="grid-3">
+            {% for label, value in content_counts.items() %}
+                <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ "{:,}".format(value or 0) }}</div></div>
+            {% endfor %}
+            </div>
         </div>
         <div class="grid-2">
             <div class="panel">
                 <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-right-to-bracket"></i> 일별 로그인/로그아웃</h2>
-                <table class="data-table"><thead><tr><th>일자</th><th>로그인</th><th>로그아웃</th></tr></thead><tbody>
-                    {% for row in daily_login %}<tr><td>{{ row.day }}</td><td>{{ row.login_count }}</td><td>{{ row.logout_count }}</td></tr>{% else %}<tr><td colspan="3" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
-                </tbody></table>
+                <div class="stats-table-wrap">
+                    <table class="data-table"><thead><tr><th>일자</th><th>이용 회원</th><th>로그인</th><th>로그아웃</th></tr></thead><tbody>
+                        {% for row in daily_login %}
+                        <tr class="stats-click-row js-daily-stats" tabindex="0" role="button" aria-expanded="false" data-day="{{ row.day }}">
+                            <td><i class="fa-solid fa-chevron-right expand-icon"></i>{{ row.day }}</td>
+                            <td>{{ row.user_count }}</td><td>{{ row.login_count }}</td><td>{{ row.logout_count }}</td>
+                        </tr>
+                        <tr class="stats-detail-row" hidden><td colspan="4"><div class="stats-detail-box">불러오는 중...</div></td></tr>
+                        {% else %}
+                        <tr><td colspan="4" class="empty-note">기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody></table>
+                </div>
+                <div class="stat-hint" style="margin-top:10px;"><i class="fa-solid fa-hand-pointer"></i> 일자 행을 클릭하면 해당 일자의 회원별 로그인·로그아웃 기록이 표시됩니다.</div>
             </div>
             <div class="panel">
                 <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-bars-progress"></i> 메뉴별 이용통계</h2>
-                <table class="data-table"><thead><tr><th>메뉴</th><th>접속</th></tr></thead><tbody>
-                    {% for row in menu_stats %}<tr><td>{{ row.menu_name }}</td><td>{{ row.count }}</td></tr>{% else %}<tr><td colspan="2" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
-                </tbody></table>
+                <div class="stats-table-wrap">
+                    <table class="data-table"><thead><tr><th>메뉴</th><th>누적 접속</th><th>회원</th><th>최근 사용</th></tr></thead><tbody>
+                        {% for row in menu_stats %}
+                        <tr><td>{{ row.menu_name }}</td><td>{{ "{:,}".format(row.access_count or 0) }}</td><td>{{ row.user_count }}</td><td>{{ row.last_used or '-' }}</td></tr>
+                        {% else %}<tr><td colspan="4" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
+                    </tbody></table>
+                </div>
             </div>
         </div>
         <div class="panel">
             <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-users-viewfinder"></i> 회원별 이용통계</h2>
-            <table class="data-table"><thead><tr><th>회원</th><th>사번</th><th>접속</th><th>최근 사용</th></tr></thead><tbody>
-                {% for row in user_stats %}<tr><td>{{ row.user_name }}</td><td>{{ row.emp_no }}</td><td>{{ row.count }}</td><td>{{ row.last_used }}</td></tr>{% else %}<tr><td colspan="4" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
-            </tbody></table>
+            <div class="table-scroll">
+                <table class="data-table"><thead><tr><th>회원</th><th>사번</th><th>누적 접속</th><th>로그인</th><th>로그아웃</th><th>사용 메뉴</th><th>최초 사용</th><th>최근 사용</th></tr></thead><tbody>
+                    {% for row in user_stats %}
+                    <tr class="stats-click-row js-member-stats" tabindex="0" role="button" aria-expanded="false" data-emp-no="{{ row.emp_no }}">
+                        <td><i class="fa-solid fa-chevron-right expand-icon"></i>{{ row.user_name }}</td>
+                        <td>{{ row.emp_no }}</td>
+                        <td>{{ "{:,}".format(row.access_count or 0) }}</td>
+                        <td>{{ "{:,}".format(row.login_count or 0) }}</td>
+                        <td>{{ "{:,}".format(row.logout_count or 0) }}</td>
+                        <td>{{ row.menu_count }}</td>
+                        <td>{{ row.first_used or '-' }}</td>
+                        <td>{{ row.last_used or '-' }}</td>
+                    </tr>
+                    <tr class="stats-detail-row" hidden><td colspan="8"><div class="stats-detail-box">불러오는 중...</div></td></tr>
+                    {% else %}<tr><td colspan="8" class="empty-note">기록이 없습니다.</td></tr>{% endfor %}
+                </tbody></table>
+            </div>
+            <div class="stat-hint" style="margin-top:10px;"><i class="fa-solid fa-hand-pointer"></i> 회원 행을 클릭하면 메뉴별 영구 누계와 최근 3개월 일별 접속 기록이 표시됩니다.</div>
         </div>
         {% endif %}
 
@@ -611,6 +677,112 @@ if (boardCreateForm) {
         location.reload();
     });
 }
+
+function escapeStatsHtml(value) {
+    return String(value ?? '-').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    })[char]);
+}
+
+function formatStatsNumber(value) {
+    return new Intl.NumberFormat('ko-KR').format(Number(value || 0));
+}
+
+async function toggleStatsDetail(row, loader) {
+    const detailRow = row.nextElementSibling;
+    if (!detailRow || !detailRow.classList.contains('stats-detail-row')) return;
+    const opening = detailRow.hidden;
+    detailRow.hidden = !opening;
+    row.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (!opening || detailRow.dataset.loaded === 'true') return;
+
+    const box = detailRow.querySelector('.stats-detail-box');
+    box.innerHTML = '<div class="empty-note"><i class="fa-solid fa-spinner fa-spin"></i> 기록을 불러오는 중입니다.</div>';
+    try {
+        box.innerHTML = await loader();
+        detailRow.dataset.loaded = 'true';
+    } catch (error) {
+        box.innerHTML = `<div class="empty-note">${escapeStatsHtml(error.message || '기록을 불러오지 못했습니다.')}</div>`;
+    }
+}
+
+function bindExpandableStatsRows(selector, loader) {
+    document.querySelectorAll(selector).forEach((row) => {
+        const open = () => toggleStatsDetail(row, () => loader(row));
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+}
+
+bindExpandableStatsRows('.js-daily-stats', async (row) => {
+    const day = row.dataset.day;
+    const response = await fetch(`/admin/stats/daily-users?day=${encodeURIComponent(day)}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || '일별 기록을 불러오지 못했습니다.');
+    if (!result.users.length) return '<div class="empty-note">해당 일자의 회원 기록이 없습니다.</div>';
+    return `
+        <h3 class="detail-title"><i class="fa-solid fa-users"></i> ${escapeStatsHtml(day)} 회원별 기록</h3>
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr><th>회원</th><th>사번</th><th>로그인</th><th>로그아웃</th><th>첫 기록</th><th>마지막 기록</th></tr></thead>
+            <tbody>${result.users.map((user) => `
+                <tr>
+                    <td>${escapeStatsHtml(user.user_name)}</td>
+                    <td>${escapeStatsHtml(user.emp_no)}</td>
+                    <td>${formatStatsNumber(user.login_count)}</td>
+                    <td>${formatStatsNumber(user.logout_count)}</td>
+                    <td>${escapeStatsHtml(user.first_time)}</td>
+                    <td>${escapeStatsHtml(user.last_time)}</td>
+                </tr>
+            `).join('')}</tbody>
+        </table></div>
+    `;
+});
+
+bindExpandableStatsRows('.js-member-stats', async (row) => {
+    const empNo = row.dataset.empNo;
+    const response = await fetch(`/admin/stats/member-detail?emp_no=${encodeURIComponent(empNo)}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || '회원 기록을 불러오지 못했습니다.');
+    const menuRows = result.menus.length ? result.menus.map((menu) => `
+        <tr>
+            <td>${escapeStatsHtml(menu.menu_name)}</td>
+            <td>${formatStatsNumber(menu.access_count)}</td>
+            <td>${escapeStatsHtml(menu.first_used)}</td>
+            <td>${escapeStatsHtml(menu.last_used)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="4" class="empty-note">메뉴별 누계가 없습니다.</td></tr>';
+    const dailyRows = result.daily.length ? result.daily.map((daily) => `
+        <tr>
+            <td>${escapeStatsHtml(daily.day)}</td>
+            <td>${formatStatsNumber(daily.access_count)}</td>
+            <td>${formatStatsNumber(daily.menu_count)}</td>
+        </tr>
+    `).join('') : '<tr><td colspan="3" class="empty-note">최근 3개월 일별 기록이 없습니다.</td></tr>';
+    return `
+        <h3 class="detail-title"><i class="fa-solid fa-user-clock"></i> ${escapeStatsHtml(result.member.user_name)} 상세 이용 기록</h3>
+        <div class="detail-grid">
+            <div>
+                <div class="stat-hint" style="margin-bottom:7px;">메뉴별 누적 기록 · 영구 유지</div>
+                <div class="stats-table-wrap"><table class="data-table">
+                    <thead><tr><th>메뉴</th><th>누적 접속</th><th>최초 사용</th><th>최근 사용</th></tr></thead>
+                    <tbody>${menuRows}</tbody>
+                </table></div>
+            </div>
+            <div>
+                <div class="stat-hint" style="margin-bottom:7px;">일별 접속 기록 · 최근 3개월</div>
+                <div class="stats-table-wrap"><table class="data-table">
+                    <thead><tr><th>일자</th><th>접속</th><th>사용 메뉴</th></tr></thead>
+                    <tbody>${dailyRows}</tbody>
+                </table></div>
+            </div>
+        </div>
+    `;
+});
 
 renderThemeList();
 </script>
