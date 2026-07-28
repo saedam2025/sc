@@ -141,7 +141,38 @@ def init_db():
         path TEXT,
         method TEXT,
         ip_address TEXT,
+        session_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS usage_user_totals (
+        emp_no TEXT PRIMARY KEY,
+        user_name TEXT,
+        access_count INTEGER NOT NULL DEFAULT 0,
+        login_count INTEGER NOT NULL DEFAULT 0,
+        logout_count INTEGER NOT NULL DEFAULT 0,
+        first_used DATETIME,
+        last_used DATETIME,
+        last_login DATETIME,
+        last_logout DATETIME,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS usage_user_menu_totals (
+        emp_no TEXT NOT NULL,
+        user_name TEXT,
+        menu_name TEXT NOT NULL,
+        access_count INTEGER NOT NULL DEFAULT 0,
+        first_used DATETIME,
+        last_used DATETIME,
+        PRIMARY KEY (emp_no, menu_name)
+    )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS usage_page_sessions (
+        session_id TEXT PRIMARY KEY,
+        emp_no TEXT NOT NULL,
+        path TEXT NOT NULL,
+        last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS admin_settings (
@@ -612,7 +643,13 @@ def init_db():
         "ALTER TABLE schools ADD COLUMN school_phone TEXT",
         "ALTER TABLE schools ADD COLUMN school_email TEXT",
         "ALTER TABLE schools ADD COLUMN access_key TEXT",
-        "ALTER TABLE gall2 ADD COLUMN post_id INTEGER"
+        "ALTER TABLE gall2 ADD COLUMN post_id INTEGER",
+        "ALTER TABLE usage_logs ADD COLUMN session_id TEXT",
+        "ALTER TABLE usage_user_totals ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE usage_user_totals ADD COLUMN logout_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE usage_user_totals ADD COLUMN last_login DATETIME",
+        "ALTER TABLE usage_user_totals ADD COLUMN last_logout DATETIME",
+        "ALTER TABLE usage_user_totals ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"
     ]
     
     for q in alter_queries:
@@ -642,6 +679,149 @@ def init_db():
         ON schools(access_key)
         WHERE access_key IS NOT NULL
     ''')
+
+    c.execute('CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_usage_logs_emp_created ON usage_logs(emp_no, created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_usage_logs_menu_created ON usage_logs(menu_name, created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_login_activity_created_at ON login_activity(created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_login_activity_emp_created ON login_activity(emp_no, created_at)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_usage_user_menu_last ON usage_user_menu_totals(emp_no, last_used)')
+
+    # 기존 원본 로그에서 화면 접속으로 판단되는 기록만 1회 이관한다.
+    # API 폴링, 파일/썸네일, 상태 조회는 과거 이용통계를 부풀렸으므로 누계에서 제외한다.
+    usage_backfill = c.execute(
+        "SELECT value FROM admin_settings WHERE key='usage_stats_v2_backfilled'"
+    ).fetchone()
+    if not usage_backfill:
+        legacy_page_filter = '''
+            method='GET'
+            AND COALESCE(path, '') <> ''
+            AND path NOT LIKE '/api/%'
+            AND path NOT LIKE '%/api/%'
+            AND path NOT LIKE '/widget/%'
+            AND path NOT LIKE '/uploads/%'
+            AND path NOT LIKE '%/thumb/%'
+            AND path NOT LIKE '%/attachment/%'
+            AND path NOT LIKE '%/download/%'
+            AND path NOT LIKE '%/file/%'
+            AND path NOT LIKE '%/weblink-file/%'
+            AND path NOT LIKE '/get_%'
+            AND path NOT LIKE '/check_%'
+            AND path <> '/user/my_info'
+            AND LOWER(path) NOT LIKE '%.ico'
+            AND LOWER(path) NOT LIKE '%.jpg'
+            AND LOWER(path) NOT LIKE '%.jpeg'
+            AND LOWER(path) NOT LIKE '%.png'
+            AND LOWER(path) NOT LIKE '%.gif'
+            AND LOWER(path) NOT LIKE '%.svg'
+            AND LOWER(path) NOT LIKE '%.webp'
+            AND LOWER(path) NOT LIKE '%.css'
+            AND LOWER(path) NOT LIKE '%.js'
+            AND LOWER(path) NOT LIKE '%.json'
+            AND LOWER(path) NOT LIKE '%.pdf'
+            AND LOWER(path) NOT LIKE '%.xlsx'
+            AND EXISTS (
+                SELECT 1 FROM users u
+                WHERE CAST(u.emp_no AS TEXT)=CAST(usage_logs.emp_no AS TEXT)
+            )
+            AND COALESCE(endpoint, '') NOT LIKE 'api_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'get_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'serve_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'download_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'check_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.api_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.get_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.serve_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.download_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.widget_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.bootstrap'
+            AND COALESCE(endpoint, '') NOT LIKE '%.%status%'
+        '''
+        legacy_events = f'''
+            SELECT COALESCE(emp_no, user_name, 'unknown') AS emp_no,
+                   MAX(COALESCE(user_name, emp_no, '알 수 없음')) AS user_name,
+                   COALESCE(menu_name, '기타') AS menu_name,
+                   MIN(created_at) AS event_at
+            FROM usage_logs
+            WHERE {legacy_page_filter}
+            GROUP BY COALESCE(emp_no, user_name, 'unknown'),
+                     COALESCE(menu_name, '기타'),
+                     path,
+                     STRFTIME('%Y-%m-%d %H:%M:%S', created_at)
+        '''
+        legacy_users = c.execute(f'''
+            SELECT emp_no,
+                   MAX(user_name) AS user_name,
+                   COUNT(*) AS access_count,
+                   MIN(event_at) AS first_used,
+                   MAX(event_at) AS last_used
+            FROM ({legacy_events})
+            GROUP BY emp_no
+        ''').fetchall()
+        for row in legacy_users:
+            c.execute('''
+                INSERT INTO usage_user_totals (
+                    emp_no, user_name, access_count, first_used, last_used, updated_at
+                ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(emp_no) DO UPDATE SET
+                    user_name=excluded.user_name,
+                    access_count=excluded.access_count,
+                    first_used=excluded.first_used,
+                    last_used=excluded.last_used,
+                    updated_at=CURRENT_TIMESTAMP
+            ''', tuple(row))
+
+        legacy_menus = c.execute(f'''
+            SELECT emp_no,
+                   MAX(user_name) AS user_name,
+                   menu_name,
+                   COUNT(*) AS access_count,
+                   MIN(event_at) AS first_used,
+                   MAX(event_at) AS last_used
+            FROM ({legacy_events})
+            GROUP BY emp_no, menu_name
+        ''').fetchall()
+        for row in legacy_menus:
+            c.execute('''
+                INSERT INTO usage_user_menu_totals (
+                    emp_no, user_name, menu_name, access_count, first_used, last_used
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(emp_no, menu_name) DO UPDATE SET
+                    user_name=excluded.user_name,
+                    access_count=excluded.access_count,
+                    first_used=excluded.first_used,
+                    last_used=excluded.last_used
+            ''', tuple(row))
+
+        legacy_logins = c.execute('''
+            SELECT COALESCE(emp_no, user_name, 'unknown') AS emp_no,
+                   MAX(COALESCE(user_name, emp_no, '알 수 없음')) AS user_name,
+                   SUM(CASE WHEN action='login' THEN 1 ELSE 0 END) AS login_count,
+                   SUM(CASE WHEN action='logout' THEN 1 ELSE 0 END) AS logout_count,
+                   MAX(CASE WHEN action='login' THEN created_at END) AS last_login,
+                   MAX(CASE WHEN action='logout' THEN created_at END) AS last_logout
+            FROM login_activity
+            GROUP BY COALESCE(emp_no, user_name, 'unknown')
+        ''').fetchall()
+        for row in legacy_logins:
+            c.execute('''
+                INSERT INTO usage_user_totals (
+                    emp_no, user_name, login_count, logout_count,
+                    last_login, last_logout, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(emp_no) DO UPDATE SET
+                    user_name=excluded.user_name,
+                    login_count=excluded.login_count,
+                    logout_count=excluded.logout_count,
+                    last_login=excluded.last_login,
+                    last_logout=excluded.last_logout,
+                    updated_at=CURRENT_TIMESTAMP
+            ''', tuple(row))
+
+        c.execute('''
+            INSERT INTO admin_settings (key, value, updated_at)
+            VALUES ('usage_stats_v2_backfilled', '1', CURRENT_TIMESTAMP)
+        ''')
 
     tabs_count = c.execute("SELECT count(*) FROM gallery_tabs").fetchone()[0]
     if tabs_count == 0:

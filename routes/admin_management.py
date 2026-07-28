@@ -9,6 +9,53 @@ from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_
 
 admin_bp = Blueprint('admin', __name__)
 
+TRACKABLE_USAGE_SQL = '''
+    (
+        session_id IS NOT NULL
+        OR (
+            session_id IS NULL
+            AND method='GET'
+            AND COALESCE(path, '') <> ''
+            AND path NOT LIKE '/api/%'
+            AND path NOT LIKE '%/api/%'
+            AND path NOT LIKE '/widget/%'
+            AND path NOT LIKE '/uploads/%'
+            AND path NOT LIKE '%/thumb/%'
+            AND path NOT LIKE '%/attachment/%'
+            AND path NOT LIKE '%/download/%'
+            AND path NOT LIKE '%/file/%'
+            AND path NOT LIKE '%/weblink-file/%'
+            AND path NOT LIKE '/get_%'
+            AND path NOT LIKE '/check_%'
+            AND path <> '/user/my_info'
+            AND LOWER(path) NOT LIKE '%.ico'
+            AND LOWER(path) NOT LIKE '%.jpg'
+            AND LOWER(path) NOT LIKE '%.jpeg'
+            AND LOWER(path) NOT LIKE '%.png'
+            AND LOWER(path) NOT LIKE '%.gif'
+            AND LOWER(path) NOT LIKE '%.svg'
+            AND LOWER(path) NOT LIKE '%.webp'
+            AND LOWER(path) NOT LIKE '%.css'
+            AND LOWER(path) NOT LIKE '%.js'
+            AND LOWER(path) NOT LIKE '%.json'
+            AND LOWER(path) NOT LIKE '%.pdf'
+            AND LOWER(path) NOT LIKE '%.xlsx'
+            AND COALESCE(endpoint, '') NOT LIKE 'api_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'get_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'serve_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'download_%'
+            AND COALESCE(endpoint, '') NOT LIKE 'check_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.api_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.get_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.serve_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.download_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.widget_%'
+            AND COALESCE(endpoint, '') NOT LIKE '%.bootstrap'
+            AND COALESCE(endpoint, '') NOT LIKE '%.%status%'
+        )
+    )
+'''
+
 
 THEME_CATEGORY_NAMES = {'custom', 'gallery', 'accent', 'deep-color', 'seasonal', 'default'}
 THEME_VAR_KEYS = {
@@ -602,34 +649,91 @@ def stats():
     require_admin()
     conn = get_db()
     daily_login = conn.execute('''
-        SELECT DATE(created_at) AS day,
+        SELECT DATE(DATETIME(created_at, '+9 hours')) AS day,
                SUM(CASE WHEN action='login' THEN 1 ELSE 0 END) AS login_count,
-               SUM(CASE WHEN action='logout' THEN 1 ELSE 0 END) AS logout_count
+               SUM(CASE WHEN action='logout' THEN 1 ELSE 0 END) AS logout_count,
+               COUNT(DISTINCT CASE WHEN action='login' THEN COALESCE(emp_no, user_name) END) AS user_count
         FROM login_activity
-        GROUP BY DATE(created_at)
+        WHERE created_at >= DATETIME('now', '-3 months')
+        GROUP BY DATE(DATETIME(created_at, '+9 hours'))
         ORDER BY day DESC
-        LIMIT 30
+        LIMIT 93
     ''').fetchall()
     menu_stats = conn.execute('''
-        SELECT menu_name, COUNT(*) AS count
-        FROM usage_logs
-        GROUP BY menu_name
-        ORDER BY count DESC
-        LIMIT 20
+        SELECT m.menu_name,
+               SUM(m.access_count) AS access_count,
+               COUNT(DISTINCT m.emp_no) AS user_count,
+               DATETIME(MAX(m.last_used), '+9 hours') AS last_used
+        FROM usage_user_menu_totals m
+        JOIN users u ON CAST(u.emp_no AS TEXT)=m.emp_no
+        GROUP BY m.menu_name
+        ORDER BY access_count DESC
     ''').fetchall()
     user_stats = conn.execute('''
-        SELECT user_name, emp_no, COUNT(*) AS count, MAX(created_at) AS last_used
-        FROM usage_logs
-        GROUP BY emp_no, user_name
-        ORDER BY count DESC
-        LIMIT 50
+        SELECT t.user_name,
+               t.emp_no,
+               t.access_count,
+               t.login_count,
+               t.logout_count,
+               DATETIME(t.first_used, '+9 hours') AS first_used,
+               DATETIME(t.last_used, '+9 hours') AS last_used,
+               COUNT(m.menu_name) AS menu_count
+        FROM usage_user_totals t
+        JOIN users u ON CAST(u.emp_no AS TEXT)=t.emp_no
+        LEFT JOIN usage_user_menu_totals m ON m.emp_no=t.emp_no
+        GROUP BY t.emp_no, t.user_name, t.access_count, t.login_count,
+                 t.logout_count, t.first_used, t.last_used
+        ORDER BY t.access_count DESC, t.login_count DESC, t.user_name
     ''').fetchall()
-    recent = conn.execute('''
-        SELECT user_name, menu_name, path, method, created_at
-        FROM usage_logs
-        ORDER BY id DESC
-        LIMIT 30
-    ''').fetchall()
+
+    today_login = conn.execute('''
+        SELECT
+            SUM(CASE WHEN action='login' THEN 1 ELSE 0 END) AS login_count,
+            SUM(CASE WHEN action='logout' THEN 1 ELSE 0 END) AS logout_count,
+            COUNT(DISTINCT CASE WHEN action='login' THEN COALESCE(emp_no, user_name) END) AS user_count
+        FROM login_activity
+        WHERE DATE(DATETIME(created_at, '+9 hours'))=DATE('now', '+9 hours')
+    ''').fetchone()
+    today_access = conn.execute(f'''
+        SELECT COUNT(*) FROM (
+            SELECT COALESCE(emp_no, user_name), path,
+                   STRFTIME('%Y-%m-%d %H:%M:%S', created_at)
+            FROM usage_logs
+            WHERE {TRACKABLE_USAGE_SQL}
+              AND DATE(DATETIME(created_at, '+9 hours'))=DATE('now', '+9 hours')
+            GROUP BY COALESCE(emp_no, user_name), path,
+                     STRFTIME('%Y-%m-%d %H:%M:%S', created_at)
+        )
+    ''').fetchone()[0]
+    active_7d = conn.execute('''
+        SELECT COUNT(DISTINCT COALESCE(emp_no, user_name))
+        FROM login_activity
+        WHERE action='login' AND created_at >= DATETIME('now', '-7 days')
+    ''').fetchone()[0]
+    active_30d = conn.execute('''
+        SELECT COUNT(DISTINCT COALESCE(emp_no, user_name))
+        FROM login_activity
+        WHERE action='login' AND created_at >= DATETIME('now', '-30 days')
+    ''').fetchone()[0]
+    cumulative = conn.execute('''
+        SELECT COALESCE(SUM(access_count), 0) AS access_count,
+               COALESCE(SUM(login_count), 0) AS login_count,
+               COALESCE(SUM(logout_count), 0) AS logout_count,
+               COUNT(*) AS user_count
+        FROM usage_user_totals t
+        JOIN users u ON CAST(u.emp_no AS TEXT)=t.emp_no
+    ''').fetchone()
+    summary_cards = [
+        {'label': '오늘 로그인', 'value': today_login['login_count'] or 0, 'hint': f"고유 회원 {today_login['user_count'] or 0}명", 'icon': 'fa-right-to-bracket'},
+        {'label': '오늘 로그아웃', 'value': today_login['logout_count'] or 0, 'hint': '로그아웃 이벤트', 'icon': 'fa-right-from-bracket'},
+        {'label': '오늘 화면 접속', 'value': today_access, 'hint': '중복·API 요청 제외', 'icon': 'fa-display'},
+        {'label': '최근 7일 이용 회원', 'value': active_7d, 'hint': f"최근 30일 {active_30d}명", 'icon': 'fa-user-clock'},
+        {'label': '누적 화면 접속', 'value': cumulative['access_count'], 'hint': '3개월 이후에도 누계 유지', 'icon': 'fa-chart-column'},
+        {'label': '누적 로그인', 'value': cumulative['login_count'], 'hint': f"로그아웃 {cumulative['logout_count']:,}회", 'icon': 'fa-key'},
+        {'label': '통계 회원', 'value': cumulative['user_count'], 'hint': '누계가 기록된 회원', 'icon': 'fa-users'},
+        {'label': '이용 메뉴', 'value': len(menu_stats), 'hint': '누적 메뉴 분류', 'icon': 'fa-bars-progress'},
+    ]
+
     certificate_size, certificate_count = _folder_size(os.path.join(BASE_DIR, 'output_pdfs'))
     content_counts = {
         '게시판 게시물': conn.execute("SELECT COUNT(*) FROM board_posts").fetchone()[0] if _table_exists(conn, 'board_posts') else 0,
@@ -644,9 +748,87 @@ def stats():
         daily_login=daily_login,
         menu_stats=menu_stats,
         user_stats=user_stats,
-        recent=recent,
+        summary_cards=summary_cards,
         content_counts=content_counts,
     )
+
+
+@admin_bp.route('/stats/daily-users')
+def stats_daily_users():
+    require_admin()
+    day = (request.args.get('day') or '').strip()
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        return jsonify({'status': 'error', 'message': '올바른 일자를 입력해 주세요.'}), 400
+
+    conn = get_db()
+    users = conn.execute('''
+        SELECT COALESCE(emp_no, '') AS emp_no,
+               MAX(COALESCE(user_name, emp_no, '알 수 없음')) AS user_name,
+               SUM(CASE WHEN action='login' THEN 1 ELSE 0 END) AS login_count,
+               SUM(CASE WHEN action='logout' THEN 1 ELSE 0 END) AS logout_count,
+               MIN(STRFTIME('%H:%M:%S', DATETIME(created_at, '+9 hours'))) AS first_time,
+               MAX(STRFTIME('%H:%M:%S', DATETIME(created_at, '+9 hours'))) AS last_time
+        FROM login_activity
+        WHERE DATE(DATETIME(created_at, '+9 hours'))=?
+        GROUP BY COALESCE(emp_no, user_name, 'unknown')
+        ORDER BY login_count DESC, user_name
+    ''', (day,)).fetchall()
+    conn.close()
+    return jsonify({
+        'status': 'success',
+        'day': day,
+        'users': [dict(row) for row in users],
+    })
+
+
+@admin_bp.route('/stats/member-detail')
+def stats_member_detail():
+    require_admin()
+    emp_no = (request.args.get('emp_no') or '').strip()
+    if not emp_no or len(emp_no) > 80:
+        return jsonify({'status': 'error', 'message': '회원을 확인할 수 없습니다.'}), 400
+
+    conn = get_db()
+    member = conn.execute('''
+        SELECT emp_no, user_name, access_count, login_count, logout_count,
+               DATETIME(first_used, '+9 hours') AS first_used,
+               DATETIME(last_used, '+9 hours') AS last_used,
+               DATETIME(last_login, '+9 hours') AS last_login,
+               DATETIME(last_logout, '+9 hours') AS last_logout
+        FROM usage_user_totals
+        WHERE emp_no=?
+    ''', (emp_no,)).fetchone()
+    if not member:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '회원 누계 기록이 없습니다.'}), 404
+
+    menus = conn.execute('''
+        SELECT menu_name, access_count,
+               DATETIME(first_used, '+9 hours') AS first_used,
+               DATETIME(last_used, '+9 hours') AS last_used
+        FROM usage_user_menu_totals
+        WHERE emp_no=?
+        ORDER BY access_count DESC, menu_name
+    ''', (emp_no,)).fetchall()
+    daily = conn.execute(f'''
+        SELECT DATE(DATETIME(created_at, '+9 hours')) AS day,
+               COUNT(DISTINCT path || '|' || STRFTIME('%Y-%m-%d %H:%M:%S', created_at)) AS access_count,
+               COUNT(DISTINCT menu_name) AS menu_count
+        FROM usage_logs
+        WHERE emp_no=?
+          AND created_at >= DATETIME('now', '-3 months')
+          AND {TRACKABLE_USAGE_SQL}
+        GROUP BY DATE(DATETIME(created_at, '+9 hours'))
+        ORDER BY day DESC
+        LIMIT 93
+    ''', (emp_no,)).fetchall()
+    conn.close()
+    return jsonify({
+        'status': 'success',
+        'member': dict(member),
+        'menus': [dict(row) for row in menus],
+        'daily': [dict(row) for row in daily],
+    })
 
 
 def _table_exists(conn, table_name):
