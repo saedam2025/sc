@@ -37,6 +37,7 @@ from routes.chat import chat_bp
 
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
+from routes.usage_stats import record_login_activity, record_page_usage, start_usage_session
 
 app = Flask(__name__)
 socketio.init_app(app)
@@ -166,26 +167,7 @@ def _classify_menu(path):
 
 def _record_usage_log():
     try:
-        path = request.path or ''
-        if request.method not in ('GET', 'POST') or path.startswith('/static'):
-            return
-        if path.startswith(('/check_messages', '/api/activity_feed', '/user/profile_img')):
-            return
-        conn = get_db()
-        conn.execute('''
-            INSERT INTO usage_logs (emp_no, user_name, menu_name, endpoint, path, method, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            session.get('emp_no'),
-            session.get('user_name'),
-            _classify_menu(path),
-            request.endpoint,
-            path,
-            request.method,
-            request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
-        ))
-        conn.commit()
-        conn.close()
+        record_page_usage(request, session, _classify_menu(request.path or ''))
     except Exception as e:
         print(f"이용 로그 기록 오류: {e}")
 
@@ -291,21 +273,12 @@ def login():
     session['profile_path'] = user.get('profile_path', '')
     session['profile_icon'] = user.get('profile_icon') or user.get('아이콘') or '👤'
 
+    conn.close()
+    start_usage_session(session)
     try:
-        conn.execute('''
-            INSERT INTO login_activity (emp_no, user_name, action, ip_address, user_agent)
-            VALUES (?, ?, 'login', ?, ?)
-        ''', (
-            session.get('emp_no'),
-            session.get('user_name'),
-            request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip(),
-            request.headers.get('User-Agent', '')[:255]
-        ))
-        conn.commit()
+        record_login_activity(request, session, 'login')
     except Exception as e:
         print(f"로그인 기록 오류: {e}")
-
-    conn.close()
     
     return jsonify({"status": "success"})
 
@@ -601,18 +574,7 @@ def chat_popup(partner):
 def logout():
     try:
         if session.get('emp_no'):
-            conn = get_db()
-            conn.execute('''
-                INSERT INTO login_activity (emp_no, user_name, action, ip_address, user_agent)
-                VALUES (?, ?, 'logout', ?, ?)
-            ''', (
-                session.get('emp_no'),
-                session.get('user_name'),
-                request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip(),
-                request.headers.get('User-Agent', '')[:255]
-            ))
-            conn.commit()
-            conn.close()
+            record_login_activity(request, session, 'logout')
     except Exception as e:
         print(f"로그아웃 기록 오류: {e}")
     session.clear()
