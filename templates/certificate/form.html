@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>증명서 발급 신청</title>
+{% extends certificate_layout %}
+{% block extra_css %}
     <style>
         /* base.html 없이 독립적으로 작동하도록 색상 변수 정의 */
+        {% if not intranet_layout %}
         :root {
             --primary-color: #004ea2;
             --primary-dark: #002c63;
@@ -15,25 +12,27 @@
             --text-gray: #64748b;
             --main-bg: #f8fafc;
         }
+        {% endif %}
 
-        body {
+        .certificate-page-shell {
             font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
-            background-color: #f4f7fa;
-            margin: 0;
+            background-color: {{ 'transparent' if intranet_layout else '#f4f7fa' }};
             padding: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            min-height: {{ 'calc(100vh - 150px)' if intranet_layout else '100vh' }};
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .cert-container {
             width: 100%;
             max-width: 1000px;
-            background-color: #fff;
+            background-color: var(--card-bg, #fff);
             padding: 40px;
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+            box-shadow: var(--card-shadow, 0 10px 30px rgba(0, 0, 0, 0.03));
             border: 1px solid var(--border-color);
             margin: 20px auto; 
             box-sizing: border-box;
@@ -106,7 +105,7 @@
             padding: 12px 14px;
             font-size: 14px;
             border: 1px solid var(--border-color);
-            background-color: #fff;
+            background-color: var(--card-bg, #fff);
             border-radius: 10px;
             transition: all 0.2s ease;
             font-family: inherit;
@@ -215,9 +214,10 @@
             .full-width, .span-2, .option-group { grid-column: span 1; }
         }
     </style>
-</head>
-<body>
+{% endblock %}
+{% block content %}
 
+<div class="certificate-page-shell">
     <div class="cert-container">
         <div class="cert-header">
             <h2>📄 강사 경력증명서 발급 신청</h2>
@@ -317,6 +317,7 @@
         <input type="hidden" name="신청구분" value="강사">
         </form>
     </div>
+</div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -371,5 +372,4 @@
             });
         });
     </script>
-</body>
-</html>
+{% endblock %}

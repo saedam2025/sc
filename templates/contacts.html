@@ -435,6 +435,124 @@
         .contact-builder-checks { grid-template-columns: 1fr; }
         .contact-builder-preview { padding: 10px; }
     }
+
+    /* 공통 테마 호환 */
+    .contact-page {
+        color: var(--text-dark);
+    }
+    .contact-shell,
+    .contact-section,
+    .contact-edit-panel,
+    .contact-builder-modal {
+        background: var(--card-bg, #ffffff);
+        border-color: var(--card-border, var(--border-color));
+        box-shadow: var(--card-shadow, 0 4px 15px rgba(15, 23, 42, 0.03));
+        backdrop-filter: var(--card-backdrop, none);
+        -webkit-backdrop-filter: var(--card-backdrop, none);
+    }
+    .contact-table {
+        background: transparent;
+    }
+    .contact-shell {
+        border-top-color: var(--primary-color);
+    }
+    .contact-header,
+    .section-head,
+    .contact-table th,
+    .contact-table td,
+    .contact-detail-row td,
+    .manual-contact-footer,
+    .contact-edit-head,
+    .contact-edit-foot,
+    .contact-builder-head,
+    .contact-builder-controls,
+    .contact-builder-foot {
+        border-color: var(--card-border, var(--border-color));
+    }
+    .contact-title h2,
+    .contact-name,
+    .contact-detail-value,
+    .contact-edit-field input,
+    .contact-edit-field select,
+    .contact-edit-field textarea,
+    .contact-builder-head h3,
+    .contact-builder-label {
+        color: var(--text-dark);
+    }
+    .contact-title p,
+    .section-title span,
+    .contact-team-row small,
+    .contact-edit-field label,
+    .muted,
+    .empty-row,
+    .contact-builder-preview-note {
+        color: var(--text-gray);
+    }
+    .contact-title i,
+    .section-title i {
+        color: var(--primary-color) !important;
+    }
+    .section-title h3,
+    .contact-table th,
+    .contact-edit-head h3,
+    .business-card-link,
+    .contact-expand-link,
+    .contact-expand-link i,
+    .contact-detail-label {
+        color: var(--primary-color);
+    }
+    .contact-btn,
+    .contact-icon-btn,
+    .contact-team-select,
+    .contact-edit-field input,
+    .contact-edit-field select,
+    .contact-edit-field textarea,
+    .contact-builder-input,
+    .contact-builder-select,
+    .contact-builder-check {
+        background: var(--input-bg, #ffffff);
+        border-color: var(--card-border, var(--border-color));
+        color: var(--input-text, var(--text-dark));
+    }
+    .contact-btn:hover,
+    .contact-icon-btn:hover,
+    .contact-table tbody tr:hover td,
+    .contact-table tbody tr.contact-detail-row:hover td {
+        background: var(--widget-hover, #f8fafc);
+        border-color: var(--primary-color);
+    }
+    .contact-btn.primary {
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        color: #ffffff;
+    }
+    .contact-btn.primary:hover {
+        background: var(--primary-dark);
+        border-color: var(--primary-dark);
+    }
+    .section-head,
+    .contact-table th,
+    .contact-team-row td,
+    .contact-detail-row td,
+    .manual-contact-footer,
+    .contact-edit-foot,
+    .contact-builder-controls {
+        background: var(--widget-bg, #f8fafc) !important;
+    }
+    .contact-table td,
+    .contact-team-row td {
+        color: var(--text-dark) !important;
+    }
+    .contact-leader-badge {
+        background: var(--primary-light);
+        color: var(--primary-color);
+    }
+    .business-card-link:hover,
+    .contact-icon-btn:hover {
+        background: var(--primary-light);
+        color: var(--primary-color);
+    }
+
     @media print {
         .navbar,
         .main-footer,

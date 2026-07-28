@@ -111,15 +111,15 @@
         flex-direction: column;
     }
     .company-gallery-item {
-        display: grid;
-        grid-template-columns: 56px minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--widget-border-color);
-        cursor: pointer;
-        min-height: 72px;
-    }
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr); /* 우측 auto 공간 삭제 (2열 구조) */
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--widget-border-color);
+    cursor: pointer;
+    min-height: 72px;
+}
     .company-gallery-item:hover .company-gallery-title {
         color: var(--blue-primary);
         text-decoration: underline;
@@ -149,6 +149,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        margin-bottom: 6px;
     }
     .company-gallery-meta,
     .company-gallery-time {
@@ -637,9 +638,9 @@
                                 {% if loop.first %}<span class="new-n-badge" style="display:inline-block; margin-left:0; margin-right:5px;">new</span>{% endif %}
                                 {{ item.title }}
                             </div>
-                            <div class="company-gallery-meta">{{ item.tab_name or '기본 갤러리 2' }} · 사진 {{ item.photo_count or 0 }}장</div>
+                            <div class="company-gallery-meta">{{ item.created_at[:10] if item.created_at else '' }} · 사진 {{ item.photo_count or 0 }}장</div>
                         </div>
-                        <div class="company-gallery-time">{{ item.created_at[:10] if item.created_at else '' }}</div>
+              
                     </div>
                     {% endfor %}
                 </div>

@@ -14,7 +14,7 @@
     {% else %}
     /* 초대 폼이나 관리자 초기 설정일 때는 중앙에 배치 */
     nav, .sidebar, header, footer, .navbar { display: none !important; }
-    body { background-color: #f8f9fa; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'Pretendard', sans-serif; }
+    body { background: var(--body-bg, #f8f9fa); margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'Pretendard', sans-serif; }
     /* 🚀 수정 포인트: 초대 폼일 때는 2단 그리드가 찌그러지지 않도록 넓이를 850px로 확장 */
     .user-mgmt-container { width: 100%; max-width: {% if mode == 'invite' %}850px{% else %}480px{% endif %}; }
     {% endif %}
@@ -96,6 +96,123 @@
     .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
     
     .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid #dee2e6; margin-top: 10px; display: none; }
+
+    /* 공통 테마 호환 */
+    .user-mgmt-container {
+        color: var(--text-dark);
+    }
+    .mgmt-header h2,
+    .mgmt-card h3,
+    .modal-header h3 {
+        color: var(--text-dark);
+    }
+    .mgmt-header p,
+    .modal-field label {
+        color: var(--text-gray);
+    }
+    .mgmt-header h2 i,
+    .mgmt-card h3 i {
+        color: var(--primary-color) !important;
+    }
+    .mgmt-card,
+    .modal-content,
+    .invite-form-card {
+        background: var(--card-bg, #ffffff);
+        border-color: var(--card-border, var(--border-color));
+        box-shadow: var(--card-shadow, 0 10px 25px rgba(0, 0, 0, 0.05));
+        backdrop-filter: var(--card-backdrop, none);
+        -webkit-backdrop-filter: var(--card-backdrop, none);
+    }
+    .table-container,
+    .approve-table th,
+    .approve-table td,
+    .modal-header,
+    #modalFooter,
+    .emoji-scroll-box,
+    .profile-img-preview {
+        border-color: var(--card-border, var(--border-color)) !important;
+    }
+    .approve-table {
+        background: transparent;
+    }
+    .approve-table th {
+        background: var(--widget-bg, #f8f9fa);
+        color: var(--text-gray);
+    }
+    .approve-table td {
+        background: transparent;
+        color: var(--text-dark);
+    }
+    .approve-table tbody tr:hover td {
+        background: var(--widget-hover, #f8fafc);
+    }
+    .table-container::-webkit-scrollbar-thumb {
+        background-color: var(--primary-color);
+    }
+    .table-container::-webkit-scrollbar-track {
+        background-color: var(--widget-bg, #f8f9fa);
+    }
+    .glass-input,
+    .admin-auth-box input {
+        background: var(--input-bg, #f8fafc);
+        border-color: var(--card-border, var(--border-color));
+        color: var(--input-text, var(--text-dark));
+    }
+    .glass-input:focus,
+    .admin-auth-box input:focus {
+        background: var(--card-bg, #ffffff);
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    }
+    .readonly-field {
+        background: var(--widget-bg, #f1f5f9) !important;
+        border-color: var(--card-border, var(--border-color)) !important;
+        color: var(--text-gray) !important;
+    }
+    .profile-setup-area,
+    #modalFooter,
+    .invite-form-card > div[style*="background: #f8fafc"] {
+        background: var(--widget-bg, #f8fafc) !important;
+    }
+    .btn-primary-glass,
+    .btn-invite-top,
+    .btn-approve {
+        background: var(--primary-color);
+        color: #ffffff;
+    }
+    .btn-primary-glass:hover {
+        background: var(--primary-dark);
+    }
+    .btn-direct-top {
+        background: var(--primary-dark);
+        color: #ffffff;
+    }
+    .btn-edit {
+        background: var(--primary-light);
+        color: var(--primary-color);
+    }
+    .btn-retire,
+    .btn-close-modal {
+        background: var(--widget-bg, #f1f5f9);
+        border-color: var(--widget-border, var(--card-border, var(--border-color)));
+        color: var(--text-dark);
+    }
+    .btn-close-modal:hover,
+    .btn-retire:hover {
+        background: var(--widget-hover, #e2e8f0);
+    }
+    .profile-icon-option.selected {
+        border-color: var(--primary-color);
+        background: var(--primary-light);
+    }
+    .profile-icon-option:hover {
+        background: var(--widget-hover, #f8fafc);
+    }
+    .emoji-scroll-box,
+    .profile-img-preview,
+    .approve-table td img {
+        background: var(--card-bg, #ffffff) !important;
+    }
 </style>
 {% endblock %}
 

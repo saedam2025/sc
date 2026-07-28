@@ -102,6 +102,9 @@
     .bulk-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 0; }
     .bulk-btn { height: 32px; border: 1px solid var(--expense-red); border-radius: 5px; padding: 0 12px; background: var(--expense-soft); color: var(--expense-red); font-size: 0.78rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: 0.2s; }
     .bulk-btn:hover { background: #fff5f5; color: #b91c1c; border-color: #b91c1c; }
+    .bulk-email-btn { border-color: var(--expense-blue); color: var(--expense-blue); }
+    .bulk-email-btn:hover { background: var(--expense-blue); color: #ffffff; border-color: var(--expense-blue); }
+    .bulk-btn:disabled { cursor: wait; opacity: 0.7; }
     
     .table-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
     .page-size-control { display: inline-flex; align-items: center; gap: 7px; color: var(--text-gray, #555555); font-size: 0.85rem; font-weight: 600; }
@@ -132,6 +135,19 @@
     .detail-action-btn:hover { border-color: var(--expense-navy); background: var(--expense-blue); color: #ffffff; }
     .modal-close { border: none; background: #f1f5f9; color: #64748b; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
     .modal-close:hover { background: #e2e8f0; color: #0f172a; }
+    .bulk-email-modal-content { width: 540px; max-width: 94vw; }
+    .bulk-email-selected { margin-bottom: 16px; padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1e3a8a; font-size: 0.86rem; font-weight: 700; }
+    .bulk-email-field label { display: block; margin-bottom: 7px; color: #334155; font-size: 0.82rem; font-weight: 800; }
+    .bulk-email-field input { width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 0 12px; color: #0f172a; background: #ffffff; font-size: 0.9rem; box-sizing: border-box; }
+    .bulk-email-field input:focus { outline: none; border-color: var(--expense-blue); box-shadow: 0 0 0 3px rgba(0, 78, 162, 0.12); }
+    .bulk-email-help { margin-top: 8px; color: #64748b; font-size: 0.76rem; line-height: 1.55; }
+    .bulk-email-status { min-height: 20px; margin-top: 12px; color: var(--expense-blue); font-size: 0.8rem; font-weight: 700; }
+    .bulk-email-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+    .bulk-email-action { height: 38px; border: 1px solid #cbd5e1; border-radius: 7px; padding: 0 15px; background: #ffffff; color: #475569; cursor: pointer; font-size: 0.82rem; font-weight: 700; display: inline-flex; align-items: center; gap: 7px; }
+    .bulk-email-action.primary { border-color: var(--expense-blue); background: var(--expense-blue); color: #ffffff; }
+    .bulk-email-action:hover { border-color: var(--expense-blue); color: var(--expense-blue); }
+    .bulk-email-action.primary:hover { background: var(--expense-navy); color: #ffffff; }
+    .bulk-email-action:disabled { cursor: wait; opacity: 0.68; }
     
     .expense-form-doc { color: #0f172a; }
     .expense-form-title { text-align: center; font-size: 1.45rem; font-weight: 800; margin: 10px 0 18px; letter-spacing: 0; }
@@ -146,6 +162,31 @@
     .attachment-list { display: flex; flex-direction: column; gap: 4px; }
     .attachment-list a { color: var(--expense-blue); text-decoration: underline; text-underline-offset: 2px; }
     .attachment-size { color: #64748b; margin-left: 5px; font-size: 0.78rem; }
+    .receipt-preview-toggle { margin-top: 10px; height: 34px; border: 1px solid var(--expense-blue); border-radius: 6px; padding: 0 12px; background: #ffffff; color: var(--expense-blue); font-size: 0.8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: 0.2s; }
+    .receipt-preview-toggle:hover { background: var(--expense-blue); color: #ffffff; }
+    .receipt-preview-toggle .toggle-chevron { transition: transform 0.2s ease; }
+    .receipt-preview-toggle[aria-expanded="true"] .toggle-chevron { transform: rotate(180deg); }
+    .receipt-preview-panel { margin-top: 12px; padding: 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; animation: receiptPreviewOpen 0.2s ease-out; }
+    .receipt-preview-panel[hidden] { display: none; }
+    .receipt-preview-guide { margin-bottom: 10px; color: #64748b; font-size: 0.78rem; font-weight: 600; }
+    .receipt-preview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .receipt-preview-card { min-width: 0; overflow: hidden; border: 1px solid #dbe3ec; border-radius: 8px; background: #ffffff; }
+    .receipt-preview-image-btn { width: 100%; min-height: 260px; padding: 8px; border: 0; background: #eef2f7; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
+    .receipt-preview-image-btn:hover { background: #e2e8f0; }
+    .receipt-preview-image { display: block; width: 100%; height: 320px; object-fit: contain; border-radius: 5px; background: #ffffff; }
+    .receipt-preview-error { display: none; padding: 32px 12px; color: #94a3b8; font-size: 0.8rem; text-align: center; }
+    .receipt-preview-caption { padding: 9px 10px; color: #334155; font-size: 0.78rem; font-weight: 700; overflow-wrap: anywhere; border-top: 1px solid #e2e8f0; }
+    .receipt-image-viewer { display: none; position: fixed; z-index: 10000001; inset: 0; padding: 24px; background: rgba(2, 6, 23, 0.94); align-items: center; justify-content: center; box-sizing: border-box; }
+    .receipt-image-viewer-dialog { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+    .receipt-image-viewer-img { display: block; max-width: 94vw; max-height: calc(100vh - 110px); width: auto; height: auto; object-fit: contain; border-radius: 6px; background: #ffffff; box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45); }
+    .receipt-image-viewer-caption { max-width: 80vw; color: #f8fafc; font-size: 0.85rem; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+    .receipt-image-viewer-actions { position: absolute; top: 0; right: 0; display: flex; gap: 8px; }
+    .receipt-image-viewer-btn { min-height: 38px; padding: 0 12px; border: 1px solid rgba(255,255,255,0.5); border-radius: 7px; background: rgba(15,23,42,0.72); color: #ffffff; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 700; }
+    .receipt-image-viewer-btn:hover { background: #ffffff; color: #0f172a; }
+    @keyframes receiptPreviewOpen {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
     .memo-box { min-height: 48px; white-space: pre-wrap; }
     .copy-field { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
     .copy-field-text { overflow-wrap: anywhere; }
@@ -169,6 +210,7 @@
         .expense-modal { position: static; background: transparent; backdrop-filter: none; }
         .expense-modal-content { box-shadow: none; margin: 0; max-height: none; width: 100%; max-width: none; padding: 0; overflow: visible; }
         .expense-modal-head, .modal-head-actions { display: none !important; }
+        .receipt-preview-toggle, .receipt-preview-panel, .receipt-image-viewer { display: none !important; }
     }
 
     @media (max-width: 1050px) {
@@ -179,6 +221,11 @@
         .expense-table { min-width: 980px; }
         .expense-table-wrap { overflow-x: auto; }
         .detail-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .receipt-preview-grid { grid-template-columns: 1fr; }
+        .receipt-preview-image { height: auto; max-height: 70vh; }
+        .receipt-image-viewer { padding: 12px; }
+        .receipt-image-viewer-actions { top: 4px; right: 4px; }
+        .receipt-image-viewer-img { max-width: 96vw; max-height: calc(100vh - 125px); }
     }
 </style>
 
@@ -267,11 +314,12 @@
                     <option value="30">30개</option>
                 </select>
             </label>
-            {% if can_see_all %}
             <div class="bulk-toolbar">
-            <button class="bulk-btn" type="button" onclick="deleteSelectedReports()"><i class="fa-solid fa-trash-can"></i> 선택삭제</button>
+                <button class="bulk-btn bulk-email-btn" type="button" onclick="openSelectedEmailModal()"><i class="fa-solid fa-envelope"></i> 선택 이메일 전송</button>
+                {% if can_see_all %}
+                <button class="bulk-btn" type="button" onclick="deleteSelectedReports()"><i class="fa-solid fa-trash-can"></i> 선택삭제</button>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         <div class="expense-table-wrap">
@@ -290,7 +338,7 @@
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>{% if can_see_all %}<input type="checkbox" id="checkAllReports" onchange="toggleAllReports(this)">{% endif %}</th>
+                        <th><input type="checkbox" id="checkAllReports" onchange="toggleAllReports(this)" aria-label="현재 페이지 전체 선택"></th>
                         <th>결의일</th>
                         <th>문서명</th>
                         <th>학교/본사</th>
@@ -312,7 +360,7 @@
                         data-manager="{{ (report.expense_manager or report.drafter or '-')|e }}"
                         data-amount="{{ report.total_amount or 0 }}"
                         data-status="{{ combined_status }}">
-                        <td>{% if can_see_all %}<input type="checkbox" class="report-check" value="{{ report.id }}">{% endif %}</td>
+                        <td><input type="checkbox" class="report-check" value="{{ report.id }}" aria-label="{{ report.title }} 선택"></td>
                         <td>{{ report.expense_date or (report.report_year ~ '.' ~ report.report_month ~ '.' ~ report.report_day) }}</td>
                         <td class="title-cell" title="{{ report.title }}">{{ report.title }}</td>
                         <td>{% if report.expense_org_type == '학교' %}{{ report.expense_school_name or '학교' }}{% else %}본사{% endif %}</td>
@@ -368,6 +416,21 @@
     </div>
 </div>
 
+<div id="receiptImageViewer" class="receipt-image-viewer" role="dialog" aria-modal="true" aria-hidden="true" aria-label="영수증 이미지 확대 보기">
+    <div class="receipt-image-viewer-dialog">
+        <div class="receipt-image-viewer-actions">
+            <a id="receiptImageOriginalLink" class="receipt-image-viewer-btn" href="#" target="_blank" rel="noopener">
+                <i class="fa-solid fa-up-right-from-square"></i> 원본 열기
+            </a>
+            <button class="receipt-image-viewer-btn" type="button" onclick="closeReceiptImageViewer()">
+                <i class="fa-solid fa-xmark"></i> 닫기
+            </button>
+        </div>
+        <img id="receiptImageViewerImg" class="receipt-image-viewer-img" src="" alt="">
+        <div id="receiptImageViewerCaption" class="receipt-image-viewer-caption"></div>
+    </div>
+</div>
+
 <div id="pendingSummaryModal" class="expense-modal">
     <div class="expense-modal-content">
         <div class="expense-modal-head">
@@ -381,6 +444,33 @@
             </div>
         </div>
         <div id="pendingSummaryBody"></div>
+    </div>
+</div>
+
+<div id="expenseEmailModal" class="expense-modal">
+    <div class="expense-modal-content bulk-email-modal-content" role="dialog" aria-modal="true" aria-labelledby="expenseEmailModalTitle">
+        <div class="expense-modal-head">
+            <div>
+                <h3 id="expenseEmailModalTitle" class="expense-modal-title">선택 지출결의서 이메일 전송</h3>
+                <div style="margin-top:6px; color:#64748b; font-size:0.8rem;">결의서 내용과 모든 첨부파일을 ZIP으로 묶어 전송합니다.</div>
+            </div>
+            <button class="modal-close" type="button" onclick="closeSelectedEmailModal()" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form onsubmit="sendSelectedReportsEmail(); return false;">
+            <div id="bulkEmailSelectedCount" class="bulk-email-selected"></div>
+            <div class="bulk-email-field">
+                <label for="bulkEmailAddress">받는 사람 이메일 주소</label>
+                <input id="bulkEmailAddress" type="email" inputmode="email" autocomplete="email" required placeholder="example@email.com">
+                <div class="bulk-email-help">
+                    한 번에 최대 50건까지 보낼 수 있습니다. 압축파일이 메일 첨부 제한을 초과하면 항목 수를 줄여 나누어 전송해주세요.
+                </div>
+            </div>
+            <div id="bulkEmailStatus" class="bulk-email-status" aria-live="polite"></div>
+            <div class="bulk-email-actions">
+                <button class="bulk-email-action" type="button" onclick="closeSelectedEmailModal()">취소</button>
+                <button id="bulkEmailSendButton" class="bulk-email-action primary" type="submit"><i class="fa-solid fa-paper-plane"></i> 압축하여 전송</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -417,6 +507,99 @@ function attachmentHtml(files) {
             <span class="attachment-size">(${escapeHtml(file.size_text || '-')})</span>
         </div>
     `).join('')}</div>`;
+}
+
+function isImageAttachment(file) {
+    const path = String((file && (file.path || file.name)) || '').split(/[?#]/)[0];
+    return /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(path);
+}
+
+function receiptAttachmentHtml(files) {
+    const fileListHtml = attachmentHtml(files);
+    if (!Array.isArray(files) || files.length === 0) return fileListHtml;
+
+    const imageFiles = files.filter(isImageAttachment);
+    if (imageFiles.length === 0) return fileListHtml;
+
+    const previewsHtml = imageFiles.map(file => {
+        const imageUrl = fileUrlFromPath(file.path || file.name);
+        const fileName = file.name || '영수증 이미지';
+        return `
+            <div class="receipt-preview-card">
+                <button type="button" class="receipt-preview-image-btn"
+                        data-image-url="${escapeHtml(imageUrl)}"
+                        data-image-name="${escapeHtml(fileName)}"
+                        onclick="openReceiptImageViewer(this.dataset.imageUrl, this.dataset.imageName)"
+                        title="클릭하여 크게 보기">
+                    <img class="receipt-preview-image"
+                         src="${escapeHtml(imageUrl)}"
+                         alt="${escapeHtml(fileName)}"
+                         loading="lazy"
+                         onerror="handleReceiptImageError(this)">
+                    <span class="receipt-preview-error"><i class="fa-regular fa-image"></i><br>이미지를 불러올 수 없습니다.</span>
+                </button>
+                <div class="receipt-preview-caption">${escapeHtml(fileName)}</div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="receipt-attachments">
+            ${fileListHtml}
+            <button type="button" class="receipt-preview-toggle"
+                    aria-expanded="false"
+                    aria-controls="receiptPreviewPanel"
+                    data-image-count="${imageFiles.length}"
+                    onclick="toggleReceiptPreview(this)">
+                <i class="fa-regular fa-images"></i>
+                <span class="receipt-preview-toggle-text">영수증 확인하기 (${imageFiles.length})</span>
+                <i class="fa-solid fa-chevron-down toggle-chevron"></i>
+            </button>
+            <div id="receiptPreviewPanel" class="receipt-preview-panel" hidden>
+                <div class="receipt-preview-guide">영수증 이미지를 클릭하면 화면 가득 크게 볼 수 있습니다.</div>
+                <div class="receipt-preview-grid">${previewsHtml}</div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleReceiptPreview(button) {
+    const panel = document.getElementById(button.getAttribute('aria-controls'));
+    if (!panel) return;
+    const shouldOpen = panel.hidden;
+    panel.hidden = !shouldOpen;
+    button.setAttribute('aria-expanded', String(shouldOpen));
+    const label = button.querySelector('.receipt-preview-toggle-text');
+    const imageCount = Number(button.dataset.imageCount || 0);
+    if (label) label.textContent = shouldOpen ? '영수증 접기' : `영수증 확인하기 (${imageCount})`;
+    if (shouldOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function handleReceiptImageError(image) {
+    image.style.display = 'none';
+    const errorMessage = image.parentElement.querySelector('.receipt-preview-error');
+    if (errorMessage) errorMessage.style.display = 'block';
+}
+
+function openReceiptImageViewer(imageUrl, imageName) {
+    const viewer = document.getElementById('receiptImageViewer');
+    const image = document.getElementById('receiptImageViewerImg');
+    const caption = document.getElementById('receiptImageViewerCaption');
+    const originalLink = document.getElementById('receiptImageOriginalLink');
+    image.src = imageUrl;
+    image.alt = imageName || '영수증 이미지';
+    caption.textContent = imageName || '영수증 이미지';
+    originalLink.href = imageUrl;
+    viewer.style.display = 'flex';
+    viewer.setAttribute('aria-hidden', 'false');
+}
+
+function closeReceiptImageViewer() {
+    const viewer = document.getElementById('receiptImageViewer');
+    const image = document.getElementById('receiptImageViewerImg');
+    viewer.style.display = 'none';
+    viewer.setAttribute('aria-hidden', 'true');
+    image.src = '';
 }
 
 function copyFieldHtml(value) {
@@ -512,7 +695,7 @@ async function openExpenseDetail(reportId) {
                     </tr>
                     <tr>
                         <th>영수증 증빙</th>
-                        <td colspan="5">${attachmentHtml(receiptFiles)}</td>
+                        <td colspan="5">${receiptAttachmentHtml(receiptFiles)}</td>
                     </tr>
                     <tr>
                         <th>비고</th>
@@ -547,6 +730,7 @@ async function openExpenseDetail(reportId) {
 }
 
 function closeExpenseDetail() {
+    closeReceiptImageViewer();
     document.getElementById('expenseDetailModal').style.display = 'none';
 }
 
@@ -737,6 +921,72 @@ function selectedReportIds() {
     return Array.from(document.querySelectorAll('.report-check:checked')).map(check => Number(check.value));
 }
 
+function openSelectedEmailModal() {
+    const ids = selectedReportIds();
+    if (ids.length === 0) {
+        alert('이메일로 전송할 지출결의서를 선택해주세요.');
+        return;
+    }
+    if (ids.length > 50) {
+        alert('한 번에 최대 50건까지 전송할 수 있습니다.');
+        return;
+    }
+    document.getElementById('bulkEmailSelectedCount').textContent = `선택한 지출결의서 ${ids.length.toLocaleString('ko-KR')}건`;
+    document.getElementById('bulkEmailStatus').textContent = '';
+    const modal = document.getElementById('expenseEmailModal');
+    modal.style.display = 'block';
+    window.setTimeout(() => document.getElementById('bulkEmailAddress').focus(), 50);
+}
+
+function closeSelectedEmailModal(forceClose = false) {
+    const sendButton = document.getElementById('bulkEmailSendButton');
+    if (!forceClose && sendButton.dataset.processing === '1') return;
+    document.getElementById('expenseEmailModal').style.display = 'none';
+    document.getElementById('bulkEmailStatus').textContent = '';
+}
+
+async function sendSelectedReportsEmail() {
+    const ids = selectedReportIds();
+    const emailInput = document.getElementById('bulkEmailAddress');
+    const email = emailInput.value.trim();
+    const sendButton = document.getElementById('bulkEmailSendButton');
+    const status = document.getElementById('bulkEmailStatus');
+
+    if (ids.length === 0) {
+        alert('이메일로 전송할 지출결의서를 선택해주세요.');
+        closeSelectedEmailModal(true);
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        alert('받는 사람 이메일 주소를 정확히 입력해주세요.');
+        emailInput.focus();
+        return;
+    }
+    if (lockActionButton(sendButton, '압축·전송 중')) return;
+    status.textContent = '결의서 내용과 첨부파일을 압축하여 메일로 전송하고 있습니다...';
+
+    try {
+        const res = await fetch('/expense/api/reports/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, email })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.message || '메일을 전송하지 못했습니다.');
+            status.textContent = data.message || '';
+            return;
+        }
+        alert(data.message || '메일을 전송했습니다.');
+        closeSelectedEmailModal(true);
+    } catch (e) {
+        alert('메일 전송 중 오류가 발생했습니다.');
+        status.textContent = '메일 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    } finally {
+        unlockActionButton(sendButton);
+    }
+}
+
 async function deleteSelectedReports() {
     const ids = selectedReportIds();
     if (ids.length === 0) return alert('삭제할 지출결의서를 선택해주세요.');
@@ -820,6 +1070,29 @@ document.getElementById('expenseDetailModal').addEventListener('click', function
 
 document.getElementById('pendingSummaryModal').addEventListener('click', function(event) {
     if (event.target === this) closePendingSummaryModal();
+});
+
+document.getElementById('expenseEmailModal').addEventListener('click', function(event) {
+    if (event.target === this) closeSelectedEmailModal();
+});
+
+document.getElementById('receiptImageViewer').addEventListener('click', function(event) {
+    if (event.target === this || event.target.classList.contains('receipt-image-viewer-dialog')) {
+        closeReceiptImageViewer();
+    }
+});
+
+document.addEventListener('keydown', function(event) {
+    if (event.key !== 'Escape') return;
+    const viewer = document.getElementById('receiptImageViewer');
+    if (viewer.style.display === 'flex') {
+        closeReceiptImageViewer();
+        return;
+    }
+    const emailModal = document.getElementById('expenseEmailModal');
+    if (emailModal.style.display === 'block') {
+        closeSelectedEmailModal();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', renderExpensePagination);

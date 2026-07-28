@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/attendance.css') }}">
 <style>
     .btn-reset {
@@ -45,6 +44,74 @@
     .btn-delete-record:hover {
         background-color: #fa5252;
         color: white;
+    }
+
+    /* 공통 테마 호환 */
+    .attendance-container {
+        color: var(--text-dark);
+    }
+    .attendance-card {
+        background: var(--card-bg, #ffffff);
+        border-color: var(--card-border, var(--border-color));
+        box-shadow: var(--card-shadow, 0 4px 15px rgba(0, 0, 0, 0.05));
+        backdrop-filter: var(--card-backdrop, none);
+        -webkit-backdrop-filter: var(--card-backdrop, none);
+    }
+    .attendance-header-area h2,
+    .attendance-table td {
+        color: var(--text-dark);
+    }
+    .attendance-header-area h2 i,
+    .position-title {
+        color: var(--primary-color);
+    }
+    .attendance-filters input[type="month"],
+    .attendance-filters select {
+        background: var(--input-bg, #f8fafc);
+        border-color: var(--card-border, var(--border-color));
+        color: var(--input-text, var(--text-dark));
+    }
+    .attendance-filters input[type="month"]:focus,
+    .attendance-filters select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    }
+    .btn-search {
+        background: var(--primary-color);
+    }
+    .btn-search:hover {
+        background: var(--primary-dark);
+    }
+    .btn-reset {
+        background: var(--widget-bg, #f1f5f9);
+        color: var(--text-gray);
+        border-color: var(--widget-border, var(--card-border, var(--border-color)));
+    }
+    .btn-reset:hover {
+        background: var(--widget-hover, #e9ecef);
+        color: var(--text-dark);
+    }
+    .attendance-table {
+        background: transparent;
+    }
+    .attendance-table th {
+        background: var(--widget-bg, #f8fafc);
+        color: var(--text-gray);
+        border-bottom-color: var(--card-border, var(--border-color));
+    }
+    .attendance-table td {
+        border-bottom-color: var(--card-border, var(--border-color));
+    }
+    .attendance-table tr:hover td {
+        background: var(--widget-hover, #f8fafc);
+    }
+    .btn-clockout {
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    .btn-clockout:hover {
+        background: var(--primary-color);
+        color: #ffffff;
     }
 </style>
 {% endblock %}

@@ -667,7 +667,7 @@
                         {% for s in schools %}
                         <tr class="main-row" style="{{ 'background-color: rgba(0,0,0,0.03); opacity: 0.7;' if s.is_active == 0 else '' }}" 
                             data-school-id="{{ s.id }}"
-                            onclick="window.location.href='{{ url_for('school.school_detail', school_id=s.id) }}'"
+                            onclick="window.location.href='{{ url_for('school.school_detail', school_key=s.access_key) }}'"
                             data-year="{{ s.year }}"
                             data-name="{{ s.school_name }}"
                             data-contract-subject="{{ s.contract_subject }}"
@@ -937,7 +937,7 @@
                     <div id="boardDropdownMenu">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             {% for cat in school_categories %}
-                            <a href="?category={{ cat.id }}" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
+                            <a href="{{ cat.url if cat.url else '?category=' ~ cat.id }}" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
                                 <i class="fas {{ cat.icon }}" style="color: var(--school-blue); width: 24px; text-align: center; font-size: 1.1rem;"></i>
                                 {{ cat.name }}
                             </a>
@@ -1185,9 +1185,9 @@
                                     {% if loop.first %}<span style="color: #ef4444; font-size: 0.65rem; font-weight: 900; margin-right: 5px; animation: blinkNew 1.5s infinite;">new</span>{% endif %}
                                     {{ item.title }}
                                 </div>
-                                <div class="company-gallery-meta">{{ item.tab_name or '기본 갤러리 2' }} · 사진 {{ item.photo_count or 0 }}장</div>
+                                <div class="company-gallery-meta">{{ item.created_at[:10] if item.created_at else '' }} · 사진 {{ item.photo_count or 0 }}장</div>
                             </div>
-                            <div class="company-gallery-time">{{ item.created_at[:10] if item.created_at else '' }}</div>
+                
                         </div>
                         {% endfor %}
                     </div>
@@ -1885,7 +1885,7 @@
     }
 
     function makeFileUrl(path) { return String(path || '#'); }
-    function canManage(author) { return currentUser === author || userLevel >= 3; }
+    function canManage(author) { return currentUser === author || userLevel <= 7; }
 
     function showView(viewId) {
         const listView = document.getElementById('boardListView');
@@ -1951,7 +1951,7 @@
 
         const canManagePost = isHeadquartersBoard
             ? canManageCurrentBoard
-            : (currentUser === data.author || userLevel >= 3);
+            : (currentUser === data.author || userLevel <= 7);
         if(canManagePost) {
             $('#readActionBtns').show();
             $('#singleDelForm').attr('action', '/school/post/delete/' + id);
