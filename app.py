@@ -398,6 +398,15 @@ def activity_feed():
 
     conn = get_db()
     activities = []
+    try:
+        activity_user_level = int(session.get('user_level', 99))
+    except (TypeError, ValueError):
+        activity_user_level = 99
+    is_center_director = (
+        activity_user_level == 8
+        and session.get('user_name') != 'admin'
+    )
+    activity_emp_no = session.get('emp_no')
 
     def table_exists(table_name):
         row = conn.execute(
@@ -474,12 +483,21 @@ def activity_feed():
         if table_exists('school_posts'):
             cols = get_columns('school_posts')
             if all(c in cols for c in ['title', 'author', 'created_at']):
-                rows = conn.execute("""
-                    SELECT id, school_id, title, author, created_at
-                    FROM school_posts
-                    ORDER BY created_at DESC
-                    LIMIT 10
-                """).fetchall()
+                school_post_query = """
+                    SELECT p.id, p.school_id, p.title, p.author, p.created_at,
+                           s.access_key
+                    FROM school_posts p
+                    JOIN schools s ON s.id = p.school_id
+                """
+                school_post_params = []
+                if is_center_director:
+                    school_post_query += " WHERE s.center_director_id = ?"
+                    school_post_params.append(activity_emp_no)
+                school_post_query += " ORDER BY p.created_at DESC LIMIT 10"
+                rows = conn.execute(
+                    school_post_query,
+                    school_post_params
+                ).fetchall()
 
                 for r in rows:
                     add_activity(
@@ -489,19 +507,28 @@ def activity_feed():
                         actor=r['author'],
                         text=f"학교업무공간에 새 글 「{r['title']}」을 등록했습니다.",
                         created_at=r['created_at'],
-                        url=f"/school/{r['school_id']}" if 'school_id' in r.keys() else "/school"
+                        url=f"/school/{r['access_key']}" if r['access_key'] else "/school"
                     )
 
         # 4) 학교업무공간 댓글
         if table_exists('school_post_comments'):
             cols = get_columns('school_post_comments')
             if all(c in cols for c in ['author', 'content', 'created_at']):
-                rows = conn.execute("""
-                    SELECT id, post_id, author, content, created_at
-                    FROM school_post_comments
-                    ORDER BY created_at DESC
-                    LIMIT 10
-                """).fetchall()
+                school_comment_query = """
+                    SELECT c.id, c.post_id, c.author, c.content, c.created_at
+                    FROM school_post_comments c
+                    JOIN school_posts p ON p.id = c.post_id
+                    JOIN schools s ON s.id = p.school_id
+                """
+                school_comment_params = []
+                if is_center_director:
+                    school_comment_query += " WHERE s.center_director_id = ?"
+                    school_comment_params.append(activity_emp_no)
+                school_comment_query += " ORDER BY c.created_at DESC LIMIT 10"
+                rows = conn.execute(
+                    school_comment_query,
+                    school_comment_params
+                ).fetchall()
 
                 for r in rows:
                     content = (r['content'] or '').replace('\n', ' ')
@@ -522,12 +549,21 @@ def activity_feed():
         if table_exists('school_tasks'):
             cols = get_columns('school_tasks')
             if all(c in cols for c in ['title', 'owner', 'created_at']):
-                rows = conn.execute("""
-                    SELECT id, school_id, title, owner, created_at
-                    FROM school_tasks
-                    ORDER BY created_at DESC
-                    LIMIT 10
-                """).fetchall()
+                school_task_query = """
+                    SELECT t.id, t.school_id, t.title, t.owner, t.created_at,
+                           s.access_key
+                    FROM school_tasks t
+                    JOIN schools s ON s.id = t.school_id
+                """
+                school_task_params = []
+                if is_center_director:
+                    school_task_query += " WHERE s.center_director_id = ?"
+                    school_task_params.append(activity_emp_no)
+                school_task_query += " ORDER BY t.created_at DESC LIMIT 10"
+                rows = conn.execute(
+                    school_task_query,
+                    school_task_params
+                ).fetchall()
 
                 for r in rows:
                     add_activity(
@@ -537,7 +573,7 @@ def activity_feed():
                         actor=r['owner'] or "시스템",
                         text=f"학교 일정 「{r['title']}」을 등록했습니다.",
                         created_at=r['created_at'],
-                        url=f"/school/{r['school_id']}" if 'school_id' in r.keys() else "/school"
+                        url=f"/school/{r['access_key']}" if r['access_key'] else "/school"
                     )
 
         # 최신순 정렬 후 20개만 반환
