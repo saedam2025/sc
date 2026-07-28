@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import platform
+import secrets
 
 if platform.system() == 'Windows':
     BASE_DIR = os.getcwd() 
@@ -534,6 +535,7 @@ def init_db():
     
     c.execute('''CREATE TABLE IF NOT EXISTS schools (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        access_key TEXT UNIQUE,
         year TEXT NOT NULL,                
         school_name TEXT NOT NULL,         
         contract_subject TEXT,
@@ -609,6 +611,7 @@ def init_db():
         "ALTER TABLE schools ADD COLUMN school_address TEXT",
         "ALTER TABLE schools ADD COLUMN school_phone TEXT",
         "ALTER TABLE schools ADD COLUMN school_email TEXT",
+        "ALTER TABLE schools ADD COLUMN access_key TEXT",
         "ALTER TABLE gall2 ADD COLUMN post_id INTEGER"
     ]
     
@@ -622,6 +625,22 @@ def init_db():
         CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_approval_id
         ON attendance(approval_id)
         WHERE approval_id IS NOT NULL
+    ''')
+
+    # 학교 상세 주소에 순번(id)을 노출하지 않도록 기존/신규 학교에
+    # 예측 불가능한 공개 접근 키를 부여한다.
+    schools_without_key = c.execute(
+        "SELECT id FROM schools WHERE access_key IS NULL OR TRIM(access_key) = ''"
+    ).fetchall()
+    for school_row in schools_without_key:
+        c.execute(
+            "UPDATE schools SET access_key = ? WHERE id = ?",
+            (secrets.token_urlsafe(24), school_row[0])
+        )
+    c.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_schools_access_key
+        ON schools(access_key)
+        WHERE access_key IS NOT NULL
     ''')
 
     tabs_count = c.execute("SELECT count(*) FROM gallery_tabs").fetchone()[0]

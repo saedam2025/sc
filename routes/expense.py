@@ -1,14 +1,16 @@
 from flask import Blueprint, render_template, request, jsonify, session, send_file
 import csv
 import html
-from io import BytesIO
+from io import BytesIO, StringIO
 import json
 import os
 import re
 import smtplib
 import tempfile
 import time
+import zipfile
 from datetime import date, datetime
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -26,6 +28,8 @@ MAX_EXCEL_FILES = 1
 MAX_RECEIPT_FILES = 20
 MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024
 MAX_RECEIPT_TOTAL_SIZE = 15 * 1024 * 1024
+MAX_BULK_EMAIL_REPORTS = 50
+MAX_BULK_EMAIL_ZIP_SIZE = 17 * 1024 * 1024
 RECEIPT_IMAGE_MAX_SIZE = (1920, 1080)
 RECEIPT_IMAGE_QUALITY = 85
 UPLOAD_FOLDER = '/mnt/data/uploads'
@@ -48,6 +52,12 @@ HEADER_ALIASES = {
     'note': ['비고', '메모', '참고', '증빙', '영수증']
 }
 TOTAL_ROW_LABELS = {'합계', '총계', '총합계', '소계', '계', '합'}
+INFORMATION_ROW_KEYWORDS = (
+    '안내', '안내문구', '비고', '참고', '참고사항', '주의', '주의사항',
+    '유의', '유의사항', '알림', '작성방법', '작성요령', '입력방법', '영수증'
+)
+INFORMATION_ROW_PREFIXES = ('*', '※', '☞', '▶', '◆', '◇', '●', '○')
+PLACEHOLDER_ROW_CHARACTERS = frozenset('-_–—·•')
 
 
 def ensure_expense_schema():
@@ -240,6 +250,60 @@ def _is_total_row(row, column_map):
     return False
 
 
+def _is_placeholder_text(value):
+    text = _clean_text(value).replace(' ', '')
+    return bool(text) and all(char in PLACEHOLDER_ROW_CHARACTERS for char in text)
+
+
+def _is_informational_row(row, column_map):
+    def value_for(field):
+        idx = column_map.get(field)
+        if idx is None or idx >= len(row):
+            return ''
+        return row[idx]
+
+    raw_date = value_for('expense_date')
+    raw_amount = value_for('amount')
+    vendor = _clean_text(value_for('vendor'))
+    description = _clean_text(value_for('description'))
+    _, date_error = _normalize_date_strict(raw_date)
+    _, amount_error = _parse_amount_strict(raw_amount)
+
+    # 날짜가 정상이거나 금액·사용처·사용내역이 모두 갖춰진 행은 실제 지출행으로 보고
+    # 나머지 필드의 오류가 있으면 기존 검증에서 정확히 안내한다.
+    if not date_error:
+        return False
+    if (
+        not amount_error
+        and vendor and not _is_placeholder_text(vendor)
+        and description and not _is_placeholder_text(description)
+    ):
+        return False
+
+    texts = [_clean_text(cell) for cell in row if _clean_text(cell)]
+    substantive_texts = [text for text in texts if not _is_placeholder_text(text)]
+    if not substantive_texts:
+        return True
+
+    core_texts = [
+        _clean_text(value_for(field))
+        for field in ('expense_date', 'vendor', 'description', 'amount')
+    ]
+    core_substantive_texts = [
+        text for text in core_texts
+        if text and not _is_placeholder_text(text)
+    ]
+    if not core_substantive_texts:
+        return True
+
+    first_text = substantive_texts[0].lstrip()
+    compact_first_text = re.sub(r'\s+', '', first_text)
+    return (
+        first_text.startswith(INFORMATION_ROW_PREFIXES)
+        or any(compact_first_text.startswith(keyword) for keyword in INFORMATION_ROW_KEYWORDS)
+    )
+
+
 def _is_total_item(item):
     amount = int(item['amount'] or 0) if 'amount' in item.keys() else 0
     for field in ('expense_date', 'category', 'vendor', 'description', 'payment_method', 'note'):
@@ -328,7 +392,7 @@ def parse_expense_file_with_errors(path):
     items = []
     errors = []
     for row_no, row in enumerate(rows[header_index + 1:], start=1):
-        if _is_total_row(row, column_map):
+        if _is_total_row(row, column_map) or _is_informational_row(row, column_map):
             continue
 
         def value_for(field):
@@ -437,6 +501,202 @@ def _expense_items_email_html(items):
             <tbody>{''.join(rows)}</tbody>
         </table>
     """
+
+
+def _record_value(record, key, default=''):
+    if hasattr(record, 'get'):
+        return record.get(key, default)
+    return record[key] if key in record.keys() else default
+
+
+def _combined_expense_status(report):
+    if _clean_text(_record_value(report, 'doc_status')) == '반려':
+        return '반려'
+    if _clean_text(_record_value(report, 'payment_status')) == '지급완료':
+        return '지급완료'
+    if _clean_text(_record_value(report, 'doc_status')) == '완료':
+        return '지급대기'
+    return '결재대기'
+
+
+def _safe_archive_component(value, fallback):
+    text = _clean_text(value)
+    text = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', '_', text)
+    text = re.sub(r'\s+', ' ', text).strip(' .')
+    return (text or fallback)[:90]
+
+
+def _unique_archive_path(used_paths, candidate):
+    normalized = candidate.casefold()
+    if normalized not in used_paths:
+        used_paths.add(normalized)
+        return candidate
+
+    root, ext = os.path.splitext(candidate)
+    number = 2
+    while True:
+        unique_candidate = f"{root}_{number}{ext}"
+        normalized = unique_candidate.casefold()
+        if normalized not in used_paths:
+            used_paths.add(normalized)
+            return unique_candidate
+        number += 1
+
+
+def _expense_report_archive_html(report, items):
+    org_text = (
+        _record_value(report, 'expense_school_name') or '학교'
+        if _clean_text(_record_value(report, 'expense_org_type')) == '학교'
+        else '본사'
+    )
+    memo_html = _html_text(_record_value(report, 'memo') or '-').replace('\n', '<br>')
+    source_names = _html_text(_record_value(report, 'source_filename') or '-')
+    receipt_names = _html_text(_record_value(report, 'receipt_filename') or '-')
+    total_amount = int(_record_value(report, 'total_amount', 0) or 0)
+    return f"""<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <title>{_html_text(_record_value(report, 'title') or '지출결의서')}</title>
+</head>
+<body style="font-family:'Malgun Gothic',sans-serif; color:#0f172a; line-height:1.55; padding:24px;">
+    <h1 style="text-align:center; font-size:24px; margin:0 0 22px;">지출결의서</h1>
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse; border:1px solid #cbd5e1; width:100%; max-width:900px; font-size:13px;">
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px; width:140px;">문서명</th><td style="border:1px solid #cbd5e1; padding:9px;" colspan="3">{_html_text(_record_value(report, 'title') or '-')}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">학교/본사</th><td style="border:1px solid #cbd5e1; padding:9px;">{_html_text(org_text)}</td><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px; width:140px;">담당자</th><td style="border:1px solid #cbd5e1; padding:9px;">{_html_text(_record_value(report, 'expense_manager') or _record_value(report, 'drafter') or '-')}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">결의일</th><td style="border:1px solid #cbd5e1; padding:9px;">{_html_text(_record_value(report, 'expense_date') or '-')}</td><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">상태</th><td style="border:1px solid #cbd5e1; padding:9px;">{_html_text(_combined_expense_status(report))}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">결의서 내역</th><td style="border:1px solid #cbd5e1; padding:9px;">{_html_text(_record_value(report, 'expense_kind') or '-')}</td><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">총 금액</th><td style="border:1px solid #cbd5e1; padding:9px; font-weight:700;">{total_amount:,}원</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">지급계좌번호</th><td style="border:1px solid #cbd5e1; padding:9px;" colspan="3">{_html_text(_record_value(report, 'payment_account') or '-')}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">첨부 엑셀</th><td style="border:1px solid #cbd5e1; padding:9px;" colspan="3">{source_names}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">영수증 증빙</th><td style="border:1px solid #cbd5e1; padding:9px;" colspan="3">{receipt_names}</td></tr>
+        <tr><th style="background:#f8fafc; border:1px solid #cbd5e1; padding:9px;">비고</th><td style="border:1px solid #cbd5e1; padding:9px;" colspan="3">{memo_html}</td></tr>
+    </table>
+    {_expense_items_email_html(items)}
+</body>
+</html>"""
+
+
+def _safe_expense_attachment_path(path):
+    if not path or not os.path.isfile(path):
+        return ''
+    try:
+        upload_root = os.path.realpath(UPLOAD_FOLDER)
+        real_path = os.path.realpath(path)
+        if os.path.commonpath([upload_root, real_path]) != upload_root:
+            return ''
+        return real_path
+    except (OSError, ValueError):
+        return ''
+
+
+def _archive_attachment_name(original_name, stored_path):
+    original_base = os.path.basename(_clean_text(original_name))
+    stored_extension = os.path.splitext(stored_path)[1]
+    original_root, original_extension = os.path.splitext(original_base)
+    if stored_extension and stored_extension.lower() != original_extension.lower():
+        original_base = f"{original_root or '첨부파일'}{stored_extension}"
+    return _safe_archive_component(original_base, os.path.basename(stored_path) or '첨부파일')
+
+
+def _build_expense_archive(report_entries):
+    archive_buffer = BytesIO()
+    missing_files = []
+    file_count = 0
+    used_paths = set()
+    summary_buffer = StringIO()
+    summary_writer = csv.writer(summary_buffer)
+    summary_writer.writerow(['순번', '문서명', '결의일', '학교/본사', '담당자', '상태', '금액'])
+
+    with zipfile.ZipFile(archive_buffer, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for index, (report, items) in enumerate(report_entries, start=1):
+            report_id = int(_record_value(report, 'id', 0) or 0)
+            title = _clean_text(_record_value(report, 'title')) or f'지출결의서_{report_id}'
+            folder = _safe_archive_component(f"{index:02d}_{report_id}_{title}", f"{index:02d}_지출결의서")
+            html_path = _unique_archive_path(used_paths, f"{folder}/지출결의서_내용.html")
+            archive.writestr(html_path, _expense_report_archive_html(report, items).encode('utf-8'))
+            file_count += 1
+
+            org_text = (
+                _record_value(report, 'expense_school_name') or '학교'
+                if _clean_text(_record_value(report, 'expense_org_type')) == '학교'
+                else '본사'
+            )
+            summary_writer.writerow([
+                index,
+                title,
+                _record_value(report, 'expense_date') or '',
+                org_text,
+                _record_value(report, 'expense_manager') or _record_value(report, 'drafter') or '',
+                _combined_expense_status(report),
+                int(_record_value(report, 'total_amount', 0) or 0)
+            ])
+
+            attachment_groups = [
+                ('첨부엑셀', _record_value(report, 'source_filename'), _record_value(report, 'source_filepath')),
+                ('영수증', _record_value(report, 'receipt_filename'), _record_value(report, 'receipt_filepath'))
+            ]
+            for group_name, filename_text, filepath_text in attachment_groups:
+                for detail in _attachment_details(filename_text, filepath_text):
+                    display_name = detail['name'] or os.path.basename(detail['path'])
+                    safe_path = _safe_expense_attachment_path(detail['path'])
+                    if not safe_path:
+                        missing_files.append(f"{title} - {display_name}")
+                        continue
+                    archive_name = _archive_attachment_name(display_name, safe_path)
+                    archive_path = _unique_archive_path(
+                        used_paths,
+                        f"{folder}/{group_name}/{archive_name}"
+                    )
+                    archive.write(safe_path, archive_path)
+                    file_count += 1
+
+        summary_path = _unique_archive_path(used_paths, '선택_지출결의서_목록.csv')
+        archive.writestr(summary_path, summary_buffer.getvalue().encode('utf-8-sig'))
+        file_count += 1
+
+    archive_name = f"지출결의서_선택자료_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    return archive_buffer.getvalue(), archive_name, file_count, missing_files
+
+
+def _send_expense_archive_email(to_email, archive_bytes, archive_name, reports):
+    sender_email, sender_password = _mail_credentials()
+    if not sender_email or not sender_password:
+        return False, '메일 계정이 설정되어 있지 않습니다.'
+
+    total_amount = sum(int(_record_value(report, 'total_amount', 0) or 0) for report in reports)
+    report_rows = ''.join(
+        f"<li>{_html_text(_record_value(report, 'title') or '지출결의서')} "
+        f"({_combined_expense_status(report)}, {int(_record_value(report, 'total_amount', 0) or 0):,}원)</li>"
+        for report in reports[:20]
+    )
+    extra_text = f"<li>외 {len(reports) - 20}건</li>" if len(reports) > 20 else ''
+    body = f"""
+    <div style="font-family:'Malgun Gothic',sans-serif; color:#0f172a; line-height:1.6;">
+        <h2 style="margin:0 0 14px; color:#0f766e;">지출결의서 선택 자료</h2>
+        <p>요청하신 지출결의서 <b>{len(reports):,}건</b>을 압축파일로 첨부합니다.</p>
+        <ul>{report_rows}{extra_text}</ul>
+        <p><b>전체 금액:</b> {total_amount:,}원</p>
+        <p style="color:#64748b; font-size:12px;">압축파일에는 지출결의서 내용, 첨부 엑셀 및 영수증 증빙파일이 포함되어 있습니다.</p>
+        <p style="margin-top:18px; color:#64748b; font-size:12px;">본 메일은 새담 인트라넷에서 발송되었습니다.</p>
+    </div>
+    """
+    msg = MIMEMultipart()
+    msg['From'] = f"새담 인트라넷 <{sender_email}>"
+    msg['To'] = to_email
+    msg['Subject'] = f"[새담 인트라넷] 지출결의서 선택 자료 {len(reports)}건"
+    msg.attach(MIMEText(body, 'html'))
+    archive_part = MIMEApplication(archive_bytes, _subtype='zip')
+    archive_part.add_header('Content-Disposition', 'attachment', filename=('utf-8', '', archive_name))
+    msg.attach(archive_part)
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        return True, ''
+    except Exception as exc:
+        return False, f"메일 서버 전송 오류: {exc}"
 
 
 def _send_expense_status_email(report, status_label, note='', items=None):
@@ -555,8 +815,9 @@ def _attachment_details(filename_text, filepath_text):
     names = [name.strip() for name in (filename_text or '').split(',') if name.strip()]
     paths = [path.strip() for path in (filepath_text or '').split(',') if path.strip()]
     details = []
-    for index, name in enumerate(names):
+    for index in range(max(len(names), len(paths))):
         path = paths[index] if index < len(paths) else ''
+        name = names[index] if index < len(names) else os.path.basename(path)
         size = os.path.getsize(path) if path and os.path.exists(path) else None
         details.append({
             'name': name,
@@ -1248,6 +1509,105 @@ def report_detail(report_id):
         "items": [dict(item) for item in items],
         "source_files": source_files,
         "receipt_files": receipt_files
+    })
+
+
+@expense_bp.route('/api/reports/email', methods=['POST'])
+def email_selected_reports():
+    ensure_expense_schema()
+    data = request.get_json(silent=True) or {}
+    to_email = _clean_text(data.get('email'))
+    raw_ids = data.get('ids') or []
+
+    if not re.fullmatch(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$', to_email):
+        return jsonify({"status": "error", "message": "받는 사람 이메일 주소를 정확히 입력해주세요."}), 400
+    if not isinstance(raw_ids, list):
+        return jsonify({"status": "error", "message": "전송할 지출결의서를 다시 선택해주세요."}), 400
+
+    report_ids = []
+    for value in raw_ids:
+        try:
+            report_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if report_id > 0 and report_id not in report_ids:
+            report_ids.append(report_id)
+
+    if not report_ids:
+        return jsonify({"status": "error", "message": "전송할 지출결의서를 선택해주세요."}), 400
+    if len(report_ids) > MAX_BULK_EMAIL_REPORTS:
+        return jsonify({
+            "status": "error",
+            "message": f"한 번에 최대 {MAX_BULK_EMAIL_REPORTS}건까지 전송할 수 있습니다."
+        }), 400
+
+    current_user = session.get('user_name', '')
+    can_manage_all = _can_manage_expenses()
+    report_entries = []
+    conn = get_db()
+    try:
+        for report_id in report_ids:
+            report = conn.execute(
+                "SELECT * FROM expense_reports WHERE id=?",
+                (report_id,)
+            ).fetchone()
+            if not report:
+                return jsonify({
+                    "status": "error",
+                    "message": f"선택한 지출결의서 #{report_id}을(를) 찾을 수 없습니다."
+                }), 404
+            if not can_manage_all and report['drafter'] != current_user:
+                return jsonify({
+                    "status": "error",
+                    "message": "본인이 작성한 지출결의서만 이메일로 전송할 수 있습니다."
+                }), 403
+            items = conn.execute(
+                "SELECT * FROM expense_items WHERE report_id=? ORDER BY row_no ASC, id ASC",
+                (report_id,)
+            ).fetchall()
+            report_entries.append((report, items))
+    finally:
+        conn.close()
+
+    try:
+        archive_bytes, archive_name, file_count, missing_files = _build_expense_archive(report_entries)
+    except Exception:
+        return jsonify({
+            "status": "error",
+            "message": "지출결의서 압축파일을 만드는 중 오류가 발생했습니다."
+        }), 500
+
+    if missing_files:
+        visible_missing = ', '.join(missing_files[:5])
+        suffix = f" 외 {len(missing_files) - 5}개" if len(missing_files) > 5 else ''
+        return jsonify({
+            "status": "error",
+            "message": f"첨부파일을 찾을 수 없어 발송하지 않았습니다: {visible_missing}{suffix}"
+        }), 400
+
+    if len(archive_bytes) > MAX_BULK_EMAIL_ZIP_SIZE:
+        return jsonify({
+            "status": "error",
+            "message": (
+                f"압축파일이 {_format_file_size(len(archive_bytes))}로 메일 첨부 제한을 초과했습니다. "
+                "선택 항목 수를 줄여 나누어 전송해주세요."
+            )
+        }), 400
+
+    reports = [entry[0] for entry in report_entries]
+    sent, mail_error = _send_expense_archive_email(to_email, archive_bytes, archive_name, reports)
+    if not sent:
+        return jsonify({
+            "status": "error",
+            "message": mail_error or "메일을 전송하지 못했습니다."
+        }), 500
+
+    return jsonify({
+        "status": "success",
+        "message": f"{to_email} 주소로 지출결의서 {len(reports)}건과 파일 {file_count}개를 전송했습니다.",
+        "report_count": len(reports),
+        "file_count": file_count,
+        "archive_size": len(archive_bytes)
     })
 
 

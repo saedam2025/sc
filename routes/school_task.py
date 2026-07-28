@@ -3,6 +3,21 @@ from routes.database import get_db
 
 school_task_bp = Blueprint('school_task', __name__)
 
+
+@school_task_bp.before_request
+def headquarters_only():
+    """전 학교 통합 업무 목록은 본사 계정만 이용한다."""
+    try:
+        user_level = int(session.get('user_level', 99))
+    except (TypeError, ValueError):
+        user_level = 99
+    if (
+        session.get('user_name') != 'admin'
+        and (not session.get('emp_no') or not 1 <= user_level <= 7)
+    ):
+        return "전 학교 통합 업무 목록은 본사 담당자만 이용할 수 있습니다.", 403
+
+
 def get_mapped_category(raw_cat):
     """
     DB에 저장된 다양한 형태의 카테고리 ID(공백, 언더바, 과거이름 등)를 

@@ -3,8 +3,10 @@ from routes.database import get_db
 import os
 import math
 import json
+import secrets
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+from functools import wraps
 
 school_bp = Blueprint('school', __name__)
 
@@ -23,6 +25,88 @@ def get_session_user_level(default=99):
 
 def can_manage_headquarters_board():
     return bool(session.get('user_name')) and 1 <= get_session_user_level() <= 5
+
+
+def can_manage_schools():
+    """본사 계정만 학교 기본정보를 관리할 수 있다."""
+    return (
+        session.get('user_name') == 'admin'
+        or (
+            bool(session.get('emp_no'))
+            and 1 <= get_session_user_level() <= 7
+        )
+    )
+
+
+def can_access_school(conn, school_id):
+    """본사 계정 또는 해당 학교에 지정된 센터장만 접근을 허용한다."""
+    if not session.get('emp_no'):
+        return False
+    if can_manage_schools():
+        return True
+    if get_session_user_level() != 8:
+        return False
+
+    assigned_school = conn.execute(
+        """
+        SELECT 1
+        FROM schools
+        WHERE id = ?
+          AND center_director_id = ?
+          AND COALESCE(is_active, 1) = 1
+        """,
+        (school_id, session.get('emp_no'))
+    ).fetchone()
+    return assigned_school is not None
+
+
+def can_access_post(conn, school_id, category):
+    """본부공지사항은 모든 센터장에게, 그 외 글은 담당 학교에만 공개한다."""
+    if is_headquarters_board(category):
+        if can_manage_schools():
+            return True
+        if not session.get('emp_no') or get_session_user_level() != 8:
+            return False
+        active_assignment = conn.execute(
+            """
+            SELECT 1
+            FROM schools
+            WHERE center_director_id = ?
+              AND COALESCE(is_active, 1) = 1
+            LIMIT 1
+            """,
+            (session.get('emp_no'),)
+        ).fetchone()
+        return active_assignment is not None
+    return can_access_school(conn, school_id)
+
+
+def get_school_access_key(conn, school_id):
+    school = conn.execute(
+        "SELECT access_key FROM schools WHERE id = ?",
+        (school_id,)
+    ).fetchone()
+    return school['access_key'] if school else None
+
+
+def redirect_to_school(school_id, **values):
+    conn = get_db()
+    access_key = get_school_access_key(conn, school_id)
+    conn.close()
+    if not access_key:
+        return redirect(url_for('school.school_list'))
+    return redirect(
+        url_for('school.school_detail', school_key=access_key, **values)
+    )
+
+
+def school_admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not can_manage_schools():
+            return "학교 관리 권한이 없습니다.", 403
+        return view(*args, **kwargs)
+    return wrapped
 
 def get_upload_dir():
     upload_dir = os.path.join(current_app.root_path, 'static', 'school_uploads')
@@ -151,24 +235,39 @@ def school_list():
     init_school_comment_table(conn)
     
     # 💡 세션에서 사용자 정보(레벨, 사번) 가져오기
-    user_level = session.get('user_level', 99)
+    user_level = get_session_user_level()
     emp_no = session.get('emp_no')
 
     # 💡 [핵심 추가] 레벨 8(센터장)인 경우, 목록을 보여주지 않고 담당 학교 메인으로 즉시 강제 이동
     if user_level == 8:
         # 해당 사번(emp_no)이 센터장으로 지정된 활성 상태의 최신 학교를 찾습니다.
         my_school = conn.execute(
-            "SELECT id FROM schools WHERE center_director_id = ? ORDER BY is_active DESC, year DESC LIMIT 1", 
+            """
+            SELECT id, access_key
+            FROM schools
+            WHERE center_director_id = ? AND COALESCE(is_active, 1) = 1
+            ORDER BY year DESC
+            LIMIT 1
+            """,
             (emp_no,)
         ).fetchone()
         
         if my_school:
             conn.close()
-            # 담당 학교의 고유 ID를 이용해 첨부하신 이미지의 상세 대시보드 화면으로 바로 쏴줍니다.
-            return redirect(url_for('school.school_detail', school_id=my_school['id']))
+            # 담당 학교의 예측 불가능한 접근 키로 상세 대시보드에 이동합니다.
+            return redirect(
+                url_for(
+                    'school.school_detail',
+                    school_key=my_school['access_key']
+                )
+            )
         else:
             conn.close()
             return "담당으로 지정된 학교가 없습니다. 본사 관리자에게 문의해주세요.", 403
+
+    if not can_manage_schools():
+        conn.close()
+        return "학교 업무공간 접근 권한이 없습니다.", 403
 
     # 레벨 1~7 (본사 관리자 등)은 기존처럼 전체 학교 목록 표시
     rows = conn.execute('''
@@ -189,6 +288,7 @@ def school_list():
 
     return render_template('school_bp.html', schools_by_year=schools_by_year, view_type='list')
 @school_bp.route('/edit_school', methods=['POST'])
+@school_admin_required
 def edit_school():
     data = request.form
     school_id = data.get('school_id')
@@ -218,6 +318,7 @@ def edit_school():
     return redirect(url_for('school.school_list'))
 
 @school_bp.route('/register', methods=['POST'])
+@school_admin_required
 def register_school():
     data = request.form
     conn = get_db()
@@ -225,12 +326,13 @@ def register_school():
     try:
         conn.execute('''
             INSERT INTO schools (
-                year, school_name, contract_subject, office_phone, office_location,
+                access_key, year, school_name, contract_subject, office_phone, office_location,
                 school_address, school_phone, school_email,
                 neulbom_assistant, neulbom_manager, center_director_id, is_active
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ''', (
+            secrets.token_urlsafe(24),
             data.get('year'), data.get('school_name'), data.get('contract_subject', ''),
             data.get('office_phone', ''), data.get('office_location', ''),
             data.get('school_address', ''), data.get('school_phone', ''), data.get('school_email', ''),
@@ -244,6 +346,7 @@ def register_school():
     return redirect(url_for('school.school_list'))
 
 @school_bp.route('/delete_schools', methods=['POST'])
+@school_admin_required
 def delete_schools():
     school_ids = request.form.getlist('school_ids')
     if school_ids:
@@ -255,6 +358,7 @@ def delete_schools():
     return redirect(url_for('school.school_list'))
 
 @school_bp.route('/toggle_schools', methods=['POST'])
+@school_admin_required
 def toggle_schools():
     school_ids = request.form.getlist('school_ids')
     if school_ids:
@@ -265,8 +369,8 @@ def toggle_schools():
         conn.close()
     return redirect(url_for('school.school_list'))
 
-@school_bp.route('/<int:school_id>')
-def school_detail(school_id):
+@school_bp.route('/<string:school_key>')
+def school_detail(school_key):
     # 기본 접속 메뉴를 'notice'에서 'community'(본부공지사항)로 변경
     category = request.args.get('category', 'community')
     page = request.args.get('page', 1, type=int)
@@ -278,7 +382,12 @@ def school_detail(school_id):
         {'id': 'notice', 'name': '수강안내문', 'icon': 'fa-circle-info'},
         {'id': 'weekly_report', 'name': '주간업무보고', 'icon': 'fa-list-check'},
         {'id': 'open_class', 'name': '공개수업', 'icon': 'fa-chalkboard-user'},
-        {'id': 'expense', 'name': '지출결의서', 'icon': 'fa-file-invoice-dollar'},
+        {
+            'id': 'expense',
+            'name': '지출결의서',
+            'icon': 'fa-file-invoice-dollar',
+            'url': '/expense/submit'
+        },
         {'id': 'item_request', 'name': '물품요청', 'icon': 'fa-box'},
         {'id': 'work_schedule', 'name': '근무표', 'icon': 'fa-calendar-days'},
         {'id': 'billing', 'name': '청구관련', 'icon': 'fa-receipt'},
@@ -312,14 +421,23 @@ def school_detail(school_id):
                u.position as director_pos, u.phone as director_phone, u.email as director_email, u.profile_icon as director_icon
         FROM schools s
         LEFT JOIN users u ON s.center_director_id = u.emp_no
-        WHERE s.id = ?
-    ''', (school_id,)).fetchone()
+        WHERE s.access_key = ?
+    ''', (school_key,)).fetchone()
     
     school_dict = dict(school) if school else None
-    
-    if not school_dict or (not school_dict.get('is_active', 1) and session.get('user_level', 1) < 3 and session.get('user_name') != 'admin'):
+
+    if not school_dict:
         conn.close()
-        return "비활성화 처리되어 접근할 수 없는 학교입니다.", 403
+        return "학교 업무공간을 찾을 수 없습니다.", 404
+
+    school_id = school_dict['id']
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return "담당 학교 업무공간만 이용할 수 있습니다.", 403
+
+    if search_category == 'expense':
+        conn.close()
+        return redirect('/expense/submit')
 
     if search_category == 'community':
         query_params = [search_category, current_category_name]
@@ -577,6 +695,12 @@ def save_school_task():
 
     conn = get_db()
     init_school_comment_table(conn)
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return jsonify({
+            'ok': False,
+            'message': '담당 학교 일정만 등록할 수 있습니다.'
+        }), 403
     try:
         conn.execute('''
             INSERT INTO school_tasks (school_id, title, start_date, start_time, end_date, end_time, note, owner)
@@ -590,6 +714,7 @@ def save_school_task():
         conn.close()
 
 @school_bp.route('/employee_search')
+@school_admin_required
 def employee_search():
     query = request.args.get('query', '')
     conn = get_db()
@@ -610,6 +735,10 @@ def get_post_api(post_id):
     if not post:
         conn.close()
         return jsonify({}), 404
+
+    if not can_access_post(conn, post['school_id'], post['category']):
+        conn.close()
+        return jsonify({'message': '담당 학교 게시글만 볼 수 있습니다.'}), 403
 
     comment_count = conn.execute(
         "SELECT COUNT(*) FROM school_post_comments WHERE post_id=?",
@@ -634,12 +763,19 @@ def add_post():
 
     if is_headquarters_board(category) and not can_manage_headquarters_board():
         return "본부공지사항 글쓰기 권한이 없습니다.", 403
+
+    conn = get_db()
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return "담당 학교 게시판에만 글을 등록할 수 있습니다.", 403
     
     files = request.files.getlist('file')
     files = [f for f in files if f and f.filename != '']
     if len(files) > POST_MAX_FILES:
+        conn.close()
         return f"게시물 첨부파일은 최대 {POST_MAX_FILES}개까지 등록할 수 있습니다.", 400
     if sum(get_uploaded_file_size(file) for file in files) > POST_MAX_TOTAL_SIZE:
+        conn.close()
         return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다.", 400
     filenames, filepaths = [], []
     
@@ -656,7 +792,6 @@ def add_post():
     filename_str = ",".join(filenames) if filenames else None
     filepath_str = ",".join(filepaths) if filepaths else None
         
-    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO school_posts (school_id, category, title, content, author, filename, filepath)
@@ -667,27 +802,44 @@ def add_post():
     conn.commit()
     conn.close()
     
-    return redirect(url_for('school.school_detail', school_id=school_id, category=category, post_id=new_post_id))
+    return redirect_to_school(
+        school_id,
+        category=category,
+        post_id=new_post_id
+    )
 
 @school_bp.route('/post/edit/<int:post_id>', methods=['POST'])
 def edit_post(post_id):
-    school_id = request.form.get('school_id')
     category = request.form.get('category')
     title = request.form.get('title')
     content = request.form.get('content')
     
     conn = get_db()
-    post = conn.execute("SELECT author, filename, filepath, category FROM school_posts WHERE id=?", (post_id,)).fetchone()
+    post = conn.execute(
+        """
+        SELECT school_id, author, filename, filepath, category
+        FROM school_posts
+        WHERE id=?
+        """,
+        (post_id,)
+    ).fetchone()
 
     if not post:
         conn.close()
         return "게시물을 찾을 수 없습니다.", 404
+
+    school_id = post['school_id']
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return "담당 학교 게시글만 수정할 수 있습니다.", 403
     
-    user_level = get_session_user_level(1)
     if is_headquarters_board(post['category']):
         has_edit_permission = can_manage_headquarters_board()
     else:
-        has_edit_permission = session.get('user_name') == post['author'] or user_level >= 3
+        has_edit_permission = (
+            session.get('user_name') == post['author']
+            or can_manage_schools()
+        )
 
     if not has_edit_permission:
         conn.close()
@@ -751,12 +903,27 @@ def edit_post(post_id):
     conn.commit()
     conn.close()
     
-    return redirect(url_for('school.school_detail', school_id=school_id, category=category, post_id=post_id))
+    return redirect_to_school(
+        school_id,
+        category=category,
+        post_id=post_id
+    )
 
 @school_bp.route('/post/<int:post_id>/comments')
 def get_post_comments(post_id):
     conn = get_db()
     init_school_comment_table(conn)
+    post = conn.execute(
+        "SELECT school_id, category FROM school_posts WHERE id = ?",
+        (post_id,)
+    ).fetchone()
+    if not post:
+        conn.close()
+        return jsonify({'message': '게시글을 찾을 수 없습니다.'}), 404
+    if not can_access_post(conn, post['school_id'], post['category']):
+        conn.close()
+        return jsonify({'message': '담당 학교 댓글만 볼 수 있습니다.'}), 403
+
     rows = conn.execute("""
         SELECT id, post_id, parent_id, content, author, filename, filepath, created_at, updated_at
         FROM school_post_comments
@@ -786,10 +953,19 @@ def add_post_comment(post_id):
     conn = get_db()
     init_school_comment_table(conn)
 
-    post = conn.execute("SELECT id FROM school_posts WHERE id=?", (post_id,)).fetchone()
+    post = conn.execute(
+        "SELECT id, school_id, category FROM school_posts WHERE id=?",
+        (post_id,)
+    ).fetchone()
     if not post:
         conn.close()
         return jsonify({'ok': False, 'message': '게시글을 찾을 수 없습니다.'}), 404
+    if not can_access_post(conn, post['school_id'], post['category']):
+        conn.close()
+        return jsonify({
+            'ok': False,
+            'message': '담당 학교 게시글에만 댓글을 등록할 수 있습니다.'
+        }), 403
 
     filename_str, filepath_str = save_uploaded_files(files)
 
@@ -811,7 +987,12 @@ def edit_post_comment(comment_id):
     conn = get_db()
     init_school_comment_table(conn)
     comment = conn.execute(
-        "SELECT author FROM school_post_comments WHERE id=?",
+        """
+        SELECT c.author, p.school_id, p.category
+        FROM school_post_comments c
+        JOIN school_posts p ON p.id = c.post_id
+        WHERE c.id=?
+        """,
         (comment_id,)
     ).fetchone()
 
@@ -819,7 +1000,15 @@ def edit_post_comment(comment_id):
         conn.close()
         return jsonify({'ok': False, 'message': '댓글을 찾을 수 없습니다.'}), 404
 
-    if session.get('user_name') != comment['author'] and session.get('user_level', 1) < 3:
+    if not can_access_post(
+        conn,
+        comment['school_id'],
+        comment['category']
+    ):
+        conn.close()
+        return jsonify({'ok': False, 'message': '담당 학교 댓글만 수정할 수 있습니다.'}), 403
+
+    if session.get('user_name') != comment['author'] and not can_manage_schools():
         conn.close()
         return jsonify({'ok': False, 'message': '권한이 없습니다.'}), 403
 
@@ -836,7 +1025,12 @@ def delete_post_comment(comment_id):
     conn = get_db()
     init_school_comment_table(conn)
     comment = conn.execute(
-        "SELECT author FROM school_post_comments WHERE id=?",
+        """
+        SELECT c.author, p.school_id, p.category
+        FROM school_post_comments c
+        JOIN school_posts p ON p.id = c.post_id
+        WHERE c.id=?
+        """,
         (comment_id,)
     ).fetchone()
 
@@ -844,7 +1038,15 @@ def delete_post_comment(comment_id):
         conn.close()
         return jsonify({'ok': False, 'message': '댓글을 찾을 수 없습니다.'}), 404
 
-    if session.get('user_name') != comment['author'] and session.get('user_level', 1) < 3:
+    if not can_access_post(
+        conn,
+        comment['school_id'],
+        comment['category']
+    ):
+        conn.close()
+        return jsonify({'ok': False, 'message': '담당 학교 댓글만 삭제할 수 있습니다.'}), 403
+
+    if session.get('user_name') != comment['author'] and not can_manage_schools():
         conn.close()
         return jsonify({'ok': False, 'message': '권한이 없습니다.'}), 403
 
@@ -855,20 +1057,31 @@ def delete_post_comment(comment_id):
 
 @school_bp.route('/post/delete/<int:post_id>', methods=['POST'])
 def delete_post(post_id):
-    school_id = request.form.get('school_id')
     category = request.form.get('category')
     conn = get_db()
-    post = conn.execute("SELECT author, filepath, category FROM school_posts WHERE id=?", (post_id,)).fetchone()
+    post = conn.execute(
+        """
+        SELECT school_id, author, filepath, category
+        FROM school_posts
+        WHERE id=?
+        """,
+        (post_id,)
+    ).fetchone()
     if not post:
         conn.close()
         return "게시물을 찾을 수 없습니다.", 404
+
+    school_id = post['school_id']
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return "담당 학교 게시글만 삭제할 수 있습니다.", 403
 
     if is_headquarters_board(post['category']):
         has_delete_permission = can_manage_headquarters_board()
     else:
         has_delete_permission = (
             session.get('user_name') == post['author']
-            or get_session_user_level(1) >= 3
+            or can_manage_schools()
         )
 
     if not has_delete_permission:
@@ -879,7 +1092,7 @@ def delete_post(post_id):
     conn.execute('DELETE FROM school_posts WHERE id=?', (post_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('school.school_detail', school_id=school_id, category=category))
+    return redirect_to_school(school_id, category=category)
 
 @school_bp.route('/post/delete_multi', methods=['POST'])
 def delete_multi():
@@ -887,9 +1100,20 @@ def delete_multi():
     category = request.form.get('category')
     post_ids = request.form.getlist('post_ids')
     conn = get_db()
+    if not can_access_school(conn, school_id):
+        conn.close()
+        return "담당 학교 게시글만 삭제할 수 있습니다.", 403
+
     posts_to_delete = []
     for pid in post_ids:
-        post = conn.execute("SELECT id, author, category FROM school_posts WHERE id=?", (pid,)).fetchone()
+        post = conn.execute(
+            """
+            SELECT id, author, category
+            FROM school_posts
+            WHERE id=? AND school_id=?
+            """,
+            (pid, school_id)
+        ).fetchone()
         if post:
             posts_to_delete.append(post)
 
@@ -897,19 +1121,18 @@ def delete_multi():
         conn.close()
         return "본부공지사항 삭제 권한이 없습니다.", 403
 
-    user_level = get_session_user_level(1)
     for post in posts_to_delete:
         if (
             is_headquarters_board(post['category'])
             or session.get('user_name') == post['author']
-            or user_level >= 3
+            or can_manage_schools()
         ):
             pid = post['id']
             conn.execute("DELETE FROM school_post_comments WHERE post_id=?", (pid,))
             conn.execute("DELETE FROM school_posts WHERE id=?", (pid,))
     conn.commit()
     conn.close()
-    return redirect(url_for('school.school_detail', school_id=school_id, category=category))
+    return redirect_to_school(school_id, category=category)
 
 # -----------------------------------------------------------
 # [추가할 부분] - school_bp.py 파일에 일정 수정/삭제 라우터 추가
@@ -921,10 +1144,17 @@ def edit_task(task_id):
     user_level = int(session.get('user_level', 99))
     
     conn = get_db()
-    task = conn.execute("SELECT owner FROM school_tasks WHERE id=?", (task_id,)).fetchone()
+    task = conn.execute(
+        "SELECT school_id, owner FROM school_tasks WHERE id=?",
+        (task_id,)
+    ).fetchone()
     
     # 본인이 등록한 일정이거나, 센터장보다 높은 권한(7 이하)인 경우에만 수정 가능
-    if not task or (task['owner'] != user_name and user_level > 7):
+    if (
+        not task
+        or not can_access_school(conn, task['school_id'])
+        or (task['owner'] != user_name and user_level > 7)
+    ):
         conn.close()
         return jsonify({'ok': False, 'message': '권한이 없습니다.'}), 403
         
@@ -944,9 +1174,16 @@ def delete_task(task_id):
     user_level = int(session.get('user_level', 99))
     
     conn = get_db()
-    task = conn.execute("SELECT owner FROM school_tasks WHERE id=?", (task_id,)).fetchone()
+    task = conn.execute(
+        "SELECT school_id, owner FROM school_tasks WHERE id=?",
+        (task_id,)
+    ).fetchone()
     
-    if not task or (task['owner'] != user_name and user_level > 7):
+    if (
+        not task
+        or not can_access_school(conn, task['school_id'])
+        or (task['owner'] != user_name and user_level > 7)
+    ):
         conn.close()
         return jsonify({'ok': False, 'message': '권한이 없습니다.'}), 403
         
