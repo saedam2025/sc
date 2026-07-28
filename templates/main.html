@@ -254,7 +254,17 @@
     .scroll-area::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
     .modal-content { background: var(--card-bg, #fff) !important; backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); border: 1px solid var(--widget-border-color) !important; border-radius: 12px !important; box-shadow: 0 10px 30px rgba(0,0,0,0.1) !important; color: var(--text-main) !important; }
-    .modal-input { width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--widget-border-color) !important; border-radius: 8px; background: var(--input-bg, #f8fafc) !important; color: var(--text-main) !important; transition: 0.2s; font-family: inherit;}
+    
+.modal-input { 
+    box-sizing: border-box; /* 패딩과 테두리를 100% 너비 안으로 포함 */
+    width: 100%; padding: 12px 14px; margin-bottom: 12px; border: 1px solid var(--widget-border-color) !important; border-radius: 8px; background: var(--input-bg, #f8fafc) !important; color: var(--text-main) !important; transition: 0.2s; font-family: inherit;
+}
+
+.btn-primary { 
+    box-sizing: border-box; /* 하단 저장 버튼 너비 정렬 */
+    background: var(--blue-primary) !important; color: white !important; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 0.9rem; 
+}
+
     .modal-input:focus { border-color: var(--blue-primary) !important; outline: none; background: var(--card-bg, #fff) !important; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05); }
     
     .btn-primary { background: var(--blue-primary) !important; color: white !important; border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 0.9rem; }
@@ -690,7 +700,7 @@
             <input type="date" id="taskDate" class="modal-input" required readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
             <input type="text" id="taskOwner" class="modal-input" value="{{ current_user }}" readonly style="background: var(--hover-bg) !important; color: var(--text-sub) !important;">
             
-            <div style="background: var(--hover-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--widget-border-color); margin-bottom: 15px;">
+            <div style="background: var(--hover-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--widget-border-color); margin-bottom: 15px; box-sizing: border-box;">
                 <select id="taskCategory" class="modal-input" style="margin-bottom: 10px; cursor: pointer; font-weight:bold;">
                     <option value="회의">회의</option>
                     <option value="면접">면접</option>
