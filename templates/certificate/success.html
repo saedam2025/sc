@@ -5,138 +5,195 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
   <title>신청 완료 | 새담청소년교육문화원</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <!-- 폰트를 폼 페이지와 동일하게 Pretendard로 변경 -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
   <style>
     :root {
-      --saedam-blue: #004ea2;
-      --saedam-navy: #002c63;
-      --bg-color: #f4f7fa;
+      /* form.html과 동일한 색상 변수 적용 */
+      --primary-color: #004ea2;
+      --primary-dark: #002c63;
+      --border-color: #d1d8e0;
+      --border-light: #f1f3f5;
+      --text-dark: #333333;
+      --text-gray: #64748b;
+      --main-bg: #f8fafc;
+      --card-bg: #ffffff;
     }
 
     body {
-      font-family: 'Nanum Gothic', sans-serif;
-      background-color: var(--bg-color);
+      font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+      background-color: var(--main-bg);
       margin: 0;
-      padding: 0;
+      padding: 20px;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .success-container {
+      width: 100%;
+      max-width: 600px;
+      background-color: var(--card-bg);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+      border: 1px solid var(--border-color);
+      box-sizing: border-box;
       text-align: center;
     }
 
-    .container {
-      width: 92%;
-      max-width: 550px;
-      background: #ffffff;
-      border-radius: 15px;
-      padding: 50px 40px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      border-top: 8px solid var(--saedam-blue);
+    /* 상단 로고 영역 */
+    .cert-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--border-light);
     }
 
+    .cert-header img {
+      height: 40px;
+      width: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    /* 성공 아이콘 */
     .check-icon {
-      width: 80px;
-      height: 80px;
-      background-color: #e7f1ff;
-      color: var(--saedam-blue);
+      width: 70px;
+      height: 70px;
+      background-color: rgba(0, 78, 162, 0.1);
+      color: var(--primary-color);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 40px;
-      margin: 0 auto 25px;
+      font-size: 32px;
+      margin: 0 auto 20px;
     }
 
     h1 {
       font-size: 24px;
-      color: var(--saedam-navy);
-      margin-bottom: 10px;
-      font-weight: bold;
+      color: var(--text-dark);
+      font-weight: 800;
+      margin-bottom: 12px;
+      margin-top: 0;
     }
 
     p.description {
       font-size: 15px;
-      color: #666;
+      color: var(--text-gray);
       line-height: 1.6;
-      margin-bottom: 35px;
+      margin-bottom: 30px;
     }
 
     /* 신청 내역 박스 */
     .summary-box {
-      background-color: #f9f9fb;
-      border: 1px solid #e1e5eb;
+      background-color: var(--main-bg);
+      border: 1px solid var(--border-light);
       border-radius: 12px;
-      padding: 25px 30px;
-      margin-bottom: 35px;
+      padding: 25px;
+      margin-bottom: 30px;
       text-align: left;
     }
 
     .summary-item {
       display: flex;
-      padding: 12px 0;
-      border-bottom: 1px dashed #d1d8e0;
+      padding: 10px 0;
+      border-bottom: 1px dashed var(--border-color);
       font-size: 15px;
     }
 
     .summary-item:last-child {
       border-bottom: none;
+      padding-bottom: 0;
+    }
+    
+    .summary-item:first-child {
+      padding-top: 0;
     }
 
     .summary-item strong {
-      width: 130px;
-      color: #555;
+      width: 120px;
+      color: var(--text-gray);
+      font-weight: 700;
       flex-shrink: 0;
     }
 
     .summary-item span {
-      color: var(--saedam-navy);
-      font-weight: bold;
+      color: var(--text-dark);
+      font-weight: 700;
       word-break: break-all;
     }
 
-    /* 버튼 스타일 */
-    .btn-group {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
+    /* form.html과 동일한 안내사항 박스 스타일 */
+    .notice-box {
+      background-color: var(--main-bg);
+      padding: 20px;
+      border-radius: 12px;
+      border-left: 4px solid var(--primary-color);
+      text-align: left;
+      margin-bottom: 30px;
     }
 
-    .btn {
-      display: inline-block;
-      padding: 14px 28px;
+    .notice-box h3 {
       font-size: 15px;
-      font-weight: bold;
-      text-decoration: none;
-      border-radius: 8px;
-      transition: all 0.3s;
-      cursor: pointer;
+      margin: 0 0 10px 0;
+      color: var(--text-dark);
+      font-weight: 700;
     }
 
+    .notice-box p {
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--text-gray);
+      margin: 0;
+    }
+
+    /* form.html의 제출 버튼(submitBtn)과 동일한 스타일 */
     .btn-home {
-      background-color: var(--saedam-blue);
-      color: #fff;
+      display: inline-block;
+      width: 100%;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      background-color: var(--primary-color);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      transition: all 0.2s;
+      box-sizing: border-box;
+      text-align: center;
+      border: none;
     }
 
     .btn-home:hover {
-      background-color: var(--saedam-navy);
+      background-color: var(--primary-dark);
       transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 78, 162, 0.2);
     }
 
-    .footer-notice {
-      margin-top: 30px;
-      font-size: 13px;
-      color: #888;
-      background: #fff9db;
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #ffe066;
+    @media (max-width: 600px) {
+      .summary-item {
+        flex-direction: column;
+      }
+      .summary-item strong {
+        margin-bottom: 6px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <div class="container">
+  <div class="success-container">
+    <!-- 새담 로고 (form.html과 동일한 클래스 및 에러 처리 적용) -->
+    <div class="cert-header">
+      <img src="{{ url_for('static', filename='logo01.gif') }}" alt="새담청소년교육문화원 로고" onerror="this.src='http://www.saedam.org/img/logo01.gif'">
+    </div>
+
     <div class="check-icon">✓</div>
     <h1>신청이 완료되었습니다!</h1>
     <p class="description">
@@ -144,24 +201,37 @@
       입력하신 이메일로 PDF 증명서를 발송해 드립니다.
     </p>
 
-<div class="summary-box">
-    <p><strong>증명서 종류:</strong> {{ data.증명서종류 }}</p>
-    <p><strong>신청인:</strong> {{ data.성명 }} 님</p>
-    <p><strong>신청일자:</strong> {{ data.신청일 }}</p>
-    <p><strong>수신 이메일:</strong> {{ data.이메일주소 }}</p>
-</div>
-
-    <div class="btn-group">
-      <a class="btn btn-home" href="{{ url_for('document.apply') }}">신청 페이지로 이동</a>
+    <!-- 신청 내역 -->
+    <div class="summary-box">
+      <div class="summary-item">
+        <strong>증명서 종류</strong>
+        <span>{{ data.증명서종류 }}</span>
+      </div>
+      <div class="summary-item">
+        <strong>신청인</strong>
+        <span>{{ data.성명 }} 님</span>
+      </div>
+      <div class="summary-item">
+        <strong>신청일자</strong>
+        <span>{{ data.신청일 }}</span>
+      </div>
+      <div class="summary-item">
+        <strong>수신 이메일</strong>
+        <span>{{ data.이메일주소 }}</span>
+      </div>
     </div>
 
-    <div class="footer-notice">
-        <b>💡 안내사항</b><br>
-        발급은 업무일 기준 1~2일 정도 소요될 수 있습니다.<br>
-        문의사항: 📞 031-8016-1900
+    <!-- 폼과 동일한 스타일의 유의사항 박스 -->
+    <div class="notice-box">
+      <h3>💡 안내사항</h3>
+      <p>
+        발급은 업무일 기준 <strong>1~2일</strong> 정도 소요될 수 있습니다.<br>
+        기타 문의사항은 아래 연락처로 문의 바랍니다.<br>
+        <strong>📞 031-8016-1900</strong>
+      </p>
     </div>
 
-    <img src="https://www.saedam.org/img_sub/logo.gif" alt="로고" style="height: 40px; margin-top: 30px; opacity: 0.8;">
+    <a class="btn-home" href="{{ url_for('document.apply') }}">신청 페이지로 이동</a>
   </div>
 
 </body>

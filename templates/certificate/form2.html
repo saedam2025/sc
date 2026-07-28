@@ -334,12 +334,15 @@
             const endDateInput = document.getElementById('endDate');
             const reasonWrapper = document.getElementById('reasonWrapper');
             const reasonSelect = document.getElementById('reasonSelect');
+            const currentUntilOption = endDateSelect.querySelector('option[value="현재까지"]');
 
             const today = new Date().toISOString().split('T')[0];
             endDateInput.max = today;
 
-            // 종료일 필드 제어
-            endDateSelect.addEventListener('change', () => {
+            const isResignationCertificate = () =>
+                certType.value === '강사 해촉증명서' || certType.value === '해촉증명서';
+
+            function updateEndDateField() {
                 if (endDateSelect.value === '현재까지') {
                     endDateWrapper.style.visibility = 'hidden';
                     endDateInput.disabled = true;
@@ -349,11 +352,22 @@
                     endDateInput.disabled = false;
                     endDateInput.required = true;
                 }
-            });
+            }
+
+            // 종료일 필드 제어
+            endDateSelect.addEventListener('change', updateEndDateField);
 
             // 증명서 종류에 따른 해촉사유 노출 제어 (해촉증명서 및 강사 해촉증명서 포함)
-            certType.addEventListener('change', () => {
-                const isResignation = certType.value === '강사 해촉증명서' || certType.value === '해촉증명서';
+            function updateCertificateRequirements() {
+                const isResignation = isResignationCertificate();
+                currentUntilOption.disabled = isResignation;
+
+                // 해촉증명서로 바꾸는 순간 기존 '현재까지' 선택을 해제한다.
+                if (isResignation && endDateSelect.value === '현재까지') {
+                    endDateSelect.value = '날짜지정';
+                }
+                updateEndDateField();
+
                 if (isResignation) {
                     reasonWrapper.style.visibility = 'visible';
                     reasonSelect.required = true;
@@ -362,11 +376,14 @@
                     reasonSelect.required = false;
                     reasonSelect.value = "";
                 }
-            });
+            }
+
+            certType.addEventListener('change', updateCertificateRequirements);
+            updateCertificateRequirements();
 
             // 제출 시 검증
             form.addEventListener('submit', (e) => {
-                const isResignation = certType.value === '강사 해촉증명서' || certType.value === '해촉증명서';
+                const isResignation = isResignationCertificate();
                 if (isResignation && endDateSelect.value === '현재까지') {
                     alert("해촉 관련 증명서는 '현재까지'를 선택하실 수 없습니다.\n정확한 해촉(계약종료) 날짜를 입력해 주세요.");
                     e.preventDefault();
