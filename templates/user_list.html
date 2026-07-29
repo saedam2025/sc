@@ -260,10 +260,19 @@
             <div class="modal-field"><label>개인연락처 ( - 하이픈 자동입력 됨)</label><input type="text" id="phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
             <div class="modal-field"><label>이메일</label><input type="email" id="email" class="glass-input readonly-field" value="{{ invite_email }}" readonly></div>
             <div class="modal-field full-width"><label>주소지</label><input type="text" id="address" class="glass-input" placeholder="전체 주소 입력"></div>
+            <div class="modal-field full-width"><label>소속부서</label>
+                <select id="department" class="glass-input" required>
+                    <option value="" disabled selected>소속부서 선택</option>
+                    <option value="본부">본부</option>
+                    <option value="북부지점">북부지점</option>
+                    <option value="센터장">센터장</option>
+                    <option value="강사">강사</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
             <div class="modal-field full-width"><label>급여통장번호</label><input type="text" id="bank_account" class="glass-input" placeholder="00은행 000-0000-0000"></div>
         </div>
         
-        <input type="hidden" id="department" value="">
         <input type="hidden" id="position" value="미지정">
         
         <div style="padding: 20px 25px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 28px 28px;">
@@ -356,7 +365,32 @@
 
 <script>
 const LEVEL_MAP = {"대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5, "계약직": 6, "센터장(팀장)": 7, "센터장": 8, "전담코디": 9, "보조코디": 10, "안전코디": 11, "방과후강사": 12, "맞춤형강사": 13, "임시회원": 14};
-const avatarEmojis = [
+const DEPARTMENT_OPTIONS = ['본부', '북부지점', '센터장', '강사', '기타'];
+
+function normalizeDepartmentOption(department, position = '') {
+    const dept = String(department || '').trim();
+    const pos = String(position || '').trim();
+    if (DEPARTMENT_OPTIONS.includes(dept)) return dept;
+    if (dept.includes('북부지점') || dept.includes('북부 지점')) return '북부지점';
+    if (dept.includes('본부') || dept.includes('본사')) return '본부';
+    if (dept.includes('센터장') || pos.includes('센터장') || pos.includes('코디')) return '센터장';
+    if (dept.includes('강사') || pos.includes('강사')) return '강사';
+    if (['최고관리자', '대표이사', '이사', '실장', '팀장', '사원', '계약직'].includes(pos)) return '본부';
+    return '기타';
+}
+
+function departmentSelectOptions(department = '', position = '', includePlaceholder = false) {
+    const rawDepartment = String(department || '').trim();
+    const selected = rawDepartment ? normalizeDepartmentOption(rawDepartment, position) : '';
+    const placeholder = includePlaceholder
+        ? `<option value="" disabled ${selected ? '' : 'selected'}>소속부서 선택</option>`
+        : '';
+    return placeholder + DEPARTMENT_OPTIONS
+        .map(option => `<option value="${option}" ${option === selected ? 'selected' : ''}>${option}</option>`)
+        .join('');
+}
+
+const userMgmtAvatarEmojis = [
     '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🦄','🐧','🐥','🦉','🐺','🐗','🐴','🦇','🐢','🐍','🐙','🦈','🐬','🐳','🦋','🐝',
     '😀','😎','🥰','🤠','😇','🥸','👽','👻','🤖','🎃','🦸','🦸‍♂️','🦸‍♀️','🦹','🧙','🧚','🧛','🛡️',
     '👑','👔','💼','🎯','💻','🌱','🔰','🚀','💡','💎','💠','🏆','💪',
@@ -430,7 +464,7 @@ function validateInputs(password, email) {
 function renderIcons(containerId, inputId) {
     const container = document.getElementById(containerId);
     if(!container) return;
-    container.innerHTML = avatarEmojis.map((e, i) => 
+    container.innerHTML = userMgmtAvatarEmojis.map((e, i) => 
         `<div class="profile-icon-option ${i===0?'selected':''}" onclick="selectIcon(this, '${inputId}', '${e}')">${e}</div>`
     ).join('');
 }
@@ -558,7 +592,11 @@ function openDirectRegisterModal() {
             <div class="modal-field"><label>연락처</label><input type="text" id="reg_phone" class="glass-input" placeholder="010-0000-0000" oninput="formatPhoneNumber(this)"></div>
             <div class="modal-field"><label>이메일</label><input type="email" id="reg_email" class="glass-input"></div>
             <div class="modal-field full-width"><label>주소지</label><input type="text" id="reg_address" class="glass-input" placeholder="전체 주소 입력"></div>
-            <div class="modal-field"><label>소속부서</label><input type="text" id="reg_department" class="glass-input" placeholder="예: 운영팀"></div>
+            <div class="modal-field"><label>소속부서</label>
+                <select id="reg_department" class="glass-input">
+                    ${departmentSelectOptions('', '', true)}
+                </select>
+            </div>
             
             <div class="modal-field"><label>직급</label>
                 <select id="reg_pos" class="glass-input">
@@ -581,9 +619,14 @@ async function submitDirectRegister() {
     const password = document.getElementById('reg_pass').value;
     const passwordConfirm = document.getElementById('reg_pass_confirm').value;
     const email = document.getElementById('reg_email').value;
+    const position = document.getElementById('reg_pos').value;
+    const department = document.getElementById('reg_department').value;
     
     if(!document.getElementById('reg_name').value || !password || !document.getElementById('reg_rrn').value) {
         return alert("필수 정보를 입력하세요.");
+    }
+    if(!position || !department) {
+        return alert("직급과 소속부서를 모두 선택하세요.");
     }
     if(password !== passwordConfirm) {
         return alert("비밀번호가 일치하지 않습니다.");
@@ -596,10 +639,10 @@ async function submitDirectRegister() {
     formData.append('password_confirm', passwordConfirm);
     formData.append('rrn', document.getElementById('reg_rrn').value);
     formData.append('email', email);
-    formData.append('position', document.getElementById('reg_pos').value);
+    formData.append('position', position);
     formData.append('phone', document.getElementById('reg_phone').value);
     formData.append('address', document.getElementById('reg_address').value);
-    formData.append('department', document.getElementById('reg_department').value);
+    formData.append('department', department);
     formData.append('bank_account', document.getElementById('reg_bank_account').value);
     formData.append('profile_icon', document.getElementById('reg_profile_icon').value);
     
@@ -616,12 +659,16 @@ async function registerUser() {
     const password = document.getElementById('password').value;
     const passwordConfirm = document.getElementById('password_confirm').value;
     const email = document.getElementById('email').value;
+    const department = document.getElementById('department').value;
 
     if(!document.getElementById('name').value || !password || !document.getElementById('rrn').value) {
         return alert("필수 정보를 입력하세요.");
     }
     if(password !== passwordConfirm) {
         return alert("비밀번호가 일치하지 않습니다.");
+    }
+    if(!department) {
+        return alert("소속부서를 선택하세요.");
     }
     if(!validateInputs(password, email)) return;
 
@@ -632,9 +679,8 @@ async function registerUser() {
     formData.append('rrn', document.getElementById('rrn').value);
     formData.append('email', email);
     
-    const deptInput = document.getElementById('department');
     const posInput = document.getElementById('position');
-    formData.append('department', deptInput ? deptInput.value : '');
+    formData.append('department', department);
     formData.append('position', posInput ? posInput.value : '미지정');
     
     formData.append('phone', document.getElementById('phone').value);
@@ -656,7 +702,11 @@ function openApproveModal(i) {
     
     document.getElementById('modalBody').innerHTML = `
         <div class="form-grid">
-            <div class="modal-field"><label>배정할 소속 부서</label><input type="text" id="approve_dept" class="glass-input" value="${u.소속 || ''}" placeholder="예: 운영팀"></div>
+            <div class="modal-field"><label>배정할 소속 부서</label>
+                <select id="approve_dept" class="glass-input">
+                    ${departmentSelectOptions(u.소속, u.직급, true)}
+                </select>
+            </div>
             <div class="modal-field"><label>배정할 직급</label>
                 <select id="modal_pos" class="glass-input" onchange="document.getElementById('approve_level').value = LEVEL_MAP[this.value] != null ? LEVEL_MAP[this.value] : '';">
                     <option value="" disabled ${LEVEL_MAP[u.직급] == null ? 'selected' : ''}>직급 선택</option>
@@ -682,7 +732,7 @@ async function submitApprove(dbId, idx) {
     const approvedDept = document.getElementById('approve_dept').value;
     const approvedLevel = document.getElementById('approve_level').value;
 
-    if (!approvedPos) return alert("배정할 직급을 선택해주세요.");
+    if (!approvedPos || !approvedDept) return alert("배정할 직급과 소속부서를 선택해주세요.");
 
     const res = await fetch('/user/approve', { 
         method: 'POST', 
@@ -761,6 +811,7 @@ function openEditModal(i) {
 
     const readOnlyAttr = isAdminAcc ? 'readonly class="glass-input readonly-field"' : 'class="glass-input"';
     const styleAttr = isAdminAcc ? 'class="glass-input readonly-field" style="pointer-events: none;"' : 'class="glass-input"';
+    const departmentSelectAttr = isAdminAcc ? 'disabled class="glass-input readonly-field"' : 'class="glass-input"';
 
     document.getElementById('modalBody').innerHTML = `
         <div class="form-grid">
@@ -791,7 +842,11 @@ function openEditModal(i) {
             <div class="modal-field"><label>연락처</label><input type="text" id="modal_phone" value="${u.전화번호||''}" oninput="formatPhoneNumber(this)" ${readOnlyAttr}></div>
             <div class="modal-field"><label>이메일</label><input type="email" id="modal_email" value="${u.이메일||''}" ${readOnlyAttr}></div>
             <div class="modal-field full-width"><label>주소지</label><input type="text" id="modal_address" value="${u.주소||''}" ${readOnlyAttr}></div>
-            <div class="modal-field"><label>소속부서</label><input type="text" id="modal_department" value="${u.소속||''}" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>소속부서</label>
+                <select id="modal_department" ${departmentSelectAttr}>
+                    ${departmentSelectOptions(u.소속, u.직급)}
+                </select>
+            </div>
             <div class="modal-field"><label>급여통장</label><input type="text" id="modal_bank" value="${u.계좌||''}" ${readOnlyAttr}></div>
         </div>
     `;

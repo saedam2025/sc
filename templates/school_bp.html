@@ -2110,24 +2110,17 @@
             
             const groups = {
                 '본부': [],
+                '북부지점': [],
                 '센터장': [],
                 '강사': [],
                 '기타': []
             };
             
             users.forEach(u => {
-                const dept = (u.department || '').toLowerCase();
-                const pos = (u.position || '').toLowerCase();
-                
-                if (dept.includes('본부') || pos.includes('본부')) {
-                    groups['본부'].push(u);
-                } else if (dept.includes('센터장') || pos.includes('센터장')) {
-                    groups['센터장'].push(u);
-                } else if (dept.includes('강사') || pos.includes('강사')) {
-                    groups['강사'].push(u);
-                } else {
-                    groups['기타'].push(u);
-                }
+                const groupName = Object.prototype.hasOwnProperty.call(groups, u.organization_group)
+                    ? u.organization_group
+                    : '기타';
+                groups[groupName].push(u);
             });
 
             let html = '';

@@ -516,21 +516,20 @@
             const filteredUsers = users.filter(u => (u.이름||'').toLowerCase() !== 'admin' && (u.사번||'').toLowerCase() !== 'admin');
             filteredUsers.sort((a, b) => (parseInt(a.레벨) || 999) - (parseInt(b.레벨) || 999));
             
-            const groups = { '본부': [], '센터장': [], '강사': [], '기타': [] };
+            const groups = { '본부': [], '북부지점': [], '센터장': [], '강사': [], '기타': [] };
             
             filteredUsers.forEach(u => {
-                const pos = u.직급 || '';
-                if (['대표이사', '팀장', '사원', '계약직'].includes(pos)) groups['본부'].push(u);
-                else if (['센터장', '안전코디', '센터장(팀장)'].includes(pos)) groups['센터장'].push(u);
-                else if (['강사'].includes(pos)) groups['강사'].push(u);
-                else groups['기타'].push(u);
+                const groupName = Object.prototype.hasOwnProperty.call(groups, u.조직그룹)
+                    ? u.조직그룹
+                    : '기타';
+                groups[groupName].push(u);
             });
             
             const container = document.getElementById('orgChartListContainer');
             if(!container) return;
             
             let html = '';
-            ['본부', '센터장', '강사', '기타'].forEach(gName => {
+            ['본부', '북부지점', '센터장', '강사', '기타'].forEach(gName => {
                 const members = groups[gName];
                 if (members.length === 0) return; 
                 
