@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, send_from_directory
 from routes.database import get_db
+from routes.organization import classify_organization_group
 import os
 import math
 import json
@@ -725,7 +726,14 @@ def employee_search():
         ORDER BY level ASC, name ASC
     """, (f'%{query}%', f'%{query}%')).fetchall()
     conn.close()
-    return jsonify([dict(u) for u in users])
+    result = []
+    for user in users:
+        item = dict(user)
+        item['organization_group'] = classify_organization_group(
+            item.get('department'), item.get('position')
+        )
+        result.append(item)
+    return jsonify(result)
 
 @school_bp.route('/post/api/<int:post_id>')
 def get_post_api(post_id):

@@ -140,6 +140,22 @@ def get_next_issue_number():
     
     return f"제{year_prefix}-{next_num:04d}호"
 
+
+def validate_dismissal_end_date(form_data):
+    """해촉증명서는 실제 계약 종료일이 반드시 있어야 한다."""
+    cert_type = str(form_data.get("증명서종류", "")).strip()
+    end_date_type = str(form_data.get("종료일선택", "")).strip()
+    end_date = str(form_data.get("근무종료일", "")).strip()
+
+    if "해촉증명서" in cert_type and (
+        end_date_type == "현재까지"
+        or end_date == "현재까지"
+        or not end_date
+    ):
+        return "해촉증명서는 '현재까지'로 신청할 수 없습니다. 정확한 계약 종료일을 입력해 주세요."
+    return None
+
+
 # --- [외부 라우트: 강사 신청용] ---
 @document_bp.route('/apply', methods=['GET', 'POST'])
 def apply():
@@ -150,8 +166,12 @@ def apply():
     ensure_db_initialized()
     if request.method == 'POST':
         try:
-            df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
             form_data = dict(request.form)
+            validation_error = validate_dismissal_end_date(form_data)
+            if validation_error:
+                return validation_error, 400
+
+            df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
             
             if form_data.get("종료일선택") == "현재까지":
                 form_data["근무종료일"] = "현재까지"
@@ -188,8 +208,12 @@ def apply2():
     ensure_db_initialized()
     if request.method == 'POST':
         try:
-            df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
             form_data = dict(request.form)
+            validation_error = validate_dismissal_end_date(form_data)
+            if validation_error:
+                return validation_error, 400
+
+            df = pd.read_excel(DATA_PATH, dtype=str).fillna("")
             
             if form_data.get("종료일선택") == "현재까지":
                 form_data["근무종료일"] = "현재까지"

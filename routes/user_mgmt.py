@@ -11,7 +11,8 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from .database import get_db 
+from .database import get_db
+from .organization import ORGANIZATION_GROUPS, classify_organization_group
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
@@ -158,6 +159,12 @@ def register():
         password_confirm = data.get('password_confirm')
         if password and password_confirm and password != password_confirm:
             return jsonify({"status": "error", "message": "비밀번호가 일치하지 않습니다."}), 400
+        department = str(data.get('department', '')).strip()
+        if department not in ORGANIZATION_GROUPS:
+            return jsonify({
+                "status": "error",
+                "message": "소속부서를 선택해주세요."
+            }), 400
 
         conn = get_db()
         # 주민번호(RRN)는 민감 정보 보호 원칙에 따라 digits를 출력하지 않고 generic placeholder를 사용하거나 처리를 우회합니다.
@@ -186,7 +193,7 @@ def register():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '대기', ?)
         ''', (data.get('name'), str(password), data.get('position'), 10, data.get('rrn', ''), 
               data.get('email', ''), data.get('phone', ''), data.get('address', ''), 
-              data.get('department', ''), data.get('bank_account', ''), profile_path, icon))
+              department, data.get('bank_account', ''), profile_path, icon))
         
         conn.commit()
         conn.close()
@@ -318,13 +325,16 @@ def get_user_list():
             
         icon = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
         profile_path = u['profile_path'] if 'profile_path' in u.keys() else None
+        department = u['department'] if 'department' in u.keys() else ''
+        position = u['position'] or ''
         result.append({
             "id": u['id'], "사번": u['emp_no'] or '', "이름": u['name'] or '',
-            "직급": u['position'] or '', "레벨": u['level'] or 10, "주민번호": u['rrn'] or '',
+            "직급": position, "레벨": u['level'] or 10, "주민번호": u['rrn'] or '',
             "비밀번호": u['password'] or '', 
             "이메일": u['email'] or '', "전화번호": u['phone'] or '', 
             "주소": u['address'] if 'address' in u.keys() else '',
-            "소속": u['department'] if 'department' in u.keys() else '',
+            "소속": department,
+            "조직그룹": classify_organization_group(department, position),
             "계좌": u['bank_account'] if 'bank_account' in u.keys() else '',
             "입사일": u['join_date'] or '', "퇴사일": u['retire_date'] or '', 
             "승인상태": u['status'] or '', "아이콘": icon, "profile_path": profile_path
