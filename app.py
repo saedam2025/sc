@@ -3,7 +3,7 @@ from datetime import datetime
 import os
 import sys
 import traceback
-from extensions import socketio
+from routes.socketio_ext import socketio
 
 # 배포 환경에서 모듈 임포트 에러 방지를 위해 현재 디렉토리를 시스템 경로에 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from routes.main import main_bp
 from routes.document import document_bp
 from routes.contract import contract_bp
+from routes.verified_contract import verified_contract_bp
 from routes.user_mgmt import user_mgmt_bp
 from routes.approval import approval_bp
 from routes.expense import expense_bp
@@ -22,12 +23,13 @@ from routes.memo import memo_bp
 from routes.attendance import attendance_bp
 from routes.excel_generator import excel_bp
 from routes.explorer import explorer_bp
-from routes.notifications import noti_bp
+from routes.notifications import emit_notification_refresh, noti_bp
 from routes.gallery import gallery_bp
 from routes.school_bp import school_bp
 from routes.school_task import school_task_bp
 from routes.contacts import contacts_bp
 from routes.admin_management import admin_bp, get_active_theme
+from routes.ebook import ebook_bp, init_ebook_schema
 
 # [수정] gall2.py가 routes 폴더 안에 있다면 아래와 같이 수정해야 합니다.
 from routes.gall2 import gall2_bp
@@ -38,8 +40,21 @@ from routes.chat import chat_bp
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
 from routes.usage_stats import record_login_activity, record_page_usage, start_usage_session
+from routes.security import (
+    hash_password,
+    load_session_secret,
+    migrate_plaintext_passwords,
+    upgrade_legacy_password,
+    verify_password,
+)
 
 app = Flask(__name__)
+app.secret_key = load_session_secret()
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.environ.get('SESSION_COOKIE_SECURE', '').lower() in {'1', 'true', 'yes'},
+)
 socketio.init_app(app)
 
 # =====================================================================
@@ -48,6 +63,14 @@ socketio.init_app(app)
 with app.app_context():
     try:
         init_db()
+        init_ebook_schema()
+        password_conn = get_db()
+        try:
+            migrated_passwords = migrate_plaintext_passwords(password_conn)
+            if migrated_passwords:
+                print(f"✅ 기존 사용자 비밀번호 {migrated_passwords}건 해시 전환 완료.")
+        finally:
+            password_conn.close()
         print("✅ 데이터베이스 초기화 및 필수 폴더 생성 완료.")
     except Exception as e:
         print(f"❌ 데이터베이스 초기화 실패: {e}")
@@ -55,9 +78,6 @@ with app.app_context():
     # 필수 정적 폴더 확인
     os.makedirs('static', exist_ok=True)
 # =====================================================================
-
-# 세션 보안 설정
-app.secret_key = os.environ.get("SECRET_KEY", "saedam_2026_secure_key_1234")
 
 # 💡 [새담 게시판 연동 추가] 첨부파일 최대 용량을 1.5GB로 설정 
 # (이 설정이 없으면 Flask 기본 제한에 걸려 대용량 파일 업로드 시 에러가 발생합니다)
@@ -75,8 +95,14 @@ EXEMPT_ROUTES = [
     'contract.contract_list', 
     'contract.contract', 
     'contract.save_contract', 
+    'verified_contract.public_contract',
+    'verified_contract.send_otp',
+    'verified_contract.verify_otp',
+    'verified_contract.complete_contract',
+    'verified_contract.public_download',
     'document.apply',
     'document.apply2',
+    'document.company_logo',
     'expense.submit_expense',
     'expense.expense_template',
 ]
@@ -133,6 +159,40 @@ def check_login():
             return "접근 권한이 없습니다. (센터장 전용 메뉴만 이용 가능)", 403
 
     _record_usage_log()
+
+
+NOTIFICATION_MUTATION_PREFIXES = (
+    '/approval',
+    '/expense',
+    '/school',
+    '/document',
+    '/contract',
+)
+NOTIFICATION_MUTATING_GET_ENDPOINTS = {
+    'document.generate_certificate',
+    'document.delete_record',
+}
+
+
+@app.after_request
+def push_notification_changes(response):
+    """업무 데이터가 바뀐 뒤 연결된 메인 화면에 갱신 신호를 보낸다."""
+    try:
+        path = request.path or ''
+        is_mutating_method = request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}
+        is_notification_area = any(
+            path.startswith(prefix)
+            for prefix in NOTIFICATION_MUTATION_PREFIXES
+        )
+        is_mutating_get = request.endpoint in NOTIFICATION_MUTATING_GET_ENDPOINTS
+        if response.status_code < 400 and (
+            (is_mutating_method and is_notification_area)
+            or is_mutating_get
+        ):
+            emit_notification_refresh(request.endpoint or path)
+    except Exception as e:
+        print(f"업무 알림 WebSocket 전송 오류: {e}")
+    return response
 
 
 def _classify_menu(path):
@@ -222,37 +282,56 @@ def login_page():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     
     if data.get('action') == 'setup_admin':
+        conn = None
         try:
             password = data.get('password')
             if not password:
                 return jsonify({"status": "error", "message": "비밀번호를 입력해주세요."}), 400
                 
             conn = get_db()
+            conn.execute("BEGIN IMMEDIATE")
+            existing_admin = conn.execute(
+                "SELECT id FROM users WHERE emp_no='admin' LIMIT 1"
+            ).fetchone()
+            if existing_admin:
+                conn.rollback()
+                return jsonify({
+                    "status": "error",
+                    "message": "관리자 계정이 이미 설정되어 있습니다."
+                }), 403
             today = datetime.now().strftime('%Y-%m-%d')
             conn.execute('''
                 INSERT INTO users (emp_no, name, password, position, level, rrn, email, status, join_date, profile_icon, department)
                 VALUES ('admin', 'admin', ?, '최고관리자', 1, '-', 'admin@admin.com', '승인', ?, '👑', '본부')
-            ''', (password, today))
+            ''', (hash_password(password), today))
             conn.commit()
-            conn.close()
             return jsonify({"status": "success", "message": "최고관리자 설정 완료! 이제 로그인하세요."})
         except Exception as e:
+            if conn is not None:
+                conn.rollback()
             return jsonify({"status": "error", "message": str(e)}), 500
+        finally:
+            if conn is not None:
+                conn.close()
 
     emp_no = str(data.get('emp_no', '')).strip()
     password = str(data.get('password', '')).strip()
     
     conn = get_db()
-    user_row = conn.execute("SELECT * FROM users WHERE emp_no=? AND password=?", (str(emp_no), str(password))).fetchone()
+    user_row = conn.execute(
+        "SELECT * FROM users WHERE emp_no=? LIMIT 1",
+        (str(emp_no),),
+    ).fetchone()
     
-    if not user_row:
+    if not user_row or not verify_password(user_row['password'], password):
         conn.close()
         return jsonify({"status": "error", "message": "사번 또는 비밀번호가 틀립니다."}), 401
 
     user = dict(user_row)
+    upgrade_legacy_password(conn, user['id'], user.get('password'), password)
     
     if int(user.get('level', 99)) == 9:
         conn.close()
@@ -262,6 +341,7 @@ def login():
         conn.close()
         return jsonify({"status": "error", "message": "승인이 대기 중인 계정입니다."}), 403
     
+    session.clear()
     session['emp_no'] = str(user.get('emp_no', ''))
     session['user_name'] = user.get('name', '알수없음')
     session['user_level'] = int(user.get('level', 14))
@@ -343,7 +423,7 @@ def update_my_info():
 
         if new_password and 'password' in columns:
             update_fields.append("password=?")
-            params.append(new_password)
+            params.append(hash_password(new_password))
 
         if not update_fields:
             return jsonify({"status": "error", "message": "수정 가능한 항목이 없습니다."}), 400
@@ -587,6 +667,7 @@ app.register_blueprint(chat_bp)
 app.register_blueprint(main_bp)
 app.register_blueprint(document_bp, url_prefix='/document')
 app.register_blueprint(contract_bp, url_prefix='/contract')
+app.register_blueprint(verified_contract_bp, url_prefix='/verified-contract')
 app.register_blueprint(user_mgmt_bp, url_prefix='/user')
 app.register_blueprint(approval_bp, url_prefix='/approval')
 app.register_blueprint(expense_bp, url_prefix='/expense')
@@ -604,6 +685,7 @@ app.register_blueprint(school_task_bp, url_prefix='/school/tasks')
 app.register_blueprint(contacts_bp)
 app.register_blueprint(gall2_bp)
 app.register_blueprint(admin_bp, url_prefix='/admin')
+app.register_blueprint(ebook_bp, url_prefix='/ebook')
 
 # 🚀 새로 분리한 메신저 블루프린트 등록 추가
 
