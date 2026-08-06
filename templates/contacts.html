@@ -553,10 +553,106 @@
         color: var(--primary-color);
     }
 
+    /* 스마트 명세서 화면과 동일한 디자인 언어 */
+    .contact-page, .contact-builder-backdrop, .contact-edit-modal, .contact-help-backdrop, .contact-toast-region {
+        --ct-primary: var(--primary-color, #2563eb);
+        --ct-soft: color-mix(in srgb, var(--ct-primary) 10%, #fff);
+        --ct-card: var(--card-bg, #fff);
+        --ct-border: var(--card-border, var(--border-color, #dbe3ef));
+        --ct-text: var(--text-color, #172033);
+        --ct-muted: var(--text-gray, #64748b);
+        --ct-surface: var(--widget-bg, #f7f9fc);
+        --ct-hover: var(--widget-hover, #edf3fb);
+    }
+    .contact-page { padding:4px 0 40px; color:var(--ct-text); }
+    .contact-shell { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+    .contact-header { align-items:center; margin:0 0 18px; padding:20px 24px; border:1px solid var(--ct-border); border-radius:20px; background:radial-gradient(circle at 85% 10%,color-mix(in srgb,var(--ct-primary) 17%,transparent),transparent 32%),var(--ct-card); box-shadow:var(--card-shadow,0 10px 35px rgba(15,23,42,.07)); }
+    .contact-title { display:flex; align-items:center; gap:15px; }
+    .contact-title-icon { width:52px; height:52px; flex:0 0 52px; display:grid; place-items:center; border-radius:16px; background:var(--ct-primary); color:#fff; font-size:1.35rem; box-shadow:0 10px 22px color-mix(in srgb,var(--ct-primary) 28%,transparent); }
+    .contact-title-icon i { color:#fff!important; font-size:1.35rem; line-height:1; }
+    .contact-title h2 { font-size:clamp(1.35rem,2vw,1.75rem); letter-spacing:-.035em; color:var(--ct-text); }
+    .contact-title p { margin-top:6px; color:var(--ct-muted); font-weight:500; }
+    .contact-btn { min-height:40px; border-color:var(--ct-border); border-radius:11px; padding:9px 14px; background:var(--ct-card); color:var(--ct-text); transition:.17s ease; }
+    .contact-btn:hover { border-color:color-mix(in srgb,var(--ct-primary) 55%,var(--ct-border)); background:var(--ct-card); color:var(--ct-primary); transform:translateY(-1px); }
+    .contact-btn.primary { border-color:var(--ct-primary); background:var(--ct-primary); box-shadow:0 7px 15px color-mix(in srgb,var(--ct-primary) 22%,transparent); }
+    .contact-btn.active { border-color:var(--ct-primary); background:var(--ct-soft); color:var(--ct-primary); }
+    .contact-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+    .contact-stat { display:flex; align-items:center; gap:12px; min-width:0; padding:15px 17px; border:1px solid var(--ct-border); border-radius:15px; background:var(--ct-card); box-shadow:var(--card-shadow,0 6px 20px rgba(15,23,42,.04)); }
+    .contact-stat-icon { width:40px; height:40px; flex:0 0 40px; display:grid; place-items:center; border-radius:12px; background:var(--ct-soft); color:var(--ct-primary); }
+    .contact-stat .contact-stat-icon { display:grid; margin-top:0; color:var(--ct-primary); font-size:.95rem; }
+    .contact-stat-icon i { color:inherit!important; line-height:1; }
+    .contact-stat strong { display:block; font-size:1.05rem; color:var(--ct-text); }
+    .contact-stat span { display:block; margin-top:2px; color:var(--ct-muted); font-size:.72rem; font-weight:700; }
+    .contact-smartbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; padding:10px; border:1px solid var(--ct-border); border-radius:16px; background:var(--ct-card); }
+    .contact-view-tabs { display:flex; align-items:center; gap:5px; overflow-x:auto; }
+    .contact-view-tab { min-height:40px; display:inline-flex; align-items:center; gap:7px; border:0; border-radius:10px; padding:9px 14px; background:transparent; color:var(--ct-muted); font:inherit; font-size:.82rem; font-weight:800; cursor:pointer; white-space:nowrap; }
+    .contact-view-tab:hover { background:var(--ct-hover); color:var(--ct-text); }
+    .contact-view-tab.active { background:var(--ct-soft); color:var(--ct-primary); }
+    .contact-search { position:relative; width:min(360px,100%); }
+    .contact-search > i { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--ct-muted); }
+    .contact-search input { width:100%; min-height:42px; padding:9px 38px; border:1px solid var(--ct-border); border-radius:11px; background:#fff; color:#172033; font:inherit; outline:none; }
+    .contact-search input:focus { border-color:var(--ct-primary); box-shadow:0 0 0 3px var(--ct-soft); }
+    .contact-search-clear { position:absolute; right:7px; top:6px; width:30px; height:30px; border:0; border-radius:8px; background:transparent; color:var(--ct-muted); cursor:pointer; }
+    .contact-section { margin-bottom:14px; border-color:var(--ct-border); border-radius:18px; background:var(--ct-card); box-shadow:var(--card-shadow,0 8px 28px rgba(15,23,42,.05)); }
+    .section-head { padding:17px 19px; border-color:var(--ct-border); background:var(--ct-card); }
+    .section-title > i { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:var(--ct-soft); color:var(--ct-primary)!important; }
+    .section-title h3 { color:var(--ct-text); }
+    .section-title span { color:var(--ct-muted); font-weight:600; }
+    .contact-table th { position:sticky; top:0; z-index:1; background:var(--ct-surface); color:var(--ct-muted); }
+    .contact-table td { color:var(--ct-text); }
+    .contact-table tbody tr:hover td { background:var(--ct-hover); }
+    .contact-page:not(.edit-mode) .contact-manage-col, .contact-page:not(.edit-mode) .manual-contact-footer { display:none!important; }
+    .contact-page.edit-mode .contact-section { border-color:color-mix(in srgb,var(--ct-primary) 35%,var(--ct-border)); }
+    .contact-page.edit-mode .contact-manage-col { animation:contactFade .18s ease-out; }
+    @keyframes contactFade { from { opacity:0; } to { opacity:1; } }
+    .contact-no-results { display:none; margin:18px 0; padding:46px 20px; border:1px dashed var(--ct-border); border-radius:16px; background:var(--ct-card); color:var(--ct-muted); text-align:center; }
+    .contact-no-results i { display:block; margin-bottom:10px; font-size:1.7rem; color:var(--ct-primary); }
+    .contact-help-backdrop { display:none; position:fixed; inset:0; z-index:11000; place-items:center; padding:20px; background:rgba(15,23,42,.6); }
+    .contact-help-backdrop.open { display:grid; }
+    .contact-help-panel { width:min(720px,100%); max-height:88vh; overflow:auto; border:1px solid var(--ct-border); border-radius:18px; background:var(--ct-card); box-shadow:0 28px 80px rgba(15,23,42,.3); }
+    .contact-help-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:17px 20px; border-bottom:1px solid var(--ct-border); }
+    .contact-help-head h3 { margin:0; font-size:1.05rem; }
+    .contact-help-body { padding:20px; }
+    .contact-help-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+    .contact-help-item { padding:15px; border:1px solid var(--ct-border); border-radius:13px; background:var(--ct-surface); }
+    .contact-help-item i { color:var(--ct-primary); }
+    .contact-help-item strong { display:block; margin:8px 0 4px; font-size:.87rem; }
+    .contact-help-item p { margin:0; color:var(--ct-muted); font-size:.74rem; line-height:1.55; }
+    .contact-toast-region { position:fixed; right:22px; bottom:22px; z-index:13000; display:grid; gap:9px; width:min(360px,calc(100vw - 32px)); pointer-events:none; }
+    .contact-toast { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:9px; padding:13px 14px; border:1px solid var(--ct-border); border-radius:13px; background:var(--ct-card); color:var(--ct-text); box-shadow:0 16px 42px rgba(15,23,42,.18); font-size:.8rem; font-weight:750; pointer-events:auto; animation:contactToastIn .2s ease-out; }
+    .contact-toast i { color:var(--ct-primary); }
+    .contact-toast.success i { color:#059669; }.contact-toast.warning i { color:#d97706; }.contact-toast.error i { color:#dc2626; }
+    .contact-toast button { border:0; background:transparent; color:var(--ct-muted); cursor:pointer; }
+    @keyframes contactToastIn { from { opacity:0; transform:translateY(8px); } }
+    .contact-builder-sheet.theme-peach { --builder-accent:#d97757; --builder-soft:#fff1eb; }
+    .contact-builder-sheet.theme-mint { --builder-accent:#3f8f7c; --builder-soft:#eaf8f3; }
+    .contact-builder-sheet.theme-sky { --builder-accent:#4e83ad; --builder-soft:#edf7ff; }
+    .contact-builder-sheet.theme-lavender { --builder-accent:#7c6aa8; --builder-soft:#f4f0ff; }
+    .contact-builder-sheet.theme-rose { --builder-accent:#a86578; --builder-soft:#fff0f4; }
+    .contact-builder-status { display:inline-flex; align-items:center; gap:6px; margin-left:auto; color:var(--ct-muted); font-size:.68rem; font-weight:750; }
+    .contact-builder-status.saved { color:#059669; }
+    .contact-builder-row-actions { display:flex; justify-content:center; gap:3px; }
+    .contact-builder-row-action { width:25px; height:25px; display:grid; place-items:center; border:1px solid #dbe3ef; border-radius:6px; background:#fff; color:#475569; cursor:pointer; font-size:.62rem; }
+    .contact-builder-row-action:hover { border-color:var(--builder-accent); color:var(--builder-accent); }
+    /* 화면 높이에 맞추고, 긴 내용은 모달 내부에서만 스크롤한다. */
+    .contact-builder-backdrop { z-index:50000; padding:8px; overflow:hidden; isolation:isolate; }
+    .contact-builder-backdrop.open { place-items:center; }
+    .contact-builder-modal { position:relative; z-index:1; display:flex; flex-direction:column; width:min(1280px,100%); height:min(912px,calc(100vh - 16px)); height:min(912px,calc(100dvh - 16px)); min-height:0; margin:0; }
+    .contact-builder-head, .contact-builder-foot { flex:0 0 auto; }
+    .contact-builder-body { flex:1 1 auto; min-height:0; overflow:hidden; }
+    .contact-builder-controls, .contact-builder-preview { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+    @media (max-width:980px) { .contact-overview { grid-template-columns:1fr 1fr; } .contact-smartbar { align-items:stretch; flex-direction:column; } .contact-search { width:100%; } }
+    @media (max-width:980px) { .contact-builder-body { display:block; overflow-y:auto; } .contact-builder-controls { overflow:visible; border-right:0; } .contact-builder-preview { overflow:visible; } }
+    @media (max-width:620px) { .contact-header { align-items:flex-start; padding:17px; } .contact-actions { width:100%; } .contact-overview { grid-template-columns:1fr; } .contact-help-grid { grid-template-columns:1fr; } .contact-builder-backdrop { padding:4px; } .contact-builder-modal { height:calc(100vh - 8px); height:calc(100dvh - 8px); border-radius:12px; } .contact-builder-foot { overflow-x:auto; justify-content:flex-start; } }
+
     @media print {
         .navbar,
         .main-footer,
         .contact-actions,
+        .contact-overview,
+        .contact-smartbar,
+        .contact-no-results,
+        .contact-toast-region,
         .section-tools,
         .manual-contact-footer,
         .contact-manage-col,
@@ -610,19 +706,37 @@
 {% block content %}
 <div class="contact-page">
     <div class="contact-shell">
+        {% set manual_count = namespace(value=0) %}{% for group in manual_contact_groups %}{% set manual_count.value = manual_count.value + (group['items']|length) %}{% endfor %}
         <div class="contact-header">
             <div class="contact-title">
-                <h2><i class="fa-solid fa-address-book" style="color:#2563eb;"></i> 본사연락망</h2>
-                <p>본부, 센터장, 학교 연락처를 한 화면에서 확인하고 구역별로 출력하거나 PDF로 저장합니다.</p>
+                <div class="contact-title-icon"><i class="fa-solid fa-address-book"></i></div>
+                <div><h2>스마트 본사연락망</h2><p>검색, 편집, 맞춤 저장과 출력까지 한 화면에서 관리합니다.</p></div>
             </div>
             <div class="contact-actions">
-                <button type="button" class="contact-btn primary" onclick="openContactBuilder()"><i class="fa-solid fa-table-list"></i> 맞춤 연락망</button>
-                <button type="button" class="contact-btn primary" onclick="printContactSection('all')"><i class="fa-solid fa-print"></i> 전체 출력/PDF</button>
-                <button type="button" class="contact-btn" onclick="printContactSection('headquarters')"><i class="fa-solid fa-building"></i> 본부</button>
-                <button type="button" class="contact-btn" onclick="printContactSection('centers')"><i class="fa-solid fa-user-tie"></i> 센터장</button>
-                <button type="button" class="contact-btn" onclick="printContactSection('schools')"><i class="fa-solid fa-school"></i> 학교</button>
+                <button type="button" class="contact-btn" onclick="openContactHelp()"><i class="fa-regular fa-circle-question"></i> 도움말</button>
+                {% if can_edit_defaults %}<button type="button" class="contact-btn" id="contactEditModeBtn" onclick="toggleContactEditMode()"><i class="fa-solid fa-pen-to-square"></i> 편집 모드</button>{% endif %}
+                <button type="button" class="contact-btn" onclick="printContactSection('all')"><i class="fa-solid fa-print"></i> 전체 출력</button>
+                <button type="button" class="contact-btn primary" onclick="openContactBuilder()"><i class="fa-solid fa-wand-magic-sparkles"></i> 맞춤 연락망</button>
             </div>
         </div>
+
+        <div class="contact-overview">
+            <div class="contact-stat"><span class="contact-stat-icon"><i class="fa-solid fa-building"></i></span><div><strong>{{ manual_count.value + (headquarters_contacts|length) }}</strong><span>본부·협력 연락처</span></div></div>
+            <div class="contact-stat"><span class="contact-stat-icon"><i class="fa-solid fa-user-tie"></i></span><div><strong>{{ center_contacts|length }}</strong><span>센터장 연락처</span></div></div>
+            <div class="contact-stat"><span class="contact-stat-icon"><i class="fa-solid fa-school"></i></span><div><strong>{{ school_contacts|length }}</strong><span>학교 연락처</span></div></div>
+            <div class="contact-stat"><span class="contact-stat-icon"><i class="fa-solid fa-bookmark"></i></span><div><strong id="savedDirectoryCount">{{ saved_contact_directories|length }}</strong><span>내 저장 연락망</span></div></div>
+        </div>
+
+        <div class="contact-smartbar">
+            <div class="contact-view-tabs" role="tablist" aria-label="연락망 구역 선택">
+                <button type="button" class="contact-view-tab active" data-contact-view="all" onclick="setContactView('all',this)"><i class="fa-solid fa-border-all"></i> 전체</button>
+                <button type="button" class="contact-view-tab" data-contact-view="headquarters" onclick="setContactView('headquarters',this)"><i class="fa-solid fa-building"></i> 본부</button>
+                <button type="button" class="contact-view-tab" data-contact-view="centers" onclick="setContactView('centers',this)"><i class="fa-solid fa-user-tie"></i> 센터장</button>
+                <button type="button" class="contact-view-tab" data-contact-view="schools" onclick="setContactView('schools',this)"><i class="fa-solid fa-school"></i> 학교</button>
+            </div>
+            <label class="contact-search" for="contactGlobalSearch"><i class="fa-solid fa-magnifying-glass"></i><input id="contactGlobalSearch" type="search" placeholder="이름, 소속, 학교, 전화번호 통합검색" oninput="filterContacts(this.value)"><button type="button" class="contact-search-clear" onclick="clearContactSearch()" title="검색 지우기"><i class="fa-solid fa-xmark"></i></button></label>
+        </div>
+        <div class="contact-no-results" id="contactNoResults"><i class="fa-solid fa-magnifying-glass"></i><strong>검색 결과가 없습니다.</strong><div>이름, 소속, 학교명 또는 전화번호를 다시 확인해주세요.</div></div>
 
         <section class="contact-section" data-print-section="headquarters">
             <div class="section-head">
@@ -945,16 +1059,57 @@
     </div>
 </div>
 
+<div id="contactHelpModal" class="contact-help-backdrop" onclick="if(event.target===this) closeContactHelp();" aria-hidden="true">
+    <div class="contact-help-panel" role="dialog" aria-modal="true" aria-labelledby="contactHelpTitle">
+        <div class="contact-help-head"><div><h3 id="contactHelpTitle"><i class="fa-regular fa-circle-question" style="color:var(--ct-primary);"></i> 스마트 연락망 도움말</h3><p style="margin:5px 0 0;color:var(--ct-muted);font-size:.75rem;">필요한 기능만 빠르게 찾을 수 있습니다.</p></div><button type="button" class="contact-icon-btn" onclick="closeContactHelp()"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="contact-help-body">
+            <div class="contact-help-grid">
+                <div class="contact-help-item"><i class="fa-solid fa-magnifying-glass"></i><strong>통합검색</strong><p>이름·소속·학교·전화번호를 입력하면 모든 표에서 일치하는 연락처만 즉시 표시됩니다.</p></div>
+                <div class="contact-help-item"><i class="fa-solid fa-pen-to-square"></i><strong>원본 연락처 편집</strong><p>관리자는 편집 모드에서 수동 연락처와 센터장 팀을 수정합니다. 직원 정보는 인사관리, 학교 정보는 학교업무공간의 원본이 반영됩니다.</p></div>
+                <div class="contact-help-item"><i class="fa-solid fa-wand-magic-sparkles"></i><strong>맞춤 연락망 편집</strong><p>원하는 분류와 표시 항목을 고르고, 각 행의 이름·소속·전화번호를 별도로 편집하거나 순서를 바꿀 수 있습니다.</p></div>
+                <div class="contact-help-item"><i class="fa-solid fa-bookmark"></i><strong>저장·다시 불러오기</strong><p>편집한 맞춤 연락망은 개인 계정에 저장됩니다. 다음 접속 때 불러와 수정·인쇄할 수 있습니다.</p></div>
+                <div class="contact-help-item"><i class="fa-solid fa-palette"></i><strong>파스텔 테마</strong><p>피치·민트·스카이·라벤더·로즈 색상을 포함해 화면과 출력물의 분위기를 바꿀 수 있습니다.</p></div>
+                <div class="contact-help-item"><i class="fa-solid fa-print"></i><strong>인쇄·PDF</strong><p>메인 화면은 구역별 출력, 맞춤 연락망은 선택한 용지·방향·색상 그대로 인쇄하거나 PDF로 저장합니다.</p></div>
+            </div>
+            {% if can_edit_defaults %}<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--ct-border);"><a class="contact-btn" href="/user"><i class="fa-solid fa-users-gear"></i> 인사정보 원본 관리</a><a class="contact-btn" href="/school"><i class="fa-solid fa-school"></i> 학교정보 원본 관리</a><button type="button" class="contact-btn primary" onclick="closeContactHelp();toggleContactEditMode(true)"><i class="fa-solid fa-pen"></i> 연락처 편집 시작</button></div>{% endif %}
+        </div>
+    </div>
+</div>
+
+<div id="builderRecordModal" class="contact-help-backdrop" onclick="if(event.target===this) closeBuilderRecordEditor();" aria-hidden="true">
+    <form class="contact-help-panel" style="width:min(620px,100%);" onsubmit="saveBuilderRecordEdit(event)">
+        <div class="contact-help-head"><div><h3><i class="fa-solid fa-address-card" style="color:var(--ct-primary);"></i> 맞춤 연락처 편집</h3><p style="margin:5px 0 0;color:var(--ct-muted);font-size:.75rem;">원본 데이터는 바뀌지 않고 이 맞춤 연락망에만 적용됩니다.</p></div><button type="button" class="contact-icon-btn" onclick="closeBuilderRecordEditor()"><i class="fa-solid fa-xmark"></i></button></div>
+        <div class="contact-help-body"><input id="builderRecordKey" type="hidden"><div class="contact-edit-body" style="padding:0;">
+            <div class="contact-edit-field"><label>분류·팀</label><input id="builderRecordGroup" maxlength="100"></div>
+            <div class="contact-edit-field"><label>소속·항목</label><input id="builderRecordOrganization" maxlength="150"></div>
+            <div class="contact-edit-field"><label>직책·구분</label><input id="builderRecordRole" maxlength="100"></div>
+            <div class="contact-edit-field"><label>성명·학교</label><input id="builderRecordName" maxlength="100" required></div>
+            <div class="contact-edit-field"><label>전화번호</label><input id="builderRecordPhone" maxlength="100"></div>
+            <div class="contact-edit-field"><label>이메일</label><input id="builderRecordEmail" maxlength="180"></div>
+            <div class="contact-edit-field full"><label>담당·상세</label><input id="builderRecordDetail" maxlength="300"></div>
+        </div></div>
+        <div class="contact-edit-foot"><button type="button" class="contact-btn" onclick="closeBuilderRecordEditor()">취소</button><button type="submit" class="contact-btn primary"><i class="fa-solid fa-floppy-disk"></i> 편집 적용</button></div>
+    </form>
+</div>
+
+<div class="contact-toast-region" id="contactToastRegion" aria-live="polite"></div>
+
 <div id="contactBuilderModal" class="contact-builder-backdrop" onclick="if(event.target === this) closeContactBuilder();" aria-hidden="true">
     <div class="contact-builder-modal" role="dialog" aria-modal="true" aria-labelledby="contactBuilderTitle">
         <div class="contact-builder-head">
             <h3 id="contactBuilderTitle"><i class="fa-solid fa-table-list" style="color:var(--primary-color, #2563eb);"></i> 맞춤 연락망 만들기</h3>
+            <span class="contact-builder-status" id="contactBuilderSaveState"><i class="fa-regular fa-circle"></i> 새 연락망</span>
             <button type="button" class="contact-icon-btn" onclick="closeContactBuilder()" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="contact-builder-body">
             <aside class="contact-builder-controls">
                 <div class="contact-builder-group">
-                    <label class="contact-builder-label" for="builderListTitle">연락망 제목</label>
+                    <label class="contact-builder-label" for="savedDirectorySelect">내 저장 연락망</label>
+                    <select class="contact-builder-select" id="savedDirectorySelect" onchange="loadSavedDirectory(this.value)"><option value="">새 연락망 만들기</option></select>
+                    <div style="display:flex;gap:6px;margin-top:7px;"><button type="button" class="contact-btn" style="flex:1;min-height:32px;padding:6px 8px;font-size:.68rem;" onclick="newContactDirectory()"><i class="fa-solid fa-plus"></i> 새로 만들기</button><button type="button" class="contact-btn" id="deleteSavedDirectoryBtn" style="min-height:32px;padding:6px 9px;font-size:.68rem;" onclick="deleteSavedDirectory()" disabled title="저장 연락망 삭제"><i class="fa-regular fa-trash-can"></i></button></div>
+                </div>
+                <div class="contact-builder-group">
+                    <label class="contact-builder-label" for="builderListTitle">연락망 이름·출력 제목</label>
                     <input class="contact-builder-input" id="builderListTitle" value="새담 업무 연락망" maxlength="60">
                 </div>
                 <div class="contact-builder-group">
@@ -966,7 +1121,22 @@
                         <label class="contact-builder-check"><input type="checkbox" value="managers" checked> 실장 <small data-source-count="managers"></small></label>
                         <label class="contact-builder-check"><input type="checkbox" value="centers" checked> 센터장 <small data-source-count="centers"></small></label>
                         <label class="contact-builder-check"><input type="checkbox" value="schools" checked> 학교 <small data-source-count="schools"></small></label>
+                        <label class="contact-builder-check"><input type="checkbox" value="custom_people"> 별도 소속·팀 <small data-source-count="custom_people"></small></label>
                     </div>
+                </div>
+                <div class="contact-builder-group">
+                    <span class="contact-builder-label">별도 소속·팀 맞춤 선택</span>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+                        <select class="contact-builder-select" id="builderCustomDepartment" aria-label="별도 소속 선택">
+                            <option value="">전체 별도 소속</option>
+                            {% for option in custom_department_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}
+                        </select>
+                        <select class="contact-builder-select" id="builderCustomTeam" aria-label="별도 팀 선택">
+                            <option value="">전체 별도 팀</option>
+                            {% for option in custom_team_options %}<option value="{{ option }}">{{ option }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <small style="display:block;margin-top:7px;color:var(--text-gray,#64748b);font-size:.65rem;line-height:1.4;">인사관리에서 별도 지정된 구성원만 표시됩니다.</small>
                 </div>
                 <div class="contact-builder-group">
                     <span class="contact-builder-label">용지와 화면 형태</span>
@@ -986,7 +1156,8 @@
                     <span class="contact-builder-label">색상과 글자 크기</span>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
                         <select class="contact-builder-select" id="builderTheme" aria-label="색상 테마">
-                            <option value="coral">주황</option><option value="blue">파랑</option><option value="green">초록</option><option value="purple">보라</option><option value="slate">회색</option>
+                            <optgroup label="기본 색상"><option value="coral">주황</option><option value="blue">파랑</option><option value="green">초록</option><option value="purple">보라</option><option value="slate">회색</option></optgroup>
+                            <optgroup label="파스텔 톤"><option value="peach">파스텔 피치</option><option value="mint">파스텔 민트</option><option value="sky">파스텔 스카이</option><option value="lavender">파스텔 라벤더</option><option value="rose">파스텔 로즈</option></optgroup>
                         </select>
                         <select class="contact-builder-select" id="builderFont" aria-label="글자 크기">
                             <option value="xsmall">아주 작게</option><option value="small" selected>작게</option><option value="medium">보통</option>
@@ -1005,6 +1176,12 @@
                         <label class="contact-builder-check"><input type="checkbox" value="detail"> 담당·상세</label>
                     </div>
                 </div>
+                <div class="contact-builder-group">
+                    <span class="contact-builder-label">연락처 개별 편집</span>
+                    <button type="button" class="contact-btn" id="builderEditModeBtn" style="width:100%;justify-content:center;" onclick="toggleBuilderEditMode()"><i class="fa-solid fa-pen-to-square"></i> 행 편집 켜기</button>
+                    <button type="button" class="contact-btn" id="restoreHiddenRecordsBtn" style="width:100%;justify-content:center;margin-top:6px;" onclick="restoreHiddenBuilderRecords()" disabled><i class="fa-solid fa-rotate-left"></i> 제외한 연락처 복구</button>
+                    <p style="margin:7px 0 0;color:var(--text-gray,#64748b);font-size:.64rem;line-height:1.45;">편집 모드에서 각 행의 내용·순서·포함 여부를 조정할 수 있습니다.</p>
+                </div>
             </aside>
             <section class="contact-builder-preview">
                 <p class="contact-builder-preview-note">선택한 크기로 미리 표시됩니다. 화면 캡처하거나 인쇄/PDF 버튼을 사용하세요.</p>
@@ -1013,6 +1190,8 @@
         </div>
         <div class="contact-builder-foot">
             <button type="button" class="contact-btn" onclick="resetContactBuilder()"><i class="fa-solid fa-rotate-left"></i> 기본값</button>
+            <button type="button" class="contact-btn" onclick="saveContactDirectory(true)"><i class="fa-solid fa-copy"></i> 새 이름으로 저장</button>
+            <button type="button" class="contact-btn primary" onclick="saveContactDirectory(false)"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
             <button type="button" class="contact-btn primary" onclick="printCustomDirectory()"><i class="fa-solid fa-print"></i> 맞춤 연락망 인쇄/PDF</button>
             <button type="button" class="contact-btn" onclick="closeContactBuilder()">닫기</button>
         </div>
@@ -1088,6 +1267,13 @@
 <script>
     const contactPrintClasses = ['print-headquarters', 'print-centers', 'print-schools'];
     const contactBuilderRecords = {{ contact_builder_records|tojson }};
+    let savedContactDirectories = {{ saved_contact_directories|tojson }};
+    let activeDirectoryId = null;
+    let contactBuilderOverrides = {};
+    let contactBuilderHiddenKeys = [];
+    let contactBuilderOrder = [];
+    let builderEditMode = false;
+    let builderApplyingSettings = false;
     const contactBuilderSettingsKey = 'saedamContactBuilderSettings';
     const contactBuilderFieldLabels = {
         group: '분류·팀', organization: '소속·항목', role: '직책·구분',
@@ -1096,6 +1282,77 @@
 
     function contactEscape(value) {
         return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+
+    function contactToast(message, type = 'info', duration = 4200) {
+        const region = document.getElementById('contactToastRegion');
+        if (!region) return;
+        const icons = {success:'fa-circle-check', warning:'fa-triangle-exclamation', error:'fa-circle-xmark', info:'fa-circle-info'};
+        const toast = document.createElement('div');
+        toast.className = `contact-toast ${type}`;
+        toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i><span>${contactEscape(message)}</span><button type="button" aria-label="알림 닫기"><i class="fa-solid fa-xmark"></i></button>`;
+        toast.querySelector('button').onclick = () => toast.remove();
+        region.appendChild(toast);
+        setTimeout(() => toast.remove(), duration);
+    }
+
+    function openContactHelp() {
+        const modal = document.getElementById('contactHelpModal');
+        modal.classList.add('open'); modal.setAttribute('aria-hidden', 'false');
+    }
+    function closeContactHelp() {
+        const modal = document.getElementById('contactHelpModal');
+        modal.classList.remove('open'); modal.setAttribute('aria-hidden', 'true');
+    }
+    function toggleContactEditMode(forceOn = false) {
+        const page = document.querySelector('.contact-page');
+        const active = forceOn || !page.classList.contains('edit-mode');
+        page.classList.toggle('edit-mode', active);
+        const button = document.getElementById('contactEditModeBtn');
+        if (button) { button.classList.toggle('active', active); button.innerHTML = active ? '<i class="fa-solid fa-check"></i> 편집 모드 종료' : '<i class="fa-solid fa-pen-to-square"></i> 편집 모드'; }
+        contactToast(active ? '편집 도구를 표시했습니다. 수정할 항목의 연필 버튼을 누르세요.' : '편집 모드를 종료했습니다.', active ? 'info' : 'success');
+    }
+    function setContactView(view, button = null) {
+        document.querySelectorAll('.contact-section[data-print-section]').forEach(section => {
+            section.hidden = view !== 'all' && section.dataset.printSection !== view;
+        });
+        document.querySelectorAll('.contact-view-tab').forEach(tab => tab.classList.toggle('active', tab === button || (!button && tab.dataset.contactView === view)));
+        filterContacts(document.getElementById('contactGlobalSearch').value);
+    }
+    function filterContacts(rawQuery) {
+        const query = String(rawQuery || '').trim().toLocaleLowerCase('ko');
+        let visibleCount = 0;
+        document.querySelectorAll('.contact-section:not([hidden])').forEach(section => {
+            section.querySelectorAll('tbody tr:not(.contact-detail-row):not(.contact-team-row)').forEach(row => {
+                const visible = !query || row.textContent.toLocaleLowerCase('ko').includes(query);
+                row.hidden = !visible;
+                const detail = row.nextElementSibling;
+                if (detail?.classList.contains('contact-detail-row')) detail.hidden = !visible;
+                if (visible) visibleCount += 1;
+            });
+            section.querySelectorAll('.contact-team-row').forEach(row => { row.hidden = Boolean(query); });
+        });
+        document.getElementById('contactNoResults').style.display = query && visibleCount === 0 ? 'block' : 'none';
+    }
+    function clearContactSearch() {
+        const input = document.getElementById('contactGlobalSearch'); input.value = ''; filterContacts(''); input.focus();
+    }
+
+    function renderSavedDirectoryOptions() {
+        const select = document.getElementById('savedDirectorySelect');
+        select.innerHTML = '<option value="">새 연락망 만들기</option>' + savedContactDirectories.map(item => `<option value="${item.id}" ${String(item.id) === String(activeDirectoryId) ? 'selected' : ''}>${contactEscape(item.name)}</option>`).join('');
+        document.getElementById('deleteSavedDirectoryBtn').disabled = !activeDirectoryId;
+        document.getElementById('savedDirectoryCount').textContent = savedContactDirectories.length;
+    }
+
+    function setBuilderSaveState(text, saved = false) {
+        const state = document.getElementById('contactBuilderSaveState');
+        state.classList.toggle('saved', saved);
+        state.innerHTML = `<i class="fa-${saved ? 'solid fa-circle-check' : 'regular fa-circle'}"></i> ${contactEscape(text)}`;
+    }
+
+    function markBuilderDirty() {
+        if (!builderApplyingSettings) setBuilderSaveState(activeDirectoryId ? '수정 내용 저장 필요' : '새 연락망', false);
     }
 
     function contactBuilderSettings() {
@@ -1107,6 +1364,11 @@
             orientation: document.getElementById('builderOrientation').value,
             theme: document.getElementById('builderTheme').value,
             font: document.getElementById('builderFont').value,
+            customDepartment: document.getElementById('builderCustomDepartment').value,
+            customTeam: document.getElementById('builderCustomTeam').value,
+            overrides: contactBuilderOverrides,
+            hiddenKeys: contactBuilderHiddenKeys,
+            order: contactBuilderOrder,
         };
     }
 
@@ -1116,35 +1378,177 @@
 
     function applyContactBuilderSettings(settings) {
         if (!settings) return;
+        builderApplyingSettings = true;
         document.getElementById('builderListTitle').value = settings.title || '새담 업무 연락망';
         ['size', 'orientation', 'theme', 'font'].forEach(key => {
             const element = document.getElementById(`builder${key[0].toUpperCase()}${key.slice(1)}`);
             if (element && settings[key]) element.value = settings[key];
         });
+        if (settings.customDepartment != null) document.getElementById('builderCustomDepartment').value = settings.customDepartment;
+        if (settings.customTeam != null) document.getElementById('builderCustomTeam').value = settings.customTeam;
         if (Array.isArray(settings.sources)) {
             document.querySelectorAll('#builderSourceChecks input').forEach(input => { input.checked = settings.sources.includes(input.value); });
         }
         if (Array.isArray(settings.fields)) {
             document.querySelectorAll('#builderFieldChecks input').forEach(input => { input.checked = input.disabled || settings.fields.includes(input.value); });
         }
+        if (settings.customDepartment || settings.customTeam) {
+            const customSource = document.querySelector('#builderSourceChecks input[value="custom_people"]');
+            if (customSource) customSource.checked = true;
+        }
+        contactBuilderOverrides = settings.overrides && typeof settings.overrides === 'object' ? structuredClone(settings.overrides) : {};
+        contactBuilderHiddenKeys = Array.isArray(settings.hiddenKeys) ? [...settings.hiddenKeys] : [];
+        contactBuilderOrder = Array.isArray(settings.order) ? [...settings.order] : [];
+        document.getElementById('restoreHiddenRecordsBtn').disabled = contactBuilderHiddenKeys.length === 0;
+        builderApplyingSettings = false;
     }
 
-    function renderContactBuilder() {
+    function contactBuilderRows(settings = contactBuilderSettings()) {
+        const orderIndex = new Map(contactBuilderOrder.map((key, index) => [key, index]));
+        return contactBuilderRecords.filter(item => {
+            if (!settings.sources.includes(item.source)) return false;
+            if (settings.customDepartment && item.custom_department !== settings.customDepartment) return false;
+            if (settings.customTeam && item.custom_team !== settings.customTeam) return false;
+            if (contactBuilderHiddenKeys.includes(item.key)) return false;
+            return true;
+        }).map(item => ({...item, ...(contactBuilderOverrides[item.key] || {})}))
+          .sort((a, b) => {
+              const ai = orderIndex.has(a.key) ? orderIndex.get(a.key) : Number.MAX_SAFE_INTEGER;
+              const bi = orderIndex.has(b.key) ? orderIndex.get(b.key) : Number.MAX_SAFE_INTEGER;
+              return ai - bi;
+          });
+    }
+
+    function renderContactBuilder(trackChange = true) {
         const settings = contactBuilderSettings();
-        const rows = contactBuilderRecords.filter(item => settings.sources.includes(item.source));
+        const rows = contactBuilderRows(settings);
         const sheet = document.getElementById('contactBuilderSheet');
         sheet.className = `contact-builder-sheet theme-${settings.theme} size-${settings.size} orientation-${settings.orientation} font-${settings.font}`;
         const heading = `<header class="contact-builder-sheet-head"><h4>${contactEscape(settings.title)}</h4><span>${rows.length}개 연락처 · ${settings.orientation === 'landscape' ? '가로' : '세로'}</span></header>`;
         if (!rows.length) {
             sheet.innerHTML = heading + '<div class="contact-builder-empty">포함할 연락망을 하나 이상 선택하세요.</div>';
             saveContactBuilderSettings(settings);
+            if (trackChange) markBuilderDirty();
             return;
         }
         const fields = settings.fields.length ? settings.fields : ['name'];
-        const head = fields.map(field => `<th>${contactEscape(contactBuilderFieldLabels[field] || field)}</th>`).join('');
-        const body = rows.map(item => `<tr>${fields.map(field => `<td>${contactEscape(item[field] || '-')}</td>`).join('')}</tr>`).join('');
+        const head = fields.map(field => `<th>${contactEscape(contactBuilderFieldLabels[field] || field)}</th>`).join('') + (builderEditMode ? '<th style="width:116px;">편집</th>' : '');
+        const body = rows.map(item => `<tr>${fields.map(field => `<td>${contactEscape(item[field] || '-')}</td>`).join('')}${builderEditMode ? `<td><div class="contact-builder-row-actions"><button class="contact-builder-row-action" type="button" title="위로" onclick="moveBuilderRecord('${contactEscape(item.key)}',-1)"><i class="fa-solid fa-arrow-up"></i></button><button class="contact-builder-row-action" type="button" title="아래로" onclick="moveBuilderRecord('${contactEscape(item.key)}',1)"><i class="fa-solid fa-arrow-down"></i></button><button class="contact-builder-row-action" type="button" title="편집" onclick="editContactRecord('${contactEscape(item.key)}')"><i class="fa-solid fa-pen"></i></button><button class="contact-builder-row-action" type="button" title="제외" onclick="hideBuilderRecord('${contactEscape(item.key)}')"><i class="fa-solid fa-eye-slash"></i></button></div></td>` : ''}</tr>`).join('');
         sheet.innerHTML = `${heading}<table class="contact-builder-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
         saveContactBuilderSettings(settings);
+        if (trackChange) markBuilderDirty();
+    }
+
+    function toggleBuilderEditMode() {
+        builderEditMode = !builderEditMode;
+        const button = document.getElementById('builderEditModeBtn');
+        button.classList.toggle('active', builderEditMode);
+        button.innerHTML = builderEditMode ? '<i class="fa-solid fa-check"></i> 행 편집 끄기' : '<i class="fa-solid fa-pen-to-square"></i> 행 편집 켜기';
+        renderContactBuilder(false);
+        contactToast(builderEditMode ? '맞춤 연락망 행 편집을 시작합니다.' : '행 편집을 종료했습니다.', 'info');
+    }
+
+    function editContactRecord(key) {
+        const item = contactBuilderRows().find(row => row.key === key) || contactBuilderRecords.find(row => row.key === key);
+        if (!item) return;
+        document.getElementById('builderRecordKey').value = key;
+        ['group','organization','role','name','phone','email','detail'].forEach(field => {
+            document.getElementById(`builderRecord${field[0].toUpperCase()}${field.slice(1)}`).value = item[field] && item[field] !== '-' ? item[field] : '';
+        });
+        const modal = document.getElementById('builderRecordModal'); modal.classList.add('open'); modal.setAttribute('aria-hidden','false');
+    }
+
+    function closeBuilderRecordEditor() {
+        const modal = document.getElementById('builderRecordModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
+    }
+
+    function saveBuilderRecordEdit(event) {
+        event.preventDefault();
+        const key = document.getElementById('builderRecordKey').value;
+        const override = {};
+        ['group','organization','role','name','phone','email','detail'].forEach(field => {
+            override[field] = document.getElementById(`builderRecord${field[0].toUpperCase()}${field.slice(1)}`).value.trim();
+        });
+        contactBuilderOverrides[key] = override;
+        closeBuilderRecordEditor(); renderContactBuilder(); contactToast('맞춤 연락처 편집 내용을 적용했습니다. 저장 버튼을 눌러 보관하세요.', 'success');
+    }
+
+    function hideBuilderRecord(key) {
+        if (!contactBuilderHiddenKeys.includes(key)) contactBuilderHiddenKeys.push(key);
+        document.getElementById('restoreHiddenRecordsBtn').disabled = false;
+        renderContactBuilder(); contactToast('선택한 연락처를 이 맞춤 연락망에서 제외했습니다.', 'info');
+    }
+
+    function restoreHiddenBuilderRecords() {
+        contactBuilderHiddenKeys = [];
+        document.getElementById('restoreHiddenRecordsBtn').disabled = true;
+        renderContactBuilder(); contactToast('제외한 연락처를 모두 복구했습니다.', 'success');
+    }
+
+    function moveBuilderRecord(key, direction) {
+        const keys = contactBuilderRows().map(item => item.key);
+        const index = keys.indexOf(key);
+        if (index < 0) return;
+        const next = Math.max(0, Math.min(keys.length - 1, index + direction));
+        if (next === index) return;
+        [keys[index], keys[next]] = [keys[next], keys[index]];
+        contactBuilderOrder = keys;
+        renderContactBuilder();
+    }
+
+    async function directoryApi(url, options = {}) {
+        const response = await fetch(url, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) throw new Error(data.error || '연락망 저장 처리에 실패했습니다.');
+        return data;
+    }
+
+    async function saveContactDirectory(saveAsNew = false) {
+        let name = document.getElementById('builderListTitle').value.trim();
+        if (saveAsNew) {
+            const entered = prompt('새로 저장할 연락망 이름을 입력하세요.', activeDirectoryId ? `${name} 복사본` : name);
+            if (entered === null) return;
+            name = entered.trim();
+            activeDirectoryId = null;
+            document.getElementById('builderListTitle').value = name;
+        }
+        if (!name) return contactToast('저장할 연락망 이름을 입력해주세요.', 'warning');
+        const settings = contactBuilderSettings(); settings.title = name;
+        try {
+            const data = await directoryApi(activeDirectoryId ? `/contacts/api/directories/${activeDirectoryId}` : '/contacts/api/directories', {
+                method: activeDirectoryId ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, settings})
+            });
+            if (activeDirectoryId) savedContactDirectories = savedContactDirectories.map(item => String(item.id) === String(activeDirectoryId) ? data.directory : item);
+            else { savedContactDirectories.unshift(data.directory); activeDirectoryId = data.directory.id; }
+            renderSavedDirectoryOptions(); setBuilderSaveState('저장됨', true); contactToast(data.message, 'success');
+        } catch (error) { contactToast(error.message, 'error', 6500); }
+    }
+
+    function loadSavedDirectory(id) {
+        if (!id) return newContactDirectory();
+        const item = savedContactDirectories.find(row => String(row.id) === String(id));
+        if (!item) return;
+        activeDirectoryId = item.id;
+        applyContactBuilderSettings(item.settings || {});
+        renderSavedDirectoryOptions(); renderContactBuilder(false); setBuilderSaveState('저장됨', true);
+        contactToast(`“${item.name}” 연락망을 불러왔습니다.`, 'success');
+    }
+
+    function newContactDirectory() {
+        activeDirectoryId = null;
+        resetContactBuilder(true);
+        renderSavedDirectoryOptions(); setBuilderSaveState('새 연락망', false);
+    }
+
+    async function deleteSavedDirectory() {
+        if (!activeDirectoryId) return;
+        const item = savedContactDirectories.find(row => String(row.id) === String(activeDirectoryId));
+        if (!confirm(`“${item?.name || '저장 연락망'}”을 삭제하시겠습니까?`)) return;
+        try {
+            const data = await directoryApi(`/contacts/api/directories/${activeDirectoryId}`, {method:'DELETE'});
+            savedContactDirectories = savedContactDirectories.filter(row => String(row.id) !== String(activeDirectoryId));
+            activeDirectoryId = null; resetContactBuilder(true); renderSavedDirectoryOptions(); contactToast(data.message, 'success');
+        } catch (error) { contactToast(error.message, 'error'); }
     }
 
     function updateContactBuilderCounts() {
@@ -1159,8 +1563,10 @@
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
+        renderSavedDirectoryOptions();
         updateContactBuilderCounts();
-        renderContactBuilder();
+        renderContactBuilder(false);
+        setBuilderSaveState(activeDirectoryId ? '저장됨' : '새 연락망', Boolean(activeDirectoryId));
     }
 
     function closeContactBuilder() {
@@ -1170,33 +1576,44 @@
         document.body.style.overflow = '';
     }
 
-    function resetContactBuilder() {
+    function resetContactBuilder(silent = false) {
         document.getElementById('builderListTitle').value = '새담 업무 연락망';
-        document.querySelectorAll('#builderSourceChecks input').forEach(input => { input.checked = true; });
+        document.querySelectorAll('#builderSourceChecks input').forEach(input => { input.checked = input.value !== 'custom_people'; });
         document.querySelectorAll('#builderFieldChecks input').forEach(input => { input.checked = input.disabled || ['group','organization','role','name','phone'].includes(input.value); });
         document.getElementById('builderSize').value = 'pocket';
         document.getElementById('builderOrientation').value = 'portrait';
         document.getElementById('builderTheme').value = 'coral';
         document.getElementById('builderFont').value = 'small';
+        document.getElementById('builderCustomDepartment').value = '';
+        document.getElementById('builderCustomTeam').value = '';
+        contactBuilderOverrides = {};
+        contactBuilderHiddenKeys = [];
+        contactBuilderOrder = [];
+        document.getElementById('restoreHiddenRecordsBtn').disabled = true;
         renderContactBuilder();
+        if (!silent) contactToast('맞춤 연락망 편집값을 기본 상태로 되돌렸습니다.', 'success');
     }
 
     function printCustomDirectory() {
         const settings = contactBuilderSettings();
         const sheet = document.getElementById('contactBuilderSheet');
-        if (!sheet.querySelector('table')) return alert('인쇄할 연락망을 하나 이상 선택하세요.');
+        if (!sheet.querySelector('table')) return contactToast('인쇄할 연락망을 하나 이상 선택하세요.', 'warning');
         const colors = {
             coral: ['#e4572e','#fff2ed'], blue: ['#2563eb','#eff6ff'], green: ['#059669','#ecfdf5'],
-            purple: ['#7c3aed','#f5f3ff'], slate: ['#334155','#f1f5f9']
+            purple: ['#7c3aed','#f5f3ff'], slate: ['#334155','#f1f5f9'],
+            peach: ['#d97757','#fff1eb'], mint: ['#3f8f7c','#eaf8f3'], sky: ['#4e83ad','#edf7ff'],
+            lavender: ['#7c6aa8','#f4f0ff'], rose: ['#a86578','#fff0f4']
         };
         const [accent, soft] = colors[settings.theme] || colors.coral;
         const page = settings.size === 'a4' ? 'A4' : 'A5';
         const fontSize = settings.font === 'xsmall' ? '8px' : settings.font === 'medium' ? '11px' : '9.5px';
+        const printSheet = sheet.cloneNode(true);
+        if (builderEditMode) printSheet.querySelectorAll('tr').forEach(row => row.lastElementChild?.remove());
         const printWindow = window.open('', 'customContactDirectory', 'width=1100,height=850,scrollbars=yes,resizable=yes');
-        if (!printWindow) return alert('인쇄 창을 열 수 없습니다. 팝업 차단을 확인해주세요.');
+        if (!printWindow) return contactToast('인쇄 창을 열 수 없습니다. 팝업 차단을 확인해주세요.', 'warning');
         printWindow.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${contactEscape(settings.title)}</title><style>
             @page{size:${page} ${settings.orientation};margin:8mm}*{box-sizing:border-box}body{margin:0;background:#fff;color:#172033;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif}.contact-builder-sheet{width:100%;border:1px solid ${accent};border-radius:6px;overflow:hidden}.contact-builder-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;background:${accent};color:#fff}.contact-builder-sheet-head h4{margin:0;font-size:15px}.contact-builder-sheet-head span{font-size:9px;font-weight:700}.contact-builder-table{width:100%;border-collapse:collapse;table-layout:fixed}.contact-builder-table th{padding:5px;border:1px solid ${accent};background:${soft};color:${accent};font-size:${fontSize};font-weight:900}.contact-builder-table td{padding:${settings.font === 'xsmall' ? '3px 4px' : settings.font === 'medium' ? '6px' : '4px 5px'};border:1px solid #dbe3ef;font-size:${fontSize};line-height:1.25;text-align:center;overflow-wrap:anywhere}.contact-builder-table tbody tr:nth-child(even) td{background:${soft}}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-        </style></head><body>${sheet.outerHTML}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));<\/script></body></html>`);
+        </style></head><body>${printSheet.outerHTML}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),150));<\/script></body></html>`);
         printWindow.document.close();
     }
 
@@ -1210,21 +1627,46 @@
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || data.success === false) throw new Error(data.error || '팀 지정에 실패했습니다.');
-            location.reload();
+            contactToast(data.message || '센터장 팀을 저장했습니다.', 'success');
+            setTimeout(() => location.reload(), 650);
         } catch (error) {
             select.disabled = false;
-            alert(error.message);
+            contactToast(error.message, 'error');
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         try { applyContactBuilderSettings(JSON.parse(localStorage.getItem(contactBuilderSettingsKey) || 'null')); } catch (error) { console.warn(error); }
+        renderSavedDirectoryOptions();
         updateContactBuilderCounts();
         document.querySelectorAll('#contactBuilderModal input, #contactBuilderModal select').forEach(element => {
+            if (element.id === 'savedDirectorySelect') return;
             element.addEventListener('input', renderContactBuilder);
             element.addEventListener('change', renderContactBuilder);
         });
-        document.addEventListener('keydown', event => { if (event.key === 'Escape') closeContactBuilder(); });
+        ['builderCustomDepartment', 'builderCustomTeam'].forEach(id => {
+            document.getElementById(id).addEventListener('change', event => {
+                if (!event.target.value) return;
+                const customSource = document.querySelector('#builderSourceChecks input[value="custom_people"]');
+                if (customSource) customSource.checked = true;
+                renderContactBuilder();
+            });
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key !== 'Escape') return;
+            closeBuilderRecordEditor(); closeContactHelp();
+            if (typeof closeManualContactModal === 'function') closeManualContactModal();
+            closeContactBuilder();
+        });
+        const notice = new URLSearchParams(location.search).get('notice');
+        if (notice === 'contact_saved') contactToast('연락처 수정 내용을 저장했습니다.', 'success');
+        if (notice === 'contact_deleted') contactToast('연락처를 삭제했습니다.', 'success');
+        try {
+            if (!localStorage.getItem('saedamContactHelpSeenV2')) {
+                setTimeout(() => contactToast('새 스마트 연락망입니다. 도움말에서 검색·편집·저장 방법을 확인하세요.', 'info', 7000), 500);
+                localStorage.setItem('saedamContactHelpSeenV2', '1');
+            }
+        } catch (error) { console.warn(error); }
     });
 
     function openBusinessCard(name, position, department, phone, email) {
@@ -1274,12 +1716,17 @@
         row.classList.toggle('is-detail-open', isExpanded);
     }
 
+    let contactPrintHiddenElements = [];
     function resetContactPrintMode() {
         document.body.classList.remove(...contactPrintClasses);
+        contactPrintHiddenElements.forEach(element => { element.hidden = true; });
+        contactPrintHiddenElements = [];
     }
 
     function printContactSection(section) {
         resetContactPrintMode();
+        contactPrintHiddenElements = Array.from(document.querySelectorAll('.contact-section[hidden], .contact-table tr[hidden]'));
+        contactPrintHiddenElements.forEach(element => { element.hidden = false; });
         if (section && section !== 'all') {
             document.body.classList.add('print-' + section);
         }

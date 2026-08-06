@@ -268,6 +268,8 @@
     .btn-approve:hover { transform: translateY(-2px); box-shadow: 0 6px 12px -3px color-mix(in srgb, var(--primary-dark) 20%, transparent); }
     .btn-reject { background: var(--input-bg, #ffffff); color: var(--primary-color, #3b82f6); border: 1px solid var(--primary-color, #3b82f6); }
     .btn-reject:hover { background: var(--primary-light, #eff6ff); transform: translateY(-2px); }
+    .btn-print { background: #334155; color: #ffffff; border: 1px solid #334155; }
+    .btn-print:hover { background: #1e293b; border-color: #1e293b; transform: translateY(-2px); box-shadow: 0 6px 12px -3px rgba(30, 41, 59, 0.25); }
     
     .detail-box { background: var(--input-bg, white); padding: 30px; border-radius: 12px; border: 1px solid var(--card-border, #e2e8f0); margin-bottom: 20px; line-height: 1.6; overflow-x: auto; min-height: 400px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
     .detail-box table { border-collapse: collapse; width: 100%; margin-bottom: 15px; table-layout: fixed; }
@@ -344,6 +346,123 @@
     .approval-edit-area div {
         margin: 0;
         line-height: 1.5;
+    }
+
+    @media print {
+        @page {
+            size: A4 portrait;
+            margin: 12mm;
+        }
+
+        html,
+        body {
+            width: auto !important;
+            min-width: 0 !important;
+            height: auto !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+        }
+
+        body.approval-printing > :not(#detailModal) {
+            display: none !important;
+        }
+
+        body.approval-printing > #detailModal {
+            display: block !important;
+            position: static !important;
+            width: auto !important;
+            height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+            backdrop-filter: none !important;
+        }
+
+        #detailModalContent {
+            position: static !important;
+            width: 100% !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-sizing: border-box !important;
+        }
+
+        #detailModalContent,
+        #detailModalContent * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        #detailModal .detail-modal-close,
+        #detailModal #actionArea,
+        #detailModal #referenceArea,
+        #detailModal #currentDocId {
+            display: none !important;
+        }
+
+        #detailModal .detail-modal-header {
+            margin: 0 0 6mm !important;
+            break-after: avoid-page;
+            page-break-after: avoid;
+        }
+
+        #detailModal .detail-box {
+            width: 100% !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: visible !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            background: #ffffff !important;
+            box-sizing: border-box !important;
+        }
+
+        #detailModal .detail-box table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        #detailModal .detail-box tr,
+        #detailModal .detail-box td,
+        #detailModal .detail-box th {
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        #detailModal .detail-box td,
+        #detailModal .detail-box th {
+            overflow-wrap: anywhere !important;
+            word-break: break-word !important;
+        }
+
+        #detailModal .detail-box img,
+        #detailModal .detail-box svg,
+        #detailModal .detail-box canvas {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        #detailModal .detail-box a {
+            color: #000000 !important;
+            text-decoration: none !important;
+        }
     }
 </style>
 
@@ -447,7 +566,7 @@
                         <div class="select-selected">선택하세요 (필수)</div>
                         <div class="select-items">
                             <div data-value="">선택하세요 (필수)</div>
-                            {% for u in user_list %}
+                            {% for u in approver_users %}
                             <div data-value="{{ u.name }}"><span style="font-size: 0.75em; color: var(--text-gray); margin-right: 4px;">{{ u.role }}</span>{{ u.name }}</div>
                             {% endfor %}
                         </div>
@@ -460,7 +579,7 @@
                         <div class="select-selected">없음 (1차 승인 시 즉시 완료)</div>
                         <div class="select-items">
                             <div data-value="">없음 (1차 승인 시 즉시 완료)</div>
-                            {% for u in user_list %}
+                            {% for u in approver_users %}
                             <div data-value="{{ u.name }}"><span style="font-size: 0.75em; color: var(--text-gray); margin-right: 4px;">{{ u.role }}</span>{{ u.name }}</div>
                             {% endfor %}
                         </div>
@@ -472,7 +591,7 @@
             <div id="receiver-line" class="form-group" style="display:none;">
                 <label>수신자 지정 (최소 1명 이상 필수 지정)</label>
                 <div class="org-chart-box">
-                    {% for g in grouped_users %}
+                    {% for g in receiver_grouped_users %}
                     <details class="org-dept" open>
                         <summary>
                             <i class="fa-solid fa-folder" style="color:#f59e0b;"></i>
@@ -499,15 +618,14 @@
                 </label>
                 
                 <div class="org-chart-box" id="cc-box" style="display:none; margin-top:8px;">
-                    {% for g in grouped_users %}
-                    <details class="org-dept">
+                    <details class="org-dept" open>
                         <summary>
                             <i class="fa-solid fa-folder" style="color:#f59e0b;"></i>
                             <i class="fa-solid fa-folder-open" style="color:#f59e0b; display:none;"></i>
-                            {{ g.group }} <span class="dept-count">{{ g.users|length }}명</span>
+                            전체 회원 <span class="dept-count">{{ reference_users|length }}명</span>
                         </summary>
                         <div class="org-users">
-                            {% for u in g.users %}
+                            {% for u in reference_users %}
                             <label class="org-user-label">
                                 <input type="checkbox" class="cc-cb" value="{{ u.name }}">
                                 <i class="fa-solid fa-user" style="color:var(--border-color); margin-right:4px;"></i>{{ u.name }} <span class="org-role">{{ u.role }}</span>
@@ -515,7 +633,6 @@
                             {% endfor %}
                         </div>
                     </details>
-                    {% endfor %}
                 </div>
             </div>
 
@@ -574,9 +691,9 @@
 
 <div id="detailModal" class="modal">
     <div id="detailModalContent" class="modal-content">
-        <span onclick="closeDetailModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        <span class="detail-modal-close" onclick="closeDetailModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
         
-        <div style="display:flex; justify-content:flex-start; align-items:center; gap:12px; margin-bottom:20px;">
+        <div class="detail-modal-header" style="display:flex; justify-content:flex-start; align-items:center; gap:12px; margin-bottom:20px;">
             <h3 id="dt_type" style="color:var(--primary-dark); margin:0; font-size:1.3rem; font-weight:800;"></h3>
             <span id="dt_status" class="status-badge" style="padding: 5px 12px;"></span>
         </div>
@@ -590,6 +707,9 @@
         <div id="referenceArea" style="display:none; text-align:center; margin-top:18px; border-top:1px dashed var(--border-color); padding-top:18px;">
             <button class="action-btn btn-approve" onclick="createDraftFromReference()" style="background:#0f766e; border-color:#0f766e;">
                 <i class="fa-solid fa-copy"></i> 이 문서 참고해 새로 기안
+            </button>
+            <button class="action-btn btn-print" type="button" onclick="printCompletedDocument()" style="margin-left:10px;">
+                <i class="fa-solid fa-print"></i> 인쇄
             </button>
         </div>
         <input type="hidden" id="currentDocId">
@@ -1518,6 +1638,37 @@ function createDraftFromReference() {
     openDraftModal(currentDetailDoc.doc_type || '기안서', true);
     document.getElementById('draftTitle').value = currentDetailDoc.title || '';
     document.getElementById('draftModalContent').scrollTop = 0;
+}
+
+function printCompletedDocument() {
+    if (!currentDetailDoc || currentDetailDoc.status !== '완료') {
+        alert('결재가 완료된 문서만 인쇄할 수 있습니다.');
+        return;
+    }
+
+    const modal = document.getElementById('detailModal');
+    const modalContent = document.getElementById('detailModalContent');
+    const originalParent = modal.parentNode;
+    const originalNextSibling = modal.nextSibling;
+    const originalScrollTop = modalContent.scrollTop;
+
+    try {
+        document.body.appendChild(modal);
+        document.body.classList.add('approval-printing');
+        modalContent.scrollTop = 0;
+
+        // 인쇄 전용 스타일이 적용된 레이아웃을 브라우저가 먼저 계산하도록 한다.
+        void modal.offsetHeight;
+        window.print();
+    } finally {
+        document.body.classList.remove('approval-printing');
+        if (originalNextSibling && originalNextSibling.parentNode === originalParent) {
+            originalParent.insertBefore(modal, originalNextSibling);
+        } else {
+            originalParent.appendChild(modal);
+        }
+        modalContent.scrollTop = originalScrollTop;
+    }
 }
 
 async function processApproval(actionStr) {

@@ -1,0 +1,235 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ebook.css') }}">
+<main class="ebook-shell reader-shell">
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="ebook-flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+  <header class="reader-top">
+    {% if book.cover_path %}<img class="reader-mini-cover" src="{{ url_for('ebook.serve_cover', ebook_id=book.id) }}" alt="표지">{% else %}<div class="reader-mini-cover"></div>{% endif %}
+    <div class="reader-title"><h1>{{ book.title }}</h1><p>{{ book.author }} · 총 <span id="readerTotalPages">{{ pages|length }}</span>페이지</p></div>
+    <div class="reader-description" aria-label="책 소개">
+      <strong><i class="fa-solid fa-book-open"></i> 책 소개</strong>
+      <p>{{ book.description or '등록된 책 소개가 없습니다.' }}</p>
+    </div>
+  </header>
+  <section class="reader-stage" id="readerStage" aria-label="e-book 리더">
+    <button class="turn-btn prev" type="button" data-page-action="prev" aria-label="이전 페이지"><i class="fa-solid fa-chevron-left"></i></button>
+    <article class="reader-page" id="readerPage" aria-live="polite"><div id="pageContent"></div><div class="page-number" id="printedPage"></div></article>
+    <button class="turn-btn next" type="button" data-page-action="next" aria-label="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
+
+    <nav class="reader-dock" id="readerDock" aria-label="고정 읽기 메뉴">
+      <div class="reader-progress"><span id="progressBar"></span></div>
+      <div class="reader-dock-inner">
+        <button class="dock-turn" type="button" data-page-action="prev" title="이전 페이지"><i class="fa-solid fa-chevron-left"></i><span>이전</span></button>
+        <div class="bookmark-dropdown" id="bookmarkDropdown">
+          <button id="bookmarkToggle" class="bookmark-toggle" type="button" aria-haspopup="menu" aria-expanded="false"><i class="fa-solid fa-bookmark"></i> 책갈피 <i class="fa-solid fa-chevron-down"></i></button>
+          <div id="bookmarkMenu" class="bookmark-menu" role="menu" hidden></div>
+        </div>
+        <span class="dock-divider" aria-hidden="true"></span>
+        <button id="fontDown" type="button" title="글자 작게">가−</button><button id="fontUp" type="button" title="글자 크게">가+</button>
+        <select id="readerTheme" aria-label="읽기 테마"><option value="default">기본</option><option value="sepia">세피아</option><option value="night">야간</option></select>
+        <select id="lineCount" aria-label="페이지당 행 수" title="페이지당 행 수">
+          <option value="50">행 수: 50행</option><option value="100">100행</option><option value="150">150행</option><option value="200">200행</option><option value="250">250행</option>
+        </select>
+        <input id="pageRange" type="range" min="1" max="{{ pages|length or 1 }}" value="{{ bookmark_page }}" aria-label="페이지 선택">
+        <span class="dock-page"><input id="pageInput" type="number" min="1" max="{{ pages|length or 1 }}" value="{{ bookmark_page }}"> / <span id="pageTotal">{{ pages|length }}</span></span>
+        <button id="fullscreenBtn" type="button" title="전체화면"><i class="fa-solid fa-expand"></i></button>
+        <a class="dock-library" href="{{ url_for('ebook.library') }}" title="서재로 이동"><i class="fa-solid fa-book-open"></i><span>서재</span></a>
+        <button class="dock-turn" type="button" data-page-action="next" title="다음 페이지"><span>다음</span><i class="fa-solid fa-chevron-right"></i></button>
+      </div>
+      <div class="reader-notice" id="readerNotice" role="status" aria-live="polite"></div>
+    </nav>
+  </section>
+</main>
+<script id="ebookPages" type="application/json">[{% for page in pages %}{{ {'id': page.id, 'page_no': page.page_no, 'html': page.content_html}|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script id="ebookBookmarks" type="application/json">[{% for mark in bookmarks %}{{ {'slot': mark.slot, 'page_no': mark.page_no}|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script>
+(() => {
+  document.body.classList.add('ebook-reader-active');
+  const sourcePages = JSON.parse(document.getElementById('ebookPages').textContent || '[]');
+  let pages = [], pageGroup = 1;
+  const bookmarkList = JSON.parse(document.getElementById('ebookBookmarks').textContent || '[]');
+  const marks = new Map(bookmarkList.map(mark => [+mark.slot, +mark.page_no]));
+  const initialSourcePage = Math.min(Math.max({{ bookmark_page|int }}, 1), Math.max(sourcePages.length, 1));
+  let index = 0, fontSize = +(localStorage.getItem('ebookFontSize') || 18), touchX = null;
+  const stage = document.getElementById('readerStage'), paper = document.getElementById('readerPage');
+  const content = document.getElementById('pageContent'), input = document.getElementById('pageInput'), range = document.getElementById('pageRange');
+  const dock = document.getElementById('readerDock'), bookmarkDropdown = document.getElementById('bookmarkDropdown');
+  const bookmarkToggle = document.getElementById('bookmarkToggle'), bookmarkMenu = document.getElementById('bookmarkMenu');
+  const noticeBox = document.getElementById('readerNotice');
+  let noticeTimer = null;
+
+  function syncDockSpace() {
+    document.body.style.setProperty('--ebook-dock-height', `${dock.offsetHeight}px`);
+  }
+  syncDockSpace();
+  if ('ResizeObserver' in window) new ResizeObserver(syncDockSpace).observe(dock);
+
+  function notice(message, isError=false) {
+    clearTimeout(noticeTimer);
+    noticeBox.textContent = message;
+    noticeBox.className = `reader-notice show${isError ? ' error' : ''}`;
+    noticeTimer = setTimeout(() => noticeBox.className = 'reader-notice', 2200);
+  }
+
+  function scrollToPageTop() {
+    const root = document.documentElement;
+    const previousRootBehavior = root.style.scrollBehavior;
+    const previousStageBehavior = stage.style.scrollBehavior;
+    root.style.scrollBehavior = 'auto';
+    stage.style.scrollBehavior = 'auto';
+    if (document.fullscreenElement === stage) {
+      stage.scrollTop = 0;
+    } else {
+      const stageTop = window.scrollY + stage.getBoundingClientRect().top;
+      window.scrollTo(0, Math.max(0, stageTop));
+    }
+    requestAnimationFrame(() => {
+      root.style.scrollBehavior = previousRootBehavior;
+      stage.style.scrollBehavior = previousStageBehavior;
+    });
+  }
+
+  function show(next, animate=true, reveal=false) {
+    if (!pages.length) { content.textContent = '표시할 페이지가 없습니다.'; return; }
+    index = Math.min(Math.max(next, 0), pages.length - 1);
+    content.innerHTML = pages[index].html;
+    content.scrollTop = 0;
+    document.getElementById('printedPage').textContent = `${index + 1} / ${pages.length}`;
+    input.value = range.value = index + 1;
+    document.querySelectorAll('[data-page-action="prev"]').forEach(button => button.disabled = index === 0);
+    document.querySelectorAll('[data-page-action="next"]').forEach(button => button.disabled = index === pages.length - 1);
+    document.getElementById('progressBar').style.width = `${((index + 1) / pages.length) * 100}%`;
+    if (animate) { stage.classList.remove('turning'); void stage.offsetWidth; stage.classList.add('turning'); }
+    if (reveal) scrollToPageTop();
+  }
+
+  function renderBookmarks() {
+    const colors = ['빨강','주황','초록','파랑','보라'];
+    bookmarkMenu.innerHTML = '';
+    const emptySlot = [1,2,3,4,5].find(slot => !marks.has(slot));
+    const saveButton = document.createElement('button');
+    saveButton.type = 'button';
+    saveButton.className = 'bookmark-menu-save';
+    saveButton.disabled = !emptySlot;
+    saveButton.innerHTML = emptySlot ? `<i class="fa-solid fa-plus"></i> 현재 쪽 저장 <span class="bookmark-dot bookmark-color-${emptySlot}"></span>` : '책갈피 5개 사용 중';
+    saveButton.onclick = () => {
+      if (!emptySlot) return;
+      const currentPage = pages[index] || {sourceStart:1, sourceEnd:1};
+      const existing = [...marks.entries()].find(([, page]) => page >= currentPage.sourceStart && page <= currentPage.sourceEnd);
+      closeBookmarkMenu();
+      if (existing) { notice(`현재 ${index + 1}쪽은 ${existing[0]}번 색상에 저장되어 있습니다.`); return; }
+      saveBookmark(emptySlot);
+    };
+    bookmarkMenu.appendChild(saveButton);
+    for (let slot = 1; slot <= 5; slot += 1) {
+      const page = marks.get(slot);
+      if (!page) continue;
+      const displayPage = page ? Math.floor((page - 1) / pageGroup) + 1 : null;
+      const row = document.createElement('div');
+      row.className = 'bookmark-menu-row';
+      row.setAttribute('role', 'group');
+      const goButton = document.createElement('button');
+      goButton.type = 'button';
+      goButton.className = 'bookmark-menu-go';
+      goButton.innerHTML = `<span class="bookmark-dot bookmark-color-${slot}"></span><span>${colors[slot - 1]} ${displayPage}쪽 이동</span>`;
+      goButton.onclick = () => { closeBookmarkMenu(); show(displayPage - 1, true, true); };
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'bookmark-menu-remove';
+      removeButton.title = `${colors[slot - 1]} ${displayPage}쪽 책갈피 삭제`;
+      removeButton.setAttribute('aria-label', removeButton.title);
+      removeButton.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      removeButton.onclick = () => { closeBookmarkMenu(); deleteBookmark(slot); };
+      row.append(goButton, removeButton);
+      bookmarkMenu.appendChild(row);
+    }
+  }
+
+  function closeBookmarkMenu() {
+    bookmarkDropdown.classList.remove('open');
+    bookmarkMenu.hidden = true;
+    bookmarkToggle.setAttribute('aria-expanded', 'false');
+  }
+
+  function toggleBookmarkMenu() {
+    const willOpen = bookmarkMenu.hidden;
+    bookmarkDropdown.classList.toggle('open', willOpen);
+    bookmarkMenu.hidden = !willOpen;
+    bookmarkToggle.setAttribute('aria-expanded', String(willOpen));
+  }
+
+  async function saveBookmark(slot) {
+    try {
+      const sourcePage = pages[index]?.sourceStart || 1;
+      const response = await fetch('{{ url_for('ebook.save_bookmark', ebook_id=book.id) }}', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slot, page_no:sourcePage})});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || '책갈피를 저장하지 못했습니다.');
+      marks.set(data.slot, data.page_no);
+      renderBookmarks();
+      notice(`${data.slot}번 색상에 현재 ${index + 1}쪽을 저장했습니다.`);
+    } catch (error) { notice(error.message, true); }
+  }
+
+  async function deleteBookmark(slot) {
+    try {
+      const response = await fetch(`/ebook/{{ book.id }}/bookmark/${slot}`, {method:'DELETE'});
+      const data = await response.json();
+      if (!response.ok || !data.ok) throw new Error(data.message || '책갈피를 삭제하지 못했습니다.');
+      marks.delete(slot);
+      renderBookmarks();
+      notice(`${slot}번 책갈피를 삭제했습니다.`);
+    } catch (error) { notice(error.message, true); }
+  }
+
+  document.querySelectorAll('[data-page-action="prev"]').forEach(button => button.onclick = () => show(index - 1, true, true));
+  document.querySelectorAll('[data-page-action="next"]').forEach(button => button.onclick = () => show(index + 1, true, true));
+  range.oninput = () => show(+range.value - 1, false, true); input.onchange = () => show(+input.value - 1, true, true);
+  document.getElementById('fontDown').onclick = () => { fontSize = Math.max(13, fontSize - 1); paper.style.fontSize = fontSize + 'px'; localStorage.setItem('ebookFontSize', fontSize); };
+  document.getElementById('fontUp').onclick = () => { fontSize = Math.min(28, fontSize + 1); paper.style.fontSize = fontSize + 'px'; localStorage.setItem('ebookFontSize', fontSize); };
+  document.getElementById('readerTheme').onchange = e => { stage.classList.remove('sepia','night'); if(e.target.value !== 'default') stage.classList.add(e.target.value); localStorage.setItem('ebookTheme', e.target.value); };
+  const savedTheme = localStorage.getItem('ebookTheme') || 'default'; document.getElementById('readerTheme').value = savedTheme; document.getElementById('readerTheme').dispatchEvent(new Event('change'));
+  const lineCount = document.getElementById('lineCount');
+  function applyLineCount(value, announce=false, anchorSourcePage=null) {
+    const rows = ['50','100','150','200','250'].includes(value) ? +value : 50;
+    const sourcePage = anchorSourcePage || pages[index]?.sourceStart || initialSourcePage;
+    lineCount.value = String(rows);
+    pageGroup = rows / 50;
+    pages = [];
+    for (let start = 0; start < sourcePages.length; start += pageGroup) {
+      const groupPages = sourcePages.slice(start, start + pageGroup);
+      pages.push({
+        sourceStart: start + 1,
+        sourceEnd: start + groupPages.length,
+        html: groupPages.map(page => `<section class="reader-page-segment">${page.html}</section>`).join('')
+      });
+    }
+    paper.classList.add('rows-limited');
+    paper.style.setProperty('--reader-content-height', `${rows * 1.95}em`);
+    localStorage.setItem('ebookLineCount', String(rows));
+    const total = pages.length;
+    range.max = input.max = Math.max(total, 1);
+    document.getElementById('pageTotal').textContent = total;
+    document.getElementById('readerTotalPages').textContent = total;
+    index = Math.min(Math.floor((sourcePage - 1) / pageGroup), Math.max(total - 1, 0));
+    renderBookmarks();
+    show(index, false, announce);
+    if (announce) notice(`${rows}행: 기존 ${pageGroup}페이지 분량을 한 페이지에 표시합니다.`);
+  }
+  lineCount.onchange = e => applyLineCount(e.target.value, true);
+  document.getElementById('fullscreenBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen();
+
+  bookmarkToggle.onclick = toggleBookmarkMenu;
+  document.addEventListener('click', event => { if (!bookmarkDropdown.contains(event.target)) closeBookmarkMenu(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeBookmarkMenu(); });
+  document.addEventListener('keydown', e => {
+    if (e.target.closest('input,textarea,select,button,summary,[contenteditable="true"]')) return;
+    if(e.key==='ArrowLeft') show(index-1, true, true);
+    if(e.key==='ArrowRight'||e.key===' ') {e.preventDefault();show(index+1, true, true);}
+  });
+  paper.addEventListener('touchstart', e => touchX=e.changedTouches[0].screenX, {passive:true});
+  paper.addEventListener('touchend', e => { const delta=e.changedTouches[0].screenX-touchX;if(Math.abs(delta)>45)show(index+(delta<0?1:-1),true,true); }, {passive:true});
+  paper.style.fontSize = fontSize + 'px';
+  applyLineCount(localStorage.getItem('ebookLineCount') || '50', false, initialSourcePage);
+})();
+</script>
+{% endblock %}

@@ -744,10 +744,45 @@
         } catch (error) { alert('서버 통신 오류가 발생했습니다.'); }
     }
 
+    let notificationWidgetRequest = null;
+    let notificationRefreshTimer = null;
+    let notificationSocket = null;
+
     function loadNotificationWidget() {
         const widgetArea = document.getElementById('notification-widget-area');
-        if (!widgetArea) return; 
-        fetch('/widget/notifications').then(res => res.text()).then(html => { widgetArea.innerHTML = html; }).catch(err => console.error(err));
+        if (!widgetArea) return Promise.resolve();
+        if (notificationWidgetRequest) return notificationWidgetRequest;
+
+        notificationWidgetRequest = fetch('/widget/notifications', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(res => {
+                if (!res.ok) throw new Error(`업무 알림 조회 실패 (${res.status})`);
+                return res.text();
+            })
+            .then(html => { widgetArea.innerHTML = html; })
+            .catch(err => console.error(err))
+            .finally(() => { notificationWidgetRequest = null; });
+        return notificationWidgetRequest;
+    }
+
+    function scheduleNotificationRefresh(delay = 250) {
+        window.clearTimeout(notificationRefreshTimer);
+        notificationRefreshTimer = window.setTimeout(
+            loadNotificationWidget,
+            delay
+        );
+    }
+
+    function initNotificationRealtime() {
+        if (typeof io !== 'function' || notificationSocket) return;
+        notificationSocket = io('/notifications', {
+            transports: ['websocket', 'polling'],
+            reconnection: true
+        });
+        notificationSocket.on('notifications_changed', () => {
+            scheduleNotificationRefresh();
+        });
     }
 
     function renderMyWeeklyTasksSummary() {
@@ -1058,7 +1093,15 @@
             });
         }
 
-        loadNotificationWidget(); setInterval(loadNotificationWidget, 60000);
+        loadNotificationWidget();
+        initNotificationRealtime();
+        setInterval(loadNotificationWidget, 300000);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                scheduleNotificationRefresh(0);
+            }
+        });
+        window.addEventListener('focus', () => scheduleNotificationRefresh(0));
 
         const globalTooltip = document.getElementById('global-tooltip');
         document.addEventListener('mouseover', (e) => {

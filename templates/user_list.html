@@ -32,6 +32,7 @@
     .btn-top { padding: 12px 20px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; transition: 0.3s; }
     .btn-invite-top { background: #6741d9; color: white; }
     .btn-direct-top { background: #0ca678; color: white; }
+    .btn-position-top { background: #2563eb; color: white; }
     .btn-top:hover { transform: translateY(-2px); filter: brightness(1.1); }
 
     .mgmt-card { background: white; padding: 30px; border-radius: 20px; border: 1px solid #e9ecef; box-shadow: 0 10px 25px rgba(0,0,0,0.02); margin-bottom: 30px; width: 100%; box-sizing: border-box;}
@@ -96,6 +97,15 @@
     .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
     
     .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid #dee2e6; margin-top: 10px; display: none; }
+    .position-manager-intro { grid-column: 1 / -1; margin: 0; padding: 13px 15px; border-radius: 10px; background: var(--primary-light, #eff6ff); color: var(--text-gray, #475569); font-size: .86rem; line-height: 1.5; }
+    .position-create-row { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 120px auto; gap: 9px; align-items: end; }
+    .position-list-wrap { grid-column: 1 / -1; overflow-x: auto; border: 1px solid var(--card-border, #e2e8f0); border-radius: 12px; }
+    .position-list { width: 100%; border-collapse: collapse; }
+    .position-list th, .position-list td { padding: 10px; border-bottom: 1px solid var(--card-border, #e2e8f0); text-align: center; font-size: .86rem; }
+    .position-list th { background: var(--widget-bg, #f8fafc); color: var(--text-gray, #475569); }
+    .position-list tbody tr:last-child td { border-bottom: 0; }
+    .position-list input { min-width: 90px; }
+    @media (max-width: 650px) { .position-create-row { grid-template-columns: 1fr; } }
 
     /* 공통 테마 호환 */
     .user-mgmt-container {
@@ -265,8 +275,6 @@
                     <option value="" disabled selected>소속부서 선택</option>
                     <option value="본부">본부</option>
                     <option value="북부지점">북부지점</option>
-                    <option value="센터장">센터장</option>
-                    <option value="강사">강사</option>
                     <option value="기타">기타</option>
                 </select>
             </div>
@@ -287,6 +295,7 @@
             <p style="color: #868e96; margin-top: 6px;">사용자 승인 및 구성원 인적사항을 통합 관리합니다.</p>
         </div>
         <div style="display: flex; gap: 12px;">
+            <button class="btn-top btn-position-top" onclick="openPositionManager()"><i class="fa-solid fa-layer-group"></i> 직급·레벨 관리</button>
             <button class="btn-top btn-direct-top" onclick="openDirectRegisterModal()"><i class="fa-solid fa-user-plus"></i> 직접 신청 등록</button>
             <button class="btn-top btn-invite-top" onclick="openInviteModal()"><i class="fa-solid fa-paper-plane"></i> 가입 초대 메일 발송</button>
         </div>
@@ -326,6 +335,8 @@
                         <th style="width:80px;">성명</th>
                         <th style="width:130px;">주민번호</th>
                         <th style="width:100px;">소속부서</th>
+                        <th style="width:110px;">별도 소속</th>
+                        <th style="width:100px;">별도 팀</th>
                         <th style="width:80px;">직급</th>
                         <th style="width:50px;">레벨</th>
                         <th style="width:120px;">연락처</th>
@@ -364,18 +375,43 @@
 </div>
 
 <script>
-const LEVEL_MAP = {"대표이사": 1, "이사": 2, "실장": 3, "팀장": 4, "사원": 5, "계약직": 6, "센터장(팀장)": 7, "센터장": 8, "전담코디": 9, "보조코디": 10, "안전코디": 11, "방과후강사": 12, "맞춤형강사": 13, "임시회원": 14};
-const DEPARTMENT_OPTIONS = ['본부', '북부지점', '센터장', '강사', '기타'];
+const LEVEL_MAP = {};
+let POSITION_LIST = [];
+const DEPARTMENT_OPTIONS = ['본부', '북부지점', '기타'];
+
+function escapeMgmt(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+
+async function loadPositionSettings() {
+    const response = await fetch('/user/positions');
+    if (!response.ok) throw new Error('직급 설정을 불러오지 못했습니다.');
+    POSITION_LIST = await response.json();
+    Object.keys(LEVEL_MAP).forEach(key => delete LEVEL_MAP[key]);
+    POSITION_LIST.forEach(item => { LEVEL_MAP[item.name] = Number(item.level); });
+}
+
+function positionOptions(selected = '', includePlaceholder = false) {
+    const rows = POSITION_LIST.filter(item => item.name !== '최고관리자' || selected === item.name);
+    const placeholder = includePlaceholder
+        ? `<option value="" disabled ${selected ? '' : 'selected'}>직급 선택</option>`
+        : '';
+    return placeholder + rows.map(item =>
+        `<option value="${escapeMgmt(item.name)}" ${item.name === selected ? 'selected' : ''}>${escapeMgmt(item.name)} (레벨 ${item.level})</option>`
+    ).join('');
+}
+
+function syncPositionLevel(selectId, levelId) {
+    const select = document.getElementById(selectId);
+    const level = document.getElementById(levelId);
+    if (select && level) level.value = LEVEL_MAP[select.value] ?? '';
+}
 
 function normalizeDepartmentOption(department, position = '') {
     const dept = String(department || '').trim();
-    const pos = String(position || '').trim();
     if (DEPARTMENT_OPTIONS.includes(dept)) return dept;
     if (dept.includes('북부지점') || dept.includes('북부 지점')) return '북부지점';
     if (dept.includes('본부') || dept.includes('본사')) return '본부';
-    if (dept.includes('센터장') || pos.includes('센터장') || pos.includes('코디')) return '센터장';
-    if (dept.includes('강사') || pos.includes('강사')) return '강사';
-    if (['최고관리자', '대표이사', '이사', '실장', '팀장', '사원', '계약직'].includes(pos)) return '본부';
     return '기타';
 }
 
@@ -537,6 +573,8 @@ async function loadAllUsers() {
                     <td class="td-center">${u.이름}</td>
                     <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
                     <td class="td-center">${u.소속||'-'}</td>
+                    <td class="td-center">${u.별도소속||'-'}</td>
+                    <td class="td-center">${u.별도팀||'-'}</td>
                     <td class="td-center">${u.직급}</td>
                     <td class="td-center">${u.레벨}</td>
                     <td class="td-center td-nowrap">${u.전화번호||'-'}</td>
@@ -566,6 +604,100 @@ async function setupAdmin() {
     const d = await res.json();
     alert(d.message);
     if(res.ok) location.href = '/login'; 
+}
+
+async function openPositionManager() {
+    try {
+        await loadPositionSettings();
+    } catch (error) {
+        return alert(error.message);
+    }
+    document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-layer-group" style="color:var(--primary-color);"></i> 직급·레벨 관리`;
+    document.getElementById('modalBody').innerHTML = `
+        <div class="form-grid">
+            <p class="position-manager-intro">직급별 권한 레벨을 관리합니다. 직급명이나 레벨을 수정하면 해당 직급을 사용하는 구성원 정보에도 즉시 반영됩니다.</p>
+            <div class="position-create-row">
+                <div class="modal-field"><label>새 직급명</label><input id="new_position_name" class="glass-input" maxlength="40" placeholder="예: 과장"></div>
+                <div class="modal-field"><label>권한 레벨</label><input id="new_position_level" class="glass-input" type="number" min="0" max="99" placeholder="0~99"></div>
+                <button type="button" class="btn-primary-glass" style="width:auto;padding:12px 20px;" onclick="createPosition()"><i class="fa-solid fa-plus"></i> 생성</button>
+            </div>
+            <div class="position-list-wrap">
+                <table class="position-list">
+                    <thead><tr><th>직급명</th><th style="width:110px;">레벨</th><th style="width:90px;">사용 인원</th><th style="width:155px;">관리</th></tr></thead>
+                    <tbody id="position_manager_rows"></tbody>
+                </table>
+            </div>
+        </div>`;
+    renderPositionManagerRows();
+    document.getElementById('adminArea').style.display = 'none';
+    document.getElementById('modalSubmitBtn').style.display = 'none';
+    document.getElementById('userModal').style.display = 'block';
+}
+
+function renderPositionManagerRows() {
+    const body = document.getElementById('position_manager_rows');
+    if (!body) return;
+    body.innerHTML = POSITION_LIST.map(item => `
+        <tr>
+            <td><input id="position_name_${item.id}" class="glass-input" maxlength="40" value="${escapeMgmt(item.name)}"></td>
+            <td><input id="position_level_${item.id}" class="glass-input" type="number" min="0" max="99" value="${item.level}"></td>
+            <td>${item.user_count}명</td>
+            <td>
+                <button type="button" class="action-btn btn-edit" onclick="savePosition(${item.id})">저장</button>
+                <button type="button" class="action-btn btn-delete" onclick="deletePosition(${item.id}, ${item.user_count})">삭제</button>
+            </td>
+        </tr>`).join('');
+}
+
+async function positionRequest(url, options) {
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({message: '처리 중 오류가 발생했습니다.'}));
+    if (!response.ok) throw new Error(data.message || '처리 중 오류가 발생했습니다.');
+    return data;
+}
+
+async function refreshPositionManager(message = '') {
+    await loadPositionSettings();
+    renderPositionManagerRows();
+    await loadAllUsers();
+    if (message) alert(message);
+}
+
+async function createPosition() {
+    const name = document.getElementById('new_position_name').value.trim();
+    const level = document.getElementById('new_position_level').value;
+    if (!name || level === '') return alert('직급명과 레벨을 입력해주세요.');
+    try {
+        const data = await positionRequest('/user/positions', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, level})
+        });
+        await refreshPositionManager(data.message);
+        document.getElementById('new_position_name').value = '';
+        document.getElementById('new_position_level').value = '';
+    } catch (error) { alert(error.message); }
+}
+
+async function savePosition(id) {
+    const name = document.getElementById(`position_name_${id}`).value.trim();
+    const level = document.getElementById(`position_level_${id}`).value;
+    if (!name || level === '') return alert('직급명과 레벨을 입력해주세요.');
+    try {
+        const data = await positionRequest(`/user/positions/${id}`, {
+            method: 'PUT', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, level})
+        });
+        await refreshPositionManager(data.message);
+    } catch (error) { alert(error.message); }
+}
+
+async function deletePosition(id, userCount) {
+    if (userCount > 0) return alert('사용 중인 직급은 구성원의 직급을 먼저 변경한 뒤 삭제할 수 있습니다.');
+    if (!confirm('이 직급을 삭제하시겠습니까?')) return;
+    try {
+        const data = await positionRequest(`/user/positions/${id}`, {method: 'DELETE'});
+        await refreshPositionManager(data.message);
+    } catch (error) { alert(error.message); }
 }
 
 function openDirectRegisterModal() {
@@ -600,10 +732,11 @@ function openDirectRegisterModal() {
             
             <div class="modal-field"><label>직급</label>
                 <select id="reg_pos" class="glass-input">
-                    <option value="" disabled selected>직급 선택</option>
-                    ${Object.keys(LEVEL_MAP).map(p => `<option value="${p}">${p}</option>`).join('')}
+                    ${positionOptions('', true)}
                 </select>
             </div>
+            <div class="modal-field"><label>별도 소속 <small>(선택)</small></label><input type="text" id="reg_custom_department" class="glass-input" maxlength="100" placeholder="예: 교육사업본부"></div>
+            <div class="modal-field"><label>별도 팀 <small>(선택)</small></label><input type="text" id="reg_custom_team" class="glass-input" maxlength="100" placeholder="예: 기획1팀"></div>
             
             <div class="modal-field full-width"><label>급여통장번호</label><input type="text" id="reg_bank_account" class="glass-input" placeholder="00은행 000-0000-0000"></div>
         </div>
@@ -643,6 +776,8 @@ async function submitDirectRegister() {
     formData.append('phone', document.getElementById('reg_phone').value);
     formData.append('address', document.getElementById('reg_address').value);
     formData.append('department', department);
+    formData.append('custom_department', document.getElementById('reg_custom_department').value);
+    formData.append('custom_team', document.getElementById('reg_custom_team').value);
     formData.append('bank_account', document.getElementById('reg_bank_account').value);
     formData.append('profile_icon', document.getElementById('reg_profile_icon').value);
     
@@ -708,12 +843,13 @@ function openApproveModal(i) {
                 </select>
             </div>
             <div class="modal-field"><label>배정할 직급</label>
-                <select id="modal_pos" class="glass-input" onchange="document.getElementById('approve_level').value = LEVEL_MAP[this.value] != null ? LEVEL_MAP[this.value] : '';">
-                    <option value="" disabled ${LEVEL_MAP[u.직급] == null ? 'selected' : ''}>직급 선택</option>
-                    ${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}
+                <select id="modal_pos" class="glass-input" onchange="syncPositionLevel('modal_pos', 'approve_level')">
+                    ${positionOptions(LEVEL_MAP[u.직급] == null ? '' : u.직급, true)}
                 </select>
             </div>
             <div class="modal-field full-width"><label>부여될 권한레벨</label><input type="text" id="approve_level" value="${LEVEL_MAP[u.직급] != null ? LEVEL_MAP[u.직급] : ''}" placeholder="직급을 선택하면 자동 배정됩니다." readonly class="glass-input readonly-field"></div>
+            <div class="modal-field"><label>별도 소속 <small>(선택)</small></label><input type="text" id="approve_custom_department" value="${escapeMgmt(u.별도소속 || '')}" class="glass-input" maxlength="100" placeholder="맞춤 연락망용 별도 소속"></div>
+            <div class="modal-field"><label>별도 팀 <small>(선택)</small></label><input type="text" id="approve_custom_team" value="${escapeMgmt(u.별도팀 || '')}" class="glass-input" maxlength="100" placeholder="맞춤 연락망용 별도 팀"></div>
         </div>
     `;
     document.getElementById('adminArea').style.display = 'block';
@@ -753,6 +889,8 @@ async function submitApprove(dbId, idx) {
         formData.append('department', approvedDept);
         formData.append('position', approvedPos);
         formData.append('level', approvedLevel); 
+        formData.append('custom_department', document.getElementById('approve_custom_department').value);
+        formData.append('custom_team', document.getElementById('approve_custom_team').value);
         
         formData.append('phone', u.전화번호 || '');
         formData.append('email', u.이메일 || '');
@@ -837,7 +975,7 @@ function openEditModal(i) {
             <div class="modal-field"><label>새 비밀번호 확인</label><input type="password" id="modal_pass_confirm" class="glass-input" placeholder="새 비밀번호 재입력" value=""></div>
             
             <div class="modal-field"><label>주민등록번호</label><input type="text" value="${u.주민번호}" readonly class="glass-input readonly-field"></div>
-            <div class="modal-field"><label>직급</label><select id="modal_pos" ${styleAttr} onchange="document.getElementById('modal_level').value = LEVEL_MAP[this.value] != null ? LEVEL_MAP[this.value] : 14;">${Object.keys(LEVEL_MAP).map(p=>`<option value="${p}" ${p===u.직급?'selected':''}>${p}</option>`).join('')}</select></div>
+            <div class="modal-field"><label>직급</label><select id="modal_pos" ${styleAttr} onchange="syncPositionLevel('modal_pos', 'modal_level')">${positionOptions(u.직급)}</select></div>
             <div class="modal-field"><label>권한레벨</label><input type="number" id="modal_level" value="${u.레벨}" readonly class="glass-input readonly-field"></div>
             <div class="modal-field"><label>연락처</label><input type="text" id="modal_phone" value="${u.전화번호||''}" oninput="formatPhoneNumber(this)" ${readOnlyAttr}></div>
             <div class="modal-field"><label>이메일</label><input type="email" id="modal_email" value="${u.이메일||''}" ${readOnlyAttr}></div>
@@ -848,6 +986,8 @@ function openEditModal(i) {
                 </select>
             </div>
             <div class="modal-field"><label>급여통장</label><input type="text" id="modal_bank" value="${u.계좌||''}" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>별도 소속 <small>(맞춤 연락망용)</small></label><input type="text" id="modal_custom_department" value="${escapeMgmt(u.별도소속 || '')}" maxlength="100" ${readOnlyAttr}></div>
+            <div class="modal-field"><label>별도 팀 <small>(맞춤 연락망용)</small></label><input type="text" id="modal_custom_team" value="${escapeMgmt(u.별도팀 || '')}" maxlength="100" ${readOnlyAttr}></div>
         </div>
     `;
     
@@ -893,6 +1033,8 @@ async function submitUpdate(dbId) {
     formData.append('address', document.getElementById('modal_address').value);
     formData.append('department', document.getElementById('modal_department').value);
     formData.append('bank_account', document.getElementById('modal_bank').value);
+    formData.append('custom_department', document.getElementById('modal_custom_department').value);
+    formData.append('custom_team', document.getElementById('modal_custom_team').value);
     
     const editIconInput = document.getElementById('edit_profile_icon');
     if(editIconInput) formData.append('profile_icon', editIconInput.value);
@@ -974,14 +1116,16 @@ function closeModal() {
     document.getElementById('adminPass').value = ''; 
     if(document.getElementById('modalSubmitBtn')) {
         document.getElementById('modalSubmitBtn').disabled = false;
+        document.getElementById('modalSubmitBtn').style.display = '';
     }
 }
 
-window.onload = () => {
+window.onload = async () => {
     {% if mode == 'invite' %}
     renderIcons('icon-container-invite', 'profile_icon');
     {% elif mode == 'admin_setup' %}
     {% else %}
+    try { await loadPositionSettings(); } catch (error) { console.error(error); }
     loadAllUsers();
     {% endif %}
 };

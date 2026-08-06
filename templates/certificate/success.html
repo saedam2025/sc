@@ -191,7 +191,7 @@
   <div class="success-container">
     <!-- 새담 로고 (form.html과 동일한 클래스 및 에러 처리 적용) -->
     <div class="cert-header">
-      <img src="{{ url_for('static', filename='logo01.gif') }}" alt="새담청소년교육문화원 로고" onerror="this.src='http://www.saedam.org/img/logo01.gif'">
+      <img src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="{{ certificate_company.company_name if certificate_company else '새담청소년교육문화원' }} 로고" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
     </div>
 
     <div class="check-icon">✓</div>
@@ -227,11 +227,11 @@
       <p>
         발급은 업무일 기준 <strong>1~2일</strong> 정도 소요될 수 있습니다.<br>
         기타 문의사항은 아래 연락처로 문의 바랍니다.<br>
-        <strong>📞 031-8016-1900</strong>
+        <strong>📞 {{ certificate_company.phone if certificate_company and certificate_company.phone else '031-8016-1900' }}</strong>
       </p>
     </div>
 
-    <a class="btn-home" href="{{ url_for('document.apply') }}">신청 페이지로 이동</a>
+    <a class="btn-home" href="{{ request.path }}">신청 페이지로 이동</a>
   </div>
 
 </body>

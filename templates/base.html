@@ -817,12 +817,16 @@
                             </a>
                             <div class="dropdown-content">
                                 <a href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>
-                                {% if session.get('user_level') is not none and session.get('user_level') <= 5 %}
-                                <a href="/contract/admin"><i class="fa-solid fa-file-contract"></i>전자계약관리</a>
-                                {% endif %}
+                                 {% if session.get('user_level') is not none and session.get('user_level') <= 2 %}
+                                 <a href="/contract/admin"><i class="fa-solid fa-file-contract"></i>전자계약관리</a>
+                                 <a href="/verified-contract/admin"><i class="fa-solid fa-shield-signature"></i>인증전자계약관리</a>
+                                 {% endif %}
                                 
                                 <!-- 기존 증명서발급 세부 메뉴들 -->
                                 <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i>증명서 발급관리</a>
+                                {% if session.get('user_level') is not none and session.get('user_level') <= 2 %}
+                                <a href="/document/admin/settings"><i class="fa-solid fa-building-shield"></i>증명서 발급설정</a>
+                                {% endif %}
                                 <a href="/expense"><i class="fa-solid fa-receipt"></i>지출결의 관리</a>
                             </div>
                         </li>
@@ -870,7 +874,7 @@
                         <!-- 6. 통합관리 메뉴 (권한 레벨 2 이상 관리자 전용) -->
                         {% if session.get('user_level', 99) <= 2 or session.get('user_name') == 'admin' %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') or request.path.startswith('/ebook') %}active{% endif %}">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
@@ -880,6 +884,7 @@
                                 <a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>
                                 <a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>
                                 <a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>
+                                <a href="/ebook/"><i class="fa-solid fa-book-open-reader"></i>&#50937; e-book</a>
                             </div>
                         </li>
                         {% endif %}

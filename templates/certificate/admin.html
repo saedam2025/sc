@@ -138,6 +138,7 @@
     .type-stat-item { font-size: 0.9rem; color: var(--text-dark, #1e293b); display: flex; align-items: center; gap: 8px; }
     .type-stat-item strong { color: var(--primary-dark, #357abd); font-size: 1.1rem; }
     .type-stat-divider { width: 1px; background-color: var(--card-border, #e2e8f0); }
+    .workgroup-select { width: 170px; padding: 6px; border: 1px solid var(--card-border, #dbe3ec); border-radius: 6px; background: var(--input-bg, #fff); color: inherit; font-size: .75rem; }
 </style>
 
 <div class="admin-container" id="adminCard">
@@ -225,8 +226,7 @@
                 <input type="text" name="search" class="search-input" placeholder="성명, 학교명 등 검색" value="{{ request.args.get('search', '') }}">
                 <button type="submit" class="btn btn-search">🔍 검색</button>
                 <a href="{{ url_for('document.admin_list') }}" class="btn btn-reset">🔄 초기화</a>
-                <button type="button" class="btn btn-stats" onclick="window.open('/document/apply', '_blank')">📊 강사 증명서신청</button>
-                <button type="button" class="btn btn-stats" onclick="window.open('/document/apply2', '_blank')">📊 임직원 증명서신청</button>
+                <a href="{{ url_for('document.certificate_settings') }}" class="btn btn-stats">⚙️ 회사·계정·작업그룹 / 신청링크</a>
             </form>
             
             <button type="button" class="btn btn-delete" onclick="deleteSelected()">🗑️ 선택 삭제</button>
@@ -246,6 +246,7 @@
                 <th style="width: 110px;">증명용도</th>
                 <th style="width: 190px;">재직기간</th>
                 <th style="width: 120px;">상태</th>
+                <th style="width: 185px;">발급회사 / 작업그룹</th>
                 <th style="width: 200px;">작업</th>
                 </tr>
             </thead>
@@ -283,7 +284,21 @@
                     </td>
                     <td>
                         {% if item.상태 == "대기" %}
-                            <a href="{{ url_for('document.generate_certificate', idx=item.index) }}" class="btn btn-issue" onclick="showLoading(this)">즉시발급</a>
+                        <select class="workgroup-select" id="workgroup-{{ item.index }}">
+                            <option value="">작업그룹 선택</option>
+                            {% for group in workgroups %}
+                            {% if not item.신청구분 or (item.신청구분 == '강사' and group.allow_instructor) or (item.신청구분 == '임직원' and group.allow_employee) %}
+                            <option value="{{ group.id }}" {% if item.작업그룹ID|string == group.id|string %}selected{% endif %}>{{ group.company_name }} · {{ group.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <strong>{{ item.회사명 or '기본 회사' }}</strong><br><small>{{ item.작업그룹명 or '-' }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.상태 == "대기" %}
+                            <button type="button" class="btn btn-issue" onclick="issueCertificate({{ item.index }}, this)">즉시발급</button>
                             <button type="button" class="btn btn-edit" 
                                 data-idx="{{ item.index }}" data-type="{{ item.증명서종류 }}" data-name="{{ item.성명 }}"
                                 data-ssn="{{ item.주민번호 }}" data-addr="{{ item.자택주소 }}" data-start="{{ item.근무시작일 }}"
@@ -299,7 +314,7 @@
                 </tr>
                 
                 <tr class="detail-row" id="detail-{{ item.index }}">
-                    <td colspan="10" style="padding: 0; border-bottom: none;">
+                    <td colspan="11" style="padding: 0; border-bottom: none;">
                         <div class="detail-content">
                             <div class="detail-item" style="width: 100%;"><span class="detail-label">[자택주소]</span> {{ item.자택주소 }}</div>
                             {% if item.종료사유 %}
@@ -307,7 +322,7 @@
                             {% endif %}
                             <div class="detail-item">
                                 <span class="detail-label">[수신메일]</span> {{ item.이메일주소 }}
-                                <img src="https://www.saedam.org/img_sub/mail.png" style="height: 14px; cursor: pointer; margin-left:5px;" onclick="openMailModal('{{ item.성명 }}', '{{ item.이메일주소 }}')">
+                                <img src="https://www.saedam.org/img_sub/mail.png" style="height: 14px; cursor: pointer; margin-left:5px;" onclick="openMailModal('{{ item.성명 }}', '{{ item.이메일주소 }}', '{{ item.작업그룹ID or '' }}')">
                             </div>
                         </div>
                     </td>
@@ -343,6 +358,11 @@
     <form action="/document/send_simple_email" method="POST">
         <label style="font-size:0.75rem; font-weight:700;">수신자</label>
         <input type="text" name="email" id="modalEmail" style="width:100%; padding:8px; margin:5px 0 15px; border:1px solid var(--card-border, #e2e8f0); border-radius:4px; background:var(--input-bg, #f9f9f9);" readonly>
+        <label style="font-size:0.75rem; font-weight:700;">발송 작업그룹</label>
+        <select name="workgroup_id" id="modalWorkgroup" style="width:100%; padding:8px; margin:5px 0 15px; border:1px solid var(--card-border, #e2e8f0); border-radius:4px; background:var(--input-bg, #f9f9f9);">
+            <option value="">기본 서버 발송계정</option>
+            {% for group in workgroups %}<option value="{{ group.id }}">{{ group.company_name }} · {{ group.name }}</option>{% endfor %}
+        </select>
         <label style="font-size:0.75rem; font-weight:700;">메일 제목</label>
         <input type="text" name="subject" id="modalSubject" style="width:100%; padding:8px; margin:5px 0 15px; border:1px solid var(--card-border, #e2e8f0); border-radius:4px;">
         <label style="font-size:0.75rem; font-weight:700;">메일 내용</label>
@@ -407,9 +427,19 @@
     }
 
     function showLoading(btn) { btn.innerHTML = "발급 중..."; btn.style.opacity = "0.6"; btn.style.pointerEvents = "none"; }
+    function issueCertificate(idx, btn) {
+        const select = document.getElementById(`workgroup-${idx}`);
+        {% if workgroups %}
+        if (!select || !select.value) { alert('발급 회사와 발송계정이 연결된 작업그룹을 선택해 주세요.'); return; }
+        {% endif %}
+        showLoading(btn);
+        const query = select && select.value ? `?workgroup_id=${encodeURIComponent(select.value)}` : '';
+        window.location.href = `/document/generate/${idx}${query}`;
+    }
 
-    function openMailModal(name, email) {
+    function openMailModal(name, email, workgroupId) {
         document.getElementById('modalEmail').value = email;
+        document.getElementById('modalWorkgroup').value = workgroupId || '';
         document.getElementById('modalSubject').value = `[새담청소년교육문화원] ${name} 강사님, 신청하신 증명서 관련 안내입니다.`;
         document.getElementById('modalOverlay').style.display = 'block';
         document.getElementById('mailModal').style.display = 'block';

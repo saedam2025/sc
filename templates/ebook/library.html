@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ebook.css') }}">
+<main class="ebook-shell">
+  <header class="ebook-head">
+    <div><h1><i class="fa-solid fa-book-open-reader"></i> 웹 e-book</h1><p>텍스트를 책처럼 읽고, 편집하고, 감상을 기록하는 디지털 서재입니다.</p></div>
+    <div class="ebook-actions"><a class="ebook-btn primary" href="{{ url_for('ebook.create_book') }}"><i class="fa-solid fa-plus"></i> 새 e-book</a></div>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="ebook-flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+  <form class="ebook-search" method="get"><input name="q" value="{{ query }}" placeholder="제목 또는 저자 검색" aria-label="도서 검색"><button class="ebook-btn primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button></form>
+  <section class="book-grid">
+    {% for book in books %}
+    <article class="book-card">
+      <a href="{{ url_for('ebook.read_book', ebook_id=book.id) }}" aria-label="{{ book.title }} 읽기">
+        <div class="book-cover">{% if book.cover_path %}<img src="{{ url_for('ebook.serve_cover', ebook_id=book.id) }}" alt="{{ book.title }} 표지">{% else %}<i class="fa-solid fa-book-open"></i>{% endif %}</div>
+      </a>
+      <h2>{{ book.title }}</h2><div class="author">{{ book.author }}</div>
+      <div class="meta"><span>{{ book.page_count }} 페이지</span><button class="review-count-link" type="button" data-review-book="{{ book.id }}" data-book-title="{{ book.title }}" data-review-count="{{ book.review_count }}">독후감 {{ book.review_count }}</button></div>
+      <div class="card-links">
+        <a class="ebook-btn small primary read-link" href="{{ url_for('ebook.read_book', ebook_id=book.id) }}">읽기</a>
+        <a class="ebook-btn small" href="{{ url_for('ebook.edit_book', ebook_id=book.id) }}">편집</a>
+      </div>
+    </article>
+    {% else %}<div class="empty-library"><i class="fa-solid fa-book" style="font-size:42px"></i><h2>아직 등록된 e-book이 없습니다.</h2><p>텍스트 파일을 올리면 읽기 좋은 페이지로 자동 변환됩니다.</p></div>{% endfor %}
+  </section>
+</main>
+
+<div class="ebook-review-modal" id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle" hidden>
+  <section class="ebook-review-dialog" tabindex="-1">
+    <header class="ebook-review-dialog-head">
+      <div><span class="modal-kicker">독후감</span><h2 id="reviewModalTitle">독후감</h2></div>
+      <button class="review-modal-close" id="reviewModalClose" type="button" aria-label="독후감 창 닫기"><i class="fa-solid fa-xmark"></i></button>
+    </header>
+    <div class="ebook-review-dialog-body" id="reviewModalBody"><div class="review-loading"><i class="fa-solid fa-spinner fa-spin"></i> 독후감을 불러오는 중입니다.</div></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const modal = document.getElementById('reviewModal');
+  const dialog = modal.querySelector('.ebook-review-dialog');
+  const title = document.getElementById('reviewModalTitle');
+  const body = document.getElementById('reviewModalBody');
+  const closeButton = document.getElementById('reviewModalClose');
+  let opener = null;
+
+  function closeReviews() {
+    modal.hidden = true;
+    document.body.classList.remove('ebook-modal-open');
+    body.innerHTML = '<div class="review-loading"><i class="fa-solid fa-spinner fa-spin"></i> 독후감을 불러오는 중입니다.</div>';
+    if (opener) opener.focus();
+  }
+
+  async function openReviews(button) {
+    opener = button;
+    const bookId = button.dataset.reviewBook;
+    title.textContent = `${button.dataset.bookTitle} 독후감`;
+    modal.hidden = false;
+    document.body.classList.add('ebook-modal-open');
+    dialog.focus();
+    try {
+      const response = await fetch(`/ebook/${bookId}/reviews-panel`, {headers:{'X-Requested-With':'fetch'}});
+      if (!response.ok) throw new Error('독후감 페이지를 불러오지 못했습니다.');
+      body.innerHTML = await response.text();
+    } catch (error) {
+      body.innerHTML = `<div class="review-load-error"><i class="fa-solid fa-circle-exclamation"></i><p>${error.message}</p></div>`;
+    }
+  }
+
+  document.querySelectorAll('[data-review-book]').forEach(button => button.addEventListener('click', () => openReviews(button)));
+  closeButton.addEventListener('click', closeReviews);
+  modal.addEventListener('click', event => { if (event.target === modal) closeReviews(); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) closeReviews(); });
+
+  const requestedBook = new URLSearchParams(location.search).get('reviews');
+  if (requestedBook && /^\d+$/.test(requestedBook)) {
+    const requestedButton = document.querySelector(`[data-review-book="${requestedBook}"]`);
+    if (requestedButton) openReviews(requestedButton);
+    const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('reviews'); history.replaceState(null, '', cleanUrl);
+  }
+})();
+</script>
+{% endblock %}

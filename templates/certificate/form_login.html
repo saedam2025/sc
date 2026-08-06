@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
-    <title>경력증명서 신청 본인인증 | 새담청소년교육문화원</title>
+    <title>경력증명서 신청 본인인증 | {{ certificate_company.company_name if certificate_company else '새담청소년교육문화원' }}</title>
     <style>
         :root {
             --saedam-blue: #004ea2;
@@ -165,7 +165,7 @@
 
     <div class="login-wrapper">
         <div class="login-header">
-            <h2>자격인증</h2>
+            <h2>{{ certificate_company.company_name if certificate_company else '자격인증' }}</h2>
             <p>경력증명서 신청을 위해 아래 비밀번호를 입력해주세요.</p>
         </div>
 
@@ -188,10 +188,10 @@
 
         <footer class="footer-info">
             <div class="guide-text">
-                발급문의: 📞 031-8016-1900<br>
-                Copyright©(사)새담청소년교육문화원. All Rights Reserved.
+                발급문의: 📞 {{ certificate_company.phone if certificate_company and certificate_company.phone else '031-8016-1900' }}<br>
+                Copyright©{{ certificate_company.company_name if certificate_company else '(사)새담청소년교육문화원' }}. All Rights Reserved.
             </div>
-            <img src="https://www.saedam.org/img_sub/logo.gif" alt="로고" style="height: 35px; margin-top: 15px; opacity: 0.8;">
+            <img src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="회사 로고" style="max-width:180px;height:45px;object-fit:contain;margin-top:15px;opacity:.9" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
         </footer>
     </div>
 

@@ -213,6 +213,7 @@
             .cert-form, .option-group { grid-template-columns: 1fr; }
             .full-width, .span-2, .option-group { grid-column: span 1; }
         }
+        .cert-company { font-size: 14px; font-weight: 800; color: var(--primary-color); margin-top: 5px; }
     </style>
 {% endblock %}
 {% block content %}
@@ -220,11 +221,11 @@
 <div class="certificate-page-shell">
     <div class="cert-container">
         <div class="cert-header">
-            <h2>📄 강사 경력증명서 발급 신청</h2>
-            <img src="{{ url_for('static', filename='logo01.gif') }}" alt="새담청소년교육문화원 로고" onerror="this.src='http://www.saedam.org/img/logo01.gif'">
+            <div><h2>📄 강사 경력증명서 발급 신청</h2>{% if certificate_company %}<div class="cert-company">{{ certificate_company.company_name }}{% if certificate_workgroup %} · {{ certificate_workgroup.name }}{% endif %}</div>{% endif %}</div>
+            <img src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="{{ certificate_company.company_name if certificate_company else '새담청소년교육문화원' }} 로고" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
         </div>
 
-        <form method="POST" action="/document/apply" id="certForm" class="cert-form">
+        <form method="POST" action="{{ request.path }}" id="certForm" class="cert-form">
             <div class="option-group">
                 <label><span>증명서 종류</span>
                     <select name="증명서종류" id="certType" required>
@@ -309,7 +310,7 @@
                 <div class="action-area">
                     <button type="submit" id="submitBtn">신청 완료하기</button>
                     <div class="contact-info">
-                        문의처: <strong>031-8016-1900</strong>
+                        문의처: <strong>{{ certificate_company.phone if certificate_company and certificate_company.phone else '031-8016-1900' }}</strong>
                     </div>
                 </div>
             </div>

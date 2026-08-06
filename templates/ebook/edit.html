@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ebook.css') }}">
+<main class="ebook-shell">
+  <header class="ebook-head"><div><h1><i class="fa-solid fa-pen-ruler"></i> e-book 편집</h1><p>페이지의 원하는 위치에 글과 이미지를 넣거나 고칠 수 있습니다.</p></div><div class="ebook-actions"><button class="ebook-btn danger" type="submit" form="deleteBookForm"><i class="fa-solid fa-trash"></i> 도서 삭제</button><a class="ebook-btn" href="{{ url_for('ebook.library') }}">서재</a><a class="ebook-btn primary" href="{{ url_for('ebook.read_book', ebook_id=book.id) }}">읽기 화면</a></div></header>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="ebook-flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+  <details class="ebook-form-card" style="max-width:none;margin-bottom:18px"><summary style="font-weight:900;cursor:pointer">도서 정보 및 표지 수정</summary><form method="post" enctype="multipart/form-data" style="margin-top:18px"><div class="ebook-form-grid"><div class="ebook-field"><label>제목</label><input name="title" value="{{ book.title }}" required></div><div class="ebook-field"><label>저자</label><input name="author" value="{{ book.author }}" required></div><div class="ebook-field full"><label>책 소개</label><textarea name="description" rows="3">{{ book.description or '' }}</textarea></div><div class="ebook-field full"><label>새 표지 (선택)</label><input type="file" name="cover" accept="image/jpeg,image/png,image/gif,image/webp"></div></div><div class="ebook-actions" style="justify-content:flex-end;margin-top:12px"><button class="ebook-btn primary" type="submit">도서 정보 저장</button></div></form></details>
+  <section class="editor-layout">
+    <div class="editor-main">
+      <div class="editor-toolbar" id="editorToolbar" role="toolbar" aria-label="고정 본문 편집 도구">
+        <select id="pageSelect" class="editor-page-select" aria-label="편집할 페이지 선택" title="편집할 페이지 선택"></select>
+        <button id="addPage" type="button" title="새 페이지 추가"><i class="fa-solid fa-plus"></i> 페이지</button>
+        <button id="deletePage" class="danger" type="button" title="현재 페이지 삭제"><i class="fa-solid fa-trash"></i> 페이지</button>
+        <span class="toolbar-group" aria-hidden="true"></span>
+        <button type="button" data-command="bold" title="굵게"><b>B</b></button><button type="button" data-command="italic" title="기울임"><i>I</i></button><button type="button" data-command="underline" title="밑줄"><u>U</u></button>
+        <button type="button" data-block="p">본문</button><button type="button" data-block="h2">제목</button><button type="button" data-command="insertUnorderedList" title="목록"><i class="fa-solid fa-list"></i></button>
+        <button type="button" id="imageButton"><i class="fa-regular fa-image"></i> 이미지</button>
+        <span class="toolbar-group image-align-tools" aria-label="선택 이미지 배치">
+          <button type="button" data-image-align="image-left" title="이미지 왼쪽 배치 (오른쪽에 글 흐름)" disabled><i class="fa-solid fa-align-left"></i></button>
+          <button type="button" data-image-align="image-center" title="이미지 가운데 배치" disabled><i class="fa-solid fa-align-center"></i></button>
+          <button type="button" data-image-align="image-right" title="이미지 오른쪽 배치 (왼쪽에 글 흐름)" disabled><i class="fa-solid fa-align-right"></i></button>
+        </span>
+        <select id="imageSize" class="image-size-select" aria-label="선택 이미지 크기" title="선택 이미지 크기" disabled><option value="image-size-small">크기 25%</option><option value="image-size-medium">크기 40%</option><option value="image-size-large">크기 60%</option><option value="image-size-full">크기 100%</option></select>
+        <button type="button" id="deleteImage" class="danger" disabled><i class="fa-solid fa-trash"></i> 선택 이미지 삭제</button>
+        <span id="pageLabel" class="editor-page-label"></span><span class="save-state" id="saveState">저장됨</span><button type="button" id="savePage" style="min-width:72px;background:var(--primary-color,#3568d4);color:#fff">저장</button>
+      </div>
+      <input id="imageInput" type="file" accept="image/jpeg,image/png,image/gif,image/webp" hidden>
+      <button id="editorPrevPage" class="editor-turn-btn prev" type="button" aria-label="이전 편집 페이지" title="이전 페이지"><i class="fa-solid fa-chevron-left"></i></button>
+      <article class="page-editor" id="pageEditor" contenteditable="true" spellcheck="true"></article>
+      <button id="editorNextPage" class="editor-turn-btn next" type="button" aria-label="다음 편집 페이지" title="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
+      <p class="editor-help">이미지를 선택하면 하단 메뉴에서 배치 방향과 크기를 조절할 수 있습니다. 왼쪽·오른쪽 이미지는 본문이 이미지 옆으로 자연스럽게 흐릅니다.</p>
+    </div>
+  </section>
+  <form id="deleteBookForm" method="post" action="{{ url_for('ebook.delete_book', ebook_id=book.id) }}" onsubmit="return confirm('경고: 이 도서를 삭제하면 모든 페이지, 표지, 삽입 이미지, 독후감, 책갈피가 영구 삭제됩니다.\n\n삭제 후에는 복구할 수 없습니다. 정말 삭제하시겠습니까?')"></form>
+</main>
+<script id="editorPages" type="application/json">[{% for page in pages %}{{ {'id':page.id,'page_no':page.page_no,'html':page.content_html}|tojson }}{% if not loop.last %},{% endif %}{% endfor %}]</script>
+<script>
+(() => {
+  document.body.classList.add('ebook-editor-active');
+  let pages=JSON.parse(document.getElementById('editorPages').textContent||'[]'), current=0, selectedImage=null, savedRange=null, dirty=false;
+  const editor=document.getElementById('pageEditor'), pageSelect=document.getElementById('pageSelect'), state=document.getElementById('saveState');
+  const editorPrevPage=document.getElementById('editorPrevPage'), editorNextPage=document.getElementById('editorNextPage');
+  const readerFontSize=Math.min(28,Math.max(13,+(localStorage.getItem('ebookFontSize')||18)));
+  editor.style.fontSize=`${readerFontSize}px`;
+  const editorToolbar=document.getElementById('editorToolbar');
+  function syncEditorToolbarSpace(){document.body.style.setProperty('--ebook-editor-dock-height',`${editorToolbar.offsetHeight}px`);}
+  syncEditorToolbarSpace();
+  if('ResizeObserver' in window)new ResizeObserver(syncEditorToolbarSpace).observe(editorToolbar);
+  function drawList(){pageSelect.innerHTML='';pages.forEach((p,i)=>{const option=document.createElement('option');option.value=i;option.textContent=`${p.page_no} 페이지`;pageSelect.appendChild(option);});pageSelect.value=String(current);}
+  const imageSize=document.getElementById('imageSize');
+  const imageSizeClasses=['image-size-small','image-size-medium','image-size-large','image-size-full'];
+  function setImageTools(enabled){document.getElementById('deleteImage').disabled=!enabled;imageSize.disabled=!enabled;document.querySelectorAll('[data-image-align]').forEach(button=>button.disabled=!enabled);if(enabled){imageSize.value=imageSizeClasses.find(name=>selectedImage.classList.contains(name))||'image-size-medium';}}
+  function selectPage(i,reveal=false){if(dirty&&!confirm('저장하지 않은 변경이 있습니다. 다른 페이지로 이동할까요?')){pageSelect.value=String(current);return;}current=Math.max(0,Math.min(i,pages.length-1));editor.innerHTML=pages[current]?.html||'<p><br></p>';document.getElementById('pageLabel').textContent=`${current+1} / ${pages.length}`;dirty=false;state.textContent='저장됨';selectedImage=null;setImageTools(false);drawList();editorPrevPage.disabled=current===0;editorNextPage.disabled=current>=pages.length-1;if(reveal)window.scrollTo({top:editor.getBoundingClientRect().top+window.scrollY-24,behavior:'auto'});}
+  editor.addEventListener('input',()=>{dirty=true;state.textContent='저장 필요';});
+  editor.addEventListener('click',e=>{editor.querySelectorAll('img.selected').forEach(img=>img.classList.remove('selected'));selectedImage=e.target.closest('img');if(selectedImage)selectedImage.classList.add('selected');setImageTools(!!selectedImage);});
+  document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{editor.focus();document.execCommand(b.dataset.command,false,null);});
+  document.querySelectorAll('[data-block]').forEach(b=>b.onclick=()=>{editor.focus();document.execCommand('formatBlock',false,b.dataset.block);});
+  document.addEventListener('selectionchange',()=>{const s=getSelection();if(s.rangeCount&&editor.contains(s.anchorNode))savedRange=s.getRangeAt(0).cloneRange();});
+  document.getElementById('imageButton').onclick=()=>{const s=getSelection();if(s.rangeCount&&editor.contains(s.anchorNode))savedRange=s.getRangeAt(0).cloneRange();document.getElementById('imageInput').click();};
+  document.getElementById('imageInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;state.textContent='이미지 업로드 중…';const form=new FormData();form.append('image',file);const response=await fetch('{{ url_for('ebook.upload_media', ebook_id=book.id) }}',{method:'POST',body:form});const data=await response.json();if(!data.ok){alert(data.message||'업로드에 실패했습니다.');state.textContent='저장 필요';return;}editor.focus();const s=getSelection();s.removeAllRanges();if(savedRange)s.addRange(savedRange);document.execCommand('insertHTML',false,`<p><img src="${data.url}" alt="본문 이미지" class="ebook-inline-image image-center image-size-medium"></p><p><br></p>`);dirty=true;state.textContent='저장 필요';e.target.value='';};
+  document.querySelectorAll('[data-image-align]').forEach(button=>button.onclick=()=>{if(!selectedImage)return;selectedImage.classList.remove('image-left','image-center','image-right');selectedImage.classList.add('ebook-inline-image',button.dataset.imageAlign);dirty=true;state.textContent='저장 필요';});
+  imageSize.onchange=()=>{if(!selectedImage)return;selectedImage.classList.remove(...imageSizeClasses);selectedImage.classList.add(imageSize.value);dirty=true;state.textContent='저장 필요';};
+  document.getElementById('deleteImage').onclick=()=>{if(selectedImage&&confirm('선택한 이미지를 본문에서 삭제할까요?')){selectedImage.remove();selectedImage=null;dirty=true;state.textContent='저장 필요';setImageTools(false);}};
+  async function save(){if(!pages[current])return;state.textContent='저장 중…';const response=await fetch(`/ebook/{{ book.id }}/pages/${pages[current].id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content_html:editor.innerHTML})});const data=await response.json();if(data.ok){pages[current].html=data.content_html;dirty=false;state.textContent='저장 완료';}else{state.textContent='저장 실패';}}
+  document.getElementById('savePage').onclick=save;
+  pageSelect.onchange=()=>selectPage(+pageSelect.value,true);
+  editorPrevPage.onclick=()=>selectPage(current-1,true);
+  editorNextPage.onclick=()=>selectPage(current+1,true);
+  document.getElementById('addPage').onclick=async()=>{if(dirty)await save();const response=await fetch('{{ url_for('ebook.add_page', ebook_id=book.id) }}',{method:'POST'});const data=await response.json();if(data.ok){pages.push({id:data.id,page_no:data.page_no,html:'<p><br></p>'});selectPage(pages.length-1,true);editor.focus();}};
+  document.getElementById('deletePage').onclick=async()=>{if(!pages[current]||!confirm(`${current+1}페이지를 삭제할까요?`))return;const response=await fetch(`/ebook/{{ book.id }}/pages/${pages[current].id}/delete`,{method:'POST'});const data=await response.json();if(!data.ok){alert(data.message||'삭제하지 못했습니다.');return;}pages.splice(current,1);pages.forEach((p,i)=>p.page_no=i+1);selectPage(Math.min(current,pages.length-1),true);};
+  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});selectPage(0);
+})();
+</script>
+{% endblock %}
