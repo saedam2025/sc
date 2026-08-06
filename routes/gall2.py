@@ -1,7 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, Response, jsonify, session
 from werkzeug.utils import secure_filename
 from .database import get_db
+from .security import admin_required, load_credential_secret
+from .storage import GALL2_ROOT
 from cryptography.fernet import Fernet
+import base64
+import hashlib
 import os
 from datetime import datetime
 from io import BytesIO
@@ -9,12 +13,11 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 gall2_bp = Blueprint('gall2', __name__)
 
-# [보안] Fernet 키 규격 준수 (기존과 동일한 키 사용)
-KEY = b'uV5Z9X-o3J-7S-9k_L6_QW0Xm8k9V8P4f1L2M3N4O5A=' 
-cipher = Fernet(KEY)
+_secret_digest = hashlib.sha256(load_credential_secret().encode('utf-8')).digest()
+cipher = Fernet(base64.urlsafe_b64encode(_secret_digest))
 
 # 저장 경로를 gall2 전용으로 변경
-BASE_GALLERY_PATH = "/mnt/data/gall2"
+BASE_GALLERY_PATH = str(GALL2_ROOT)
 UPLOAD_FOLDER = os.path.join(BASE_GALLERY_PATH, 'uploads')
 THUMB_FOLDER = os.path.join(BASE_GALLERY_PATH, 'thumbnails')
 GALLERY_IMAGE_MAX_SIZE = (1920, 1080)
@@ -304,6 +307,7 @@ def upload():
     return redirect(url_for('gall2.index'))
 
 @gall2_bp.route('/gall2/post/<int:post_id>/update', methods=['POST'])
+@admin_required
 def update_post(post_id):
     ensure_gall2_schema()
     data = request.get_json(silent=True) or request.form
@@ -323,6 +327,7 @@ def update_post(post_id):
     return jsonify({"status": "success"})
 
 @gall2_bp.route('/gall2/post/<int:post_id>/delete', methods=['POST'])
+@admin_required
 def delete_post(post_id):
     ensure_gall2_schema()
     page = request.args.get('page', 1, type=int)
@@ -333,6 +338,7 @@ def delete_post(post_id):
     return redirect(url_for('gall2.index', page=page))
 
 @gall2_bp.route('/gall2/delete/<int:id>')
+@admin_required
 def delete(id):
     conn = get_db()
     file = conn.execute('SELECT * FROM gall2 WHERE id = ?', (id,)).fetchone()
@@ -348,6 +354,7 @@ def delete(id):
 
 # [신규 추가] 다중 선택 삭제 처리
 @gall2_bp.route('/gall2/delete_bulk', methods=['POST'])
+@admin_required
 def delete_bulk():
     data = request.get_json(silent=True) or request.form
     post_ids = data.get('post_ids', [])

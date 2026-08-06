@@ -5,12 +5,13 @@ import os
 import threading
 import unicodedata
 import uuid
-from .database import get_db, BASE_DIR
-from extensions import socketio
+from .database import get_db
+from .socketio_ext import socketio
+from .storage import CHAT_UPLOADS, UPLOADS_ROOT
 
 chat_bp = Blueprint('chat', __name__)
-CHAT_UPLOAD_FOLDER = os.path.join(BASE_DIR, 'chat_uploads')
-LEGACY_UPLOAD_FOLDER = '/mnt/data/uploads'
+CHAT_UPLOAD_FOLDER = str(CHAT_UPLOADS)
+LEGACY_UPLOAD_FOLDER = str(UPLOADS_ROOT)
 CHAT_MAX_FILE_SIZE = 10 * 1024 * 1024
 CHAT_RETENTION_DAYS = 30
 CHAT_CLEANUP_INTERVAL = timedelta(hours=1)

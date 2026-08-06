@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import mimetypes
 import os
-import platform
 import sqlite3
 import uuid
 from datetime import datetime
@@ -36,6 +35,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from .database import get_db
+from .storage import MEMO_UPLOADS
 
 
 memo_bp = Blueprint("memo", __name__)
@@ -59,13 +59,11 @@ POSTIT_SHAPES = {
 
 
 def _storage_root() -> Path:
-    if platform.system() != "Windows" and os.path.exists("/mnt/data"):
-        return Path("/mnt/data")
-    return Path(current_app.root_path)
+    return MEMO_UPLOADS.parent
 
 
 def _upload_dir() -> Path:
-    path = _storage_root() / "memo_uploads"
+    path = MEMO_UPLOADS
     path.mkdir(parents=True, exist_ok=True)
     return path
 

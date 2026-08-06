@@ -4,9 +4,12 @@ import json
 import time
 from datetime import datetime, timedelta
 from .database import get_db
+from .organization import ORGANIZATION_GROUPS, classify_organization_group
+from .security import is_admin_session
+from .storage import UPLOADS_ROOT
 
 approval_bp = Blueprint('approval', __name__)
-UPLOAD_FOLDER = '/mnt/data/uploads'
+UPLOAD_FOLDER = str(UPLOADS_ROOT)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def send_system_message(conn, receiver, content):
@@ -87,6 +90,91 @@ def sync_completed_vacation(conn, doc, doc_data):
 def rows_to_dicts(rows):
     return [dict(row) for row in rows]
 
+
+def _approval_names(value):
+    return {
+        item.strip()
+        for item in str(value or '').split(',')
+        if item.strip()
+    }
+
+
+def can_view_approval(doc, current_user):
+    if is_admin_session():
+        return True
+    allowed = {
+        str(doc['drafter'] or '').strip(),
+        str(doc['approver_1'] or '').strip(),
+        str(doc['approver_2'] or '').strip(),
+    }
+    allowed.update(_approval_names(doc['receivers']))
+    allowed.update(_approval_names(doc['cc_receivers']))
+    return bool(current_user and current_user in allowed)
+
+
+def normalize_user_level(value, default=14):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def get_current_user_level(conn, current_user):
+    current_emp_no = str(session.get('emp_no', '')).strip()
+    row = None
+    if current_emp_no:
+        row = conn.execute(
+            "SELECT level FROM users WHERE emp_no=? AND status='승인' LIMIT 1",
+            (current_emp_no,)
+        ).fetchone()
+    if not row:
+        row = conn.execute(
+            "SELECT level FROM users WHERE name=? AND status='승인' ORDER BY id ASC LIMIT 1",
+            (current_user,)
+        ).fetchone()
+    if row:
+        return normalize_user_level(row['level'])
+    return normalize_user_level(session.get('user_level', 14))
+
+
+def get_approval_members(conn):
+    rows = conn.execute('''
+        SELECT emp_no, name, position, level, department
+        FROM users
+        WHERE status='승인'
+          AND LOWER(COALESCE(emp_no, '')) != 'admin'
+          AND LOWER(COALESCE(name, '')) != 'admin'
+        ORDER BY level ASC, name ASC
+    ''').fetchall()
+
+    members = []
+    for row in rows:
+        user = dict(row)
+        members.append({
+            'name': user.get('name') or '',
+            'role': user.get('position') or '사원',
+            'level': normalize_user_level(user.get('level')),
+            'dept': user.get('department') or '소속 없음'
+        })
+    members.sort(key=lambda user: (user['level'], user['name']))
+    return members
+
+
+def group_approval_members(members):
+    grouped_users = [
+        {'group': group, 'users': []}
+        for group in ORGANIZATION_GROUPS
+    ]
+    users_by_group = {
+        group['group']: group['users']
+        for group in grouped_users
+    }
+    for user in members:
+        group_name = classify_organization_group(user['dept'], user['role'])
+        users_by_group[group_name].append(user)
+    return [group for group in grouped_users if group['users']]
+
+
 @approval_bp.route('/')
 def index():
     ensure_schema() # DB 스키마 패치
@@ -104,15 +192,19 @@ def index():
     ''', (current_user, current_user)).fetchall()
     pending_docs = rows_to_dicts(pending_rows)
 
-    draft_rows = conn.execute("SELECT * FROM approvals WHERE drafter = ? ORDER BY created_at DESC", (current_user,)).fetchall()
+    draft_rows = conn.execute('''
+        SELECT * FROM approvals
+        WHERE drafter = ? AND status != '완료'
+        ORDER BY created_at DESC
+    ''', (current_user,)).fetchall()
     my_drafts = rows_to_dicts(draft_rows)
 
     completed_rows = conn.execute('''
         SELECT * FROM approvals
         WHERE status = '완료'
-          AND (drafter = ? OR approver_1 = ? OR approver_2 = ? OR receivers LIKE ? OR cc_receivers LIKE ?)
+          AND drafter = ?
         ORDER BY updated_at DESC
-    ''', (current_user, current_user, current_user, f'%{current_user}%', f'%{current_user}%')).fetchall()
+    ''', (current_user,)).fetchall()
     completed_docs = rows_to_dicts(completed_rows)
 
     archive_rows = conn.execute('''
@@ -120,48 +212,24 @@ def index():
         WHERE status = '완료'
         ORDER BY updated_at DESC
     ''').fetchall()
-    archive_docs = rows_to_dicts(archive_rows)
-
-    db_users = conn.execute("SELECT name, position, level, department FROM users WHERE status='승인' ORDER BY department ASC, level ASC, name ASC").fetchall()
-    
-    user_list = []
-    for row in db_users:
-        u = dict(row)
-        if u.get('name') != current_user and u.get('name', '').lower() != 'admin':
-            pos = u.get('position')
-            if not pos: pos = '사원'
-            dept = u.get('department')
-            if not dept: dept = '소속 없음'
-            
-            user_list.append({
-                'name': u.get('name'), 
-                'role': pos,
-                'level': u.get('level', 10),
-                'dept': dept
-            })
-            
-    user_list.sort(key=lambda x: (x['level'], x['name']))
-    
-    grouped_users = [
-        {'group': '본부', 'users': []},
-        {'group': '센터장', 'users': []},
-        {'group': '강사', 'users': []}
+    archive_docs = [
+        dict(row)
+        for row in archive_rows
+        if can_view_approval(row, current_user)
     ]
-    
-    for user in user_list:
-        pos = user['role']
-        if '센터장' in pos:
-            grouped_users[1]['users'].append(user)
-        elif '강사' in pos:
-            grouped_users[2]['users'].append(user)
-        else:
-            grouped_users[0]['users'].append(user)
-            
-    grouped_users = [g for g in grouped_users if len(g['users']) > 0]
-    
-    flat_user_list = []
-    for g in grouped_users:
-        flat_user_list.extend(g['users'])
+
+    current_user_level = get_current_user_level(conn, current_user)
+    all_members = get_approval_members(conn)
+    approver_users = [
+        user for user in all_members
+        if user['level'] <= current_user_level
+        and (user['name'] != current_user or current_user_level == 1)
+    ]
+    receiver_users = [
+        user for user in all_members
+        if user['name'] != current_user
+    ]
+    receiver_grouped_users = group_approval_members(receiver_users)
         
     conn.close()
 
@@ -171,8 +239,9 @@ def index():
                            my_drafts=my_drafts, 
                            completed_docs=completed_docs, 
                            archive_docs=archive_docs,
-                           user_list=flat_user_list,
-                           grouped_users=grouped_users,
+                           approver_users=approver_users,
+                           receiver_grouped_users=receiver_grouped_users,
+                           reference_users=all_members,
                            next_id=next_id)
 
 @approval_bp.route('/submit', methods=['POST'])
@@ -183,8 +252,8 @@ def submit_approval():
     title = request.form.get('title')
     doc_data = request.form.get('doc_data', '{}')
     
-    approver_1 = request.form.get('approver_1', '')
-    approver_2 = request.form.get('approver_2', '')
+    approver_1 = request.form.get('approver_1', '').strip()
+    approver_2 = request.form.get('approver_2', '').strip()
     receivers = request.form.get('receivers', '')
     cc_receivers = request.form.get('cc_receivers', '')
     receiver_doc_types = ['보고서', '업무일지', '회의록']
@@ -215,10 +284,33 @@ def submit_approval():
         if not receivers.strip():
             return jsonify({"status": "error", "message": "수신자를 최소 1명 이상 지정해주세요."}), 400
     else:
-        if not approver_1.strip():
+        if not approver_1:
             return jsonify({"status": "error", "message": "1차 결재자는 필수입니다."}), 400
-        if approver_2.strip() and approver_1.strip() == approver_2.strip():
+        if approver_2 and approver_1 == approver_2:
             return jsonify({"status": "error", "message": "1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다."}), 400
+
+        validation_conn = get_db()
+        try:
+            current_user_level = get_current_user_level(validation_conn, current_user)
+            eligible_approver_names = {
+                user['name']
+                for user in get_approval_members(validation_conn)
+                if user['level'] <= current_user_level
+                and (user['name'] != current_user or current_user_level == 1)
+            }
+        finally:
+            validation_conn.close()
+
+        if approver_1 not in eligible_approver_names:
+            return jsonify({
+                "status": "error",
+                "message": "1차 결재자는 본인과 동급이거나 상위 레벨인 회원만 지정할 수 있습니다."
+            }), 400
+        if approver_2 and approver_2 not in eligible_approver_names:
+            return jsonify({
+                "status": "error",
+                "message": "2차 결재자는 본인과 동급이거나 상위 레벨인 회원만 지정할 수 있습니다."
+            }), 400
 
     if doc_type in receiver_doc_types:
         status = '완료'
@@ -285,6 +377,18 @@ def approval_action(doc_id):
         conn.close()
         return jsonify({"status": "error", "message": "문서를 찾을 수 없습니다."}), 404
 
+    expected_approver = None
+    if doc['status'] == '대기':
+        expected_approver = doc['approver_1']
+    elif doc['status'] == '1차승인':
+        expected_approver = doc['approver_2']
+    if action in {'approve', 'reject'} and current_user != expected_approver:
+        conn.close()
+        return jsonify({
+            "status": "error",
+            "message": "현재 단계의 지정 결재자만 승인 또는 반려할 수 있습니다."
+        }), 403
+
     new_status = doc['status']
     msg_receivers = []
     msg_content = ""
@@ -340,10 +444,13 @@ def approval_action(doc_id):
 
 @approval_bp.route('/detail/<int:doc_id>')
 def get_detail(doc_id):
+    current_user = session.get('user_name')
     conn = get_db()
     doc = conn.execute("SELECT * FROM approvals WHERE id=?", (doc_id,)).fetchone()
     conn.close()
     if not doc: return jsonify({"error": "Not found"}), 404
+    if not can_view_approval(doc, current_user):
+        return jsonify({"error": "Forbidden"}), 403
     
     doc_dict = dict(doc)
     

@@ -7,10 +7,11 @@ import json
 import urllib.parse
 from .database import get_db
 from .board import init_board_db  # 💡 새로 추가: board.py에서 게시판 DB 초기화 함수 임포트
+from .storage import UPLOADS_ROOT
 
 main_bp = Blueprint('main', __name__)
 
-UPLOAD_FOLDER = '/mnt/data/uploads'
+UPLOAD_FOLDER = str(UPLOADS_ROOT)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # === 실시간 접속자 상태 관리를 위한 전역 변수 ===

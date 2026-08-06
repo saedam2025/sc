@@ -228,6 +228,15 @@ def _init_center_team_table(conn):
     conn.commit()
 
 
+def _ensure_contact_user_columns(conn):
+    columns = _columns(conn, 'users')
+    if 'custom_department' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN custom_department TEXT DEFAULT ''")
+    if 'custom_team' not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN custom_team TEXT DEFAULT ''")
+    conn.commit()
+
+
 def _load_manual_contact_groups(conn):
     rows = conn.execute("""
         SELECT id, category_key, category_name, organization_name, role_title, person_name,
@@ -270,6 +279,8 @@ def _contact_from_user(row):
         'name': _dash(data.get('name')),
         'position': _dash(data.get('position')),
         'department': _dash(data.get('department')),
+        'custom_department': _clean_text(data.get('custom_department')),
+        'custom_team': _clean_text(data.get('custom_team')),
         'phone': _dash(data.get('phone')),
         'email': _dash(data.get('email')),
         'emp_no': _dash(data.get('emp_no')),
@@ -279,7 +290,8 @@ def _contact_from_user(row):
 def _load_user_contacts(conn, positions):
     placeholders = ','.join(['?'] * len(positions))
     rows = conn.execute(f"""
-        SELECT emp_no, name, position, department, phone, email, level
+        SELECT emp_no, name, position, department, custom_department, custom_team,
+               phone, email, level
         FROM users
         WHERE emp_no != 'admin'
           AND COALESCE(status, '승인') = '승인'
@@ -292,6 +304,21 @@ def _load_user_contacts(conn, positions):
     contacts = [_contact_from_user(row) for row in rows]
     contacts.sort(key=lambda item: (order.get(item['position'], 99), item['name']))
     return contacts
+
+
+def _load_custom_contacts(conn):
+    rows = conn.execute('''
+        SELECT emp_no, name, position, department, custom_department, custom_team,
+               phone, email, level
+        FROM users
+        WHERE emp_no != 'admin'
+          AND COALESCE(status, '승인') = '승인'
+          AND COALESCE(retire_date, '') = ''
+          AND (TRIM(COALESCE(custom_department, '')) <> ''
+               OR TRIM(COALESCE(custom_team, '')) <> '')
+        ORDER BY custom_department ASC, custom_team ASC, level ASC, name ASC
+    ''').fetchall()
+    return [_contact_from_user(row) for row in rows]
 
 
 def _load_center_contacts(conn):
@@ -349,13 +376,14 @@ def _group_center_contacts(contacts):
     return groups
 
 
-def _builder_contact_records(manual_groups, headquarters, centers, schools):
+def _builder_contact_records(manual_groups, headquarters, centers, schools, custom_contacts):
     records = []
     for group in manual_groups:
         source = 'partners' if group['key'] == 'partner' else 'headquarters'
         source_label = '협력사' if source == 'partners' else '본부'
         for item in group['items']:
             records.append({
+                'key': f"manual:{item['id']}",
                 'source': source,
                 'source_label': source_label,
                 'group': group['name'],
@@ -369,6 +397,7 @@ def _builder_contact_records(manual_groups, headquarters, centers, schools):
     for item in headquarters:
         source = 'managers' if item['position'] == '실장' else 'staff'
         records.append({
+            'key': f"employee:{item['emp_no']}",
             'source': source,
             'source_label': '실장' if source == 'managers' else '직원',
             'group': '본사',
@@ -381,6 +410,7 @@ def _builder_contact_records(manual_groups, headquarters, centers, schools):
         })
     for item in centers:
         records.append({
+            'key': f"center:{item['emp_no']}",
             'source': 'centers',
             'source_label': '센터장',
             'group': item['team_name'],
@@ -391,8 +421,24 @@ def _builder_contact_records(manual_groups, headquarters, centers, schools):
             'email': item['email'],
             'detail': item['assigned_schools'],
         })
+    for item in custom_contacts:
+        records.append({
+            'key': f"custom:{item['emp_no']}",
+            'source': 'custom_people',
+            'source_label': '별도 조직',
+            'group': item['custom_team'] or item['custom_department'] or '별도 조직',
+            'name': item['name'],
+            'role': item['position'],
+            'organization': item['custom_department'] or item['department'],
+            'phone': item['phone'],
+            'email': item['email'],
+            'detail': item['custom_team'],
+            'custom_department': item['custom_department'],
+            'custom_team': item['custom_team'],
+        })
     for item in schools:
         records.append({
+            'key': f"school:{item['id']}",
             'source': 'schools',
             'source_label': '학교',
             'group': '학교',
@@ -443,6 +489,7 @@ def _load_school_contacts(conn):
     for row in rows:
         data = dict(row)
         contacts.append({
+            'id': data.get('id'),
             'year': _dash(data.get('year')),
             'school_name': _dash(data.get('school_name')),
             'contract_subject': _dash(data.get('contract_subject')),
@@ -464,20 +511,69 @@ def _is_contact_admin():
     return session.get('user_name') == 'admin' or int(session.get('user_level', 99)) <= 2
 
 
+def _directory_owner():
+    return _clean_text(session.get('emp_no') or session.get('user_name'))
+
+
+def _init_saved_directory_table(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS saved_contact_directories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_emp_no TEXT NOT NULL,
+            name TEXT NOT NULL,
+            settings_json TEXT NOT NULL DEFAULT '{}',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(owner_emp_no, name)
+        )
+    ''')
+    conn.commit()
+
+
+def _saved_directory_dict(row):
+    data = dict(row)
+    try:
+        settings = json.loads(data.get('settings_json') or '{}')
+    except (TypeError, ValueError):
+        settings = {}
+    return {
+        'id': data['id'],
+        'name': data['name'],
+        'settings': settings,
+        'created_at': data.get('created_at'),
+        'updated_at': data.get('updated_at'),
+    }
+
+
 @contacts_bp.route('/contacts')
 def contact_list():
     conn = get_db()
     _init_office_contact_table(conn)
     _init_center_team_table(conn)
+    _ensure_contact_user_columns(conn)
+    _init_saved_directory_table(conn)
 
     manual_contact_groups = _load_manual_contact_groups(conn)
     headquarters_contacts = _load_user_contacts(conn, HQ_POSITIONS)
     center_contacts = _load_center_contacts(conn)
     school_contacts = _load_school_contacts(conn)
+    custom_contacts = _load_custom_contacts(conn)
     center_contact_groups = _group_center_contacts(center_contacts)
     contact_builder_records = _builder_contact_records(
-        manual_contact_groups, headquarters_contacts, center_contacts, school_contacts
+        manual_contact_groups, headquarters_contacts, center_contacts, school_contacts, custom_contacts
     )
+    owner = _directory_owner()
+    saved_directories = []
+    if owner:
+        saved_directories = [
+            _saved_directory_dict(row)
+            for row in conn.execute('''
+                SELECT id, name, settings_json, created_at, updated_at
+                FROM saved_contact_directories
+                WHERE owner_emp_no = ?
+                ORDER BY updated_at DESC, id DESC
+            ''', (owner,)).fetchall()
+        ]
     conn.close()
 
     return render_template(
@@ -489,8 +585,105 @@ def contact_list():
         center_contact_groups=center_contact_groups,
         school_contacts=school_contacts,
         contact_builder_records=contact_builder_records,
+        custom_department_options=sorted({item['custom_department'] for item in custom_contacts if item['custom_department']}),
+        custom_team_options=sorted({item['custom_team'] for item in custom_contacts if item['custom_team']}),
+        saved_contact_directories=saved_directories,
         can_edit_defaults=_is_contact_admin(),
     )
+
+
+@contacts_bp.route('/contacts/api/directories', methods=['GET', 'POST'])
+def saved_directories_api():
+    owner = _directory_owner()
+    if not owner:
+        return jsonify({'success': False, 'error': '로그인이 필요합니다.'}), 401
+    conn = get_db()
+    _init_saved_directory_table(conn)
+    try:
+        if request.method == 'GET':
+            rows = conn.execute('''
+                SELECT id, name, settings_json, created_at, updated_at
+                FROM saved_contact_directories WHERE owner_emp_no = ?
+                ORDER BY updated_at DESC, id DESC
+            ''', (owner,)).fetchall()
+            return jsonify({'success': True, 'directories': [_saved_directory_dict(row) for row in rows]})
+
+        data = request.get_json(silent=True) or {}
+        name = _clean_text(data.get('name'))
+        settings = data.get('settings')
+        if not name or len(name) > 80:
+            return jsonify({'success': False, 'error': '연락망 이름은 1~80자로 입력해주세요.'}), 400
+        if not isinstance(settings, dict):
+            return jsonify({'success': False, 'error': '연락망 편집 정보가 올바르지 않습니다.'}), 400
+        settings_json = json.dumps(settings, ensure_ascii=False)
+        if len(settings_json.encode('utf-8')) > 200000:
+            return jsonify({'success': False, 'error': '저장할 연락망 정보가 너무 큽니다.'}), 413
+        try:
+            cursor = conn.execute('''
+                INSERT INTO saved_contact_directories (owner_emp_no, name, settings_json)
+                VALUES (?, ?, ?)
+            ''', (owner, name, settings_json))
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            if 'UNIQUE' in str(exc).upper():
+                return jsonify({'success': False, 'error': '같은 이름의 저장 연락망이 있습니다.'}), 409
+            raise
+        row = conn.execute('''
+            SELECT id, name, settings_json, created_at, updated_at
+            FROM saved_contact_directories WHERE id = ?
+        ''', (cursor.lastrowid,)).fetchone()
+        return jsonify({'success': True, 'message': '맞춤 연락망을 저장했습니다.', 'directory': _saved_directory_dict(row)}), 201
+    finally:
+        conn.close()
+
+
+@contacts_bp.route('/contacts/api/directories/<int:directory_id>', methods=['PUT', 'DELETE'])
+def saved_directory_detail_api(directory_id):
+    owner = _directory_owner()
+    if not owner:
+        return jsonify({'success': False, 'error': '로그인이 필요합니다.'}), 401
+    conn = get_db()
+    _init_saved_directory_table(conn)
+    try:
+        current = conn.execute('''
+            SELECT id, name FROM saved_contact_directories
+            WHERE id = ? AND owner_emp_no = ?
+        ''', (directory_id, owner)).fetchone()
+        if not current:
+            return jsonify({'success': False, 'error': '저장된 연락망을 찾을 수 없습니다.'}), 404
+        if request.method == 'DELETE':
+            conn.execute("DELETE FROM saved_contact_directories WHERE id = ? AND owner_emp_no = ?", (directory_id, owner))
+            conn.commit()
+            return jsonify({'success': True, 'message': '저장 연락망을 삭제했습니다.'})
+
+        data = request.get_json(silent=True) or {}
+        name = _clean_text(data.get('name'))
+        settings = data.get('settings')
+        if not name or len(name) > 80 or not isinstance(settings, dict):
+            return jsonify({'success': False, 'error': '연락망 이름과 편집 정보를 확인해주세요.'}), 400
+        settings_json = json.dumps(settings, ensure_ascii=False)
+        if len(settings_json.encode('utf-8')) > 200000:
+            return jsonify({'success': False, 'error': '저장할 연락망 정보가 너무 큽니다.'}), 413
+        try:
+            conn.execute('''
+                UPDATE saved_contact_directories
+                SET name = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND owner_emp_no = ?
+            ''', (name, settings_json, directory_id, owner))
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            if 'UNIQUE' in str(exc).upper():
+                return jsonify({'success': False, 'error': '같은 이름의 저장 연락망이 있습니다.'}), 409
+            raise
+        row = conn.execute('''
+            SELECT id, name, settings_json, created_at, updated_at
+            FROM saved_contact_directories WHERE id = ?
+        ''', (directory_id,)).fetchone()
+        return jsonify({'success': True, 'message': '맞춤 연락망 수정 내용을 저장했습니다.', 'directory': _saved_directory_dict(row)})
+    finally:
+        conn.close()
 
 
 @contacts_bp.route('/contacts/center-team', methods=['POST'])
@@ -955,7 +1148,7 @@ def save_manual_contact():
 
     conn.commit()
     conn.close()
-    return redirect(url_for('contacts.contact_list'))
+    return redirect(url_for('contacts.contact_list', notice='contact_saved'))
 
 
 @contacts_bp.route('/contacts/manual/<int:contact_id>/delete', methods=['POST'])
@@ -968,4 +1161,4 @@ def delete_manual_contact(contact_id):
     conn.execute("DELETE FROM office_contact_entries WHERE id = ?", (contact_id,))
     conn.commit()
     conn.close()
-    return redirect(url_for('contacts.contact_list'))
+    return redirect(url_for('contacts.contact_list', notice='contact_deleted'))

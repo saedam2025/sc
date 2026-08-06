@@ -29,6 +29,7 @@ from openpyxl import Workbook, load_workbook
 from PIL import Image, UnidentifiedImageError
 
 from .database import AI_MAIL_UPLOADS, get_db
+from .security import load_credential_secret
 
 
 ai_mail_bp = Blueprint('ai_mail', __name__)
@@ -141,9 +142,7 @@ def _is_valid_email(value):
 
 
 def _fernet():
-    secret = current_app.secret_key or os.environ.get('SECRET_KEY')
-    if not secret:
-        raise RuntimeError('SECRET_KEY가 설정되지 않아 메일 자격증명을 보관할 수 없습니다.')
+    secret = load_credential_secret()
     digest = hashlib.sha256(str(secret).encode('utf-8')).digest()
     return Fernet(base64.urlsafe_b64encode(digest))
 

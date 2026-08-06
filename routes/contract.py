@@ -7,7 +7,6 @@ import io
 import pdfkit
 import yagmail
 import json
-import sqlite3
 import re
 import shutil
 import base64
@@ -16,6 +15,22 @@ from datetime import datetime, timedelta, timezone
 from hashids import Hashids
 from html import escape
 from urllib.request import Request, urlopen
+from .contract_repository import (
+    CONTRACT_COLUMNS,
+    delete_contract_records,
+    insert_contract_records,
+    update_contract_record,
+)
+from .database import get_db
+from .security import is_admin_session
+from .storage import (
+    APP_ROOT as _APP_ROOT,
+    COMPANY_STAMP_ROOT,
+    CONTRACTS_ROOT,
+    DATA_ROOT,
+    PDF_FONT_ROOT,
+    TERMS_ROOT,
+)
 
 # PDF 페이지 분할을 위한 라이브러리 (서버에 pip install PyPDF2 필요)
 try:
@@ -33,29 +48,18 @@ hashids = Hashids(salt="saedam_secret_salt", min_length=8)
 
 # --- [저장 경로 설정: Windows + Render 동시 대응] ---
 # contract.py가 routes 폴더에 있으므로 한 단계 위가 프로젝트 루트이다.
-APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-# Render Persistent Disk 경로는 환경변수 DATA_DIR로 지정할 수 있다.
-# 환경변수가 없으면 /mnt/data가 실제로 존재할 때 사용하고,
-# 그 외(Windows 로컬 등)에는 프로젝트 루트를 사용한다.
-DATA_DIR_ENV = os.environ.get('DATA_DIR', '').strip()
-if DATA_DIR_ENV:
-    MOUNT_PATH = os.path.abspath(DATA_DIR_ENV)
-elif os.path.isdir('/mnt/data'):
-    MOUNT_PATH = '/mnt/data'
-else:
-    MOUNT_PATH = APP_ROOT
+APP_ROOT = str(_APP_ROOT)
+MOUNT_PATH = str(DATA_ROOT)
 
 # GitHub/프로젝트에 포함된 기본 계약 양식 폴더
 BUNDLED_TERMS_DIR = os.path.join(APP_ROOT, 'terms')
 
-# 기존 엑셀 대신 SQLite 파이썬 DB 사용
-DB_FILE = os.path.join(MOUNT_PATH, 'contracts.db')
-CONTRACTS_DIR = os.path.join(MOUNT_PATH, 'contracts')
-TERMS_DIR = os.path.join(MOUNT_PATH, 'terms')
+# 전자계약도 saedam.db를 사용하고, 생성 파일만 통합 저장소에 둔다.
+CONTRACTS_DIR = str(CONTRACTS_ROOT)
+TERMS_DIR = str(TERMS_ROOT)
 CATEGORIES_FILE = os.path.join(MOUNT_PATH, 'categories.json')
 COMPANY_SETTINGS_FILE = os.path.join(MOUNT_PATH, 'company_settings.json')
-COMPANY_STAMP_DIR = os.path.join(MOUNT_PATH, 'company_stamps')
+COMPANY_STAMP_DIR = str(COMPANY_STAMP_ROOT)
 
 os.makedirs(MOUNT_PATH, exist_ok=True)
 os.makedirs(CONTRACTS_DIR, exist_ok=True)
@@ -164,7 +168,7 @@ KST = timezone(timedelta(hours=9))
 # wkhtmltopdf는 서버에 한글 폰트가 없으면 숫자와 문장부호만 남기고
 # 한글 글리프를 비워 버릴 수 있다. 공개 배포된 나눔고딕 TTF를
 # 최초 PDF 생성 시 /mnt/data/pdf_fonts에 내려받아 HTML 안에 base64로 삽입한다.
-PDF_FONT_DIR = os.path.join(MOUNT_PATH, 'pdf_fonts')
+PDF_FONT_DIR = str(PDF_FONT_ROOT)
 os.makedirs(PDF_FONT_DIR, exist_ok=True)
 
 PDF_FONT_FILES = {
@@ -389,7 +393,7 @@ def get_company_stamp_abs_path(profile):
         if os.path.exists(candidate):
             return candidate
 
-    return os.path.abspath(os.path.join(os.getcwd(), 'static', 'stamp7.png'))
+    return os.path.abspath(os.path.join(APP_ROOT, 'static', 'stamp7.png'))
 
 
 def get_company_stamp_src(profile):
@@ -628,51 +632,51 @@ def render_contract_template(raw_html, user_data, columns):
 
     return c
 
-# --- [DB 관련 공통 함수 (엑셀 대체)] ---
-def init_db():
-    columns = [
-        '계약구분', '수탁학교명', '부서명', '성명', '주민번호', '수수료', '보조금', '경력수당', '직책수당', '기타', '근무시간', '계약기간',
-        '비고1', '비고2', '비고3', '비고4', 'email', '연락처', '거주지', '계약완료일시', '연도', '파일명', 'IP'
-    ]
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='contracts'")
-    if not cursor.fetchone():
-        cols_def = ", ".join([f"'{col}' TEXT" for col in columns])
-        cursor.execute(f"CREATE TABLE contracts ({cols_def})")
-    conn.commit()
-    conn.close()
-
+# --- [DB 관련 공통 함수] ---
 def get_contracts_df():
-    if not os.path.exists(DB_FILE):
-        init_db()
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_db()
     try:
-        df = pd.read_sql_query("SELECT * FROM contracts", conn)
+        column_sql = ", ".join(f'"{column}"' for column in CONTRACT_COLUMNS)
+        df = pd.read_sql_query(
+            f'SELECT id, {column_sql} FROM contracts ORDER BY id',
+            conn,
+        )
+    finally:
+        conn.close()
+    if df.empty:
+        empty = pd.DataFrame(columns=list(CONTRACT_COLUMNS))
+        empty.index = pd.Index([], name='id', dtype='int64')
+        return empty
+    df = df.set_index('id')
+    for column in CONTRACT_COLUMNS:
+        df[column] = df[column].fillna('').astype(str)
+    return df
+
+
+def insert_contracts_df(df):
+    records = []
+    for row in df.to_dict('records'):
+        records.append({
+            column: '' if pd.isna(row.get(column)) else row.get(column, '')
+            for column in CONTRACT_COLUMNS
+        })
+    conn = get_db()
+    try:
+        inserted = insert_contract_records(conn, records)
+        conn.commit()
+        return inserted
     except Exception:
-        init_db()
-        df = pd.read_sql_query("SELECT * FROM contracts", conn)
-    conn.close()
-    return df.fillna("").astype(str)
-
-def save_contracts_df(df):
-    conn = sqlite3.connect(DB_FILE)
-    # 기존 엑셀 덮어쓰기 로직과 동일하게 동작하도록 replace 사용
-    df.to_sql('contracts', conn, if_exists='replace', index=False)
-    conn.close()
-
-init_db()
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 # --- [관리자 기능 로직] ---
 
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
-    if not session.get('user_name'):
-        return "<script>alert('인트라넷 로그인이 필요한 페이지입니다.'); location.href='/login_page';</script>"
-
-    user_level = session.get('user_level')
-    if user_level is None or int(user_level) > 5:
-        return f"<script>alert('접근 권한이 없습니다. (현재 레벨: {user_level})'); location.href='/';</script>"
+    if not is_admin_session():
+        return "<script>alert('관리자 권한이 필요합니다.'); location.href='/';</script>", 403
 
     page = request.args.get('page', 1, type=int)
     per_page = 10
@@ -733,7 +737,7 @@ def admin_page():
 
 @contract_bp.route('/admin/categories', methods=['GET', 'POST'])
 def manage_categories():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
     
     old_cats = load_categories()
@@ -760,7 +764,7 @@ def manage_categories():
 @contract_bp.route('/admin/company_settings', methods=['GET', 'POST', 'DELETE'])
 def company_settings():
     """양식관리 화면에서 계약서에 찍힐 회사명/대표/도장 프로필을 최대 3세트까지 관리한다."""
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     settings = load_company_settings()
@@ -864,7 +868,7 @@ def company_settings():
 @contract_bp.route('/admin/company_stamp/<path:filename>')
 def company_stamp_file(filename):
     """양식관리 화면에서 등록된 도장 이미지를 미리보기로 보여준다."""
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return "권한이 없습니다.", 403
 
     safe_name = os.path.basename(filename)
@@ -878,7 +882,7 @@ def company_stamp_file(filename):
 
 @contract_bp.route('/admin/upload_excel', methods=['POST'])
 def upload_excel():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     if 'excel_file' not in request.files: return jsonify({'status': 'error', 'message': '파일 없음'}), 400
@@ -892,20 +896,17 @@ def upload_excel():
         if '연도' not in new_df.columns: new_df['연도'] = ""
         else: new_df['연도'] = new_df['연도'].fillna("")
 
-        existing_df = get_contracts_df()
-        combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-        save_contracts_df(combined_df)
+        insert_contracts_df(new_df)
         return jsonify({'status': 'success', 'message': f'{len(new_df)}명의 계약정보가 추가 되었습니다.'})
     except Exception as e: return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @contract_bp.route('/admin/add', methods=['POST'])
 def admin_add():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     try:
         new_data = request.json
-        df = get_contracts_df()
         new_row = {
             '계약구분': new_data.get('계약구분', '방과후강사'), '수탁학교명': new_data.get('수탁학교명'),
             '부서명': new_data.get('부서명'), '성명': new_data.get('성명'), '주민번호': new_data.get('주민번호'),
@@ -917,33 +918,43 @@ def admin_add():
             '비고3': new_data.get('비고3', ''), '비고4': new_data.get('비고4', ''),
             '연도': "", '계약완료일시': "", '파일명': "", 'IP': ""
         }
-        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-        save_contracts_df(df)
+        insert_contracts_df(pd.DataFrame([new_row]))
         return jsonify({'status': 'success'})
     except Exception as e: return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @contract_bp.route('/admin/delete', methods=['POST'])
 def delete_contracts():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     indices = request.json.get('indices', [])
     try:
         df = get_contracts_df()
-        for idx in [int(i) for i in indices]:
+        contract_ids = [int(i) for i in indices]
+        files_to_delete = []
+        for idx in contract_ids:
             if idx in df.index:
                 filename = df.at[idx, '파일명']
                 if filename and not pd.isna(filename):
-                    p = os.path.join(CONTRACTS_DIR, str(filename))
-                    if os.path.exists(p): os.remove(p)
-        df = df.drop([int(i) for i in indices])
-        save_contracts_df(df)
+                    files_to_delete.append(os.path.join(CONTRACTS_DIR, str(filename)))
+        conn = get_db()
+        try:
+            delete_contract_records(conn, contract_ids)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+        for path in files_to_delete:
+            if os.path.isfile(path):
+                os.remove(path)
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"status": "error", "message": str(e)})
 
 @contract_bp.route('/admin/download_selected')
 def download_selected_contracts():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     id_param = request.args.get('ids', '')
@@ -1000,7 +1011,7 @@ def download_selected_contracts():
 
 @contract_bp.route('/admin/terms', methods=['GET'])
 def get_terms():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     contract_type = request.args.get('type', '방과후강사')
@@ -1029,7 +1040,7 @@ def get_terms():
 
 @contract_bp.route('/admin/terms', methods=['POST'])
 def save_terms():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     data = request.json
@@ -1066,7 +1077,7 @@ def save_terms():
 
 @contract_bp.route('/admin/preview', methods=['POST'])
 def preview_contract():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     contract_type = request.form.get('type', '방과후강사')
@@ -1141,14 +1152,17 @@ def login():
         name = data.get('name')
         ssn_raw = data.get('ssn', '')
         ssn_last4 = data.get('ssn_last4')
-        ssn = ssn_raw.replace("-", "")
+        ssn = re.sub(r'\D', '', str(ssn_raw))
+        ssn_last4 = re.sub(r'\D', '', str(ssn_last4 or ''))
         
         try:
             df = get_contracts_df()
-            user_rows = df[(df['성명'] == name) & (df['주민번호'].astype(str).str.replace("-", "") == ssn)]
-            if not user_rows.empty and ssn[-4:] == ssn_last4:
+            normalized_ssn = df['주민번호'].astype(str).str.replace(r'\D', '', regex=True)
+            user_rows = df[(df['성명'] == name) & (normalized_ssn == ssn)]
+            if not user_rows.empty and len(ssn) >= 4 and ssn[-4:] == ssn_last4:
                 session['contract_user_name'] = name
-                session['contract_user_ssn'] = ssn_raw 
+                session['contract_record_ids'] = [int(idx) for idx in user_rows.index]
+                session.pop('contract_user_ssn', None)
                 return redirect(url_for('contract.contract_list'))
             return "<script>alert('정보가 일치하지 않습니다.'); history.back();</script>"
         except Exception as e:
@@ -1159,7 +1173,12 @@ def login():
 def contract_list():
     if 'contract_user_name' not in session: return redirect(url_for('contract.login'))
     df = get_contracts_df()
-    my_contracts_df = df[(df['성명'] == session['contract_user_name']) & (df['주민번호'].astype(str) == session['contract_user_ssn']) & (df['계약완료일시'] == "")]
+    allowed_ids = {
+        int(value)
+        for value in session.get('contract_record_ids', [])
+        if str(value).isdigit()
+    }
+    my_contracts_df = df[df.index.isin(allowed_ids) & (df['계약완료일시'] == "")]
     contracts = []
     for idx, row in my_contracts_df.iterrows():
         item = row.to_dict()
@@ -1175,9 +1194,15 @@ def contract(safe_id):
     orig_idx = decoded[0]
     try:
         df = get_contracts_df()
-        if orig_idx >= len(df): return abort(404)
-        target_row = df.iloc[orig_idx]
-        if target_row['성명'] != session.get('contract_user_name'):
+        allowed_ids = {
+            int(value)
+            for value in session.get('contract_record_ids', [])
+            if str(value).isdigit()
+        }
+        if orig_idx not in df.index:
+            return abort(404)
+        target_row = df.loc[orig_idx]
+        if orig_idx not in allowed_ids:
             return "<script>alert('접근 권한이 없습니다.'); location.href='/contract/list';</script>"
         
         user_data = target_row.to_dict()
@@ -1215,7 +1240,12 @@ def save_contract():
     try:
         df = get_contracts_df()
 
-        if str(df.at[idx, '성명']) != session.get('contract_user_name'):
+        allowed_ids = {
+            int(value)
+            for value in session.get('contract_record_ids', [])
+            if str(value).isdigit()
+        }
+        if idx not in df.index or idx not in allowed_ids:
             return jsonify({"status": "error", "message": "잘못된 접근입니다."}), 403
 
         contract_type = str(df.at[idx, '계약구분']).strip()
@@ -1534,15 +1564,25 @@ def save_contract():
 
             user_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
 
-            df.at[idx, '연도'] = str(now_dt.year)
-            df.at[idx, '연락처'] = phone_value
-            df.at[idx, 'email'] = email_value
-            df.at[idx, '거주지'] = address_value
-            df.at[idx, '계약완료일시'] = now_dt.strftime('%Y-%m-%d %H:%M:%S')
-            df.at[idx, '파일명'] = filename
-            df.at[idx, 'IP'] = user_ip
-
-            save_contracts_df(df)
+            conn = get_db()
+            try:
+                changed = update_contract_record(conn, idx, {
+                    '연도': str(now_dt.year),
+                    '연락처': phone_value,
+                    'email': email_value,
+                    '거주지': address_value,
+                    '계약완료일시': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    '파일명': filename,
+                    'IP': user_ip,
+                })
+                if changed != 1:
+                    raise ValueError('계약 기록을 찾을 수 없습니다.')
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
 
             try:
                 recipients = [addr for addr in [email_value, SENDER_EMAIL] if addr]
@@ -1595,7 +1635,7 @@ def download_pdf(idx):
 
 @contract_bp.route('/admin/preview_pdf/<int:idx>')
 def preview_pdf(idx):
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     try:
@@ -1770,7 +1810,7 @@ def admin_logout():
 
 @contract_bp.route('/admin/send_remind_mail', methods=['POST'])
 def send_remind_mail():
-    if int(session.get('user_level', 99)) > 5:
+    if not is_admin_session():
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     indices = request.json.get('indices', [])

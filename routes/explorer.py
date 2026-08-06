@@ -2,16 +2,9 @@ from flask import Blueprint, render_template, session, abort, send_file, request
 import os
 import shutil
 from datetime import datetime
-from werkzeug.security import generate_password_hash
-
-# [중요] 실제 프로젝트의 DB 설정에 맞게 수정하세요.
-# 예: from app import db; from models import User
-try:
-    from models import db, User 
-except ImportError:
-    # 파일이 없거나 경로가 다를 경우를 대비한 가이드 (실제 환경에 맞춰 수정 필요)
-    db = None
-    User = None
+from .database import get_db
+from .security import admin_required, hash_password
+from .storage import DATA_ROOT
 
 # 'explorer'라는 이름의 독립된 Blueprint 생성
 explorer_bp = Blueprint('explorer', __name__)
@@ -20,48 +13,36 @@ explorer_bp = Blueprint('explorer', __name__)
 # [신규] Admin 비밀번호 변경 처리 라우트
 # ==========================================
 @explorer_bp.route('/change_admin_password', methods=['POST'])
+@admin_required
 def change_admin_password():
-    current_user = session.get('user_name')
-    if not current_user:
-        return "로그인이 필요합니다.", 401
-    
-    # [보안] 관리자 권한 확인 (필요 시 주석 해제)
-    # if current_user not in ['admin', '관리자']:
-    #     return "권한이 없습니다.", 403
-
     new_password = request.form.get('new_password')
     if not new_password:
         return "<script>alert('새 비밀번호를 입력해주세요.'); history.back();</script>"
-    
-    if db is None or User is None:
-        return "<script>alert('DB 모델(User, db)을 불러오지 못했습니다. explorer.py 상단의 import문을 확인하세요.'); history.back();</script>"
 
+    conn = get_db()
     try:
-        # DB에서 admin 계정 찾기
-        admin_user = User.query.filter_by(username='admin').first()
-        
-        if admin_user:
-            # 신규 비밀번호 해싱 후 저장
-            admin_user.password = generate_password_hash(new_password)
-            db.session.commit()
-            return f"""<script>alert('admin 계정의 비밀번호가 성공적으로 변경되었습니다.'); location.href='/explorer';</script>"""
-        else:
-            return f"""<script>alert('admin 계정을 데이터베이스에서 찾을 수 없습니다.'); location.href='/explorer';</script>"""
-            
+        cursor = conn.execute(
+            "UPDATE users SET password=? WHERE emp_no='admin'",
+            (hash_password(new_password),),
+        )
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return "<script>alert('admin 계정을 찾을 수 없습니다.'); location.href='/explorer';</script>", 404
+        conn.commit()
+        return "<script>alert('admin 계정의 비밀번호가 변경되었습니다.'); location.href='/explorer';</script>"
     except Exception as e:
-        db.session.rollback()
-        return f"""<script>alert('오류 발생: {str(e)}'); location.href='/explorer';</script>"""
+        conn.rollback()
+        return "<script>alert('비밀번호 변경 중 오류가 발생했습니다.'); location.href='/explorer';</script>", 500
+    finally:
+        conn.close()
 
 
 @explorer_bp.route('/', defaults={'req_path': ''}, strict_slashes=False)
 @explorer_bp.route('/<path:req_path>')
+@admin_required
 def file_explorer(req_path):
-    current_user = session.get('user_name')
-    if not current_user:
-        return "로그인이 필요합니다.", 401
-    
     # 탐색할 최상위 기본 경로 (Render 디스크 마운트 경로)
-    BASE_DIR = '/mnt/data'
+    BASE_DIR = str(DATA_ROOT)
     abs_path = os.path.abspath(os.path.join(BASE_DIR, req_path))
 
     # [핵심 보안] 상위 폴더(../)로 넘어가려는 해킹 시도 차단

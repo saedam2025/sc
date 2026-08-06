@@ -1,17 +1,20 @@
 from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, Response, jsonify
 from werkzeug.utils import secure_filename
 from .database import get_db
+from .security import admin_required, load_credential_secret
+from .storage import GALLERY_ROOT
 from cryptography.fernet import Fernet
+import base64
+import hashlib
 import os
 from PIL import Image
 
 gallery_bp = Blueprint('gallery', __name__)
 
-# [보안] Fernet 키 규격 준수
-KEY = b'uV5Z9X-o3J-7S-9k_L6_QW0Xm8k9V8P4f1L2M3N4O5A=' 
-cipher = Fernet(KEY)
+_secret_digest = hashlib.sha256(load_credential_secret().encode('utf-8')).digest()
+cipher = Fernet(base64.urlsafe_b64encode(_secret_digest))
 
-BASE_GALLERY_PATH = "/mnt/data/gallery"
+BASE_GALLERY_PATH = str(GALLERY_ROOT)
 UPLOAD_FOLDER = os.path.join(BASE_GALLERY_PATH, 'uploads')
 THUMB_FOLDER = os.path.join(BASE_GALLERY_PATH, 'thumbnails')
 
@@ -66,6 +69,7 @@ def index():
         return f"DB 에러: {e}. 'database.py'에서 init_db()가 실행되었는지 확인하세요."
 
 @gallery_bp.route('/gallery/add_tab', methods=['POST'])
+@admin_required
 def add_tab():
     conn = get_db()
     cursor = conn.execute("INSERT INTO gallery_tabs (name) VALUES ('새 갤러리 탭')")
@@ -75,6 +79,7 @@ def add_tab():
     return redirect(url_for('gallery.index', tab_id=new_id))
 
 @gallery_bp.route('/gallery/rename_tab', methods=['POST'])
+@admin_required
 def rename_tab():
     data = request.json
     tab_id = data.get('id')
@@ -87,6 +92,7 @@ def rename_tab():
     return jsonify({"status": "success"})
 
 @gallery_bp.route('/gallery/delete_tab/<int:tab_id>', methods=['POST'])
+@admin_required
 def delete_tab(tab_id):
     if tab_id != 1: # 1번 기본탭은 절대 삭제 불가
         conn = get_db()
@@ -98,6 +104,7 @@ def delete_tab(tab_id):
     return redirect(url_for('gallery.index'))
 
 @gallery_bp.route('/gallery/upload', methods=['POST'])
+@admin_required
 def upload():
     active_tab_id = request.args.get('tab_id', 1, type=int)
     files = request.files.getlist('file')
@@ -149,6 +156,7 @@ def upload():
     return redirect(url_for('gallery.index', tab_id=active_tab_id))
 
 @gallery_bp.route('/gallery/delete/<int:id>')
+@admin_required
 def delete(id):
     active_tab_id = request.args.get('tab_id', 1, type=int)
     conn = get_db()

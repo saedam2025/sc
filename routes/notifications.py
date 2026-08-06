@@ -1,10 +1,25 @@
 from flask import Blueprint, render_template, session
-import os
-import sqlite3
-import pandas as pd  # 🚀 증명서 건수 조회를 위해 추가
+from .socketio_ext import socketio
 from .database import get_db
 
 noti_bp = Blueprint('noti', __name__)
+
+
+@socketio.on('connect', namespace='/notifications')
+def notification_socket_connect():
+    if not session.get('emp_no'):
+        return False
+    return True
+
+
+def emit_notification_refresh(reason='changed'):
+    """연결된 메인 화면에 업무 알림 재조회 신호를 보낸다."""
+    socketio.emit(
+        'notifications_changed',
+        {'reason': str(reason or 'changed')},
+        namespace='/notifications',
+    )
+
 
 @noti_bp.route('/widget/notifications')
 def widget_notifications():
@@ -40,35 +55,28 @@ def widget_notifications():
             WHERE COALESCE(doc_status, '대기') NOT IN ('완료', '반려')
         """).fetchone()
         expense_wait_count = expense_wait[0] if expense_wait else 0
+
+        # 증명서 발급 대기
+        certificate_wait = conn.execute("""
+            SELECT COUNT(*)
+            FROM certificate_requests
+            WHERE status = '대기'
+        """).fetchone()
+        cert_wait_count = certificate_wait[0] if certificate_wait else 0
     except Exception as e:
         print("메인 DB 조회 오류:", e)
     finally:
         conn.close()
 
-    # 2. 🚀 증명서 발급 대기 건수 (엑셀 파일 조회)
+    # 2. 전자계약 미계약 건수 (saedam.db 통합 테이블)
     try:
-        # document.py에 정의된 경로 방식과 동일하게 설정
-        BASE_DIR = "/mnt/data" if os.path.exists("/mnt/data") else os.getcwd()
-        DATA_PATH = os.path.join(BASE_DIR, "certificates.xlsx")
-        
-        if os.path.exists(DATA_PATH):
-            df = pd.read_excel(DATA_PATH, dtype=str)
-            # '상태' 컬럼이 '대기'인 행의 개수
-            cert_wait_count = len(df[df['상태'] == '대기'])
-    except Exception as e:
-        print("증명서 엑셀 조회 오류:", e)
-
-    # 3. 전자계약 미계약 건수 (contracts.db)
-    try:
-        if os.path.exists('/mnt/data'): MOUNT_PATH = '/mnt/data'
-        else: MOUNT_PATH = os.getcwd()
-        CONTRACT_DB_FILE = os.path.join(MOUNT_PATH, 'contracts.db')
-        
-        if os.path.exists(CONTRACT_DB_FILE):
-            c_conn = sqlite3.connect(CONTRACT_DB_FILE)
-            c_row = c_conn.execute("SELECT COUNT(*) FROM contracts WHERE 계약완료일시 = '' OR 계약완료일시 IS NULL").fetchone()
-            contract_miss_count = c_row[0] if c_row else 0
-            c_conn.close()
+        c_conn = get_db()
+        c_row = c_conn.execute(
+            'SELECT COUNT(*) FROM contracts '
+            'WHERE "계약완료일시" = \'\' OR "계약완료일시" IS NULL'
+        ).fetchone()
+        contract_miss_count = c_row[0] if c_row else 0
+        c_conn.close()
     except Exception as e:
         print("전자계약 DB 조회 오류:", e)
 

@@ -5,14 +5,19 @@ import pandas as pd
 import base64
 import smtplib
 import os
-import platform
 import re
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from .database import get_db
-from .organization import ORGANIZATION_GROUPS, classify_organization_group
+from .security import admin_required, hash_password
+from .storage import DATA_ROOT, PROFILE_ROOT as _PROFILE_ROOT
+from .organization import (
+    DEPARTMENT_OPTIONS,
+    classify_organization_group,
+    normalize_department,
+)
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
 
@@ -20,12 +25,8 @@ user_mgmt_bp = Blueprint('user_mgmt', __name__)
 # [사진 저장 경로 설정 복구]
 # 윈도우는 현재폴더/id, 렌더 서버는 /mnt/data/id 에 영구 저장합니다.
 # =====================================================================
-if platform.system() == 'Windows':
-    BASE_DIR = os.getcwd() 
-else:
-    BASE_DIR = '/mnt/data' if os.path.exists('/mnt/data') else os.getcwd()
-
-PROFILE_ROOT = os.path.join(BASE_DIR, 'id')
+BASE_DIR = str(DATA_ROOT)
+PROFILE_ROOT = str(_PROFILE_ROOT)
 # =====================================================================
 
 LEVEL_MAP = {
@@ -40,10 +41,52 @@ GROUP_CODE_MAP = {
     "방과후강사": 12, "맞춤형강사": 13, "임시회원": 14
 }
 
+DEFAULT_POSITIONS = tuple(LEVEL_MAP.items())
+
+
+def _ensure_hr_schema(conn):
+    """기존 DB에서도 인사관리 설정을 즉시 사용할 수 있도록 보강한다."""
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS hr_positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            level INTEGER NOT NULL CHECK(level BETWEEN 0 AND 99),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if 'custom_department' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN custom_department TEXT DEFAULT ''")
+    if 'custom_team' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN custom_team TEXT DEFAULT ''")
+    conn.executemany('''
+        INSERT OR IGNORE INTO hr_positions (name, level, sort_order)
+        VALUES (?, ?, ?)
+    ''', ((name, level, order) for order, (name, level) in enumerate(DEFAULT_POSITIONS, 1)))
+    conn.commit()
+
+
+def _position_rows(conn):
+    _ensure_hr_schema(conn)
+    return conn.execute('''
+        SELECT id, name, level, sort_order,
+               (SELECT COUNT(*) FROM users WHERE position = hr_positions.name) AS user_count
+        FROM hr_positions
+        ORDER BY level ASC, sort_order ASC, name ASC
+    ''').fetchall()
+
+
+def _position_level(conn, position, default=14):
+    _ensure_hr_schema(conn)
+    row = conn.execute("SELECT level FROM hr_positions WHERE name = ?", (str(position or '').strip(),)).fetchone()
+    return int(row['level']) if row else default
+
 def generate_sd_emp_no(conn, position):
     # 정수로 변경된 GROUP_CODE_MAP에 맞춰서 두 자리 문자열로 자동 변환 (예: 5 -> "05")
     # 등록되지 않은 직급일 경우 기본값을 14(임시회원)로 처리합니다.
-    group_code = GROUP_CODE_MAP.get(position, 14)
+    group_code = _position_level(conn, position, GROUP_CODE_MAP.get(position, 14))
     prefix = f"sd{int(group_code):02d}"
     
     row = conn.execute("SELECT emp_no FROM users WHERE emp_no LIKE ? ORDER BY emp_no DESC LIMIT 1", (f"{prefix}%",)).fetchone()
@@ -91,6 +134,7 @@ def send_real_email(target_email, invite_link):
         return False
 
 @user_mgmt_bp.route('/')
+@admin_required
 def index():
     try:
         conn = get_db()
@@ -107,8 +151,103 @@ def index():
 
     return render_template('user_list.html')
 
+
+@user_mgmt_bp.route('/positions', methods=['GET', 'POST'])
+@admin_required
+def manage_positions():
+    conn = get_db()
+    try:
+        if request.method == 'GET':
+            rows = _position_rows(conn)
+            return jsonify([
+                {
+                    'id': row['id'], 'name': row['name'], 'level': row['level'],
+                    'sort_order': row['sort_order'], 'user_count': row['user_count'],
+                }
+                for row in rows
+            ])
+
+        data = request.get_json(silent=True) or {}
+        name = str(data.get('name') or '').strip()
+        if not name or len(name) > 40:
+            return jsonify({'status': 'error', 'message': '직급명은 1~40자로 입력해주세요.'}), 400
+        try:
+            level = int(data.get('level'))
+        except (TypeError, ValueError):
+            return jsonify({'status': 'error', 'message': '레벨을 숫자로 입력해주세요.'}), 400
+        if level < 0 or level > 99:
+            return jsonify({'status': 'error', 'message': '레벨은 0~99 범위로 입력해주세요.'}), 400
+
+        _ensure_hr_schema(conn)
+        sort_order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM hr_positions").fetchone()[0]
+        try:
+            conn.execute(
+                "INSERT INTO hr_positions (name, level, sort_order) VALUES (?, ?, ?)",
+                (name, level, sort_order),
+            )
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            if 'UNIQUE' in str(exc).upper():
+                return jsonify({'status': 'error', 'message': '이미 등록된 직급입니다.'}), 409
+            raise
+        return jsonify({'status': 'success', 'message': '직급을 생성했습니다.'}), 201
+    finally:
+        conn.close()
+
+
+@user_mgmt_bp.route('/positions/<int:position_id>', methods=['PUT', 'DELETE'])
+@admin_required
+def update_position(position_id):
+    conn = get_db()
+    try:
+        _ensure_hr_schema(conn)
+        row = conn.execute("SELECT id, name, level FROM hr_positions WHERE id = ?", (position_id,)).fetchone()
+        if not row:
+            return jsonify({'status': 'error', 'message': '직급을 찾을 수 없습니다.'}), 404
+
+        if request.method == 'DELETE':
+            used_count = conn.execute("SELECT COUNT(*) FROM users WHERE position = ?", (row['name'],)).fetchone()[0]
+            if used_count:
+                return jsonify({
+                    'status': 'error',
+                    'message': f"{used_count}명의 구성원이 사용 중인 직급은 삭제할 수 없습니다.",
+                }), 409
+            conn.execute("DELETE FROM hr_positions WHERE id = ?", (position_id,))
+            conn.commit()
+            return jsonify({'status': 'success', 'message': '직급을 삭제했습니다.'})
+
+        data = request.get_json(silent=True) or {}
+        name = str(data.get('name') or '').strip()
+        if not name or len(name) > 40:
+            return jsonify({'status': 'error', 'message': '직급명은 1~40자로 입력해주세요.'}), 400
+        try:
+            level = int(data.get('level'))
+        except (TypeError, ValueError):
+            return jsonify({'status': 'error', 'message': '레벨을 숫자로 입력해주세요.'}), 400
+        if level < 0 or level > 99:
+            return jsonify({'status': 'error', 'message': '레벨은 0~99 범위로 입력해주세요.'}), 400
+
+        duplicate = conn.execute(
+            "SELECT id FROM hr_positions WHERE name = ? AND id != ?", (name, position_id)
+        ).fetchone()
+        if duplicate:
+            return jsonify({'status': 'error', 'message': '이미 등록된 직급입니다.'}), 409
+
+        # 직급명/레벨 변경은 해당 직급을 사용하는 구성원에게 함께 반영한다.
+        conn.execute(
+            "UPDATE hr_positions SET name = ?, level = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (name, level, position_id),
+        )
+        conn.execute("UPDATE users SET position = ?, level = ? WHERE position = ?", (name, level, row['name']))
+        conn.commit()
+        return jsonify({'status': 'success', 'message': '직급과 레벨을 수정했습니다.'})
+    finally:
+        conn.close()
+
 # 🚀 신규 추가: 인트라넷 최초 구동 시 관리자 비밀번호 입력 라우트
 @user_mgmt_bp.route('/setup_admin', methods=['POST'])
+@admin_required
 def setup_admin():
     try:
         data = request.json
@@ -117,11 +256,21 @@ def setup_admin():
             return jsonify({"status": "error", "message": "비밀번호를 입력해주세요."}), 400
             
         conn = get_db()
+        _ensure_hr_schema(conn)
+        existing = conn.execute(
+            "SELECT id FROM users WHERE emp_no='admin' LIMIT 1"
+        ).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({
+                "status": "error",
+                "message": "관리자 계정이 이미 설정되어 있습니다."
+            }), 409
         today = datetime.now().strftime('%Y-%m-%d')
         conn.execute('''
             INSERT INTO users (emp_no, name, password, position, level, rrn, email, status, join_date, profile_icon, department)
             VALUES ('admin', 'admin', ?, '최고관리자', 1, '-', 'admin@admin.com', '승인', ?, '👑', '본부')
-        ''', (password, today))
+        ''', (hash_password(password), today))
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "최고관리자 계정이 성공적으로 설정되었습니다."})
@@ -137,6 +286,7 @@ def invite_page(token):
         return "유효하지 않은 링크입니다.", 403
 
 @user_mgmt_bp.route('/send_invite', methods=['POST'])
+@admin_required
 def send_invite():
     try:
         data = request.json
@@ -157,10 +307,12 @@ def register():
         
         password = data.get('password')
         password_confirm = data.get('password_confirm')
-        if password and password_confirm and password != password_confirm:
+        if not password:
+            return jsonify({"status": "error", "message": "비밀번호를 입력해주세요."}), 400
+        if password != password_confirm:
             return jsonify({"status": "error", "message": "비밀번호가 일치하지 않습니다."}), 400
         department = str(data.get('department', '')).strip()
-        if department not in ORGANIZATION_GROUPS:
+        if department not in DEPARTMENT_OPTIONS:
             return jsonify({
                 "status": "error",
                 "message": "소속부서를 선택해주세요."
@@ -187,13 +339,18 @@ def register():
             profile_path = f"/user/profile_img/{safe_filename}"
 
         icon = data.get('profile_icon', '👤')
+        requested_position = str(data.get('position') or '미지정').strip()
+        requested_level = _position_level(conn, requested_position, 14)
         conn.execute('''
-            INSERT INTO users (name, password, position, level, rrn, email, phone, 
-                               address, department, bank_account, profile_path, status, profile_icon)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '대기', ?)
-        ''', (data.get('name'), str(password), data.get('position'), 10, data.get('rrn', ''), 
+            INSERT INTO users (name, password, position, level, rrn, email, phone,
+                               address, department, bank_account, profile_path, status, profile_icon,
+                               custom_department, custom_team)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '대기', ?, ?, ?)
+        ''', (data.get('name'), hash_password(password), requested_position, requested_level, data.get('rrn', ''),
               data.get('email', ''), data.get('phone', ''), data.get('address', ''), 
-              department, data.get('bank_account', ''), profile_path, icon))
+              department, data.get('bank_account', ''), profile_path, icon,
+              str(data.get('custom_department') or '').strip()[:100],
+              str(data.get('custom_team') or '').strip()[:100]))
         
         conn.commit()
         conn.close()
@@ -202,6 +359,7 @@ def register():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/approve', methods=['POST'])
+@admin_required
 def approve():
     try:
         data = request.json
@@ -209,9 +367,14 @@ def approve():
         pos = data['approved_position']
         
         conn = get_db()
+        _ensure_hr_schema(conn)
+        position_row = conn.execute("SELECT level FROM hr_positions WHERE name = ?", (pos,)).fetchone()
+        if not position_row:
+            conn.close()
+            return jsonify({"status": "error", "message": "등록된 직급을 선택해주세요."}), 400
         emp_no = generate_sd_emp_no(conn, pos)
         join_date = datetime.now().strftime('%Y-%m-%d')
-        level = LEVEL_MAP.get(pos, 10)
+        level = int(position_row['level'])
         
         conn.execute("UPDATE users SET emp_no=?, position=?, level=?, status='승인', join_date=? WHERE id=?", 
                      (emp_no, pos, level, join_date, user_id))
@@ -223,6 +386,7 @@ def approve():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/retire', methods=['POST'])
+@admin_required
 def retire_user():
     try:
         data = request.json
@@ -239,13 +403,29 @@ def retire_user():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/update', methods=['POST'])
+@admin_required
 def update_user():
     try:
         data = request.form
         user_id = int(data.get('user_idx', 0))
         profile_file = request.files.get('profile_image')
+        department = str(data.get('department', '')).strip()
+        if department not in DEPARTMENT_OPTIONS:
+            return jsonify({
+                "status": "error",
+                "message": "소속부서는 본부, 북부지점, 기타 중에서 선택해주세요."
+            }), 400
         
         conn = get_db()
+        _ensure_hr_schema(conn)
+        position = str(data.get('position') or '').strip()
+        position_row = conn.execute("SELECT level FROM hr_positions WHERE name = ?", (position,)).fetchone()
+        if not position_row:
+            conn.close()
+            return jsonify({"status": "error", "message": "등록된 직급을 선택해주세요."}), 400
+        level = int(position_row['level'])
+        custom_department = str(data.get('custom_department') or '').strip()[:100]
+        custom_team = str(data.get('custom_team') or '').strip()[:100]
         
         if profile_file and profile_file.filename != '':
             os.makedirs(PROFILE_ROOT, exist_ok=True)
@@ -264,25 +444,29 @@ def update_user():
             # 1. 새 비밀번호가 입력된 경우 (비밀번호 포함 전체 업데이트)
             conn.execute("""
                 UPDATE users 
-                SET password=?, position=?, level=?, phone=?, email=?, 
-                    address=?, department=?, bank_account=?, profile_icon=?
+                SET password=?, position=?, level=?, phone=?, email=?,
+                    address=?, department=?, bank_account=?, profile_icon=?,
+                    custom_department=?, custom_team=?
                 WHERE id=?
             """, (
-                new_password, data.get('position'), int(data.get('level', 10)), 
+                hash_password(new_password), position, level,
                 data.get('phone', ''), data.get('email', ''), data.get('address', ''), 
-                data.get('department', ''), data.get('bank_account', ''), data.get('profile_icon', '👤'), user_id
+                department, data.get('bank_account', ''), data.get('profile_icon', '👤'),
+                custom_department, custom_team, user_id
             ))
         else:
             # 2. 비밀번호 칸을 비워둔 경우 (기존 비밀번호는 유지하고 나머지만 업데이트)
             conn.execute("""
                 UPDATE users 
-                SET position=?, level=?, phone=?, email=?, 
-                    address=?, department=?, bank_account=?, profile_icon=?
+                SET position=?, level=?, phone=?, email=?,
+                    address=?, department=?, bank_account=?, profile_icon=?,
+                    custom_department=?, custom_team=?
                 WHERE id=?
             """, (
-                data.get('position'), int(data.get('level', 10)), 
+                position, level,
                 data.get('phone', ''), data.get('email', ''), data.get('address', ''), 
-                data.get('department', ''), data.get('bank_account', ''), data.get('profile_icon', '👤'), user_id
+                department, data.get('bank_account', ''), data.get('profile_icon', '👤'),
+                custom_department, custom_team, user_id
             ))
         
         conn.commit()
@@ -293,6 +477,7 @@ def update_user():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/delete', methods=['POST'])
+@admin_required
 def delete_user():
     try:
         data = request.json
@@ -308,8 +493,10 @@ def delete_user():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/list')
+@admin_required
 def get_user_list():
     conn = get_db()
+    _ensure_hr_schema(conn)
     users = conn.execute("SELECT * FROM users ORDER BY level ASC, id ASC").fetchall()
     conn.close()
     
@@ -326,14 +513,16 @@ def get_user_list():
         icon = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
         profile_path = u['profile_path'] if 'profile_path' in u.keys() else None
         department = u['department'] if 'department' in u.keys() else ''
+        custom_department = u['custom_department'] if 'custom_department' in u.keys() else ''
+        custom_team = u['custom_team'] if 'custom_team' in u.keys() else ''
         position = u['position'] or ''
         result.append({
             "id": u['id'], "사번": u['emp_no'] or '', "이름": u['name'] or '',
-            "직급": position, "레벨": u['level'] or 10, "주민번호": u['rrn'] or '',
-            "비밀번호": u['password'] or '', 
+            "직급": position, "레벨": u['level'] if u['level'] is not None else 10, "주민번호": u['rrn'] or '',
             "이메일": u['email'] or '', "전화번호": u['phone'] or '', 
             "주소": u['address'] if 'address' in u.keys() else '',
-            "소속": department,
+            "소속": normalize_department(department),
+            "별도소속": custom_department or '', "별도팀": custom_team or '',
             "조직그룹": classify_organization_group(department, position),
             "계좌": u['bank_account'] if 'bank_account' in u.keys() else '',
             "입사일": u['join_date'] or '', "퇴사일": u['retire_date'] or '', 

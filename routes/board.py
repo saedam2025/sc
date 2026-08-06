@@ -4,10 +4,12 @@ import os
 import uuid
 from datetime import datetime, timezone, timedelta
 from .database import get_db
+from .security import admin_required
+from .storage import BOARD_UPLOADS
 
 board_bp = Blueprint('board', __name__, url_prefix='/board')
 
-UPLOAD_FOLDER = '/mnt/data/board_uploads'
+UPLOAD_FOLDER = str(BOARD_UPLOADS)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def init_board_db():
@@ -284,6 +286,7 @@ def board_delete(board_en, post_id):
     return jsonify({"status": "success"})
 
 @board_bp.route('/admin/create', methods=['POST'])
+@admin_required
 def create_board():
     data = request.get_json()
     conn = get_db()
@@ -301,6 +304,7 @@ def create_board():
         conn.close()
 
 @board_bp.route('/admin/setup', methods=['GET'])
+@admin_required
 def admin_setup_page():
     return render_template('board/admin_create.html')
 

@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from numbers import Number
 from openpyxl import load_workbook
+from .storage import DEPOSIT_UPLOADS
 
 # 블루프린트 이름 지정
 excel_bp = Blueprint("excel_generator", __name__)
@@ -96,7 +97,7 @@ def deposit_account_from_cell(value, number_format):
     return restored, " ".join(warnings), True
 
 def deposit_upload_path():
-    upload_root = os.path.join(os.getcwd(), "uploads_deposit")
+    upload_root = str(DEPOSIT_UPLOADS)
     os.makedirs(upload_root, exist_ok=True)
     return os.path.join(upload_root, f"_upload_{uuid.uuid4().hex}.xlsx")
 

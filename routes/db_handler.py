@@ -1,7 +1,8 @@
 import pandas as pd
 import os
+from .storage import DATA_ROOT
 
-STORAGE_DIR = '/mnt/data' if os.path.exists('/mnt/data') else 'database'
+STORAGE_DIR = str(DATA_ROOT)
 EXCEL_FILE = os.path.join(STORAGE_DIR, 'tasks.xlsx')
 OWNER_FILE = os.path.join(STORAGE_DIR, 'owners.xlsx')
 ATTEND_FILE = os.path.join(STORAGE_DIR, 'attendance.xlsx')

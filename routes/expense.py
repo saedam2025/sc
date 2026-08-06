@@ -18,6 +18,8 @@ from openpyxl import load_workbook
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .database import get_db
+from .storage import APP_ROOT, UPLOADS_ROOT
+from .security import is_admin_session
 
 expense_bp = Blueprint('expense', __name__)
 
@@ -32,15 +34,14 @@ MAX_BULK_EMAIL_REPORTS = 50
 MAX_BULK_EMAIL_ZIP_SIZE = 17 * 1024 * 1024
 RECEIPT_IMAGE_MAX_SIZE = (1920, 1080)
 RECEIPT_IMAGE_QUALITY = 85
-UPLOAD_FOLDER = '/mnt/data/uploads'
+UPLOAD_FOLDER = str(UPLOADS_ROOT)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 MAIL_SETTINGS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mail_settings.json'))
-EXPENSE_TEMPLATE_PATH = os.path.abspath(os.path.join(
-    os.path.dirname(__file__),
-    '..',
-    '-==메뉴얼',
-    '지출결의서(배호영2026-06).xlsx'
-))
+EXPENSE_TEMPLATE_PATH = str(
+    APP_ROOT
+    / 'manuals'
+    / '지출결의서_기본양식.xlsx'
+)
 
 HEADER_ALIASES = {
     'expense_date': ['일자', '날짜', '사용일', '사용일자', '지출일', '지출일자', '거래일자', '집행일자'],
@@ -462,7 +463,7 @@ def _payment_status_for_doc(doc_status):
 
 
 def _can_manage_expenses():
-    return session.get('user_name') == 'admin' or session.get('user_level', 99) <= 5
+    return is_admin_session()
 
 
 def _html_text(value):
@@ -1424,7 +1425,7 @@ def index():
     ensure_expense_schema()
     current_user = session.get('user_name', '')
     user_level = session.get('user_level', 99)
-    can_see_all = current_user == 'admin' or user_level <= 5
+    can_see_all = is_admin_session()
 
     filters = {
         'q': request.args.get('q', '').strip(),

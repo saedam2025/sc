@@ -1,28 +1,296 @@
 import sqlite3
 import os
-import platform
 import secrets
+from datetime import date, datetime
 
-if platform.system() == 'Windows':
-    BASE_DIR = os.getcwd() 
-else:
-    BASE_DIR = '/mnt/data' if os.path.exists('/mnt/data') else os.getcwd()
+from .storage import (
+    AI_MAIL_UPLOADS as _AI_MAIL_UPLOADS,
+    APP_ROOT,
+    DATA_ROOT,
+    GALLERY_ROOT as _GALLERY_ROOT,
+    GALLERY_THUMBS as _GALLERY_THUMBS,
+    GALLERY_UPLOADS as _GALLERY_UPLOADS,
+    MAIN_DB_FILE,
+    PROFILE_ROOT as _PROFILE_ROOT,
+    SCHOOL_UPLOADS as _SCHOOL_UPLOADS,
+    bootstrap_legacy_files,
+)
 
-DB_FILE = os.path.join(BASE_DIR, 'saedam.db')
-GALLERY_ROOT = os.path.join(BASE_DIR, 'gallery')
-GALLERY_UPLOADS = os.path.join(GALLERY_ROOT, 'uploads')
-GALLERY_THUMBS = os.path.join(GALLERY_ROOT, 'thumbnails')
-PROFILE_ROOT = os.path.join(BASE_DIR, 'id')
-SCHOOL_UPLOADS = os.path.join(BASE_DIR, 'school_uploads')
-AI_MAIL_UPLOADS = os.path.join(BASE_DIR, 'ai_mail_uploads')
+
+BASE_DIR = str(DATA_ROOT)
+DB_FILE = str(MAIN_DB_FILE)
+GALLERY_ROOT = str(_GALLERY_ROOT)
+GALLERY_UPLOADS = str(_GALLERY_UPLOADS)
+GALLERY_THUMBS = str(_GALLERY_THUMBS)
+PROFILE_ROOT = str(_PROFILE_ROOT)
+SCHOOL_UPLOADS = str(_SCHOOL_UPLOADS)
+AI_MAIL_UPLOADS = str(_AI_MAIL_UPLOADS)
+
+
+def _bootstrap_main_database():
+    """빈 영구 디스크에는 프로젝트 DB를 자동으로 최초 복제한다."""
+    bundled_db = APP_ROOT / 'saedam.db'
+    target_db = MAIN_DB_FILE
+    if target_db.exists() or not bundled_db.is_file():
+        return
+    target_db.parent.mkdir(parents=True, exist_ok=True)
+    source_conn = sqlite3.connect(str(bundled_db))
+    target_conn = sqlite3.connect(str(target_db))
+    try:
+        source_conn.backup(target_conn)
+    finally:
+        target_conn.close()
+        source_conn.close()
+
+
+bootstrap_legacy_files()
+_bootstrap_main_database()
 
 def get_db():
-    if platform.system() == 'Windows':
-        print(f"DEBUG: 현재 연결된 DB 파일 위치 -> {DB_FILE}")
-        
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def ensure_certificate_schema(conn):
+    """증명발급 신청을 saedam.db에 저장하기 위한 표준 스키마."""
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS certificate_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            applied_date TEXT,
+            applicant_type TEXT,
+            certificate_type TEXT NOT NULL,
+            applicant_name TEXT NOT NULL,
+            resident_number TEXT,
+            home_address TEXT,
+            work_start_date TEXT,
+            work_end_date TEXT,
+            workplace TEXT,
+            subject_or_duty TEXT,
+            purpose TEXT,
+            position TEXT,
+            email TEXT,
+            status TEXT NOT NULL DEFAULT '대기',
+            issued_date TEXT,
+            issue_number TEXT,
+            termination_reason TEXT,
+            filename TEXT,
+            legacy_row_number INTEGER UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    request_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute('PRAGMA table_info(certificate_requests)').fetchall()
+    }
+    request_additions = {
+        'workgroup_id': 'INTEGER',
+        'company_id': 'INTEGER',
+        'workgroup_name': "TEXT NOT NULL DEFAULT ''",
+        'company_name': "TEXT NOT NULL DEFAULT ''",
+    }
+    for column_name, column_ddl in request_additions.items():
+        if column_name not in request_columns:
+            conn.execute(
+                f'ALTER TABLE certificate_requests ADD COLUMN {column_name} {column_ddl}'
+            )
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS certificate_companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            representative_name TEXT NOT NULL,
+            business_number TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            seal_filename TEXT NOT NULL DEFAULT '',
+            seal_path TEXT NOT NULL DEFAULT '',
+            logo_filename TEXT NOT NULL DEFAULT '',
+            logo_path TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    company_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute('PRAGMA table_info(certificate_companies)').fetchall()
+    }
+    for column_name in ('logo_filename', 'logo_path'):
+        if column_name not in company_columns:
+            conn.execute(
+                f"ALTER TABLE certificate_companies ADD COLUMN {column_name} TEXT NOT NULL DEFAULT ''"
+            )
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS certificate_workgroups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            company_id INTEGER NOT NULL,
+            sender_id INTEGER,
+            access_token TEXT NOT NULL UNIQUE,
+            allow_instructor INTEGER NOT NULL DEFAULT 1,
+            allow_employee INTEGER NOT NULL DEFAULT 1,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (company_id) REFERENCES certificate_companies(id),
+            FOREIGN KEY (sender_id) REFERENCES ai_mail_senders(id)
+        )
+    ''')
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_certificate_requests_status '
+        'ON certificate_requests(status)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_certificate_requests_type '
+        'ON certificate_requests(certificate_type)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_certificate_requests_name '
+        'ON certificate_requests(applicant_name)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_certificate_requests_workgroup '
+        'ON certificate_requests(workgroup_id)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_certificate_workgroups_active '
+        'ON certificate_workgroups(is_active, company_id)'
+    )
+
+
+def _legacy_certificate_value(value):
+    if value is None:
+        return ''
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return str(value).strip()
+
+
+def migrate_legacy_certificates(conn):
+    """기존 certificates.xlsx를 최초 1회만 SQLite로 안전하게 이관한다."""
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS admin_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    ensure_certificate_schema(conn)
+
+    migration_key = 'certificate_sqlite_migration_v1'
+    migrated = conn.execute(
+        'SELECT value FROM admin_settings WHERE key=?',
+        (migration_key,),
+    ).fetchone()
+    if migrated:
+        return int(conn.execute(
+            'SELECT COUNT(*) FROM certificate_requests'
+        ).fetchone()[0])
+
+    existing_count = int(conn.execute(
+        'SELECT COUNT(*) FROM certificate_requests'
+    ).fetchone()[0])
+    if existing_count:
+        conn.execute('''
+            INSERT INTO admin_settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value=excluded.value,
+                updated_at=CURRENT_TIMESTAMP
+        ''', (migration_key, f'existing:{existing_count}'))
+        return existing_count
+
+    candidates = [
+        os.path.join(BASE_DIR, 'certificates.xlsx'),
+        str(APP_ROOT / 'certificates.xlsx'),
+    ]
+    legacy_path = next(
+        (path for path in candidates if os.path.exists(path)),
+        None,
+    )
+    if not legacy_path:
+        conn.execute('''
+            INSERT INTO admin_settings (key, value, updated_at)
+            VALUES (?, 'no_legacy_file', CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET
+                value=excluded.value,
+                updated_at=CURRENT_TIMESTAMP
+        ''', (migration_key,))
+        return 0
+
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(legacy_path, read_only=True, data_only=True)
+    worksheet = workbook.active
+    rows = worksheet.iter_rows(values_only=True)
+    headers = [_legacy_certificate_value(value) for value in next(rows, ())]
+    inserted_count = 0
+
+    try:
+        for row_number, values in enumerate(rows, start=2):
+            record = {
+                header: _legacy_certificate_value(value)
+                for header, value in zip(headers, values)
+                if header
+            }
+            if not any(record.values()):
+                continue
+            certificate_type = record.get('증명서종류', '')
+            applicant_name = record.get('성명', '')
+            if not certificate_type or not applicant_name:
+                continue
+            applicant_type = record.get('신청구분', '')
+            if not applicant_type:
+                applicant_type = '강사' if '강사' in certificate_type else '임직원'
+
+            conn.execute('''
+                INSERT OR IGNORE INTO certificate_requests (
+                    applied_date, applicant_type, certificate_type,
+                    applicant_name, resident_number, home_address,
+                    work_start_date, work_end_date, workplace,
+                    subject_or_duty, purpose, position, email, status,
+                    issued_date, issue_number, termination_reason, filename,
+                    legacy_row_number
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                record.get('신청일', ''),
+                applicant_type,
+                certificate_type,
+                applicant_name,
+                record.get('주민번호', ''),
+                record.get('자택주소', ''),
+                record.get('근무시작일', ''),
+                record.get('근무종료일', ''),
+                record.get('근무장소', ''),
+                record.get('강의과목', ''),
+                record.get('용도', ''),
+                record.get('직책', ''),
+                record.get('이메일주소', ''),
+                record.get('상태', '') or '대기',
+                record.get('발급일', ''),
+                record.get('발급번호', ''),
+                record.get('종료사유', ''),
+                record.get('파일명', ''),
+                row_number,
+            ))
+            inserted_count += int(conn.execute(
+                'SELECT changes()'
+            ).fetchone()[0])
+    finally:
+        workbook.close()
+
+    conn.execute('''
+        INSERT INTO admin_settings (key, value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            value=excluded.value,
+            updated_at=CURRENT_TIMESTAMP
+    ''', (migration_key, f'imported:{inserted_count}'))
+    return inserted_count
+
 
 def init_db():
     os.makedirs(GALLERY_UPLOADS, exist_ok=True)
@@ -33,6 +301,7 @@ def init_db():
     
     conn = get_db()
     c = conn.cursor()
+    ensure_certificate_schema(conn)
     
     c.execute('''CREATE TABLE IF NOT EXISTS tasks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,11 +385,43 @@ def init_db():
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
     )''')
 
+    # 인사관리에서 직급명과 권한 레벨을 화면으로 관리한다.
+    c.execute('''CREATE TABLE IF NOT EXISTS hr_positions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        level INTEGER NOT NULL CHECK(level BETWEEN 0 AND 99),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    default_positions = (
+        ('최고관리자', 0), ('대표이사', 1), ('이사', 2), ('실장', 3),
+        ('팀장', 4), ('사원', 5), ('계약직', 6), ('센터장(팀장)', 7),
+        ('센터장', 8), ('전담코디', 9), ('보조코디', 10), ('안전코디', 11),
+        ('방과후강사', 12), ('맞춤형강사', 13), ('임시회원', 14),
+    )
+    c.executemany('''
+        INSERT OR IGNORE INTO hr_positions (name, level, sort_order)
+        VALUES (?, ?, ?)
+    ''', ((name, level, order) for order, (name, level) in enumerate(default_positions, 1)))
+
     c.execute('''CREATE TABLE IF NOT EXISTS contact_center_teams (
         emp_no TEXT PRIMARY KEY,
         team_no INTEGER NOT NULL,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS saved_contact_directories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_emp_no TEXT NOT NULL,
+        name TEXT NOT NULL,
+        settings_json TEXT NOT NULL DEFAULT '{}',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(owner_emp_no, name)
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_saved_contact_directories_owner
+                 ON saved_contact_directories(owner_emp_no, updated_at)''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS login_activity (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -614,6 +915,8 @@ def init_db():
         "ALTER TABLE users ADD COLUMN bank_account TEXT",
         "ALTER TABLE users ADD COLUMN department TEXT",
         "ALTER TABLE users ADD COLUMN profile_path TEXT",
+        "ALTER TABLE users ADD COLUMN custom_department TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN custom_team TEXT DEFAULT ''",
         "ALTER TABLE approvals ADD COLUMN receivers TEXT DEFAULT ''",
         "ALTER TABLE approvals ADD COLUMN cc_receivers TEXT DEFAULT ''",
         "ALTER TABLE approvals ADD COLUMN filesize TEXT DEFAULT ''",
@@ -686,6 +989,11 @@ def init_db():
     c.execute('CREATE INDEX IF NOT EXISTS idx_login_activity_created_at ON login_activity(created_at)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_login_activity_emp_created ON login_activity(emp_no, created_at)')
     c.execute('CREATE INDEX IF NOT EXISTS idx_usage_user_menu_last ON usage_user_menu_totals(emp_no, last_used)')
+    c.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_emp_no_unique
+        ON users(emp_no)
+        WHERE emp_no IS NOT NULL AND TRIM(emp_no) != ''
+    ''')
 
     # 기존 원본 로그에서 화면 접속으로 판단되는 기록만 1회 이관한다.
     # API 폴링, 파일/썸네일, 상태 조회는 과거 이용통계를 부풀렸으므로 누계에서 제외한다.
@@ -823,6 +1131,12 @@ def init_db():
             VALUES ('usage_stats_v2_backfilled', '1', CURRENT_TIMESTAMP)
         ''')
 
+    migrate_legacy_certificates(conn)
+    from .contract_repository import ensure_contract_schema_and_migrate
+    contract_count = ensure_contract_schema_and_migrate(conn)
+    from .verified_contract_repository import ensure_verified_contract_schema
+    ensure_verified_contract_schema(conn)
+
     tabs_count = c.execute("SELECT count(*) FROM gallery_tabs").fetchone()[0]
     if tabs_count == 0:
         c.execute("INSERT INTO gallery_tabs (id, name) VALUES (1, '기본 갤러리')")
@@ -833,6 +1147,9 @@ def init_db():
 
     conn.commit()
     conn.close()
+    if contract_count:
+        from .contract_repository import archive_legacy_contract_database
+        archive_legacy_contract_database()
     print("DATABASE INITIALIZED SUCCESSFULLY")
 
 if __name__ == "__main__":

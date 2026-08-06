@@ -1,28 +1,36 @@
-ORGANIZATION_GROUPS = ('본부', '북부지점', '센터장', '강사', '기타')
+DEPARTMENT_OPTIONS = ('본부', '북부지점', '기타')
+ORGANIZATION_GROUPS = ('본부', '북부지점', '센터장', '코디', '강사', '기타')
 
-HEADQUARTERS_POSITIONS = {
-    '최고관리자', '대표이사', '이사', '실장', '팀장', '사원', '계약직'
+POSITION_GROUPS = {
+    '본부': {'대표이사', '이사', '실장', '팀장', '사원', '계약직'},
+    '센터장': {'센터장(팀장)', '센터장'},
+    '코디': {'전담코디', '보조코디', '안전코디'},
+    '강사': {'방과후강사', '맞춤형강사'},
+    '기타': {'임시회원'},
 }
 
 
+def normalize_department(department):
+    """기존 자유입력 소속을 새 3개 부서 선택값으로 안전하게 표시한다."""
+    department = str(department or '').strip()
+    if '북부지점' in department or '북부 지점' in department:
+        return '북부지점'
+    if department in {'본부', '본사'}:
+        return '본부'
+    return '기타'
+
+
 def classify_organization_group(department, position):
-    """선택한 소속부서를 우선하여 사용자의 조직도 그룹을 반환한다."""
+    """북부지점 소속을 우선하고, 그 외 사용자는 직급으로 조직도 그룹을 정한다."""
     department = str(department or '').strip()
     position = str(position or '').strip()
 
-    # 새 인사관리 선택값은 직급보다 우선한다.
-    if department in ORGANIZATION_GROUPS:
-        return department
-
-    # 기존 자유입력 데이터도 새 5개 그룹에 맞춰 호환 분류한다.
+    # 북부지점 소속은 직급과 관계없이 하나의 지점 그룹으로 묶는다.
     if '북부지점' in department or '북부 지점' in department:
         return '북부지점'
-    if '본부' in department or '본사' in department:
-        return '본부'
-    if '센터장' in department or '센터장' in position or '코디' in position:
-        return '센터장'
-    if '강사' in department or '강사' in position:
-        return '강사'
-    if position in HEADQUARTERS_POSITIONS:
-        return '본부'
+
+    for group, positions in POSITION_GROUPS.items():
+        if position in positions:
+            return group
+
     return '기타'

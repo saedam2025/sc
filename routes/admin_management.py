@@ -6,6 +6,8 @@ import shutil
 from datetime import datetime
 
 from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_db
+from .security import hash_password, is_admin_session
+from .storage import CHAT_UPLOADS
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -78,7 +80,7 @@ ADMIN_TABS = [
 
 
 def is_admin_level():
-    return session.get('user_name') == 'admin' or session.get('emp_no') == 'admin' or int(session.get('user_level', 99)) <= 2
+    return is_admin_session()
 
 
 def require_admin():
@@ -188,10 +190,10 @@ def _folder_size(path):
 
 
 def _storage_roots():
-    data_root = '/mnt/data' if os.path.exists('/mnt/data') else BASE_DIR
+    data_root = BASE_DIR
     return [
         {'key': 'board', 'label': '게시판', 'path': os.path.join(data_root, 'board_uploads'), 'icon': 'fa-clipboard-list'},
-        {'key': 'messenger', 'label': '사내메신저', 'path': os.path.join(data_root, 'uploads'), 'icon': 'fa-comments'},
+        {'key': 'messenger', 'label': '사내메신저', 'path': str(CHAT_UPLOADS), 'icon': 'fa-comments'},
         {'key': 'school', 'label': '학교업무메뉴', 'path': SCHOOL_UPLOADS, 'icon': 'fa-school'},
         {'key': 'certificate', 'label': '증명발급', 'path': os.path.join(data_root, 'output_pdfs'), 'icon': 'fa-file-invoice'},
         {'key': 'contract', 'label': '계약시스템', 'path': os.path.join(data_root, 'contracts'), 'icon': 'fa-file-contract'},
@@ -857,7 +859,10 @@ def reset_admin_password():
     if not new_password:
         return redirect(url_for('admin.settings'))
     conn = get_db()
-    conn.execute("UPDATE users SET password=? WHERE emp_no='admin'", (new_password,))
+    conn.execute(
+        "UPDATE users SET password=? WHERE emp_no='admin'",
+        (hash_password(new_password),),
+    )
     conn.commit()
     conn.close()
     return redirect(url_for('admin.settings'))
