@@ -105,6 +105,12 @@ EXEMPT_ROUTES = [
     'document.company_logo',
     'expense.submit_expense',
     'expense.expense_template',
+    # e리플렛 서재·공유 뷰어·이미지는 학부모가 로그인 없이 열람한다.
+    'ebook.library',
+    'ebook.read_book',
+    'ebook.public_reader',
+    'ebook.serve_cover',
+    'ebook.serve_page_image',
 ]
 
 # 💡 레벨 8(센터장) 전용 허용 경로 목록 정의
@@ -136,6 +142,7 @@ LEVEL_8_ALLOWED_PATHS = [
     '/api/move_pin',
     '/socket.io',
     '/gall2',
+    '/ebook',
     '/api/activity_feed',
 ]
 
@@ -215,6 +222,7 @@ def _classify_menu(path):
         ('/contacts', '본사연락망'),
         ('/memo', '개인화이트보드'),
         ('/excel-generator', '입금용 엑셀 생성기'),
+        ('/ebook', 'e리플렛'),
         ('/notifications', '알림'),
     ]
     if path == '/':
