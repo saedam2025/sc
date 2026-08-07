@@ -845,7 +845,7 @@
 
                         <!-- 4. 업무지원 메뉴 (기존 유지) -->
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path or request.path.startswith('/ebook') %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
@@ -854,6 +854,7 @@
                                 <a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>
                                 <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태 관리</a>
                                 <a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>
+                                <a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>
                             </div>
                         </li>
 
@@ -874,7 +875,7 @@
                         <!-- 6. 통합관리 메뉴 (권한 레벨 2 이상 관리자 전용) -->
                         {% if session.get('user_level', 99) <= 2 or session.get('user_name') == 'admin' %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') or request.path.startswith('/ebook') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') %}active{% endif %}">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
@@ -884,7 +885,6 @@
                                 <a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>
                                 <a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>
                                 <a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>
-                                <a href="/ebook/"><i class="fa-solid fa-book-open-reader"></i>&#50937; e-book</a>
                             </div>
                         </li>
                         {% endif %}

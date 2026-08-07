@@ -1,19 +1,51 @@
-{% extends 'base.html' %}
+{% extends 'ebook/public_base.html' %}
+{% block title %}새 e리플렛{% endblock %}
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/ebook.css') }}">
-<main class="ebook-shell">
-  <header class="ebook-head"><div><h1>새 e-book 만들기</h1><p>TXT 또는 MD 본문을 문단 기준으로 자동 페이지화합니다.</p></div><a class="ebook-btn" href="{{ url_for('ebook.library') }}">서재로</a></header>
-  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="ebook-flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
-  <form class="ebook-form-card" method="post" enctype="multipart/form-data">
-    <div class="ebook-form-grid">
-      <div class="ebook-field"><label for="title">제목 *</label><input id="title" name="title" required maxlength="200" value="{{ request.form.get('title','') }}"></div>
-      <div class="ebook-field"><label for="author">저자 *</label><input id="author" name="author" required maxlength="120" value="{{ request.form.get('author','') }}"></div>
-      <div class="ebook-field full"><label for="description">책 소개</label><textarea id="description" name="description" rows="3" maxlength="2000">{{ request.form.get('description','') }}</textarea></div>
-      <div class="ebook-field"><label for="text_file">본문 텍스트 *</label><input id="text_file" name="text_file" type="file" accept=".txt,.md,text/plain" required><small>UTF-8/CP949, 최대 20MB</small></div>
-      <div class="ebook-field"><label for="cover">책 표지 (선택)</label><input id="cover" name="cover" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><small>JPG·PNG·GIF·WEBP, 최대 12MB</small></div>
-      <div class="ebook-field full"><label for="page_length">페이지당 글자 수</label><select id="page_length" name="page_length"><option value="1400">여유 있게 (약 1,400자)</option><option value="1800" selected>기본 (약 1,800자)</option><option value="2400">많이 (약 2,400자)</option></select><small>문단과 문장 경계를 우선하여 실제 분량은 조금 달라질 수 있습니다.</small></div>
+<main class="leaflet-form-page">
+  <header class="leaflet-form-head">
+    <a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-arrow-left"></i> 서재로</a>
+    <span>NEW LEAFLET</span>
+    <h1>새 e리플렛 만들기</h1>
+    <p>이미지를 여러 장 선택하면 파일명의 번호 순서대로 한 권의 e리플렛을 만듭니다.</p>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% for category, message in messages %}<div class="leaflet-flash {{ category }}">{{ message }}</div>{% endfor %}{% endwith %}
+  <form class="leaflet-form-card" method="post" enctype="multipart/form-data">
+    <label class="leaflet-field"><span>제목 <b>*</b></span><input name="title" required maxlength="200" value="{{ request.form.get('title','') }}" placeholder="예: 2026년 3분기 방과후학교 선택형교육 안내"></label>
+    <label class="leaflet-field"><span>리플렛 소개</span><textarea name="description" maxlength="2000" rows="3" placeholder="서재에 보여줄 짧은 설명을 입력하세요.">{{ request.form.get('description','') }}</textarea></label>
+    <div class="leaflet-field">
+      <span>페이지 이미지 <b>*</b></span>
+      <label class="leaflet-dropzone" id="leafletDropzone">
+        <input id="pageImages" name="page_images" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" multiple required>
+        <i class="fa-regular fa-images"></i><strong>PNG·JPG 페이지 선택</strong>
+        <small>파일명의 번호를 인식해 01, 02, 03 순으로 정렬합니다.<br>최대 100장, 한 장당 20MB</small>
+      </label>
+      <div class="leaflet-file-summary" id="fileSummary" hidden></div>
+      <div class="leaflet-preview-strip" id="previewStrip"></div>
     </div>
-    <div class="ebook-actions" style="justify-content:flex-end;margin-top:24px"><a class="ebook-btn" href="{{ url_for('ebook.library') }}">취소</a><button class="ebook-btn primary" type="submit"><i class="fa-solid fa-wand-magic-sparkles"></i> e-book 생성</button></div>
+    <div class="leaflet-form-note"><i class="fa-solid fa-circle-info"></i><span><strong>첫 번째 이미지가 표지가 됩니다.</strong> 올린 뒤 서재에서 표지를 보고 리플렛을 구분할 수 있습니다.</span></div>
+    <div class="leaflet-form-actions"><a href="{{ url_for('ebook.library') }}">취소</a><button type="submit"><i class="fa-solid fa-wand-magic-sparkles"></i> e리플렛 만들기</button></div>
   </form>
 </main>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const input = document.getElementById('pageImages'), strip = document.getElementById('previewStrip');
+  const summary = document.getElementById('fileSummary'), zone = document.getElementById('leafletDropzone');
+  function naturalSort(a,b) { return a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}); }
+  function render() {
+    const files = [...input.files].sort(naturalSort); strip.innerHTML = '';
+    summary.hidden = !files.length; summary.textContent = files.length ? `${files.length}장 선택 · 자동으로 번호순 정렬됩니다.` : '';
+    files.slice(0, 12).forEach((file, index) => {
+      const item = document.createElement('figure'), img = document.createElement('img');
+      img.src = URL.createObjectURL(file); img.onload = () => URL.revokeObjectURL(img.src); img.alt = `${index+1}번 미리보기`;
+      item.append(img); item.insertAdjacentHTML('beforeend', `<figcaption>${index+1}<small>${file.name}</small></figcaption>`); strip.appendChild(item);
+    });
+    if (files.length > 12) strip.insertAdjacentHTML('beforeend', `<div class="leaflet-more-pages">+${files.length-12}<small>장 더</small></div>`);
+  }
+  input.addEventListener('change', render);
+  ['dragenter','dragover'].forEach(type => zone.addEventListener(type, () => zone.classList.add('dragging')));
+  ['dragleave','drop'].forEach(type => zone.addEventListener(type, () => zone.classList.remove('dragging')));
+})();
+</script>
 {% endblock %}
