@@ -27,6 +27,21 @@
         return list[Math.floor(rng() * list.length)];
     }
 
+    function ensureVisibleThemeLines(vars, primary) {
+        const isInvisible = (value) => {
+            const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
+            return !normalized
+                || normalized === 'transparent'
+                || /^(rgba|hsla)\([^)]*,0(?:\.0+)?\)$/.test(normalized)
+                || /^#[0-9a-f]{6}00$/.test(normalized);
+        };
+        const lineColor = `color-mix(in srgb, ${primary} 38%, #cbd5e1)`;
+        if (isInvisible(vars['--card-border'])) vars['--card-border'] = lineColor;
+        if (isInvisible(vars['--widget-border'])) vars['--widget-border'] = lineColor;
+        vars['--theme-line-color'] = vars['--widget-border'] || vars['--card-border'] || lineColor;
+        return vars;
+    }
+
     function createTheme(index, catalog) {
         const rng = seededRandom(`saedam-theme:${catalog}:${index}`);
         const hue = Math.floor((index * 137.5) % 360);
@@ -121,6 +136,8 @@
             vars['--widget-hover'] = clayBg;
             vars['--widget-border'] = 'transparent';
         }
+
+        ensureVisibleThemeLines(vars, primary);
 
         return {
             name,
@@ -234,6 +251,8 @@
             vars['--widget-hover'] = clayBg;
             vars['--widget-border'] = 'transparent';
         }
+
+        ensureVisibleThemeLines(vars, primary);
 
         return {
             name,
@@ -350,6 +369,8 @@
             vars['--widget-hover'] = clayBg;
             vars['--widget-border'] = 'transparent';
         }
+
+        ensureVisibleThemeLines(vars, primary);
 
         return {
             name,
