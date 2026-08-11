@@ -243,6 +243,5 @@ class CertificateManagementFlowTest(unittest.TestCase):
         self.assertEqual(parseaddr(str(smtp.message["From"]))[1], "certificate@saedam.org")
         self.assertTrue(smtp.closed)
 
-
 if __name__ == "__main__":
     unittest.main()
