@@ -53,7 +53,7 @@ DEFAULT_INVITE_MAIL_BODY = (
     '안녕하세요. (사)새담청소년교육문화원입니다.\n'
     '새담 인트라넷 가입 신청을 위한 초대 메일입니다.\n'
     '아래 가입 신청하기 버튼을 눌러 본인 정보를 입력해 주세요.\n'
-    '가입 승인 후 새담 홈페이지 (www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
+    '가입 승인 후 새담 홈페이지 www.saedam.org를 통해 인트라넷에 접속할 수 있습니다.'
 )
 PRIVACY_SECURITY_CONSENT_VERSION = '2026-08-10-v1'
 INTRANET_HOMEPAGE_URL = 'https://www.saedam.org'
@@ -285,7 +285,7 @@ def send_real_email(target_email, invite_link, subject, content):
 
     safe_content = '<br>'.join(escape(content).splitlines())
     access_guide = (
-        '가입 승인 후 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
+        '가입 승인 후 새담 홈페이지 www.saedam.org를 통해 인트라넷에 접속할 수 있습니다.'
     )
     access_guide_html = '' if 'saedam.org' in str(content).lower() else f'''
                 <p style="margin: 18px 0 0; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; color: #334155; font-size: 14px; line-height: 1.7;">
