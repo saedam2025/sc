@@ -4,7 +4,7 @@
     <style>
         /* === 다이나믹 테마 변수 (기본값) === */
         :root {
-            --body-bg: #f8fafc;
+            --body-bg: #f5f6f8;
             --primary-color: #4a90e2;
             --primary-dark: #357abd;
             --text-dark: #1e293b;
@@ -26,7 +26,7 @@
         .theme-manager-shell, .theme-manager-shell *, .theme-modal-backdrop, .theme-modal-backdrop * { box-sizing: border-box; }
         .theme-manager-shell, .theme-modal-backdrop { font-family: 'Pretendard', sans-serif; }
 
-        .content-container { max-width: none !important; padding: 0 24px 24px !important; }
+        .content-container { max-width: none !important; padding: 30px 24px 24px !important; }
         .main-footer { display: none; }
 
         /* 테마관리 화면에서는 상단 드롭다운의 재실행 애니메이션으로 인한 hover 떨림을 차단 */
@@ -439,7 +439,7 @@
         .theme-modal-btn.primary { border-color:var(--primary-color); background:var(--primary-color); color:#fff; }
         @media (max-width:1100px) { .theme-manager-shell { grid-template-columns:360px minmax(0, 1fr); } .preview-area { padding:20px; } }
         @media (max-width:820px) {
-            .content-container { padding:0 12px 18px !important; }
+            .content-container { padding:30px 12px 18px !important; }
             .theme-manager-shell { display:flex; flex-direction:column; height:auto; min-height:0; overflow:visible; }
             .theme-manager-shell .sidebar { height:620px; border-right:0; border-bottom:1px solid #e2e8f0; }
             .preview-area { min-height:620px; }
@@ -566,7 +566,7 @@
         </form>
     </div>
 
-    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260710-3008"></script>
+    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260810-3010"></script>
     <script>
         // === 엔진 설정 ===
         // 🌟 다크모드(사이버)를 제외하고 5가지 밝은 UI 스타일만 순환 적용
@@ -649,14 +649,15 @@
             };
 
             // 밝은 배경을 기반으로 한 5가지 UI 스타일에 따른 CSS 변수 세팅
+            const lineColor = `color-mix(in srgb, ${primary} 38%, #cbd5e1)`;
             if (uiStyle === 'glass') {
                 vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
                 vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
                 vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
             } else if (uiStyle === 'solid') {
-                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = lineColor;
                 vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
-                vars["--widget-bg"] = "#f1f5f9"; vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+                vars["--widget-bg"] = "#f1f5f9"; vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = lineColor;
             } else if (uiStyle === 'glow') {
                 vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
                 vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
@@ -665,15 +666,16 @@
                 const neuBg = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 90%)`; 
                 const darkShadow = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 80%)`;
                 const lightShadow = `#ffffff`;
-                vars["--body-bg"] = neuBg; vars["--card-bg"] = neuBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--body-bg"] = neuBg; vars["--card-bg"] = neuBg; vars["--card-border"] = lineColor; vars["--card-backdrop"] = "none";
                 vars["--card-shadow"] = `12px 12px 24px ${darkShadow}, -12px -12px 24px ${lightShadow}`;
-                vars["--widget-bg"] = neuBg; vars["--widget-border"] = "transparent"; vars["--widget-hover"] = neuBg;
+                vars["--widget-bg"] = neuBg; vars["--widget-border"] = lineColor; vars["--widget-hover"] = neuBg;
             } else if (uiStyle === 'clay') {
                 const clayBg = `hsl(${hue}, ${bgS}%, 95%)`;
-                vars["--card-bg"] = clayBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--card-bg"] = clayBg; vars["--card-border"] = lineColor; vars["--card-backdrop"] = "none";
                 vars["--card-shadow"] = `10px 10px 20px rgba(0,0,0,0.1), inset -6px -6px 16px rgba(0,0,0,0.08), inset 6px 6px 16px rgba(255,255,255,0.9)`;
-                vars["--widget-bg"] = clayBg; vars["--widget-border"] = "transparent"; vars["--widget-hover"] = clayBg;
+                vars["--widget-bg"] = clayBg; vars["--widget-border"] = lineColor; vars["--widget-hover"] = clayBg;
             }
+            vars["--theme-line-color"] = vars["--widget-border"] || vars["--card-border"] || lineColor;
             
             generatedThemes.push({ name: name, type: effectType, vars: vars });
         }
@@ -683,9 +685,9 @@
             name: '[기본] 테마없음',
             type: 'none',
             vars: {
-                '--body-bg': '#ffffff',
-                '--app-bg': '#ffffff',
-                '--main-bg': '#ffffff',
+                '--body-bg': '#f5f6f8',
+                '--app-bg': '#f5f6f8',
+                '--main-bg': '#f5f6f8',
                 '--primary-color': '#2563eb',
                 '--primary-light': '#eff6ff',
                 '--primary-dark': '#1d4ed8',
@@ -942,7 +944,8 @@
             '--primary-dark', '--text-dark', '--text-gray', '--border-color', '--border-light',
             '--input-text', '--tooltip-bg', '--tooltip-text', '--effect-color1', '--effect-color2',
             '--effect-color3', '--card-bg', '--card-border', '--card-backdrop', '--card-shadow',
-            '--input-bg', '--widget-bg', '--widget-hover', '--widget-border', '--nav-bg'
+            '--input-bg', '--widget-bg', '--widget-hover', '--widget-border', '--widget-border-color',
+            '--theme-line-color', '--nav-bg'
         ];
 
         function resetPreviewThemeVars() {
@@ -1486,9 +1489,10 @@
             };
             if (style === 'solid') Object.assign(vars, {'--card-bg':'#ffffff','--card-border':hexRgba(primary,.18),'--card-backdrop':'none','--card-shadow':'0 18px 38px rgba(15,23,42,.12)','--input-bg':'#f8fafc','--widget-bg':'#ffffff','--widget-hover':hexRgba(primary,.08),'--widget-border':hexRgba(primary,.16),'--nav-bg':'#ffffff'});
             else if (style === 'glow') Object.assign(vars, {'--card-bg':'rgba(255,255,255,.84)','--card-border':primary,'--card-backdrop':'blur(12px)','--card-shadow':`0 0 28px ${hexRgba(primary,.42)}`,'--input-bg':'rgba(255,255,255,.64)','--widget-bg':'rgba(255,255,255,.62)','--widget-hover':'rgba(255,255,255,.94)','--widget-border':primary,'--nav-bg':'rgba(255,255,255,.88)'});
-            else if (style === 'neumorphism') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':'transparent','--card-backdrop':'none','--card-shadow':`12px 12px 24px ${shadeHex(bgEnd,-24)}, -12px -12px 24px #ffffff`,'--input-bg':'rgba(255,255,255,.46)','--widget-bg':bgEnd,'--widget-hover':bgEnd,'--widget-border':'transparent','--nav-bg':bgEnd});
-            else if (style === 'clay') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':'transparent','--card-backdrop':'none','--card-shadow':'10px 10px 20px rgba(0,0,0,.1), inset -6px -6px 16px rgba(0,0,0,.08), inset 6px 6px 16px rgba(255,255,255,.9)','--input-bg':'rgba(255,255,255,.58)','--widget-bg':bgEnd,'--widget-hover':shadeHex(bgEnd,8),'--widget-border':'transparent','--nav-bg':bgEnd});
+            else if (style === 'neumorphism') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':hexRgba(primary,.22),'--card-backdrop':'none','--card-shadow':`12px 12px 24px ${shadeHex(bgEnd,-24)}, -12px -12px 24px #ffffff`,'--input-bg':'rgba(255,255,255,.46)','--widget-bg':bgEnd,'--widget-hover':bgEnd,'--widget-border':hexRgba(primary,.2),'--nav-bg':bgEnd});
+            else if (style === 'clay') Object.assign(vars, {'--card-bg':bgEnd,'--card-border':hexRgba(primary,.22),'--card-backdrop':'none','--card-shadow':'10px 10px 20px rgba(0,0,0,.1), inset -6px -6px 16px rgba(0,0,0,.08), inset 6px 6px 16px rgba(255,255,255,.9)','--input-bg':'rgba(255,255,255,.58)','--widget-bg':bgEnd,'--widget-hover':shadeHex(bgEnd,8),'--widget-border':hexRgba(primary,.2),'--nav-bg':bgEnd});
             else Object.assign(vars, {'--card-bg':'rgba(255,255,255,.68)','--card-border':'rgba(255,255,255,.9)','--card-backdrop':'blur(24px)','--card-shadow':'0 16px 42px rgba(15,23,42,.13)','--input-bg':'rgba(255,255,255,.82)','--widget-bg':'rgba(255,255,255,.72)','--widget-hover':'rgba(255,255,255,.96)','--widget-border':'rgba(255,255,255,.9)','--nav-bg':'rgba(255,255,255,.78)'});
+            vars['--theme-line-color'] = vars['--widget-border'] || vars['--card-border'] || vars['--border-color'];
             return vars;
         }
 

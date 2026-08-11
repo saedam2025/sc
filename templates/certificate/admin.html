@@ -30,6 +30,7 @@
         margin-bottom: 20px; padding-bottom: 15px; 
         border-bottom: 2px solid rgba(0,0,0,0.05);
     }
+    .admin-header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 
     /* 2. 대시보드 통계 */
     .dashboard-cards {
@@ -89,8 +90,8 @@
     .btn-search:hover { background: var(--widget-hover, #e2e8f0); }
     .btn-reset { background: var(--widget-bg, #f1f5f9); color: var(--text-gray, #64748b); border: 1px solid var(--card-border, #e2e8f0); }
     .btn-reset:hover { background: var(--widget-hover, #e2e8f0); }
-    .btn-stats { background: var(--widget-bg, #f1f5f9); color: var(--primary-color, #4a90e2); border: 1px solid var(--primary-color, #4a90e2); }
-    .btn-stats:hover { background: var(--widget-hover, #e2e8f0); }
+    .btn-settings { padding: 9px 15px; background: var(--primary-color, #4a90e2); color: #fff; border: 1px solid var(--primary-color, #4a90e2); }
+    .btn-settings:hover { color: #fff; filter: brightness(.92); transform: translateY(-1px); }
     .btn-issue { background: var(--primary-color, #4a90e2); color: white; border: none; }
     .btn-issue:hover { filter: brightness(0.9); }
     .btn-edit { background: var(--widget-bg, #f1f5f9); color: var(--primary-color, #4a90e2); border: 1px solid var(--primary-color, #4a90e2); }
@@ -147,8 +148,10 @@
             <img src="http://www.saedam.org/img/logo01.gif" alt="새담 로고" style="height: 35px; mix-blend-mode: multiply;">
             <h2 style="margin:0; font-size:1.3rem;">증명서 발급 관리 시스템</h2>
         </div>
-        <div style="font-size: 0.85rem;">
-            현재 접속: <strong>{{ session.get('user_name') }}</strong>
+        <div class="admin-header-actions">
+            <a href="{{ url_for('document.certificate_settings') }}" class="btn btn-settings">
+                <i class="fa-solid fa-gear"></i> 증명서 발급설정
+            </a>
         </div>
     </div>
 
@@ -226,7 +229,6 @@
                 <input type="text" name="search" class="search-input" placeholder="성명, 학교명 등 검색" value="{{ request.args.get('search', '') }}">
                 <button type="submit" class="btn btn-search">🔍 검색</button>
                 <a href="{{ url_for('document.admin_list') }}" class="btn btn-reset">🔄 초기화</a>
-                <a href="{{ url_for('document.certificate_settings') }}" class="btn btn-stats">⚙️ 회사·계정·작업그룹 / 신청링크</a>
             </form>
             
             <button type="button" class="btn btn-delete" onclick="deleteSelected()">🗑️ 선택 삭제</button>

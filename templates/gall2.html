@@ -20,7 +20,7 @@
     .gallery-content-wrapper {
         width: 100%;
         max-width: 1550px;
-        margin: 20px auto;
+        margin: 0 auto 20px;
         background: #fff;
         padding: 30px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -831,9 +831,10 @@
         <div class="admin-header">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <img src="http://www.saedam.org/img/logo01.gif" alt="새담 로고" style="height: 35px;">
-                <h2 style="margin:0; font-size:1.3rem;">사내 갤러리</h2>
+                <h2 style="margin:0; font-size:1.3rem;">{{ gallery_title or '사내 갤러리' }}</h2>
             </div>
             <div style="font-size: 0.85rem; color: #666;">
+                {% if school_gallery %}<a class="btn-gallery" href="{{ url_for('school.school_detail', school_key=school_gallery.access_key) }}" style="margin-right:8px;"><i class="fas fa-arrow-left"></i> 업무공간</a>{% endif %}
                 현재 접속: <strong>{{ session.get('user_name') }}</strong>
             </div>
         </div>
@@ -841,7 +842,7 @@
         <div class="gallery-toolbar">
             <div class="gallery-title-block">
                 <div style="font-size: 0.85rem; color: #555;">
-                    💡 <strong>사내 갤러리 업로드 안내:</strong> 하나의 게시물에 20장/최대 20MB까지의 사진을 등록할 수 있습니다.
+                    💡 <strong>{{ gallery_help or '갤러리 업로드 안내' }}:</strong> 하나의 게시물에 20장/최대 20MB까지의 사진을 등록할 수 있습니다.
                 </div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items: center;">
@@ -862,7 +863,7 @@
                 <input id="postTitleInput" class="gallery-input" type="text" maxlength="120" placeholder="게시물 제목">
                 <textarea id="postContentInput" class="gallery-textarea" placeholder="게시물 내용"></textarea>
             </div>
-            <form action="{{ url_for('gall2.upload', tab_id=active_tab_id) }}" class="dropzone" id="galleryDropzone">
+            <form action="{{ url_for('gall2.school_gallery_upload', school_key=school_gallery.access_key) if school_gallery else url_for('gall2.upload', tab_id=active_tab_id) }}" class="dropzone" id="galleryDropzone">
                 <div class="dz-message" data-dz-message>
                     <i class="fas fa-cloud-arrow-up fa-2x" style="margin-bottom:8px;"></i><br>
                     사진을 이곳에 끌어다 놓거나 클릭해서 선택하세요.<br>
@@ -886,7 +887,7 @@
             <article class="post-card" onclick="openGalleryPost({{ post.id }})">
                 <input type="checkbox" class="post-select-check" value="{{ post.id }}" aria-label="게시물 선택" onclick="event.stopPropagation();">
                 {% if post.cover_thumb %}
-                <img class="post-thumb" src="{{ url_for('gall2.serve_thumb', filename=post.cover_thumb) }}" alt="{{ post.title }}" loading="lazy">
+                <img class="post-thumb" src="{{ url_for('gall2.school_gallery_serve_thumb', school_key=school_gallery.access_key, filename=post.cover_thumb) if school_gallery else url_for('gall2.serve_thumb', filename=post.cover_thumb) }}" alt="{{ post.title }}" loading="lazy">
                 {% else %}
                 <div class="post-thumb empty"><i class="far fa-images"></i></div>
                 {% endif %}
@@ -903,11 +904,11 @@
         </div>
         {% if pagination and pagination.total_pages > 1 %}
         <nav class="gallery-pagination" aria-label="갤러리 페이지">
-            <a class="page-link-button {% if not pagination.has_prev_block %}disabled{% endif %}" href="{{ url_for('gall2.index', page=pagination.prev_block_page) }}">이전</a>
+            <a class="page-link-button {% if not pagination.has_prev_block %}disabled{% endif %}" href="{{ url_for('gall2.school_gallery', school_key=school_gallery.access_key, page=pagination.prev_block_page) if school_gallery else url_for('gall2.index', page=pagination.prev_block_page) }}">이전</a>
             {% for page_no in range(pagination.block_start, pagination.block_end + 1) %}
-            <a class="page-link-button {% if page_no == pagination.page %}active{% endif %}" href="{{ url_for('gall2.index', page=page_no) }}">{{ page_no }}</a>
+            <a class="page-link-button {% if page_no == pagination.page %}active{% endif %}" href="{{ url_for('gall2.school_gallery', school_key=school_gallery.access_key, page=page_no) if school_gallery else url_for('gall2.index', page=page_no) }}">{{ page_no }}</a>
             {% endfor %}
-            <a class="page-link-button {% if not pagination.has_next_block %}disabled{% endif %}" href="{{ url_for('gall2.index', page=pagination.next_block_page) }}">다음</a>
+            <a class="page-link-button {% if not pagination.has_next_block %}disabled{% endif %}" href="{{ url_for('gall2.school_gallery', school_key=school_gallery.access_key, page=pagination.next_block_page) if school_gallery else url_for('gall2.index', page=pagination.next_block_page) }}">다음</a>
         </nav>
         {% endif %}
         {% else %}
@@ -970,8 +971,12 @@
 <script>
     // 기존의 JavaScript 로직은 변경 없이 그대로 유지됩니다. (업로드 및 모달 기능)
     const galleryPosts = {{ posts|tojson }};
-    const rawUrlTemplate = "{{ url_for('gall2.serve_file', filename='__filename__') }}";
-    const thumbUrlTemplate = "{{ url_for('gall2.serve_thumb', filename='__filename__') }}";
+    const rawUrlTemplate = "{{ url_for('gall2.school_gallery_serve_file', school_key=school_gallery.access_key, filename='__filename__') if school_gallery else url_for('gall2.serve_file', filename='__filename__') }}";
+    const thumbUrlTemplate = "{{ url_for('gall2.school_gallery_serve_thumb', school_key=school_gallery.access_key, filename='__filename__') if school_gallery else url_for('gall2.serve_thumb', filename='__filename__') }}";
+    const galleryIndexUrl = "{{ url_for('gall2.school_gallery', school_key=school_gallery.access_key) if school_gallery else url_for('gall2.index') }}";
+    const galleryBulkDeleteUrl = "{{ url_for('gall2.school_gallery_delete_bulk', school_key=school_gallery.access_key) if school_gallery else url_for('gall2.delete_bulk') }}";
+    const galleryUpdateUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/update{% else %}/gall2/post/__post_id__/update{% endif %}";
+    const galleryDeleteUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/delete{% else %}/gall2/post/__post_id__/delete{% endif %}";
     const currentPage = {{ pagination.page if pagination else 1 }};
     let activePost = null;
     let activeImageIndex = 0;
@@ -1131,13 +1136,13 @@
         const postIds = getSelectedPostIds();
         if (postIds.length === 0) return;
         if (!confirm(`선택한 게시물 ${postIds.length}개와 포함된 사진을 삭제할까요?`)) return;
-        fetch("{{ url_for('gall2.delete_bulk') }}", {
+        fetch(galleryBulkDeleteUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ post_ids: postIds })
         }).then(res => res.json()).then(data => {
             if (data.status === 'success') {
-                window.location.href = `{{ url_for('gall2.index') }}?page=${currentPage}`;
+                window.location.href = `${galleryIndexUrl}?page=${currentPage}`;
             } else {
                 alert(data.message || '선택삭제에 실패했습니다.');
             }
@@ -1278,7 +1283,7 @@
             alert('제목을 입력해 주세요.');
             return;
         }
-        fetch(`/gall2/post/${activePost.id}/update`, {
+        fetch(galleryUpdateUrlTemplate.replace('__post_id__', activePost.id), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, content })
@@ -1296,7 +1301,7 @@
         if (!confirm('이 게시물과 포함된 사진을 삭제할까요?')) return;
         const form = document.createElement('form');
         form.method = 'post';
-        form.action = `/gall2/post/${activePost.id}/delete?page=${currentPage}`;
+        form.action = `${galleryDeleteUrlTemplate.replace('__post_id__', activePost.id)}?page=${currentPage}`;
         document.body.appendChild(form);
         form.submit();
     });

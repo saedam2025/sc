@@ -651,9 +651,9 @@
         
         async function loadOrgChartPopup() {
             try {
-                const res = await fetch('/user/list');
+                const res = await fetch('/user/list?approved_only=1');
                 const users = await res.json();
-                const filteredUsers = users.filter(u => (u.이름||'').toLowerCase() !== 'admin');
+                const filteredUsers = users.filter(u => u.승인상태 === '승인' && (u.이름||'').toLowerCase() !== 'admin');
                 const groups = { '본부': [], '북부지점': [], '센터장': [], '코디': [], '강사': [], '기타': [] };
                 
                 filteredUsers.forEach(u => {
@@ -1055,7 +1055,8 @@
         function initializeChatSocket() {
             if (typeof io !== 'function') return;
             chatSocket = io('/chat', {
-                transports: ['websocket', 'polling'],
+                transports: ['polling'],
+                upgrade: false,
                 reconnection: true,
                 reconnectionDelay: 1000
             });

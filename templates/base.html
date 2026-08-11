@@ -18,10 +18,27 @@
                 if (disableGlobalTheme) return;
 
                 const savedTheme = localStorage.getItem('saedam_theme');
+                const savedThemeName = localStorage.getItem('saedam_theme_name');
                 const managedTheme = {{ global_theme|tojson }};
                 const managedThemeVars = managedTheme && managedTheme.vars ? managedTheme.vars : null;
                 const themeVars = managedThemeVars || (savedTheme ? JSON.parse(savedTheme) : null);
                 const managedEffect = managedTheme && managedTheme.effect ? managedTheme.effect : null;
+                const isDefaultTheme = Boolean(
+                    (managedTheme && (
+                        managedTheme.catalog === 'default'
+                        || managedTheme.key === 'default:0'
+                        || managedTheme.name === '[기본] 테마없음'
+                    ))
+                    || (!managedThemeVars && savedThemeName === '[기본] 테마없음')
+                );
+                if (themeVars && isDefaultTheme) {
+                    themeVars['--body-bg'] = '#f5f6f8';
+                    themeVars['--app-bg'] = '#f5f6f8';
+                    themeVars['--main-bg'] = '#f5f6f8';
+                    if (savedTheme) {
+                        localStorage.setItem('saedam_theme', JSON.stringify(themeVars));
+                    }
+                }
                 if (managedEffect) {
                     localStorage.setItem('saedam_theme_effect', managedEffect);
                 }
@@ -42,6 +59,32 @@
                             document.documentElement.style.setProperty('--dashboard-card-hover-shadow', value);
                         }
                     }
+
+                    // 구형 저장 테마 중 투명 테두리를 쓰는 경우에도 메뉴/게시물 구분선은 유지한다.
+                    const isInvisibleLine = (value) => {
+                        const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
+                        return !normalized
+                            || normalized === 'transparent'
+                            || /^(rgba|hsla)\([^)]*,0(?:\.0+)?\)$/.test(normalized)
+                            || /^#[0-9a-f]{6}00$/.test(normalized);
+                    };
+                    const candidates = [
+                        themeVars['--theme-line-color'],
+                        themeVars['--widget-border'],
+                        themeVars['--card-border'],
+                        themeVars['--border-color']
+                    ];
+                    const visibleLine = candidates.find(value => !isInvisibleLine(value));
+                    const lineColor = visibleLine || 'color-mix(in srgb, var(--primary-color, #2563eb) 38%, #cbd5e1)';
+                    document.documentElement.style.setProperty('--theme-line-color', lineColor);
+                    document.documentElement.style.setProperty('--border-color', lineColor);
+                    document.documentElement.style.setProperty('--widget-border-color', lineColor);
+                    if (isInvisibleLine(themeVars['--card-border'])) {
+                        document.documentElement.style.setProperty('--card-border', lineColor);
+                    }
+                    if (isInvisibleLine(themeVars['--widget-border'])) {
+                        document.documentElement.style.setProperty('--widget-border', lineColor);
+                    }
                 }
             } catch (e) {
                 console.error('테마 로드 실패', e);
@@ -57,9 +100,10 @@
 
         /* === 깔끔한 고정 테마 변수 === */
         :root {
-            --body-bg: #ffffff; 
-            --app-bg: #ffffff; 
-            --main-bg: #ffffff; 
+            /* 기본(테마 없음): 흰색 그리드 카드를 제외한 전체 페이지 바탕 */
+            --body-bg: #f5f6f8;
+            --app-bg: #f5f6f8;
+            --main-bg: #f5f6f8;
             
             --primary-color: #2563eb; 
             --primary-light: #eff6ff; 
@@ -80,6 +124,7 @@
             --card-backdrop: none;
             --widget-bg: #ffffff;
             --widget-border: var(--border-color);
+            --theme-line-color: var(--border-color);
             --input-bg: #f8fafc;
             --effect-color1: transparent;
             --effect-color2: transparent;
@@ -549,7 +594,6 @@
         }
 
         .menu-item:hover,
-        .dropdown-content a:hover,
         .user-profile:hover,
         .btn-memo:hover,
         .btn-memo.active {
@@ -642,12 +686,7 @@
             padding: 12px 8px; 
         }
         .menu-item-wrapper::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 25px; }
-        .menu-item-wrapper:hover .dropdown-content { display: block; animation: floatUp 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-        
-        @keyframes floatUp { 
-            from { transform: translate(-50%, 15px); } 
-            to { transform: translate(-50%, 0); } 
-        }
+        .menu-item-wrapper:hover .dropdown-content { display: block; }
         
         .dropdown-content a { 
             color: #334155 !important; 
@@ -661,13 +700,35 @@
             font-size: 0.9rem; 
             font-weight: 500; 
             border-radius: 10px; 
-            transition: all 0.2s ease;
             margin-bottom: 2px;
         }
+
+        .dropdown-content a i {
+            width: 20px;
+            text-align: center;
+            color: #64748b;
+        }
+
+        /* 게시판/업무 목록은 테마 종류와 관계없이 항목별 구분선을 유지한다. */
+        .clean-table tbody td,
+        .board-table tbody td,
+        .task-table tbody td,
+        .approval-table tbody td,
+        .expense-table tbody td,
+        .school-list-table tbody td,
+        .attendance-table tbody td,
+        .list-item-common,
+        .company-gallery-item {
+            border-bottom-color: var(--theme-line-color, var(--border-color)) !important;
+        }
         .dropdown-content a:hover { 
-            background: #f1f5f9 !important; 
+            background: color-mix(in srgb, var(--primary-color, #2563eb) 10%, #ffffff) !important;
             color: var(--primary-color, #2563eb) !important; 
-            padding-left: 20px; 
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color, #2563eb) 18%, transparent);
+        }
+
+        .dropdown-content a:hover i {
+            color: var(--primary-color, #2563eb);
         }
 
         /* 우측 유저 섹션 */
@@ -724,15 +785,39 @@
             width: 100%;
         }
 
-        /* 컨텐츠(그리드) 영역 - 이 부분만 1700px로 제한 및 가운데 정렬 */
+        /* 컨텐츠(그리드) 영역 - 메인 메뉴 아래 간격은 main-content 20px + 여기 30px = 50px */
         .content-container {
             width: 100%;
             max-width: 1700px !important; 
-            padding: 0 45px 50px 45px;  
+            padding: 30px 45px 50px 45px;
             box-sizing: border-box;
             margin: 0 auto; 
             position: relative;
             z-index: 10;
+        }
+
+        /* 각 메뉴 화면에 제각각 지정돼 있던 상단 margin은 공통 50px 간격에 맞춰 제거 */
+        .content-container > :is(
+            .dashboard-wrapper,
+            .dashboard-container,
+            .admin-container,
+            .cs,
+            .expense-page,
+            .school-container,
+            .calendar-container,
+            .pm-page,
+            .aim-page,
+            .deg-page,
+            .attendance-container,
+            .contact-page,
+            .memo-page,
+            .user-mgmt-container,
+            .admin-shell,
+            .theme-manager-shell,
+            .gallery-page,
+            .board-page-shell
+        ) {
+            margin-top: 0 !important;
         }
 
         /* 🚀 모달 및 폼 전역 스타일 */
@@ -794,7 +879,7 @@
     <div id="bg-effect-container" aria-hidden="true"></div>
 
     <div class="app-wrapper">
-        {% if current_user_level|int != 8 %}
+        {% if session.get('emp_no') and not center_director_mode %}
         <header class="navbar">
             <div class="nav-container">
                 <a href="/" class="logo">
@@ -804,87 +889,98 @@
                 <nav style="height: 100%;">
                     <ul class="menu-list">
                         <!-- 1. 메인달력 -> 메인메뉴 명칭 변경 -->
+                        {% if menu_access.get('main_home', true) %}
                         <li class="menu-item-wrapper">
                             <a href="/" class="menu-item {% if request.endpoint == 'main.index' %}active{% endif %}">
                                 <i class="fa-solid fa-calendar-days"></i> 메인메뉴
                             </a>
                         </li>
+                        {% endif %}
                         
                         <!-- 2. 사내결재 메뉴 통합 (드롭다운 구조로 변경) -->
+                        {% if menu_access.get('approval_group', true) %}
                         <li class="menu-item-wrapper dropdown">
                             <a href="javascript:void(0);" class="menu-item {% if 'approval' in request.path or 'expense' in request.path or 'contract' in request.path or 'document' in request.path %}active{% endif %}">
                                 <i class="fa-solid fa-file-signature"></i> 사내결재
                             </a>
                             <div class="dropdown-content">
-                                <a href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>
-                                 {% if session.get('user_level') is not none and session.get('user_level') <= 2 %}
+                                {% if menu_access.get('approval_main', true) %}<a href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>{% endif %}
+                                 {% if menu_access.get('contract_admin', true) %}
                                  <a href="/contract/admin"><i class="fa-solid fa-file-contract"></i>전자계약관리</a>
-                                 <a href="/verified-contract/admin"><i class="fa-solid fa-shield-signature"></i>인증전자계약관리</a>
+                                 {% endif %}
+                                 {% if menu_access.get('verified_contract_admin', true) %}
+                                 <a href="/verified-contract/admin"><i class="fa-solid fa-file-signature"></i>인증전자계약관리</a>
                                  {% endif %}
                                 
                                 <!-- 기존 증명서발급 세부 메뉴들 -->
-                                <a href="/document/admin"><i class="fa-solid fa-file-invoice"></i>증명서 발급관리</a>
-                                {% if session.get('user_level') is not none and session.get('user_level') <= 2 %}
-                                <a href="/document/admin/settings"><i class="fa-solid fa-building-shield"></i>증명서 발급설정</a>
-                                {% endif %}
-                                <a href="/expense"><i class="fa-solid fa-receipt"></i>지출결의 관리</a>
+                                {% if menu_access.get('document_admin', true) %}<a href="/document/admin"><i class="fa-solid fa-file-invoice"></i>증명서 발급관리</a>{% endif %}
+                                {% if menu_access.get('expense_main', true) %}<a href="/expense"><i class="fa-solid fa-receipt"></i>지출결의 관리</a>{% endif %}
                             </div>
                         </li>
+                        {% endif %}
 
                         <!-- 3. 학교관리 메뉴 신설 (드롭다운 서브메뉴 추가) -->
+                        {% if menu_access.get('school_group', true) %}
                         <li class="menu-item-wrapper dropdown">
                             <a href="javascript:void(0);" class="menu-item {% if 'school' in request.path %}active{% endif %}">
                                 <i class="fa-solid fa-school"></i> 학교관리
                             </a>
                             <div class="dropdown-content">
-                                <a href="/school"><i class="fa-solid fa-chalkboard-user"></i>학교업무공간</a>
-                                <a href="/school/tasks"><i class="fa-solid fa-list-check"></i>학교업무처리</a>
-                                <a href="/school/calendar"><i class="fa-solid fa-calendar-week"></i>학교일정표</a>
+                                {% if menu_access.get('school_workspace', true) %}<a href="/school"><i class="fa-solid fa-chalkboard-user"></i>학교업무공간</a>{% endif %}
+                                {% if menu_access.get('school_tasks', true) %}<a href="/school/tasks"><i class="fa-solid fa-list-check"></i>학교업무처리</a>{% endif %}
+                                {% if menu_access.get('school_calendar', true) %}<a href="/school/calendar"><i class="fa-solid fa-calendar-week"></i>학교일정표</a>{% endif %}
                             </div>
                         </li>
+                        {% endif %}
 
                         <!-- 4. 업무지원 메뉴 (기존 유지) -->
+                        {% if menu_access.get('support_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path or request.path.startswith('/ebook') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
-                                <a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i>스마트 명세서 발송</a>
-                                <a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일 발송</a>
-                                <a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>
-                                <a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태 관리</a>
-                                <a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>
-                                <a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>
+                                {% if menu_access.get('payroll_main', true) %}<a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i>스마트 명세서 발송</a>{% endif %}
+                                {% if menu_access.get('ai_mail_main', true) %}<a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일 발송</a>{% endif %}
+                                {% if menu_access.get('excel_generator', true) %}<a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>{% endif %}
+                                {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태 관리</a>{% endif %}
+                                {% if menu_access.get('contacts_main', true) %}<a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>{% endif %}
+                                {% if menu_access.get('ebook_library', true) %}<a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>{% endif %}
                             </div>
                         </li>
+                        {% endif %}
 
                         <!-- 5. 업무공간 메뉴 (기존 유지) -->
+                        {% if menu_access.get('workspace_group', true) %}
                         <li class="menu-item-wrapper dropdown">
                             <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') %}active{% endif %}">
                                 <i class="fa-solid fa-layer-group"></i> 업무공간
                             </a>
                             <div class="dropdown-content">
-                                <a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>사내 게시판</a>
-                                <a href="/board/archive"><i class="fa-solid fa-folder-open"></i>사내 자료실</a>
-                                <a href="/gall2"><i class="fa-regular fa-images"></i>사내 갤러리</a>
-                                <a href="/board/manual"><i class="fa-solid fa-book"></i>업무메뉴얼</a>
-                                <a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>개인화이트보드</a>
+                                {% if menu_access.get('board_noti', true) %}<a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>사내 게시판</a>{% endif %}
+                                {% if menu_access.get('board_archive', true) %}<a href="/board/archive"><i class="fa-solid fa-folder-open"></i>사내 자료실</a>{% endif %}
+                                {% if menu_access.get('gallery_main', true) %}<a href="/gall2"><i class="fa-regular fa-images"></i>사내 갤러리</a>{% endif %}
+                                {% if menu_access.get('board_manual', true) %}<a href="/board/manual"><i class="fa-solid fa-book"></i>업무메뉴얼</a>{% endif %}
+                                {% if menu_access.get('memo_main', true) %}<a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>개인화이트보드</a>{% endif %}
                             </div>
                         </li>
+                        {% endif %}
 
-                        <!-- 6. 통합관리 메뉴 (권한 레벨 2 이상 관리자 전용) -->
-                        {% if session.get('user_level', 99) <= 2 or session.get('user_name') == 'admin' %}
+                        <!-- 6. 통합관리 메뉴 -->
+                        {% if menu_access.get('admin_group', false) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') or request.path.startswith('/ebook/books') %}active{% endif %}">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
-                                <a href="/user"><i class="fa-solid fa-user-gear"></i>인사관리</a>
-                                <a href="/admin/boards"><i class="fa-solid fa-clipboard-list"></i>게시판관리</a>
-                                <a href="/admin/disk"><i class="fa-solid fa-hard-drive"></i>디스크관리</a>
-                                <a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>
-                                <a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>
-                                <a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>
+                                {% if menu_access.get('admin_people', false) %}<a href="/user"><i class="fa-solid fa-user-gear"></i>인사관리</a>{% endif %}
+                                {% if menu_access.get('admin_menu_permissions', false) %}<a href="/admin/menu-permissions"><i class="fa-solid fa-key"></i>메뉴 권한관리</a>{% endif %}
+                                {% if menu_access.get('admin_boards', false) %}<a href="/admin/boards"><i class="fa-solid fa-clipboard-list"></i>게시판관리</a>{% endif %}
+                                {% if menu_access.get('admin_disk', false) %}<a href="/admin/disk"><i class="fa-solid fa-hard-drive"></i>디스크관리</a>{% endif %}
+                                {% if menu_access.get('admin_themes', false) %}<a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>{% endif %}
+                                {% if menu_access.get('ebook_library', false) %}<a href="{{ url_for('ebook.text_library') }}"><i class="fa-solid fa-book-open-reader"></i>eBook 관리</a>{% endif %}
+                                {% if menu_access.get('admin_stats', false) %}<a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>{% endif %}
+                                {% if menu_access.get('admin_settings', false) %}<a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>{% endif %}
                             </div>
                         </li>
                         {% endif %}
@@ -893,9 +989,9 @@
 
                 <div class="user-section">
                     {% if session.get('user_name') %}
-                    <a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
+                    {% if menu_access.get('memo_main', true) %}<a href="{{ url_for('memo.memo_board') }}" class="btn-memo {% if 'memo' in request.path %}active{% endif %}" title="개인 화이트보드 메모장">
                         <i class="fa-solid fa-chalkboard"></i>
-                    </a>
+                    </a>{% endif %}
 
                     <div class="user-profile" onclick="openMyInfoModal()">
                         <div id="nav-profile-icon-container" style="background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; font-size: 1.1rem;">

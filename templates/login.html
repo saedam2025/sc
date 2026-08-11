@@ -657,13 +657,13 @@
             <div class="widget-title"><i class="fa-solid fa-utensils"></i> 점심 추천</div>
             <div class="widget-content text-small fade-in" id="widget-lunch">로딩중...</div>
         </div>
-        <div class="info-widget" title="수원시 실시간 미세먼지 농도">
-            <div class="widget-title"><i class="fa-solid fa-mask"></i> 미세먼지 (수원)</div>
-            <div class="widget-content" id="widget-dust">로딩중...</div>
+        <div class="info-widget" title="성공한 로그인 누적 횟수">
+            <div class="widget-title"><i class="fa-solid fa-chart-line"></i> 총 누적접속자</div>
+            <div class="widget-content">{{ "{:,}".format(total_login_count|default(0, true)) }} 명</div>
         </div>
-        <div class="info-widget" title="오늘 로그인 버튼을 누른 횟수 (실제 카운트)">
+        <div class="info-widget" title="오늘 로그인에 성공한 고유 사용자 수">
             <div class="widget-title"><i class="fa-solid fa-users"></i> 금일 접속자</div>
-            <div class="widget-content" id="widget-users">로딩중...</div>
+            <div class="widget-content">{{ "{:,}".format(today_login_users|default(0, true)) }} 명 <span style="font-size:11px; color:var(--success-color);">●</span></div>
         </div>
         <div class="info-widget widget-quote" id="quote-wrapper" data-tooltip="격언 불러오는 중...">
             <div class="widget-title"><i class="fa-solid fa-quote-left"></i> 오늘의 격언</div>
@@ -671,7 +671,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260713-3009" onerror="console.warn('테마 카탈로그를 불러오지 못해 내장 테마를 사용합니다.');"></script>
+    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260810-3010" onerror="console.warn('테마 카탈로그를 불러오지 못해 내장 테마를 사용합니다.');"></script>
     <script>
         // === 다이나믹 테마 생성 엔진 ===
         const uiStyles = ['glass', 'solid', 'glow', 'neumorphism', 'clay'];
@@ -725,16 +725,17 @@
                 "--effect-color3": `hsl(${(hue - 40 + 360) % 360}, ${effS}%, ${effL}%)`
             };
 
+            const lineColor = `color-mix(in srgb, ${primary} 38%, #cbd5e1)`;
             if (uiStyle === 'glass') {
                 vars["--card-bg"] = "rgba(255, 255, 255, 0.6)"; vars["--card-border"] = "rgba(255, 255, 255, 0.9)";
                 vars["--card-backdrop"] = "blur(24px)"; vars["--card-shadow"] = "0 15px 40px rgba(0, 0, 0, 0.1)";
                 vars["--input-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--widget-bg"] = "rgba(255, 255, 255, 0.7)"; 
                 vars["--widget-hover"] = "rgba(255, 255, 255, 1)"; vars["--widget-border"] = "rgba(255, 255, 255, 1)";
             } else if (uiStyle === 'solid') {
-                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = "transparent";
+                vars["--card-bg"] = "#ffffff"; vars["--card-border"] = lineColor;
                 vars["--card-backdrop"] = "none"; vars["--card-shadow"] = "0 20px 40px rgba(0, 0, 0, 0.1)";
                 vars["--input-bg"] = "#f1f5f9"; vars["--widget-bg"] = "#f1f5f9"; 
-                vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = "transparent";
+                vars["--widget-hover"] = "#e2e8f0"; vars["--widget-border"] = lineColor;
             } else if (uiStyle === 'glow') {
                 vars["--card-bg"] = "rgba(255, 255, 255, 0.8)"; vars["--card-border"] = primary;
                 vars["--card-backdrop"] = "blur(10px)"; vars["--card-shadow"] = `0 0 25px ${primary}`;
@@ -743,17 +744,18 @@
             } else if (uiStyle === 'neumorphism') {
                 const neuBg = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 90%)`;
                 const darkShadow = `hsl(${hue}, ${Math.max(0, bgS - 20)}%, 80%)`;
-                vars["--body-bg"] = neuBg; vars["--card-bg"] = neuBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--body-bg"] = neuBg; vars["--card-bg"] = neuBg; vars["--card-border"] = lineColor; vars["--card-backdrop"] = "none";
                 vars["--card-shadow"] = `12px 12px 24px ${darkShadow}, -12px -12px 24px #ffffff`;
                 vars["--input-bg"] = "rgba(255,255,255,0.45)"; vars["--widget-bg"] = neuBg; 
-                vars["--widget-hover"] = neuBg; vars["--widget-border"] = "transparent";
+                vars["--widget-hover"] = neuBg; vars["--widget-border"] = lineColor;
             } else if (uiStyle === 'clay') {
                 const clayBg = `hsl(${hue}, ${bgS}%, 95%)`;
-                vars["--card-bg"] = clayBg; vars["--card-border"] = "transparent"; vars["--card-backdrop"] = "none";
+                vars["--card-bg"] = clayBg; vars["--card-border"] = lineColor; vars["--card-backdrop"] = "none";
                 vars["--card-shadow"] = "10px 10px 20px rgba(0,0,0,0.1), inset -6px -6px 16px rgba(0,0,0,0.08), inset 6px 6px 16px rgba(255,255,255,0.9)";
                 vars["--input-bg"] = "rgba(255,255,255,0.55)"; vars["--widget-bg"] = clayBg; 
-                vars["--widget-hover"] = clayBg; vars["--widget-border"] = "transparent";
+                vars["--widget-hover"] = clayBg; vars["--widget-border"] = lineColor;
             }
+            vars["--theme-line-color"] = vars["--widget-border"] || vars["--card-border"] || lineColor;
             
             generatedThemes.push({ name: name, type: effectType, vars: vars });
         }
@@ -1391,13 +1393,6 @@
             document.getElementById('widget-lunch').textContent = randomLunch;
             document.getElementById('lunch-wrapper').setAttribute('data-tooltip', randomLunch);
 
-            try {
-                let currentCount = localStorage.getItem('today_login_count') || 125;
-                document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
-            } catch(e) {
-                document.getElementById('widget-users').innerHTML = `125 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
-            }
-
             const quotes = [
                 "성공은 매일 반복한 작은 노력들의 합이다.", "미래는 현재 우리가 무엇을 하는가에 달려 있다.",
                 "시작하는 방법은 그만 말하고 이제 행동하는 것이다.", "멈추지 않는 이상, 얼마나 천천히 가는지는 중요하지 않다."
@@ -1406,45 +1401,6 @@
             document.getElementById('widget-quote').textContent = randomQuote;
             document.getElementById('quote-wrapper').setAttribute('data-tooltip', randomQuote);
 
-            const dustElement = document.getElementById('widget-dust');
-            dustElement.textContent = '확인 중...';
-            let dustFinished = false;
-            const dustTimeout = setTimeout(function () {
-                if (!dustFinished) {
-                    dustFinished = true;
-                    dustElement.innerHTML = '<span style="color:#64748b; font-size:12px;">정보 확인 지연</span>';
-                }
-            }, 7000);
-
-            if (typeof fetch !== 'function') {
-                clearTimeout(dustTimeout);
-                dustFinished = true;
-                dustElement.innerHTML = '<span style="color:#64748b; font-size:12px;">정보 확인 불가</span>';
-                return;
-            }
-
-            fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=37.2636&longitude=127.0286&current=pm10')
-                .then(function (res) {
-                    if (!res.ok) throw new Error('미세먼지 API 응답 오류');
-                    return res.json();
-                })
-                .then(function (data) {
-                    if (dustFinished) return;
-                    const pm10 = data && data.current ? Number(data.current.pm10) : NaN;
-                    if (!Number.isFinite(pm10)) throw new Error('미세먼지 데이터 없음');
-                    let status = '좋음', color = 'var(--success-color)';
-                    if (pm10 > 30) { status = '보통'; color = '#f59e0b'; }
-                    if (pm10 > 80) { status = '나쁨'; color = '#ef4444'; }
-                    dustFinished = true;
-                    clearTimeout(dustTimeout);
-                    dustElement.innerHTML = `<span style="color:${color}; font-weight:800;">${status} <span style="font-size:12px; color:var(--text-gray); font-weight:400;">(${pm10})</span></span>`;
-                })
-                .catch(function () {
-                    if (dustFinished) return;
-                    dustFinished = true;
-                    clearTimeout(dustTimeout);
-                    dustElement.innerHTML = '<span style="color:#ef4444; font-size:12px;">정보 불러오기 실패</span>';
-                });
         }
 
         function handleEnter(e) { if (e.key === 'Enter') doLogin(); }
@@ -1453,12 +1409,6 @@
             const emp_no = document.getElementById('emp_no').value;
             const password = document.getElementById('password').value;
             if(!emp_no || !password) { alert('사번과 비밀번호를 모두 입력해주세요.'); return; }
-
-            try {
-                let currentCount = parseInt(localStorage.getItem('today_login_count') || "125") + 1;
-                localStorage.setItem('today_login_count', currentCount);
-                document.getElementById('widget-users').innerHTML = `${currentCount} 명 <span style="font-size:11px; color:var(--success-color);">●</span>`;
-            } catch (e) {}
 
             try {
                 const res = await fetch('/login', {
@@ -1473,7 +1423,7 @@
                     const err = await res.json(); alert(err.message || '로그인에 실패했습니다.');
                 }
             } catch (error) {
-                alert('서버와 통신하는 중 오류가 발생했습니다. (임시 접속 카운트 완료)');
+                alert('서버와 통신하는 중 오류가 발생했습니다.');
             }
         }
     </script>

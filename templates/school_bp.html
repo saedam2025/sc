@@ -28,8 +28,9 @@
 
     /* 전체 배경 및 폰트 설정 */
     .dashboard-container { padding: 20px 0; background-color: transparent; color: var(--school-text); letter-spacing: -0.02em; position: relative; z-index: 2; }
-    .dashboard-container.school-detail-spacing { padding-top: 0; }
-    .dashboard-container.school-detail-spacing .school-container { padding-top: 4px; }
+    /* 상세 업무공간도 다른 메뉴 화면과 같은 상단 여백을 유지한다. */
+    .dashboard-container.school-detail-spacing { padding-top: 20px; }
+    .dashboard-container.school-detail-spacing .school-container { padding-top: 25px; }
     .dashboard-container.school-detail-spacing .school-workspace-shell { padding-top: 13px; }
 
     /* 메인 컨테이너 */
@@ -169,11 +170,41 @@
     @keyframes schoolToastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
     /* Web / File Link 카드 (좌측) - 요청하신 이미지 스타일 반영 */
-    .school-link-card { height: 138px; padding: 16px 20px 14px; display: flex; flex: 0 0 auto; flex-direction: column; box-sizing: border-box; }
-    .school-link-header { font-size: 1.05rem; font-weight: 800; color: var(--school-navy); margin-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 8px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .school-link-card { height: 160px; padding: 16px 20px 14px; display: flex; flex: 0 0 auto; flex-direction: column; box-sizing: border-box; }
+    .school-link-header { font-size: 0.8rem; font-weight: 800; color: var(--school-navy); margin-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.05); padding-bottom: 8px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .school-link-add { border:0; background:transparent; color:var(--text-gray, #64748b); cursor:pointer; padding:5px; border-radius:6px; font-size:1rem; }
     .school-link-add:hover { background:var(--school-soft); color:var(--school-blue); }
-    .school-link-grid { display: flex; flex: 0 0 64px; gap: 10px; align-items: stretch; height: 64px; max-height: 64px; overflow-x: auto; overflow-y: hidden; padding: 7px 8px 3px; box-sizing: border-box; scrollbar-width: thin; }
+    .school-link-grid {
+        display: flex;
+        flex: 1 1 auto;
+        gap: 10px;
+        align-items: flex-start;
+        min-height: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 7px 8px 8px;
+        box-sizing: border-box;
+        scrollbar-width: thin;
+        scrollbar-color: color-mix(in srgb, var(--school-blue) 55%, var(--school-border)) color-mix(in srgb, var(--school-border) 55%, transparent);
+        scrollbar-gutter: stable;
+        overscroll-behavior-inline: contain;
+    }
+    .school-link-grid::-webkit-scrollbar { height: 8px; }
+    .school-link-grid::-webkit-scrollbar-track {
+        background: color-mix(in srgb, var(--school-border) 55%, transparent);
+        border-radius: 999px;
+        margin: 0 8px;
+    }
+    .school-link-grid::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--school-blue) 55%, var(--school-border));
+        border: 2px solid transparent;
+        border-radius: 999px;
+        background-clip: padding-box;
+    }
+    .school-link-grid::-webkit-scrollbar-thumb:hover {
+        background: color-mix(in srgb, var(--school-blue) 78%, var(--school-border));
+        background-clip: padding-box;
+    }
     .school-link-item { 
         position: relative;
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
@@ -401,7 +432,7 @@
 
     .pagination-container { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 30px; }
     .page-btn { padding: 3px 12px; margin: 0 4px; border: 1px solid var(--school-border); border-radius: 6px; background: var(--school-soft); cursor: pointer; color: var(--text-gray, #475569); font-size: 0.8rem; font-weight: 700; transition: 0.2s; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; }
-    .page-btn:hover:not(:disabled) { background: var(--widget-hover, #f1f5f9); color: var(--school-blue); border-color: var(--school-blue); pointer-events: none; }
+    .page-btn:hover:not(:disabled) { background: var(--widget-hover, #f1f5f9); color: var(--school-blue); border-color: var(--school-blue); }
     .page-btn.active { background: var(--school-blue); color: white; border-color: var(--school-blue); pointer-events: none; }
     .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -937,7 +968,7 @@
                     <div id="boardDropdownMenu">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             {% for cat in school_categories %}
-                            <a href="{{ cat.url if cat.url else '?category=' ~ cat.id }}" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
+                            <a href="{{ cat.url if cat.url else url_for('school.school_detail', school_key=school.access_key, category=cat.id) }}" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
                                 <i class="fas {{ cat.icon }}" style="color: var(--school-blue); width: 24px; text-align: center; font-size: 1.1rem;"></i>
                                 {{ cat.name }}
                             </a>
@@ -993,29 +1024,29 @@
                     <div class="pagination-container">
                         {% if pagination.total_pages > 1 %}
                         {% if pagination.has_prev %}
-                        <a href="?category={{ category }}&page={{ pagination.page - 1 }}&search={{ pagination.search|urlencode }}" class="page-btn"><i class="fas fa-chevron-left"></i> Prev</a>
+                        <a href="{{ url_for('school.school_detail', school_key=school.access_key, category=category, page=pagination.page - 1, search=pagination.search) }}" class="page-btn"><i class="fas fa-chevron-left"></i> Prev</a>
                         {% else %}
                         <button class="page-btn" disabled><i class="fas fa-chevron-left"></i> Prev</button>
                         {% endif %}
 
                         {% for p_num in range(pagination.start_page, pagination.end_page + 1) %}
-                        <a href="?category={{ category }}&page={{ p_num }}&search={{ pagination.search|urlencode }}" class="page-btn {{ 'active' if p_num == pagination.page else '' }}">{{ p_num }}</a>
+                        <a href="{{ url_for('school.school_detail', school_key=school.access_key, category=category, page=p_num, search=pagination.search) }}" class="page-btn {{ 'active' if p_num == pagination.page else '' }}">{{ p_num }}</a>
                         {% endfor %}
 
                         {% if pagination.has_next %}
-                        <a href="?category={{ category }}&page={{ pagination.page + 1 }}&search={{ pagination.search|urlencode }}" class="page-btn">Next <i class="fas fa-chevron-right"></i></a>
+                        <a href="{{ url_for('school.school_detail', school_key=school.access_key, category=category, page=pagination.page + 1, search=pagination.search) }}" class="page-btn">Next <i class="fas fa-chevron-right"></i></a>
                         {% else %}
                         <button class="page-btn" disabled>Next <i class="fas fa-chevron-right"></i></button>
                         {% endif %}
                         {% endif %}
                     </div>
 
-                    <form class="board-search-form" method="GET" action="">
+                    <form class="board-search-form" method="GET" action="{{ url_for('school.school_detail', school_key=school.access_key) }}">
                         <input type="hidden" name="category" value="{{ category }}">
                         <input type="search" name="search" class="board-search-input" value="{{ pagination.search }}" placeholder="제목, 내용 또는 작성자 검색" aria-label="게시판 검색어">
                         <button type="submit" class="btn btn-primary board-search-btn"><i class="fas fa-magnifying-glass"></i> 검색</button>
                         {% if pagination.search %}
-                        <a href="?category={{ category }}" class="btn board-search-reset">초기화</a>
+                        <a href="{{ url_for('school.school_detail', school_key=school.access_key, category=category) }}" class="btn board-search-reset">초기화</a>
                         {% endif %}
                     </form>
                 </div>
@@ -1160,13 +1191,13 @@
                 <div class="widget-card gallery-widget company-gallery-card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--school-border); padding-bottom: 10px;">
                         <h3 style="margin: 0; font-size: 1.05rem; color: var(--school-navy); font-weight: 800; display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-images" style="color: var(--school-blue);"></i> 사내갤러리
+                            <i class="fas fa-images" style="color: var(--school-blue);"></i> 학교갤러리
                         </h3>
                         <div style="display: flex; gap: 8px;">
                             <button type="button" class="gallery-action-btn" onclick="location.reload()" title="새로고침">
                                 <i class="fa-solid fa-rotate-right"></i>
                             </button>
-                            <button type="button" class="gallery-action-btn" onclick="location.href='{{ url_for('gall2.index') }}'" title="사진 추가">
+                            <button type="button" class="gallery-action-btn" onclick="location.href='{{ url_for('gall2.school_gallery', school_key=school.access_key) }}'" title="사진 추가">
                                 <i class="fa-solid fa-plus"></i>
                             </button>
                         </div>
@@ -1174,9 +1205,9 @@
                     {% if gallery_preview_items %}
                     <div class="company-gallery-list">
                         {% for item in gallery_preview_items %}
-                        <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.index') }}'">
+                        <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.school_gallery', school_key=school.access_key) }}'">
                             {% if item.thumb_name %}
-                            <img class="company-gallery-thumb" src="{{ url_for('gall2.serve_thumb', filename=item.thumb_name) }}" alt="{{ item.title }}" loading="lazy">
+                            <img class="company-gallery-thumb" src="{{ url_for('gall2.school_gallery_serve_thumb', school_key=school.access_key, filename=item.thumb_name) }}" alt="{{ item.title }}" loading="lazy">
                             {% else %}
                             <div class="company-gallery-thumb fallback"><i class="fa-regular fa-image"></i></div>
                             {% endif %}
@@ -1194,7 +1225,7 @@
                     {% else %}
                     <div class="company-gallery-empty">
                         <i class="fa-regular fa-images" style="font-size: 2.3rem; color: var(--school-blue);"></i>
-                        <div>등록된 사내갤러리 사진이 없습니다.</div>
+                        <div>등록된 학교갤러리 사진이 없습니다.</div>
                     </div>
                     {% endif %}
                 </div>
@@ -1392,7 +1423,7 @@
     const POST_MAX_FILES = 10;
     const POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024;
     const activeCategoryName = "{% if view_type == 'detail' %}{{ active_cat.name|e }}{% else %}게시판{% endif %}";
-    const isHeadquartersBoard = "{{ category if view_type == 'detail' else '' }}" === "community";
+    const isSharedBoard = ["community", "reference"].includes("{{ category if view_type == 'detail' else '' }}");
     const canManageCurrentBoard = {{ 'true' if can_manage_current_board|default(false) else 'false' }};
     const schoolToastStorageKey = 'schoolWorkspaceToast';
 
@@ -1949,7 +1980,7 @@
             $('#readFiles').html(fileHtml).show();
         } else { $('#readFiles').hide(); }
 
-        const canManagePost = isHeadquartersBoard
+        const canManagePost = isSharedBoard
             ? canManageCurrentBoard
             : (currentUser === data.author || userLevel <= 7);
         if(canManagePost) {
@@ -2089,16 +2120,16 @@
         document.getElementById(id).style.display = 'block'; 
         
         if (id === 'regModal') {
-            loadOrgChart('regOrgChart', 'selectedDirId', 'selectedDirName');
+            loadDirectorAssignmentOrgChart('regOrgChart', 'selectedDirId', 'selectedDirName');
         } else if (id === 'editModal') {
-            loadOrgChart('editOrgChart', 'edit_selectedDirId', 'edit_selectedDirName');
+            loadDirectorAssignmentOrgChart('editOrgChart', 'edit_selectedDirId', 'edit_selectedDirName');
         }
     }
     
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     window.onclick = function(e) { if(e.target.classList.contains('sd-modal')) e.target.style.display='none'; }
     
-    async function loadOrgChart(containerId, targetIdInput, targetNameDisplay) {
+    async function loadDirectorAssignmentOrgChart(containerId, targetIdInput, targetNameDisplay) {
         const container = document.getElementById(containerId);
         if (container.dataset.loaded === 'true') return;
         

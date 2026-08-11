@@ -509,18 +509,21 @@
 
     async function loadOrgChart() {
         try {
-            const res = await fetch('/user/list');
+            const res = await fetch('/api/chat/organization', {
+                headers: { 'Accept': 'application/json' }
+            });
             if(!res.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
-            const users = await res.json();
+            const data = await res.json();
+            const users = Array.isArray(data.users) ? data.users : [];
             
-            const filteredUsers = users.filter(u => (u.이름||'').toLowerCase() !== 'admin' && (u.사번||'').toLowerCase() !== 'admin');
-            filteredUsers.sort((a, b) => (parseInt(a.레벨) || 999) - (parseInt(b.레벨) || 999));
+            const filteredUsers = users.filter(u => (u.name || '').toLowerCase() !== 'admin' && (u.emp_no || '').toLowerCase() !== 'admin');
+            filteredUsers.sort((a, b) => (parseInt(a.level) || 999) - (parseInt(b.level) || 999));
             
             const groups = { '본부': [], '북부지점': [], '센터장': [], '코디': [], '강사': [], '기타': [] };
             
             filteredUsers.forEach(u => {
-                const groupName = Object.prototype.hasOwnProperty.call(groups, u.조직그룹)
-                    ? u.조직그룹
+                const groupName = Object.prototype.hasOwnProperty.call(groups, u.organization_group)
+                    ? u.organization_group
                     : '기타';
                 groups[groupName].push(u);
             });
@@ -549,10 +552,10 @@
                 `;
                 
                 members.forEach(u => {
-                    const name = u.이름 || '-';
-                    const dept = u.소속 || '소속미지정';
-                    const pos = u.직급 || '직급미지정';
-                    const icon = u.아이콘 || '👤';
+                    const name = u.name || '-';
+                    const dept = u.department || '소속미지정';
+                    const pos = u.position || '직급미지정';
+                    const icon = u.icon || '👤';
                     
                     html += `
                     <div class="org-status-item" style="margin-top:2px; display:flex; align-items:center;">
@@ -634,7 +637,8 @@
     function initializeChatWidgetSocket() {
         if (typeof io !== 'function') return;
         chatWidgetSocket = io('/chat', {
-            transports: ['websocket', 'polling'],
+            transports: ['polling'],
+            upgrade: false,
             reconnection: true,
             reconnectionDelay: 1000
         });

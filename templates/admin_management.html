@@ -52,6 +52,31 @@
     .create-form-section { display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color, #e2e8f0); }
     .board-create-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
     .permission-create-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; }
+    .menu-permission-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .menu-permission-toolbar select { min-width:220px; }
+    .menu-permission-guide { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; margin-bottom:18px; }
+    .menu-permission-guide > div { padding:14px 16px; border:1px solid var(--border-color); border-radius:12px; background:var(--widget-bg, #f8fafc); }
+    .menu-permission-guide strong { display:block; color:var(--text-dark); margin-bottom:4px; }
+    .menu-permission-guide span { color:var(--text-gray); font-size:.84rem; line-height:1.5; }
+    .menu-permission-groups { display:grid; gap:16px; }
+    .menu-permission-group { border:1px solid var(--border-color); border-radius:14px; overflow:hidden; background:var(--card-bg, #fff); }
+    .menu-permission-row { display:grid; grid-template-columns:minmax(220px, 1fr) minmax(260px, 360px); gap:20px; align-items:center; padding:15px 18px; border-top:1px solid var(--border-color); }
+    .menu-permission-row:first-child { border-top:0; }
+    .menu-permission-row.parent { background:var(--widget-bg, #f8fafc); }
+    .menu-permission-label { display:flex; align-items:center; gap:11px; min-width:0; }
+    .menu-permission-label i { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; border-radius:9px; color:var(--primary-color); background:var(--primary-light, #eff6ff); }
+    .menu-permission-label strong { color:var(--text-dark); }
+    .menu-permission-label small { display:block; color:var(--text-gray); margin-top:3px; }
+    .menu-permission-row.child .menu-permission-label { padding-left:30px; }
+    .menu-permission-row select { width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px; background:var(--input-bg, #fff); color:var(--text-dark); font-weight:700; }
+    .menu-special-policy { margin:0 18px 16px 48px; padding:14px 16px; border:1px solid rgba(37,99,235,.24); border-radius:12px; background:rgba(37,99,235,.06); display:flex; justify-content:space-between; align-items:center; gap:18px; }
+    .menu-special-policy strong { display:block; color:var(--text-dark); margin-bottom:5px; }
+    .menu-special-policy span { display:block; color:var(--text-gray); font-size:.82rem; line-height:1.55; }
+    .menu-special-toggle { display:inline-flex; align-items:center; gap:9px; flex:0 0 auto; font-weight:900; color:var(--primary-color); cursor:pointer; }
+    .menu-special-toggle input { width:20px; height:20px; accent-color:var(--primary-color); }
+    .menu-permission-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:18px; position:sticky; bottom:14px; z-index:5; }
+    .menu-permission-actions .btn { box-shadow:0 8px 24px rgba(15,23,42,.14); }
+    .save-notice { padding:12px 16px; margin-bottom:16px; border:1px solid #86efac; border-radius:12px; background:#f0fdf4; color:#166534; font-weight:800; }
     
     /* 제목과 폼을 하나의 묶음으로 묶는 그룹 테두리 박스 */
     .form-group-wrapper {
@@ -173,6 +198,10 @@
         .admin-shell, .disk-layout, .grid-2, .grid-3, .detail-grid { grid-template-columns: 1fr; }
         .stats-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
+        .menu-permission-guide { grid-template-columns:1fr; }
+        .menu-permission-row { grid-template-columns:1fr; gap:10px; }
+        .menu-permission-row.child .menu-permission-label { padding-left:12px; }
+        .menu-special-policy { margin:0 12px 14px; align-items:flex-start; flex-direction:column; }
     }
 
     @media (max-width: 560px) {
@@ -194,10 +223,8 @@
         z-index: 10;
     }
 
-    /* PC화면에서 좌측 메뉴판 높이를 우측 첫번째 패널과 정렬 */
-    @media (min-width: 981px) {
-        .admin-side { margin-top: 78px; }
-    }
+    /* 좌측 메뉴판도 상단 메뉴 아래 공통 50px 시작선에 맞춤 */
+    .admin-side { margin-top: 0; }
 </style>
 
 <div class="admin-shell">
@@ -211,6 +238,85 @@
     </aside>
 
     <section class="admin-main">
+
+        {% if active_section == 'menu_permissions' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-key"></i> 메뉴 권한관리</h1>
+                <div class="admin-subtitle">상단 주메뉴와 서브메뉴의 회원 접근 레벨을 각각 설정합니다.</div>
+            </div>
+            <div class="menu-permission-toolbar">
+                <select id="bulkMenuLevel" class="table-input" aria-label="전체 메뉴 일괄 레벨">
+                    <option value="">일괄 적용 레벨 선택</option>
+                    <option value="-1">전체 차단</option>
+                    {% for level in level_numbers %}
+                    <option value="{{ level }}">레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-ghost" type="button" onclick="applyBulkMenuLevel()"><i class="fa-solid fa-wand-magic-sparkles"></i> 화면에 일괄 적용</button>
+            </div>
+        </div>
+
+        {% if saved %}
+        <div class="save-notice"><i class="fa-solid fa-circle-check"></i> 메뉴 접근권한을 저장했습니다. 열린 화면은 다음 요청부터 새 권한이 적용됩니다.</div>
+        {% endif %}
+
+        <div class="menu-permission-guide">
+            <div><strong><i class="fa-solid fa-arrow-down-1-9"></i> 레벨 기준</strong><span>숫자가 작을수록 높은 권한입니다. 예: 레벨 5 이상은 권한 등급상 5 이상인 숫자 0~5 회원에게 허용됩니다.</span></div>
+            <div><strong><i class="fa-solid fa-diagram-project"></i> 주메뉴 우선</strong><span>서브메뉴가 허용되어도 주메뉴가 차단되면 메뉴가 노출되지 않고 직접 접근도 차단됩니다.</span></div>
+            <div><strong><i class="fa-solid fa-clipboard-list"></i> 게시판 권한 분리</strong><span>여기서는 게시판 메뉴 진입만 설정합니다. 읽기·쓰기·댓글·삭제는 게시판관리 설정을 사용합니다.</span></div>
+        </div>
+
+        <form method="post" id="menuPermissionForm">
+            <div class="menu-permission-groups">
+                {% for group in menu_groups %}
+                <section class="menu-permission-group">
+                    <div class="menu-permission-row parent">
+                        <div class="menu-permission-label">
+                            <i class="fa-solid {{ group.icon }}"></i>
+                            <div><strong>{{ group.label }}</strong><small>주메뉴 권한{% if group.children %} · 하위 {{ group.children|length }}개 메뉴{% endif %}</small></div>
+                        </div>
+                        <select name="{{ group.key }}" data-permission-select required aria-label="{{ group.label }} 주메뉴 권한">
+                            <option value="-1" {% if menu_max_levels[group.key] == -1 %}selected{% endif %}>차단 (최고관리자 제외)</option>
+                            {% for level in level_numbers %}
+                            <option value="{{ level }}" {% if menu_max_levels[group.key] == level %}selected{% endif %}>레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }} / 일반회원 {{ positions_by_level[level].user_count }}명{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% for child in group.children %}
+                    <div class="menu-permission-row child">
+                        <div class="menu-permission-label">
+                            <i class="fa-solid {{ child[2] }}"></i>
+                            <div><strong>{{ child[1] }}</strong><small>서브메뉴 권한 · 주메뉴 권한과 함께 적용</small></div>
+                        </div>
+                        <select name="{{ child[0] }}" data-permission-select required aria-label="{{ child[1] }} 서브메뉴 권한">
+                            <option value="-1" {% if menu_max_levels[child[0]] == -1 %}selected{% endif %}>차단 (최고관리자 제외)</option>
+                            {% for level in level_numbers %}
+                            <option value="{{ level }}" {% if menu_max_levels[child[0]] == level %}selected{% endif %}>레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }} / 일반회원 {{ positions_by_level[level].user_count }}명{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endfor %}
+                    {% if group.key == 'school_group' %}
+                    <div class="menu-special-policy">
+                        <div>
+                            <strong><i class="fa-solid fa-school-lock"></i> 레벨 8 센터장 전용모드</strong>
+                            <span>사용 시 일반 메뉴 레벨 설정을 무시하고 상단 메뉴를 숨깁니다. 레벨 8 회원은 자신이 센터장으로 등록된 활성 센터 업무공간과 학교일정표만 이용할 수 있으며, 담당 센터가 없으면 업무공간 접근이 차단됩니다.</span>
+                        </div>
+                        <label class="menu-special-toggle">
+                            <input type="checkbox" name="school_director_scope_enabled" value="1" {% if school_director_scope %}checked{% endif %}>
+                            전용모드 사용
+                        </label>
+                    </div>
+                    {% endif %}
+                </section>
+                {% endfor %}
+            </div>
+            <div class="menu-permission-actions">
+                <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 전체 메뉴 권한 저장</button>
+            </div>
+        </form>
+        {% endif %}
 
         {% if active_section == 'boards' %}
         <div class="admin-header">
@@ -651,6 +757,17 @@ async function deleteDiskItem(root, path) {
     const data = await res.json();
     if (!res.ok) return alert(data.message || '삭제에 실패했습니다.');
     location.reload();
+}
+
+function applyBulkMenuLevel() {
+    const picker = document.getElementById('bulkMenuLevel');
+    if (!picker || picker.value === '') {
+        alert('일괄 적용할 레벨을 선택해주세요.');
+        return;
+    }
+    document.querySelectorAll('[data-permission-select]').forEach((select) => {
+        select.value = picker.value;
+    });
 }
 
 const boardCreateForm = document.getElementById('boardCreateForm');

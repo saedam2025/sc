@@ -456,7 +456,7 @@
                                     <span class="badge status-{{ task.status }}">{{ task.status }}</span>
                                 </td>
 
-                                <td style="text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-gray);">
+                                <td class="task-processor" style="text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-gray);">
                                     {{ task.processor }}
                                 </td>
                             </tr>
@@ -703,6 +703,8 @@
                                 badge.textContent = newStatus;
                                 badge.className = `badge status-${newStatus}`;
                             }
+                            const processorCell = row.querySelector('.task-processor');
+                            if (processorCell) processorCell.textContent = data.processor || '-';
                         }
                     });
                     applyFilters(); 
