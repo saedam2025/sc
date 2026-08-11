@@ -39,13 +39,23 @@ from routes.chat import chat_bp
 
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
-from routes.usage_stats import record_login_activity, record_page_usage, start_usage_session
+from routes.usage_stats import (
+    get_login_summary,
+    record_login_activity,
+    record_page_usage,
+    start_usage_session,
+)
 from routes.security import (
     hash_password,
     load_session_secret,
     migrate_plaintext_passwords,
     upgrade_legacy_password,
     verify_password,
+)
+from routes.menu_access import (
+    build_menu_access,
+    center_director_mode_active,
+    enforce_request_menu_access,
 )
 
 app = Flask(__name__)
@@ -113,39 +123,6 @@ EXEMPT_ROUTES = [
     'ebook.serve_page_image',
 ]
 
-# 💡 레벨 8(센터장) 전용 허용 경로 목록 정의
-# 개인 프로필 관련 API 경로들을 모두 허용하도록 추가했습니다.
-LEVEL_8_ALLOWED_PATHS = [
-    '/school',
-    '/school/calendar',
-    '/school/tasks',
-    '/contacts',
-    '/logout',
-    '/user/my_info',
-    '/user/update_my_info', 
-    '/user/profile',         # 💡 공통 메인메뉴 프로필 조회 허용
-    '/user/edit',            # 💡 공통 메인메뉴 프로필 수정 허용
-    '/user/password',        # 💡 공통 메인메뉴 비밀번호 변경 허용
-    '/user/upload',          # 💡 공통 메인메뉴 프로필 사진 업로드 허용
-    '/user/api',             # 💡 기타 유저 관련 API 허용
-    '/chat_popup',
-    '/chat/attachment',
-    '/send_message',
-    '/get_chat_history',
-    '/delete_message',
-    '/api/chat',
-    '/api/unread_messages',
-    '/api/message_',
-    '/api/messages',
-    '/api/leave_chat',
-    '/api/toggle_pin',
-    '/api/move_pin',
-    '/socket.io',
-    '/gall2',
-    '/ebook',
-    '/api/activity_feed',
-]
-
 @app.before_request
 def check_login():
     # 1. 예외 경로이거나 정적 파일 요청이면 통과
@@ -156,16 +133,12 @@ def check_login():
     if 'emp_no' not in session:
         return redirect(url_for('login_page'))
     
-    # 3. 레벨 8 (센터장) 권한 체크 로직
-    user_level = session.get('user_level', 99)
-    if user_level == 8:
-        is_allowed = any(request.path.startswith(allowed) for allowed in LEVEL_8_ALLOWED_PATHS)
-        if request.path == '/':
-            return redirect(url_for('school.school_list'))
-        if not is_allowed:
-            return "접근 권한이 없습니다. (센터장 전용 메뉴만 이용 가능)", 403
-
     _record_usage_log()
+
+
+@app.before_request
+def check_menu_access():
+    return enforce_request_menu_access()
 
 
 NOTIFICATION_MUTATION_PREFIXES = (
@@ -222,6 +195,7 @@ def _classify_menu(path):
         ('/contacts', '본사연락망'),
         ('/memo', '개인화이트보드'),
         ('/excel-generator', '입금용 엑셀 생성기'),
+        ('/ebook/books', 'eBook'),
         ('/ebook', 'e리플렛'),
         ('/notifications', '알림'),
     ]
@@ -244,11 +218,21 @@ def _record_usage_log():
 # =====================================================================
 @app.context_processor
 def inject_user_data():
+    try:
+        user_level = session.get('user_level', 99)
+        menu_access = build_menu_access(user_level)
+        center_director_mode = center_director_mode_active(user_level)
+    except Exception as e:
+        print(f"메뉴 권한 로드 오류: {e}")
+        menu_access = {}
+        center_director_mode = False
     return {
         'current_user': session.get('user_name'),
         'current_user_profile_path': session.get('profile_path'),
         'current_user_level': session.get('user_level', 99),
-        'global_theme': get_active_theme()
+        'global_theme': get_active_theme(),
+        'menu_access': menu_access,
+        'center_director_mode': center_director_mode,
     }
 
 # =====================================================================
@@ -270,6 +254,8 @@ def as_datetime_filter(value, format="%Y-%m-%d %H:%M:%S"):
 @app.route('/login_page')
 def login_page():
     hidden_theme_keys = []
+    login_summary = {'today_users': 0, 'total_logins': 0}
+    conn = None
     try:
         conn = get_db()
         admin = conn.execute("SELECT id FROM users WHERE emp_no = 'admin'").fetchone()
@@ -279,14 +265,22 @@ def login_page():
             WHERE is_hidden=1
         ''').fetchall()
         hidden_theme_keys = [row['theme_key'] for row in hidden_rows]
-        conn.close()
+        login_summary = get_login_summary(conn)
         
         if not admin:
             return render_template('user_list.html', mode='admin_setup')
     except Exception as e:
         print(f"로그인 페이지 관리자 체크 오류: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
 
-    return render_template('login.html', hidden_theme_keys=hidden_theme_keys)
+    return render_template(
+        'login.html',
+        hidden_theme_keys=hidden_theme_keys,
+        today_login_users=login_summary['today_users'],
+        total_login_count=login_summary['total_logins'],
+    )
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -717,4 +711,14 @@ def internal_server_error(e):
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=True, allow_unsafe_werkzeug=True)
+    debug_mode = os.environ.get('APP_DEBUG', '').strip().lower() in {
+        '1', 'true', 'yes', 'on'
+    }
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=port,
+        debug=debug_mode,
+        use_reloader=debug_mode,
+        allow_unsafe_werkzeug=True,
+    )
