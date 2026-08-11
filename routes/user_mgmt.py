@@ -53,7 +53,7 @@ DEFAULT_INVITE_MAIL_BODY = (
     '안녕하세요. (사)새담청소년교육문화원입니다.\n'
     '새담 인트라넷 가입 신청을 위한 초대 메일입니다.\n'
     '아래 가입 신청하기 버튼을 눌러 본인 정보를 입력해 주세요.\n'
-    '가입 승인 후 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
+    '가입 승인 후 새담 홈페이지 (www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
 )
 PRIVACY_SECURITY_CONSENT_VERSION = '2026-08-10-v1'
 INTRANET_HOMEPAGE_URL = 'https://www.saedam.org'
