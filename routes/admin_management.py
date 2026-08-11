@@ -8,6 +8,14 @@ from datetime import datetime
 from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_db
 from .security import hash_password, is_admin_session
 from .storage import CHAT_UPLOADS
+from .menu_access import (
+    MENU_CATALOG,
+    MENU_GROUPS,
+    SCHOOL_DIRECTOR_SCOPE_SETTING,
+    ensure_menu_access_schema,
+    load_menu_max_levels,
+    school_director_scope_enabled,
+)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -60,17 +68,40 @@ TRACKABLE_USAGE_SQL = '''
 
 
 THEME_CATEGORY_NAMES = {'custom', 'gallery', 'accent', 'deep-color', 'seasonal', 'default'}
+DEFAULT_THEME_PAGE_BACKGROUND = '#f5f6f8'
 THEME_VAR_KEYS = {
     '--body-bg', '--app-bg', '--main-bg', '--nav-bg', '--primary-color', '--primary-light',
     '--primary-dark', '--text-dark', '--text-gray', '--border-color', '--border-light',
     '--card-bg', '--card-border', '--card-shadow', '--card-backdrop', '--input-bg',
     '--input-text', '--widget-bg', '--widget-hover', '--widget-border', '--widget-border-color',
+    '--theme-line-color',
     '--tooltip-bg', '--tooltip-text', '--effect-color1', '--effect-color2', '--effect-color3',
 }
 
 
+def _normalize_default_theme_background(theme):
+    """기존에 저장된 기본 테마의 흰색 페이지 배경도 새 기본색으로 보정한다."""
+    if not isinstance(theme, dict):
+        return theme
+    is_default_theme = (
+        str(theme.get('catalog') or '').strip().lower() == 'default'
+        or str(theme.get('key') or '').strip().lower() == 'default:0'
+        or str(theme.get('name') or '').strip() == '[기본] 테마없음'
+    )
+    if not is_default_theme:
+        return theme
+
+    normalized = dict(theme)
+    theme_vars = dict(normalized.get('vars') or {})
+    for key in ('--body-bg', '--app-bg', '--main-bg'):
+        theme_vars[key] = DEFAULT_THEME_PAGE_BACKGROUND
+    normalized['vars'] = theme_vars
+    return normalized
+
+
 ADMIN_TABS = [
     ('people', '인사관리', 'fa-user-gear', '/user'),
+    ('menu_permissions', '메뉴 권한관리', 'fa-key', '/admin/menu-permissions'),
     ('boards', '게시판관리', 'fa-clipboard-list', '/admin/boards'),
     ('disk', '디스크관리', 'fa-hard-drive', '/admin/disk'),
     ('themes', '테마관리', 'fa-palette', '/admin/theme'),
@@ -97,7 +128,7 @@ def get_active_theme():
         conn.close()
         if not row or not row['value']:
             return None
-        return json.loads(row['value'])
+        return _normalize_default_theme_background(json.loads(row['value']))
     except Exception:
         return None
 
@@ -230,6 +261,7 @@ def _menu_usage_label(path):
         ('/contract', '계약시스템'), ('/gall2', '갤러리'), ('/gallery', '갤러리'), ('/approval', '사내결재'),
         ('/expense', '지출결의'), ('/ai-mail', 'AI메일전송'), ('/payroll', '급여/업무지원'), ('/attendance', '근태관리'),
         ('/contacts', '본사연락망'), ('/memo', '개인화이트보드'), ('/excel-generator', '입금용 엑셀 생성기'),
+        ('/ebook/books', 'eBook'), ('/ebook', 'e리플렛'),
     ]
     if path == '/':
         return '메인메뉴'
@@ -248,6 +280,86 @@ def _render(section, **context):
 def index():
     require_admin()
     return redirect(url_for('admin.boards'))
+
+
+@admin_bp.route('/menu-permissions', methods=['GET', 'POST'])
+def menu_permissions():
+    require_admin()
+    conn = get_db()
+    try:
+        ensure_menu_access_schema(conn)
+        if request.method == 'POST':
+            updates = {}
+            for menu_key in MENU_CATALOG:
+                raw_value = request.form.get(menu_key)
+                try:
+                    max_level = int(raw_value)
+                except (TypeError, ValueError):
+                    return f'잘못된 메뉴 권한 값입니다: {menu_key}', 400
+                if max_level < -1 or max_level > 99:
+                    return f'메뉴 권한 레벨은 -1~99 범위여야 합니다: {menu_key}', 400
+                updates[menu_key] = max_level
+
+            updated_by = str(session.get('emp_no') or session.get('user_name') or 'admin')
+            conn.executemany('''
+                INSERT INTO menu_access_permissions (menu_key, max_level, updated_by, updated_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(menu_key) DO UPDATE SET
+                    max_level=excluded.max_level,
+                    updated_by=excluded.updated_by,
+                    updated_at=CURRENT_TIMESTAMP
+            ''', ((key, value, updated_by) for key, value in updates.items()))
+            director_scope_enabled = request.form.get('school_director_scope_enabled') == '1'
+            conn.execute('''
+                INSERT INTO admin_settings (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value,
+                    updated_at=CURRENT_TIMESTAMP
+            ''', (
+                SCHOOL_DIRECTOR_SCOPE_SETTING,
+                '1' if director_scope_enabled else '0',
+            ))
+            conn.commit()
+            return redirect(url_for('admin.menu_permissions', saved=1))
+
+        max_levels = load_menu_max_levels(conn)
+        position_rows = conn.execute('''
+            SELECT p.level,
+                   GROUP_CONCAT(p.name, ', ') AS position_names,
+                   (
+                       SELECT COUNT(*)
+                       FROM users u
+                       WHERE u.level=p.level
+                         AND u.status='승인'
+                         AND LOWER(TRIM(COALESCE(u.emp_no, ''))) <> 'admin'
+                   ) AS user_count
+            FROM hr_positions p
+            GROUP BY p.level
+            ORDER BY p.level ASC
+        ''').fetchall()
+        positions_by_level = {
+            int(row['level']): {
+                'names': row['position_names'] or '',
+                'user_count': int(row['user_count'] or 0),
+            }
+            for row in position_rows
+        }
+        configured_levels = set(max_levels.values())
+        level_numbers = sorted(
+            set(range(0, 15)) | set(positions_by_level) | configured_levels | {99}
+        )
+        return _render(
+            'menu_permissions',
+            menu_groups=MENU_GROUPS,
+            menu_max_levels=max_levels,
+            level_numbers=level_numbers,
+            positions_by_level=positions_by_level,
+            school_director_scope=school_director_scope_enabled(conn),
+            saved=request.args.get('saved') == '1',
+        )
+    finally:
+        conn.close()
 
 
 @admin_bp.route('/boards')
@@ -502,6 +614,7 @@ def apply_theme():
         'effect': _clean_theme_effect(data.get('effect') or data.get('type')),
         'vars': _clean_theme_vars(data.get('vars')),
     }
+    theme = _normalize_default_theme_background(theme)
     if not theme['vars']:
         return jsonify({'status': 'error', 'message': '테마 변수 정보가 없습니다.'}), 400
     _set_setting('active_theme', json.dumps(theme, ensure_ascii=False))

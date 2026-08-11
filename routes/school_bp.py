@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, send_from_directory
 from routes.database import get_db
 from routes.organization import classify_organization_group
+from routes.menu_access import school_director_scope_enabled
 import os
 import math
 import json
@@ -11,12 +12,34 @@ from functools import wraps
 
 school_bp = Blueprint('school', __name__)
 
-HEADQUARTERS_BOARD_CATEGORIES = {'community', '본부공지사항'}
+SHARED_BOARD_CATEGORIES = {'community', '본부공지사항', 'reference', '자료실'}
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
 
-def is_headquarters_board(category):
-    return str(category or '').strip() in HEADQUARTERS_BOARD_CATEGORIES
+def is_shared_board(category):
+    """모든 센터장 업무공간에서 같은 게시물을 표시하는 게시판인지 반환한다."""
+    return str(category or '').strip() in SHARED_BOARD_CATEGORIES
+
+
+def build_school_post_list_queries(school_id, category, category_name, search_query=''):
+    """공유 게시판은 학교 조건 없이, 개별 게시판은 해당 학교 조건으로 조회한다."""
+    if is_shared_board(category):
+        query_params = [category, category_name]
+        where_clause = "(category = ? OR category = ?)"
+    else:
+        query_params = [school_id, category, category_name]
+        where_clause = "school_id = ? AND (category = ? OR category = ?)"
+
+    if search_query:
+        where_clause += " AND (title LIKE ? OR author LIKE ? OR content LIKE ?)"
+        search_value = f"%{search_query}%"
+        query_params.extend([search_value, search_value, search_value])
+
+    return (
+        f"SELECT COUNT(*) FROM school_posts WHERE {where_clause}",
+        f"SELECT * FROM school_posts WHERE {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        query_params,
+    )
 
 def get_session_user_level(default=99):
     try:
@@ -24,7 +47,7 @@ def get_session_user_level(default=99):
     except (TypeError, ValueError):
         return default
 
-def can_manage_headquarters_board():
+def can_manage_shared_board():
     return bool(session.get('user_name')) and 1 <= get_session_user_level() <= 5
 
 
@@ -47,6 +70,8 @@ def can_access_school(conn, school_id):
         return True
     if get_session_user_level() != 8:
         return False
+    if not school_director_scope_enabled(conn):
+        return True
 
     assigned_school = conn.execute(
         """
@@ -62,12 +87,14 @@ def can_access_school(conn, school_id):
 
 
 def can_access_post(conn, school_id, category):
-    """본부공지사항은 모든 센터장에게, 그 외 글은 담당 학교에만 공개한다."""
-    if is_headquarters_board(category):
+    """본부공지사항·자료실은 전역 공개하고, 그 외 글은 담당 학교에만 공개한다."""
+    if is_shared_board(category):
         if can_manage_schools():
             return True
         if not session.get('emp_no') or get_session_user_level() != 8:
             return False
+        if not school_director_scope_enabled(conn):
+            return True
         active_assignment = conn.execute(
             """
             SELECT 1
@@ -239,8 +266,9 @@ def school_list():
     user_level = get_session_user_level()
     emp_no = session.get('emp_no')
 
-    # 💡 [핵심 추가] 레벨 8(센터장)인 경우, 목록을 보여주지 않고 담당 학교 메인으로 즉시 강제 이동
-    if user_level == 8:
+    # 메뉴 권한관리의 '센터장 지정공간 제한'이 켜진 경우만 담당 학교로 이동한다.
+    director_scope_applies = user_level == 8 and school_director_scope_enabled(conn)
+    if director_scope_applies:
         # 해당 사번(emp_no)이 센터장으로 지정된 활성 상태의 최신 학교를 찾습니다.
         my_school = conn.execute(
             """
@@ -266,7 +294,9 @@ def school_list():
             conn.close()
             return "담당으로 지정된 학교가 없습니다. 본사 관리자에게 문의해주세요.", 403
 
-    if not can_manage_schools():
+    # 지정공간 제한을 끄면 레벨 8은 전체 목록과 공간을 열람할 수 있다.
+    # 학교 등록·수정·삭제는 school_admin_required로 계속 본사 권한만 허용된다.
+    if not can_manage_schools() and user_level != 8:
         conn.close()
         return "학교 업무공간 접근 권한이 없습니다.", 403
 
@@ -374,7 +404,7 @@ def toggle_schools():
 def school_detail(school_key):
     # 기본 접속 메뉴를 'notice'에서 'community'(본부공지사항)로 변경
     category = request.args.get('category', 'community')
-    page = request.args.get('page', 1, type=int)
+    page = max(1, request.args.get('page', 1, type=int) or 1)
     search_query = request.args.get('search', '').strip()
 
 # 커뮤니티를 본부공지사항으로 변경하고 맨 앞으로 이동
@@ -407,12 +437,11 @@ def school_detail(school_key):
          current_category_name = cat_id_to_name.get(category, category)
 
     can_manage_current_board = (
-        not is_headquarters_board(search_category)
-        or can_manage_headquarters_board()
+        not is_shared_board(search_category)
+        or can_manage_shared_board()
     )
     
     per_page = 7
-    offset = (page - 1) * per_page
     
     conn = get_db()
     init_school_comment_table(conn)
@@ -440,34 +469,19 @@ def school_detail(school_key):
         conn.close()
         return redirect('/expense/submit')
 
-    if search_category == 'community':
-        query_params = [search_category, current_category_name]
-        count_query = "SELECT COUNT(*) FROM school_posts WHERE (category = ? OR category = ?)"
-        data_query = "SELECT * FROM school_posts WHERE (category = ? OR category = ?)"
-        
-        if search_query:
-            search_filter = " AND (title LIKE ? OR author LIKE ? OR content LIKE ?)"
-            count_query += search_filter
-            data_query += search_filter
-            query_params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
-            
-        data_query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    else:
-        query_params = [school_id, search_category, current_category_name]
-        count_query = "SELECT COUNT(*) FROM school_posts WHERE school_id = ? AND (category = ? OR category = ?)"
-        data_query = "SELECT * FROM school_posts WHERE school_id = ? AND (category = ? OR category = ?)"
-        
-        if search_query:
-            search_filter = " AND (title LIKE ? OR author LIKE ? OR content LIKE ?)"
-            count_query += search_filter
-            data_query += search_filter
-            query_params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
-            
-        data_query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    count_query, data_query, query_params = build_school_post_list_queries(
+        school_id, search_category, current_category_name, search_query
+    )
     
     total_posts = conn.execute(count_query, query_params).fetchone()[0]
     total_pages = math.ceil(total_posts / per_page)
-    
+
+    # 삭제나 잘못된 직접 URL로 현재 페이지가 범위를 벗어나도
+    # 빈 목록 또는 음수 OFFSET 대신 마지막 유효 페이지를 표시한다.
+    if total_pages and page > total_pages:
+        page = total_pages
+    offset = (page - 1) * per_page
+
     query_params.extend([per_page, offset])
     posts = conn.execute(data_query, query_params).fetchall()
     
@@ -601,7 +615,7 @@ def school_detail(school_key):
         except Exception:
             pass
 
-    # 메인 화면과 동일한 사내갤러리(gall2) 최신 게시물 미리보기
+    # 모든 센터장이 공유하는 학교갤러리(범위 0) 최신 게시물 미리보기
     gallery_preview_items = []
     try:
         gallery_rows = conn.execute('''
@@ -620,12 +634,13 @@ def school_detail(school_key):
                    ) AS thumb_name
             FROM gall2_posts p
             LEFT JOIN gall2_tabs t ON p.tab_id = t.id
+            WHERE p.school_id = 0
             ORDER BY p.created_at DESC, p.id DESC
             LIMIT 5
         ''').fetchall()
         gallery_preview_items = [dict(row) for row in gallery_rows]
     except Exception as e:
-        print(f"학교 업무공간 사내갤러리 미리보기 로드 에러: {e}")
+        print(f"학교 업무공간 학교갤러리 미리보기 로드 에러: {e}")
             
     conn.close()
     
@@ -769,8 +784,8 @@ def add_post():
     content = request.form.get('content')
     author = session.get('user_name')
 
-    if is_headquarters_board(category) and not can_manage_headquarters_board():
-        return "본부공지사항 글쓰기 권한이 없습니다.", 403
+    if is_shared_board(category) and not can_manage_shared_board():
+        return "공유 게시판 글쓰기 권한이 없습니다.", 403
 
     conn = get_db()
     if not can_access_school(conn, school_id):
@@ -841,8 +856,8 @@ def edit_post(post_id):
         conn.close()
         return "담당 학교 게시글만 수정할 수 있습니다.", 403
     
-    if is_headquarters_board(post['category']):
-        has_edit_permission = can_manage_headquarters_board()
+    if is_shared_board(post['category']):
+        has_edit_permission = can_manage_shared_board()
     else:
         has_edit_permission = (
             session.get('user_name') == post['author']
@@ -1084,8 +1099,8 @@ def delete_post(post_id):
         conn.close()
         return "담당 학교 게시글만 삭제할 수 있습니다.", 403
 
-    if is_headquarters_board(post['category']):
-        has_delete_permission = can_manage_headquarters_board()
+    if is_shared_board(post['category']):
+        has_delete_permission = can_manage_shared_board()
     else:
         has_delete_permission = (
             session.get('user_name') == post['author']
@@ -1116,22 +1131,25 @@ def delete_multi():
     for pid in post_ids:
         post = conn.execute(
             """
-            SELECT id, author, category
+            SELECT id, school_id, author, category
             FROM school_posts
-            WHERE id=? AND school_id=?
+            WHERE id=?
             """,
-            (pid, school_id)
+            (pid,)
         ).fetchone()
-        if post:
+        if post and (
+            is_shared_board(post['category'])
+            or str(post['school_id']) == str(school_id)
+        ):
             posts_to_delete.append(post)
 
-    if any(is_headquarters_board(post['category']) for post in posts_to_delete) and not can_manage_headquarters_board():
+    if any(is_shared_board(post['category']) for post in posts_to_delete) and not can_manage_shared_board():
         conn.close()
-        return "본부공지사항 삭제 권한이 없습니다.", 403
+        return "공유 게시판 삭제 권한이 없습니다.", 403
 
     for post in posts_to_delete:
         if (
-            is_headquarters_board(post['category'])
+            is_shared_board(post['category'])
             or session.get('user_name') == post['author']
             or can_manage_schools()
         ):

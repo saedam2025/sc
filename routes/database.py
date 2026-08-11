@@ -382,7 +382,8 @@ def init_db():
         rrn TEXT, email TEXT, phone TEXT,
         address TEXT, bank_account TEXT, department TEXT, profile_path TEXT,
         profile_icon TEXT DEFAULT '👤',
-        join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기'
+        join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기',
+        applied_at DATETIME, approved_at DATETIME
     )''')
 
     # 인사관리에서 직급명과 권한 레벨을 화면으로 관리한다.
@@ -479,6 +480,14 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS admin_settings (
         key TEXT PRIMARY KEY,
         value TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
+    # 상단 주메뉴와 서브메뉴의 회원 레벨별 접근 기준.
+    c.execute('''CREATE TABLE IF NOT EXISTS menu_access_permissions (
+        menu_key TEXT PRIMARY KEY,
+        max_level INTEGER NOT NULL CHECK(max_level BETWEEN -1 AND 99),
+        updated_by TEXT,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
@@ -860,10 +869,20 @@ def init_db():
         author TEXT,
         tab_id INTEGER NOT NULL DEFAULT 1,
         upload_token TEXT UNIQUE,
+        school_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (tab_id) REFERENCES gall2_tabs (id)
     )''')
+    gall2_post_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in c.execute('PRAGMA table_info(gall2_posts)').fetchall()
+    }
+    if 'school_id' not in gall2_post_columns:
+        c.execute('ALTER TABLE gall2_posts ADD COLUMN school_id INTEGER')
+    # 학교갤러리는 센터별이 아니라 모든 센터장이 공유하는 단일 범위(0)다.
+    c.execute('UPDATE gall2_posts SET school_id=0 WHERE school_id IS NOT NULL AND school_id<>0')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_gall2_posts_school_id ON gall2_posts(school_id, created_at)')
     
     c.execute('''CREATE TABLE IF NOT EXISTS schools (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -917,6 +936,8 @@ def init_db():
         "ALTER TABLE users ADD COLUMN profile_path TEXT",
         "ALTER TABLE users ADD COLUMN custom_department TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN custom_team TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN applied_at DATETIME",
+        "ALTER TABLE users ADD COLUMN approved_at DATETIME",
         "ALTER TABLE approvals ADD COLUMN receivers TEXT DEFAULT ''",
         "ALTER TABLE approvals ADD COLUMN cc_receivers TEXT DEFAULT ''",
         "ALTER TABLE approvals ADD COLUMN filesize TEXT DEFAULT ''",
@@ -960,6 +981,24 @@ def init_db():
             c.execute(q)
         except sqlite3.OperationalError:
             pass 
+
+    # 기존 회원은 보유 중인 입사일을 승인일로 이관하고, 기록이 없던 신청일은
+    # 마이그레이션 시각으로 채워 이후부터 날짜가 누락되지 않게 한다.
+    c.execute('''
+        UPDATE users
+        SET applied_at = CASE
+            WHEN TRIM(COALESCE(join_date, '')) <> '' THEN join_date || ' 00:00:00'
+            ELSE DATETIME('now', 'localtime')
+        END
+        WHERE applied_at IS NULL OR TRIM(applied_at) = ''
+    ''')
+    c.execute('''
+        UPDATE users
+        SET approved_at = join_date || ' 00:00:00'
+        WHERE status = '승인'
+          AND TRIM(COALESCE(join_date, '')) <> ''
+          AND (approved_at IS NULL OR TRIM(approved_at) = '')
+    ''')
 
     c.execute('''
         CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_approval_id

@@ -6,6 +6,7 @@ import threading
 import unicodedata
 import uuid
 from .database import get_db
+from .organization import classify_organization_group, normalize_department
 from .socketio_ext import socketio
 from .storage import CHAT_UPLOADS, UPLOADS_ROOT
 
@@ -939,6 +940,42 @@ def api_unread_messages():
     details = {room['partner']: room['unread_count'] for room in rooms if room['unread_count'] > 0}
     total_count = sum(details.values())
     return jsonify({"total_unread": total_count, "details": details, "rooms": rooms})
+
+
+@chat_bp.route('/api/chat/organization')
+def chat_organization():
+    """로그인 사용자가 메신저 조직도에 필요한 최소 회원정보만 조회한다."""
+    if not session.get('user_name'):
+        return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+
+    conn = get_db()
+    users = conn.execute('''
+        SELECT emp_no, name, department, position, level, profile_icon
+        FROM users
+        WHERE status = '승인'
+          AND LOWER(COALESCE(emp_no, '')) <> 'admin'
+          AND LOWER(COALESCE(name, '')) <> 'admin'
+        ORDER BY level ASC, id ASC
+    ''').fetchall()
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "users": [
+            {
+                "emp_no": user['emp_no'] or '',
+                "name": user['name'] or '',
+                "department": normalize_department(user['department']),
+                "position": user['position'] or '',
+                "level": user['level'] if user['level'] is not None else 99,
+                "organization_group": classify_organization_group(
+                    user['department'], user['position']
+                ),
+                "icon": user['profile_icon'] or '👤',
+            }
+            for user in users
+        ],
+    })
 
 @chat_bp.route('/send_message', methods=['POST'])
 def send_message():

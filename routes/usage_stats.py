@@ -103,6 +103,28 @@ def start_usage_session(session):
     session['_usage_session_id'] = secrets.token_urlsafe(18)
 
 
+def get_login_summary(conn):
+    """Return successful-login counts using Korea Standard Time for today."""
+    row = conn.execute('''
+        SELECT
+            (
+                SELECT COUNT(DISTINCT emp_no)
+                FROM login_activity
+                WHERE action='login'
+                  AND created_at >= DATETIME(DATE('now', '+9 hours'), '-9 hours')
+                  AND created_at < DATETIME(DATE('now', '+9 hours'), '+15 hours')
+            ) AS today_users,
+            (
+                SELECT COALESCE(SUM(login_count), 0)
+                FROM usage_user_totals
+            ) AS total_logins
+    ''').fetchone()
+    return {
+        'today_users': int(row['today_users'] or 0),
+        'total_logins': int(row['total_logins'] or 0),
+    }
+
+
 def record_page_usage(req, session, menu_name):
     if not _is_page_navigation(req):
         return False

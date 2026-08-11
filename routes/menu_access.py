@@ -1,0 +1,314 @@
+"""상단 메뉴의 레벨별 노출 및 직접 접근 권한 관리."""
+
+from flask import jsonify, redirect, request, session
+
+from .database import get_db
+
+
+SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
+
+MENU_GROUPS = (
+    {
+        'key': 'main_home',
+        'label': '메인메뉴',
+        'icon': 'fa-calendar-days',
+        'default_max_level': 14,
+        'children': (),
+    },
+    {
+        'key': 'approval_group',
+        'label': '사내결재',
+        'icon': 'fa-file-signature',
+        'default_max_level': 14,
+        'children': (
+            ('approval_main', '사내결재', 'fa-file-signature', 14),
+            ('contract_admin', '전자계약관리', 'fa-file-contract', 2),
+            ('verified_contract_admin', '인증전자계약관리', 'fa-file-signature', 2),
+            ('document_admin', '증명서 발급관리', 'fa-file-invoice', 14),
+            ('expense_main', '지출결의 관리', 'fa-receipt', 14),
+        ),
+    },
+    {
+        'key': 'school_group',
+        'label': '학교관리',
+        'icon': 'fa-school',
+        'default_max_level': 14,
+        'children': (
+            ('school_workspace', '학교업무공간', 'fa-chalkboard-user', 14),
+            ('school_tasks', '학교업무처리', 'fa-list-check', 14),
+            ('school_calendar', '학교일정표', 'fa-calendar-week', 14),
+        ),
+    },
+    {
+        'key': 'support_group',
+        'label': '업무지원',
+        'icon': 'fa-briefcase',
+        'default_max_level': 14,
+        'children': (
+            ('payroll_main', '스마트 명세서 발송', 'fa-envelope-open-text', 14),
+            ('ai_mail_main', '스마트 메일 발송', 'fa-wand-magic-sparkles', 14),
+            ('excel_generator', '입금용 엑셀 생성기', 'fa-file-excel', 14),
+            ('attendance_main', '근태 관리', 'fa-clock-rotate-left', 14),
+            ('contacts_main', '본사연락망', 'fa-address-book', 14),
+            ('ebook_library', 'e리플렛', 'fa-book-open-reader', 14),
+        ),
+    },
+    {
+        'key': 'workspace_group',
+        'label': '업무공간',
+        'icon': 'fa-layer-group',
+        'default_max_level': 14,
+        'children': (
+            ('board_noti', '사내 게시판', 'fa-clipboard-list', 14),
+            ('board_archive', '사내 자료실', 'fa-folder-open', 14),
+            ('gallery_main', '사내 갤러리', 'fa-images', 14),
+            ('board_manual', '업무메뉴얼', 'fa-book', 14),
+            ('memo_main', '개인화이트보드', 'fa-chalkboard', 14),
+        ),
+    },
+    {
+        'key': 'admin_group',
+        'label': '통합관리',
+        'icon': 'fa-screwdriver-wrench',
+        'default_max_level': 2,
+        'children': (
+            ('admin_people', '인사관리', 'fa-user-gear', 2),
+            ('admin_menu_permissions', '메뉴 권한관리', 'fa-key', 2),
+            ('admin_boards', '게시판관리', 'fa-clipboard-list', 2),
+            ('admin_disk', '디스크관리', 'fa-hard-drive', 2),
+            ('admin_themes', '테마관리', 'fa-palette', 2),
+            ('admin_stats', '이용통계', 'fa-chart-line', 2),
+            ('admin_settings', 'Admin설정', 'fa-user-shield', 2),
+        ),
+    },
+)
+
+
+def _catalog():
+    result = {}
+    for group in MENU_GROUPS:
+        result[group['key']] = {
+            'key': group['key'],
+            'label': group['label'],
+            'parent_key': None,
+            'default_max_level': group['default_max_level'],
+        }
+        for key, label, _icon, default_max_level in group['children']:
+            result[key] = {
+                'key': key,
+                'label': label,
+                'parent_key': group['key'],
+                'default_max_level': default_max_level,
+            }
+    return result
+
+
+MENU_CATALOG = _catalog()
+
+
+def ensure_menu_access_schema(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS menu_access_permissions (
+            menu_key TEXT PRIMARY KEY,
+            max_level INTEGER NOT NULL CHECK(max_level BETWEEN -1 AND 99),
+            updated_by TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+
+def school_director_scope_enabled(conn=None):
+    """레벨 8 센터장을 담당 센터 공간으로 제한하는 정책(기본 사용)."""
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
+    try:
+        row = conn.execute(
+            'SELECT value FROM admin_settings WHERE key=?',
+            (SCHOOL_DIRECTOR_SCOPE_SETTING,),
+        ).fetchone()
+        if not row:
+            return True
+        return str(row['value'] or '').strip().lower() not in {'0', 'false', 'no', 'off'}
+    finally:
+        if owns_connection:
+            conn.close()
+
+
+def center_director_mode_active(user_level=None, conn=None):
+    """레벨 8 센터장 전용모드가 현재 회원에게 적용되는지 반환한다."""
+    if is_master_admin():
+        return False
+    try:
+        level = int(session.get('user_level', 99) if user_level is None else user_level)
+    except (TypeError, ValueError):
+        level = 99
+    return level == 8 and school_director_scope_enabled(conn)
+
+
+def load_menu_max_levels(conn=None):
+    """저장된 값을 기본 권한과 합쳐 모든 메뉴 키를 반환한다."""
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
+    try:
+        ensure_menu_access_schema(conn)
+        values = {
+            key: item['default_max_level']
+            for key, item in MENU_CATALOG.items()
+        }
+        rows = conn.execute(
+            'SELECT menu_key, max_level FROM menu_access_permissions'
+        ).fetchall()
+        for row in rows:
+            if row['menu_key'] in values:
+                values[row['menu_key']] = int(row['max_level'])
+        return values
+    finally:
+        if owns_connection:
+            conn.close()
+
+
+def is_master_admin():
+    return (
+        str(session.get('emp_no') or '').lower() == 'admin'
+        or str(session.get('user_name') or '').lower() == 'admin'
+    )
+
+
+def menu_is_allowed(menu_key, user_level=None, max_levels=None):
+    """하위 메뉴는 자신의 권한과 주메뉴 권한을 모두 만족해야 한다."""
+    item = MENU_CATALOG.get(menu_key)
+    if not item:
+        return True
+    if is_master_admin():
+        return True
+    try:
+        level = int(session.get('user_level', 99) if user_level is None else user_level)
+    except (TypeError, ValueError):
+        level = 99
+    levels = max_levels or load_menu_max_levels()
+    if level > int(levels.get(menu_key, item['default_max_level'])):
+        return False
+    parent_key = item['parent_key']
+    if parent_key:
+        parent = MENU_CATALOG[parent_key]
+        if level > int(levels.get(parent_key, parent['default_max_level'])):
+            return False
+    return True
+
+
+def build_menu_access(user_level=None):
+    levels = load_menu_max_levels()
+    return {
+        key: menu_is_allowed(key, user_level=user_level, max_levels=levels)
+        for key in MENU_CATALOG
+    }
+
+
+def _admin_menu_key(path):
+    rules = (
+        ('/admin/menu-permissions', 'admin_menu_permissions'),
+        ('/admin/boards', 'admin_boards'),
+        ('/admin/disk', 'admin_disk'),
+        ('/admin/themes', 'admin_themes'),
+        ('/admin/theme', 'admin_themes'),
+        ('/admin/stats', 'admin_stats'),
+        ('/admin/settings', 'admin_settings'),
+    )
+    for prefix, key in rules:
+        if path.startswith(prefix):
+            return key
+    return 'admin_boards'
+
+
+def resolve_request_menu(path, endpoint='', view_args=None):
+    """현재 요청을 상단 메뉴의 하위 항목 하나에 연결한다."""
+    endpoint = endpoint or ''
+    view_args = view_args or {}
+    if path == '/':
+        return 'main_home'
+    if path.startswith('/admin'):
+        return _admin_menu_key(path)
+    if endpoint.startswith('user_mgmt.'):
+        if endpoint in {
+            'user_mgmt.invite_page', 'user_mgmt.register',
+            'user_mgmt.serve_profile_image',
+        }:
+            return None
+        return 'admin_people'
+    if path.startswith('/contract/admin'):
+        return 'contract_admin'
+    if path.startswith('/verified-contract/admin'):
+        return 'verified_contract_admin'
+    if path.startswith('/document/admin/settings') or path.startswith('/document/api/') \
+            or path.startswith('/document/company-seal') or path.startswith('/document/company-logo'):
+        return 'document_admin'
+    if path.startswith('/document/admin') or path.startswith('/document/generate') \
+            or path.startswith('/document/delete') or path.startswith('/document/send_simple_email') \
+            or path.startswith('/document/edit') or path.startswith('/document/pdf'):
+        return 'document_admin'
+    if path.startswith('/approval'):
+        return 'approval_main'
+    if path.startswith('/expense'):
+        return 'expense_main'
+    if path.startswith('/school/tasks'):
+        return 'school_tasks'
+    if path.startswith('/school/calendar'):
+        return 'school_calendar'
+    if path.startswith('/school'):
+        return 'school_workspace'
+    if path.startswith('/payroll'):
+        return 'payroll_main'
+    if path.startswith('/ai-mail'):
+        return 'ai_mail_main'
+    if path.startswith('/excel-generator'):
+        return 'excel_generator'
+    if path.startswith('/attendance') or path.startswith('/api/attendance'):
+        return 'attendance_main'
+    if path.startswith('/contacts'):
+        return 'contacts_main'
+    if path.startswith('/ebook'):
+        return 'ebook_library'
+    if path.startswith('/board/'):
+        board_key = str(view_args.get('board_en') or '').strip()
+        if not board_key:
+            parts = path.split('/')
+            board_key = parts[2] if len(parts) > 2 else ''
+        return {
+            'noti': 'board_noti',
+            'archive': 'board_archive',
+            'manual': 'board_manual',
+        }.get(board_key)
+    if path.startswith('/gall2'):
+        return 'gallery_main'
+    if path.startswith('/memo'):
+        return 'memo_main'
+    return None
+
+
+def enforce_request_menu_access():
+    """로그인 회원의 직접 URL/API 접근도 메뉴 설정과 같게 차단한다."""
+    if not session.get('emp_no'):
+        return None
+    menu_key = resolve_request_menu(request.path or '', request.endpoint or '', request.view_args)
+    if center_director_mode_active():
+        if request.path == '/':
+            return redirect('/school')
+        # 전용모드는 일반 메뉴 레벨 설정보다 우선한다. 학교 화면에서 사용하는
+        # 출퇴근 처리 API는 화면 내부 기능이므로 함께 허용한다.
+        if menu_key in {'school_workspace', 'school_calendar'} \
+                or (request.path or '').startswith('/api/attendance'):
+            return None
+        if menu_key:
+            message = '센터장은 담당 센터 업무공간과 학교일정표만 이용할 수 있습니다.'
+            if request.is_json or '/api/' in (request.path or '') \
+                    or request.accept_mimetypes.best == 'application/json':
+                return jsonify({'status': 'error', 'message': message}), 403
+            return message, 403
+    if not menu_key or menu_is_allowed(menu_key):
+        return None
+    message = '이 메뉴에 접근할 권한이 없습니다.'
+    if request.is_json or '/api/' in (request.path or '') or request.accept_mimetypes.best == 'application/json':
+        return jsonify({'status': 'error', 'message': message}), 403
+    return message, 403

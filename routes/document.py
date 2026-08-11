@@ -1243,6 +1243,7 @@ def delete_multiple():
         
     return redirect(url_for('document.admin_list'))
 
+
 # 안내 메일 전송 기능 (admin.html 모달 전송용)
 @document_bp.route('/send_simple_email', methods=['POST'])
 @admin_required

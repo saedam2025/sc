@@ -202,7 +202,7 @@ def record_attendance(action_type):
         )
         conn.commit()
         conn.close()
-        return jsonify({'status': 'success', 'message': f'{now_time} 퇴근 처리되었습니다. (근무시간: {hours}시간)'})
+        return jsonify({'status': 'success', 'message': f'{now_time} 퇴근 처리되었습니다.'})
     
     conn.close()
     return jsonify({'status': 'error', 'message': '잘못된 요청입니다.'})

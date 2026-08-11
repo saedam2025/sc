@@ -9,4 +9,9 @@ socketio = SocketIO(
     manage_session=False,
     ping_interval=25,
     ping_timeout=20,
+    # Windows의 Werkzeug 개발 서버에서는 WebSocket 연결 종료 시
+    # ``write() before start_response``가 반복될 수 있다. 메신저와 알림은
+    # Socket.IO long-polling으로도 동일하게 동작하므로 안정적인 전송만 허용한다.
+    transports=["polling"],
+    allow_upgrades=False,
 )

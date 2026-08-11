@@ -6,12 +6,15 @@ import base64
 import smtplib
 import os
 import re
+import hashlib
+import secrets
 from datetime import datetime
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from .database import get_db
-from .security import admin_required, hash_password
+from .security import admin_required, hash_password, is_admin_session
 from .storage import DATA_ROOT, PROFILE_ROOT as _PROFILE_ROOT
 from .organization import (
     DEPARTMENT_OPTIONS,
@@ -43,6 +46,22 @@ GROUP_CODE_MAP = {
 
 DEFAULT_POSITIONS = tuple(LEVEL_MAP.items())
 
+INVITE_MAIL_SUBJECT_KEY = 'user_invite_mail_subject'
+INVITE_MAIL_BODY_KEY = 'user_invite_mail_body'
+DEFAULT_INVITE_MAIL_SUBJECT = '[새담 인트라넷] 회원 가입 초대장'
+DEFAULT_INVITE_MAIL_BODY = (
+    '안녕하세요. (사)새담청소년교육문화원입니다.\n'
+    '새담 인트라넷 가입 신청을 위한 초대 메일입니다.\n'
+    '아래 가입 신청하기 버튼을 눌러 본인 정보를 입력해 주세요.\n'
+    '가입 승인 후 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
+)
+PRIVACY_SECURITY_CONSENT_VERSION = '2026-08-10-v1'
+INTRANET_HOMEPAGE_URL = 'https://www.saedam.org'
+PASSWORD_MAX_LENGTH = 12
+PASSWORD_ALLOWED_RE = re.compile(
+    r'^[A-Za-z0-9!@#$%^&*()_+~`\-={}\[\]:;"\'<>,.?/|\\]{1,12}$'
+)
+
 
 def _ensure_hr_schema(conn):
     """기존 DB에서도 인사관리 설정을 즉시 사용할 수 있도록 보강한다."""
@@ -61,6 +80,31 @@ def _ensure_hr_schema(conn):
         conn.execute("ALTER TABLE users ADD COLUMN custom_department TEXT DEFAULT ''")
     if 'custom_team' not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN custom_team TEXT DEFAULT ''")
+    if 'privacy_security_consent' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN privacy_security_consent INTEGER NOT NULL DEFAULT 0")
+    if 'privacy_security_consent_at' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN privacy_security_consent_at DATETIME")
+    if 'privacy_security_consent_version' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN privacy_security_consent_version TEXT DEFAULT ''")
+    if 'applied_at' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN applied_at DATETIME")
+    if 'approved_at' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN approved_at DATETIME")
+    conn.execute('''
+        UPDATE users
+        SET applied_at = CASE
+            WHEN TRIM(COALESCE(join_date, '')) <> '' THEN join_date || ' 00:00:00'
+            ELSE DATETIME('now', 'localtime')
+        END
+        WHERE applied_at IS NULL OR TRIM(applied_at) = ''
+    ''')
+    conn.execute('''
+        UPDATE users
+        SET approved_at = join_date || ' 00:00:00'
+        WHERE status = '승인'
+          AND TRIM(COALESCE(join_date, '')) <> ''
+          AND (approved_at IS NULL OR TRIM(approved_at) = '')
+    ''')
     conn.executemany('''
         INSERT OR IGNORE INTO hr_positions (name, level, sort_order)
         VALUES (?, ?, ?)
@@ -95,7 +139,138 @@ def generate_sd_emp_no(conn, position):
     next_no = int(last_no_str) + 1
     return f"{prefix}{next_no:03d}"
 
-def send_real_email(target_email, invite_link):
+def _ensure_admin_settings(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS admin_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+
+def _ensure_user_invite_schema(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS user_invites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token_hash TEXT NOT NULL UNIQUE,
+            email TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'sent',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sent_at DATETIME,
+            used_at DATETIME,
+            used_user_id INTEGER
+        )
+    ''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_user_invites_email ON user_invites(email)')
+
+
+def _invite_token_hash(token):
+    return hashlib.sha256(str(token or '').encode('utf-8')).hexdigest()
+
+
+def _normalize_email(value):
+    return str(value or '').strip().lower()
+
+
+def _is_valid_email(value):
+    return bool(re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', str(value or '').strip()))
+
+
+def _is_valid_signup_password(value):
+    password = str(value or '')
+    return bool(
+        PASSWORD_ALLOWED_RE.fullmatch(password)
+        and re.search(r'[A-Za-z]', password)
+        and re.search(r'\d', password)
+        and re.search(r'[^A-Za-z0-9]', password)
+    )
+
+
+def _normalize_rrn(value):
+    digits = re.sub(r'\D', '', str(value or ''))
+    return digits
+
+
+def _is_valid_rrn(value):
+    digits = _normalize_rrn(value)
+    if len(digits) != 13 or digits[6] not in '123490':
+        return False
+
+    century = {'1': 1900, '2': 1900, '3': 2000, '4': 2000, '9': 1800, '0': 1800}[digits[6]]
+    try:
+        datetime.strptime(f'{century + int(digits[:2]):04d}{digits[2:6]}', '%Y%m%d')
+    except ValueError:
+        return False
+
+    weights = (2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5)
+    checksum = (11 - sum(int(number) * weight for number, weight in zip(digits[:12], weights)) % 11) % 10
+    return checksum == int(digits[-1])
+
+
+def _format_rrn(value):
+    digits = _normalize_rrn(value)
+    return f'{digits[:6]}-{digits[6:]}'
+
+
+def _duplicate_rrn_user(conn, rrn_digits, exclude_user_id=None):
+    if not rrn_digits:
+        return None
+    query = 'SELECT id, name, status, rrn FROM users'
+    params = []
+    if exclude_user_id is not None:
+        query += ' WHERE id != ?'
+        params.append(int(exclude_user_id))
+    for row in conn.execute(query, params).fetchall():
+        if _normalize_rrn(row['rrn']) == rrn_digits:
+            return row
+    return None
+
+
+def _normalize_invite_mail_template(subject, body):
+    clean_subject = re.sub(r'[\r\n]+', ' ', str(subject or '')).strip()
+    clean_body = str(body or '').strip()
+    if not clean_subject:
+        raise ValueError('메일 제목을 입력해주세요.')
+    if not clean_body:
+        raise ValueError('메일 내용을 입력해주세요.')
+    if len(clean_subject) > 200:
+        raise ValueError('메일 제목은 200자 이내로 입력해주세요.')
+    if len(clean_body) > 5000:
+        raise ValueError('메일 내용은 5,000자 이내로 입력해주세요.')
+    return clean_subject, clean_body
+
+
+def _load_invite_mail_template(conn):
+    _ensure_admin_settings(conn)
+    rows = conn.execute(
+        'SELECT key, value FROM admin_settings WHERE key IN (?, ?)',
+        (INVITE_MAIL_SUBJECT_KEY, INVITE_MAIL_BODY_KEY),
+    ).fetchall()
+    settings = {row['key']: row['value'] for row in rows}
+    return {
+        'subject': settings.get(INVITE_MAIL_SUBJECT_KEY) or DEFAULT_INVITE_MAIL_SUBJECT,
+        'body': settings.get(INVITE_MAIL_BODY_KEY) or DEFAULT_INVITE_MAIL_BODY,
+    }
+
+
+def _save_invite_mail_template(conn, subject, body):
+    clean_subject, clean_body = _normalize_invite_mail_template(subject, body)
+    _ensure_admin_settings(conn)
+    conn.executemany('''
+        INSERT INTO admin_settings (key, value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET
+            value=excluded.value,
+            updated_at=CURRENT_TIMESTAMP
+    ''', (
+        (INVITE_MAIL_SUBJECT_KEY, clean_subject),
+        (INVITE_MAIL_BODY_KEY, clean_body),
+    ))
+    return clean_subject, clean_body
+
+
+def send_real_email(target_email, invite_link, subject, content):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
     SENDER_EMAIL = os.environ.get('MAIL_USERNAME') or "lunch9797@gmail.com"
@@ -103,10 +278,23 @@ def send_real_email(target_email, invite_link):
 
     if not SENDER_EMAIL or not SENDER_PASSWORD: return False
 
-    msg = MIMEMultipart()
+    msg = MIMEMultipart('alternative')
     msg['From'] = f"새담 인트라넷 <{SENDER_EMAIL}>"
     msg['To'] = target_email
-    msg['Subject'] = "[새담 인트라넷] 회원 가입 초대장"
+    msg['Subject'] = subject
+
+    safe_content = '<br>'.join(escape(content).splitlines())
+    access_guide = (
+        '가입 승인 후 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속할 수 있습니다.'
+    )
+    access_guide_html = '' if 'saedam.org' in str(content).lower() else f'''
+                <p style="margin: 18px 0 0; padding: 12px 14px; background: #f0f7ff; border-radius: 8px; color: #334155; font-size: 14px; line-height: 1.7;">
+                    인트라넷 접속 방법: 가입 승인 후 <a href="{INTRANET_HOMEPAGE_URL}" target="_blank" style="color:#2563eb; font-weight:bold;">새담 홈페이지 www.saedam.org</a>를 이용해 주세요.
+                </p>
+    '''
+    access_guide_plain = '' if 'saedam.org' in str(content).lower() else (
+        f'\n\n{access_guide}\n새담 홈페이지: {INTRANET_HOMEPAGE_URL}'
+    )
 
     # [수정됨] 이메일 클라이언트(아웃룩, 지메일 등)에서 호환성이 높은 테이블을 사용한 가로 배열 디자인
     body = f"""
@@ -114,7 +302,8 @@ def send_real_email(target_email, invite_link):
         <tr>
             <td style="padding: 30px; vertical-align: middle;">
                 <h2 style="color: #4a90e2; margin: 0 0 10px 0; font-size: 22px;">새담 인트라넷 초대</h2>
-                <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.5;">안녕하세요. (사)새담청소년교육문화원입니다.<br>인트라넷 회원가입을 위한 보안 링크를 보내드립니다. 우측 버튼을 클릭하여 진행해주세요.</p>
+                <p style="margin: 0; color: #555; font-size: 15px; line-height: 1.7;">{safe_content}</p>
+                {access_guide_html}
             </td>
             <td style="padding: 30px; text-align: right; vertical-align: middle; width: 160px; background-color: #f8fbff; border-left: 1px solid #eee;">
                 <a href="{invite_link}" target="_blank" style="display: inline-block; background: #4a90e2; color: white; padding: 14px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; white-space: nowrap; font-size: 15px; box-shadow: 0 2px 4px rgba(74, 144, 226, 0.3);">가입 신청하기</a>
@@ -122,7 +311,12 @@ def send_real_email(target_email, invite_link):
         </tr>
     </table>
     """
-    msg.attach(MIMEText(body, 'html'))
+    msg.attach(MIMEText(
+        content + access_guide_plain + f'\n\n가입 신청: {invite_link}',
+        'plain',
+        'utf-8',
+    ))
+    msg.attach(MIMEText(body, 'html', 'utf-8'))
     try:
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
@@ -131,6 +325,72 @@ def send_real_email(target_email, invite_link):
         server.quit()
         return True
     except:
+        return False
+
+
+def send_membership_result_email(target_email, applicant_name, approved, emp_no='', position='', department=''):
+    """가입 승인 또는 거부 결과를 신청자에게 안내한다."""
+    target_email = _normalize_email(target_email)
+    if not _is_valid_email(target_email):
+        return False
+
+    smtp_server = "smtp.gmail.com"
+    smtp_port = 587
+    sender_email = os.environ.get('MAIL_USERNAME') or "lunch9797@gmail.com"
+    sender_password = os.environ.get('MAIL_PASSWORD') or "txnbofpijgysjpfq"
+    if not sender_email or not sender_password:
+        return False
+
+    safe_name = str(applicant_name or '신청자').strip() or '신청자'
+    if approved:
+        subject = '[새담 인트라넷] 가입 승인 완료'
+        heading = '가입 신청이 승인되었습니다.'
+        accent_color = '#16a34a'
+        detail_lines = [
+            f'{safe_name}님, 새담 인트라넷 가입 신청이 승인되었습니다.',
+            f'사번: {emp_no}',
+            f'소속부서: {department}',
+            f'직급: {position}',
+            '이제 새담 인트라넷에 로그인하여 이용하실 수 있습니다.',
+            '접속 방법: 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속해 주세요.',
+            f'새담 홈페이지: {INTRANET_HOMEPAGE_URL}',
+        ]
+    else:
+        subject = '[새담 인트라넷] 가입 승인 거부 안내'
+        heading = '가입 신청이 승인되지 않았습니다.'
+        accent_color = '#dc2626'
+        detail_lines = [
+            f'{safe_name}님, 새담 인트라넷 가입 신청이 승인되지 않았습니다.',
+            '관련 문의가 필요한 경우 새담 인트라넷 관리자에게 연락해 주세요.',
+        ]
+
+    plain_content = '\n'.join(detail_lines)
+    safe_content = '<br>'.join(escape(line) for line in detail_lines)
+    message = MIMEMultipart('alternative')
+    message['From'] = f"새담 인트라넷 <{sender_email}>"
+    message['To'] = target_email
+    message['Subject'] = subject
+    message.attach(MIMEText(plain_content, 'plain', 'utf-8'))
+    message.attach(MIMEText(f'''
+        <table width="100%" cellpadding="0" cellspacing="0" style="font-family:sans-serif;max-width:640px;margin:0 auto;border:1px solid #e5e7eb;border-radius:14px;background:#ffffff;border-collapse:separate;overflow:hidden;">
+            <tr><td style="height:7px;background:{accent_color};font-size:0;">&nbsp;</td></tr>
+            <tr>
+                <td style="padding:32px;">
+                    <h2 style="margin:0 0 18px;color:{accent_color};font-size:22px;">{escape(heading)}</h2>
+                    <p style="margin:0;color:#374151;font-size:15px;line-height:1.8;">{safe_content}</p>
+                </td>
+            </tr>
+        </table>
+    ''', 'html', 'utf-8'))
+
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=20) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, target_email, message.as_string())
+        return True
+    except Exception as exc:
+        print(f"가입 처리 결과 메일 발송 실패: {exc}")
         return False
 
 @user_mgmt_bp.route('/')
@@ -268,9 +528,11 @@ def setup_admin():
             }), 409
         today = datetime.now().strftime('%Y-%m-%d')
         conn.execute('''
-            INSERT INTO users (emp_no, name, password, position, level, rrn, email, status, join_date, profile_icon, department)
-            VALUES ('admin', 'admin', ?, '최고관리자', 1, '-', 'admin@admin.com', '승인', ?, '👑', '본부')
-        ''', (hash_password(password), today))
+            INSERT INTO users (emp_no, name, password, position, level, rrn, email, status,
+                               join_date, profile_icon, department, applied_at, approved_at)
+            VALUES ('admin', 'admin', ?, '최고관리자', 1, '-', 'admin@admin.com',
+                    '승인', ?, '👑', '본부', ?, ?)
+        ''', (hash_password(password), today, f'{today} 00:00:00', f'{today} 00:00:00'))
         conn.commit()
         conn.close()
         return jsonify({"status": "success", "message": "최고관리자 계정이 성공적으로 설정되었습니다."})
@@ -279,31 +541,159 @@ def setup_admin():
 
 @user_mgmt_bp.route('/invite_page/<token>')
 def invite_page(token):
+    conn = get_db()
     try:
-        email = base64.b64decode(token).decode('utf-8')
-        return render_template('user_list.html', invite_email=email, mode='invite')
-    except:
-        return "유효하지 않은 링크입니다.", 403
+        _ensure_user_invite_schema(conn)
+        token_hash = _invite_token_hash(token)
+        invite = conn.execute(
+            'SELECT * FROM user_invites WHERE token_hash=?',
+            (token_hash,),
+        ).fetchone()
+
+        # 기존 방식으로 이미 발송된 Base64 링크도 최초 접근 시 일회용 초대로 전환한다.
+        if not invite:
+            try:
+                legacy_email = _normalize_email(base64.b64decode(token).decode('utf-8'))
+            except Exception:
+                legacy_email = ''
+            if _is_valid_email(legacy_email):
+                conn.execute('''
+                    INSERT OR IGNORE INTO user_invites
+                        (token_hash, email, status, sent_at)
+                    VALUES (?, ?, 'sent', CURRENT_TIMESTAMP)
+                ''', (token_hash, legacy_email))
+                conn.commit()
+                invite = conn.execute(
+                    'SELECT * FROM user_invites WHERE token_hash=?',
+                    (token_hash,),
+                ).fetchone()
+
+        if not invite:
+            return '유효하지 않은 가입초대 링크입니다.', 403
+
+        existing_user = conn.execute(
+            'SELECT id FROM users WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? LIMIT 1',
+            (_normalize_email(invite['email']),),
+        ).fetchone()
+        if invite['status'] != 'sent' or existing_user:
+            if invite['status'] == 'sent':
+                conn.execute('''
+                    UPDATE user_invites
+                    SET status='used', used_at=CURRENT_TIMESTAMP, used_user_id=?
+                    WHERE id=?
+                ''', (existing_user['id'] if existing_user else None, invite['id']))
+                conn.commit()
+            return render_template(
+                'user_list.html',
+                mode='invite_expired',
+                invite_message='이미 가입신청된 링크입니다.',
+            ), 410
+
+        return render_template(
+            'user_list.html',
+            invite_email=invite['email'],
+            invite_token=token,
+            mode='invite',
+        )
+    finally:
+        conn.close()
 
 @user_mgmt_bp.route('/send_invite', methods=['POST'])
 @admin_required
 def send_invite():
     try:
-        data = request.json
-        email = data.get('email')
-        token = base64.b64encode(email.encode('utf-8')).decode('utf-8')
+        data = request.get_json(silent=True) or {}
+        email = _normalize_email(data.get('email'))
+        if not _is_valid_email(email):
+            return jsonify({"status": "error", "message": "올바른 이메일 주소를 입력해주세요."}), 400
+
+        conn = get_db()
+        try:
+            _ensure_user_invite_schema(conn)
+            existing_user = conn.execute(
+                'SELECT id FROM users WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? LIMIT 1',
+                (email,),
+            ).fetchone()
+            if existing_user:
+                return jsonify({
+                    'status': 'error',
+                    'message': '이미 가입 신청했거나 가입된 이메일입니다.',
+                }), 409
+
+            current_template = _load_invite_mail_template(conn)
+            subject, body = _save_invite_mail_template(
+                conn,
+                data.get('subject', current_template['subject']),
+                data.get('body', current_template['body']),
+            )
+            token = secrets.token_urlsafe(32)
+            cursor = conn.execute('''
+                INSERT INTO user_invites (token_hash, email, status, sent_at)
+                VALUES (?, ?, 'sent', CURRENT_TIMESTAMP)
+            ''', (_invite_token_hash(token), email))
+            invite_id = cursor.lastrowid
+            conn.commit()
+        finally:
+            conn.close()
+
         invite_link = url_for('user_mgmt.invite_page', token=token, _external=True)
-        if send_real_email(email, invite_link):
-            return jsonify({"status": "success", "message": "초대 메일이 발송되었습니다."})
+        if send_real_email(email, invite_link, subject, body):
+            return jsonify({"status": "success", "message": "메일 내용을 저장하고 초대 메일을 발송했습니다."})
+        failed_conn = get_db()
+        try:
+            failed_conn.execute(
+                "UPDATE user_invites SET status='failed' WHERE id=?",
+                (invite_id,),
+            )
+            failed_conn.commit()
+        finally:
+            failed_conn.close()
         return jsonify({"status": "error", "message": "발송 실패 (서버 설정을 확인하세요)"}), 500
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@user_mgmt_bp.route('/invite_mail_template', methods=['GET', 'POST'])
+@admin_required
+def invite_mail_template():
+    conn = get_db()
+    try:
+        if request.method == 'GET':
+            template = _load_invite_mail_template(conn)
+            conn.commit()
+            return jsonify({
+                'status': 'success',
+                **template,
+                'default_subject': DEFAULT_INVITE_MAIL_SUBJECT,
+                'default_body': DEFAULT_INVITE_MAIL_BODY,
+            })
+
+        data = request.get_json(silent=True) or {}
+        subject, body = _save_invite_mail_template(
+            conn,
+            data.get('subject'),
+            data.get('body'),
+        )
+        conn.commit()
+        return jsonify({
+            'status': 'success',
+            'message': '가입 초대 메일 내용을 저장했습니다.',
+            'subject': subject,
+            'body': body,
+        })
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    finally:
+        conn.close()
 
 @user_mgmt_bp.route('/register', methods=['POST'])
 def register():
     try:
         data = request.form
         profile_file = request.files.get('profile_image')
+        is_admin_direct = is_admin_session()
         
         password = data.get('password')
         password_confirm = data.get('password_confirm')
@@ -311,6 +701,29 @@ def register():
             return jsonify({"status": "error", "message": "비밀번호를 입력해주세요."}), 400
         if password != password_confirm:
             return jsonify({"status": "error", "message": "비밀번호가 일치하지 않습니다."}), 400
+        if not _is_valid_signup_password(password):
+            return jsonify({
+                "status": "error",
+                "message": "비밀번호는 영문, 숫자, 특수문자를 포함하여 12자 이내로 입력해주세요.",
+            }), 400
+        consent_given = str(data.get('privacy_security_consent') or '').strip() == '1'
+        if not consent_given and not is_admin_direct:
+            return jsonify({
+                "status": "error",
+                "message": "개인정보 활용·개인정보 보호·영업비밀 보안 동의가 필요합니다."
+            }), 400
+        rrn_digits = _normalize_rrn(data.get('rrn'))
+        if not is_admin_direct and not _is_valid_rrn(rrn_digits):
+            return jsonify({
+                'status': 'error',
+                'message': '유효한 주민등록번호를 입력해주세요.',
+            }), 400
+        email = _normalize_email(data.get('email'))
+        if (not is_admin_direct or email) and not _is_valid_email(email):
+            return jsonify({
+                'status': 'error',
+                'message': '유효한 이메일 주소를 입력해주세요.',
+            }), 400
         department = str(data.get('department', '')).strip()
         if department not in DEPARTMENT_OPTIONS:
             return jsonify({
@@ -319,11 +732,47 @@ def register():
             }), 400
 
         conn = get_db()
+        _ensure_hr_schema(conn)
+        _ensure_user_invite_schema(conn)
+        invite = None
+        if not is_admin_direct:
+            invite_token = str(data.get('invite_token') or '').strip()
+            invite = conn.execute(
+                'SELECT * FROM user_invites WHERE token_hash=?',
+                (_invite_token_hash(invite_token),),
+            ).fetchone() if invite_token else None
+            if not invite or invite['status'] != 'sent':
+                conn.close()
+                return jsonify({
+                    'status': 'error',
+                    'message': '이미 가입신청된 링크입니다.' if invite else '유효하지 않은 가입초대 링크입니다.',
+                }), 410
+            if _normalize_email(invite['email']) != email:
+                conn.close()
+                return jsonify({
+                    'status': 'error',
+                    'message': '초대받은 이메일과 가입 이메일이 일치하지 않습니다.',
+                }), 400
+
         # 주민번호(RRN)는 민감 정보 보호 원칙에 따라 digits를 출력하지 않고 generic placeholder를 사용하거나 처리를 우회합니다.
-        dup = conn.execute("SELECT id FROM users WHERE name=? AND rrn=?", (data.get('name'), data.get('rrn', ''))).fetchone()
+        dup = _duplicate_rrn_user(conn, rrn_digits)
         if dup:
             conn.close()
-            return jsonify({"status": "error", "message": "이미 가입된 사용자입니다."}), 400
+            return jsonify({"status": "error", "message": "동일한 주민등록번호로 가입 신청한 사용자가 있습니다."}), 409
+        if not is_admin_direct:
+            email_dup = conn.execute(
+                'SELECT id FROM users WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? LIMIT 1',
+                (email,),
+            ).fetchone()
+            if email_dup:
+                conn.execute('''
+                    UPDATE user_invites
+                    SET status='used', used_at=CURRENT_TIMESTAMP, used_user_id=?
+                    WHERE email=? AND status='sent'
+                ''', (email_dup['id'], email))
+                conn.commit()
+                conn.close()
+                return jsonify({'status': 'error', 'message': '이미 가입신청된 링크입니다.'}), 410
 
         profile_path = None
         if profile_file and profile_file.filename != '':
@@ -341,16 +790,34 @@ def register():
         icon = data.get('profile_icon', '👤')
         requested_position = str(data.get('position') or '미지정').strip()
         requested_level = _position_level(conn, requested_position, 14)
-        conn.execute('''
+        consent_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if consent_given else None
+        applied_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        consent_version = PRIVACY_SECURITY_CONSENT_VERSION if consent_given else ''
+        stored_rrn = _format_rrn(rrn_digits) if _is_valid_rrn(rrn_digits) else str(data.get('rrn') or '').strip()
+        cursor = conn.execute('''
             INSERT INTO users (name, password, position, level, rrn, email, phone,
                                address, department, bank_account, profile_path, status, profile_icon,
-                               custom_department, custom_team)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '대기', ?, ?, ?)
-        ''', (data.get('name'), hash_password(password), requested_position, requested_level, data.get('rrn', ''),
-              data.get('email', ''), data.get('phone', ''), data.get('address', ''), 
+                               custom_department, custom_team, privacy_security_consent,
+                               privacy_security_consent_at, privacy_security_consent_version,
+                               applied_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '대기', ?, ?, ?, ?, ?, ?, ?)
+        ''', (data.get('name'), hash_password(password), requested_position, requested_level, stored_rrn,
+              email, data.get('phone', ''), data.get('address', ''), 
               department, data.get('bank_account', ''), profile_path, icon,
               str(data.get('custom_department') or '').strip()[:100],
-              str(data.get('custom_team') or '').strip()[:100]))
+              str(data.get('custom_team') or '').strip()[:100],
+              1 if consent_given else 0, consent_at, consent_version, applied_at))
+
+        if invite:
+            updated = conn.execute('''
+                UPDATE user_invites
+                SET status='used', used_at=CURRENT_TIMESTAMP, used_user_id=?
+                WHERE email=? AND status='sent'
+            ''', (cursor.lastrowid, email))
+            if updated.rowcount < 1:
+                conn.rollback()
+                conn.close()
+                return jsonify({'status': 'error', 'message': '이미 가입신청된 링크입니다.'}), 410
         
         conn.commit()
         conn.close()
@@ -362,28 +829,126 @@ def register():
 @admin_required
 def approve():
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         user_id = int(data['user_idx'])
-        pos = data['approved_position']
+        pos = str(data.get('approved_position') or '').strip()
+        department = str(data.get('approved_department') or '').strip()
+        custom_department = str(data.get('custom_department') or '').strip()[:100]
+        custom_team = str(data.get('custom_team') or '').strip()[:100]
+        if department not in DEPARTMENT_OPTIONS:
+            return jsonify({'status': 'error', 'message': '배정할 소속부서를 선택해주세요.'}), 400
         
         conn = get_db()
         _ensure_hr_schema(conn)
+        user = conn.execute(
+            "SELECT id, name, email, rrn, status FROM users WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        if not user:
+            conn.close()
+            return jsonify({'status': 'error', 'message': '승인할 사용자를 찾을 수 없습니다.'}), 404
+        if user['status'] != '대기':
+            conn.close()
+            return jsonify({'status': 'error', 'message': '이미 처리된 가입 신청입니다.'}), 409
+
+        rrn_digits = _normalize_rrn(user['rrn'])
+        duplicate_user = _duplicate_rrn_user(conn, rrn_digits, exclude_user_id=user_id)
+        if duplicate_user:
+            conn.close()
+            return jsonify({
+                'status': 'error',
+                'message': '동일한 주민등록번호로 가입된 회원이 있어 승인할 수 없습니다.',
+            }), 409
+
         position_row = conn.execute("SELECT level FROM hr_positions WHERE name = ?", (pos,)).fetchone()
         if not position_row:
             conn.close()
             return jsonify({"status": "error", "message": "등록된 직급을 선택해주세요."}), 400
         emp_no = generate_sd_emp_no(conn, pos)
         join_date = datetime.now().strftime('%Y-%m-%d')
+        approved_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         level = int(position_row['level'])
         
-        conn.execute("UPDATE users SET emp_no=?, position=?, level=?, status='승인', join_date=? WHERE id=?", 
-                     (emp_no, pos, level, join_date, user_id))
+        conn.execute('''
+            UPDATE users
+            SET emp_no=?, position=?, level=?, status='승인', join_date=?,
+                department=?, custom_department=?, custom_team=?, approved_at=?
+            WHERE id=?
+        ''', (emp_no, pos, level, join_date, department, custom_department, custom_team,
+              approved_at, user_id))
         conn.commit()
         conn.close()
-        
-        return jsonify({"status": "success", "message": f"승인 완료! (사번: {emp_no})"})
+
+        mail_sent = send_membership_result_email(
+            user['email'], user['name'], True,
+            emp_no=emp_no, position=pos, department=department,
+        )
+        message = f"승인 완료! (사번: {emp_no})"
+        message += "\n승인 완료 메일을 발송했습니다." if mail_sent else "\n승인은 완료됐지만 결과 메일 발송에 실패했습니다."
+        return jsonify({"status": "success", "message": message, "mail_sent": mail_sent})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@user_mgmt_bp.route('/reject', methods=['POST'])
+@admin_required
+def reject_user():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        user_id = int(data['user_idx'])
+        conn = get_db()
+        user = conn.execute(
+            "SELECT id, name, email, status FROM users WHERE id=?",
+            (user_id,),
+        ).fetchone()
+        if not user:
+            return jsonify({'status': 'error', 'message': '거부할 가입 신청을 찾을 수 없습니다.'}), 404
+        if user['status'] != '대기':
+            return jsonify({'status': 'error', 'message': '이미 처리된 가입 신청입니다.'}), 409
+
+        conn.execute("UPDATE users SET status='거부' WHERE id=? AND status='대기'", (user_id,))
+        conn.commit()
+        applicant_name = user['name']
+        applicant_email = user['email']
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+    mail_sent = send_membership_result_email(applicant_email, applicant_name, False)
+    message = '가입 승인을 거부했습니다.'
+    message += '\n승인 거부 메일을 발송했습니다.' if mail_sent else '\n거부 처리는 완료됐지만 결과 메일 발송에 실패했습니다.'
+    return jsonify({'status': 'success', 'message': message, 'mail_sent': mail_sent})
+
+
+@user_mgmt_bp.route('/delete_pending', methods=['POST'])
+@admin_required
+def delete_pending_user():
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        user_id = int(data['user_idx'])
+        conn = get_db()
+        user = conn.execute("SELECT id, status FROM users WHERE id=?", (user_id,)).fetchone()
+        if not user:
+            return jsonify({'status': 'error', 'message': '삭제할 가입 신청을 찾을 수 없습니다.'}), 404
+        if user['status'] != '대기':
+            return jsonify({'status': 'error', 'message': '승인 대기 중인 가입 신청만 삭제할 수 있습니다.'}), 409
+
+        conn.execute("DELETE FROM users WHERE id=? AND status='대기'", (user_id,))
+        conn.commit()
+        return jsonify({'status': 'success', 'message': '가입 신청을 영구 삭제했습니다.'})
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @user_mgmt_bp.route('/retire', methods=['POST'])
 @admin_required
@@ -413,7 +978,7 @@ def update_user():
         if department not in DEPARTMENT_OPTIONS:
             return jsonify({
                 "status": "error",
-                "message": "소속부서는 본부, 북부지점, 기타 중에서 선택해주세요."
+                "message": "소속부서는 본부, 북부지점, 파견, 기타 중에서 선택해주세요."
             }), 400
         
         conn = get_db()
@@ -497,7 +1062,14 @@ def delete_user():
 def get_user_list():
     conn = get_db()
     _ensure_hr_schema(conn)
-    users = conn.execute("SELECT * FROM users ORDER BY level ASC, id ASC").fetchall()
+    approved_only = request.args.get('approved_only') == '1'
+    query = "SELECT * FROM users"
+    params = []
+    if approved_only:
+        query += " WHERE status = ?"
+        params.append('승인')
+    query += " ORDER BY level ASC, id ASC"
+    users = conn.execute(query, params).fetchall()
     conn.close()
     
     # 🚀 수정 포인트: 세션을 통해 현재 로그인한 사용자가 '최고관리자'인지 판별
@@ -525,6 +1097,8 @@ def get_user_list():
             "별도소속": custom_department or '', "별도팀": custom_team or '',
             "조직그룹": classify_organization_group(department, position),
             "계좌": u['bank_account'] if 'bank_account' in u.keys() else '',
+            "가입신청일": u['applied_at'] if 'applied_at' in u.keys() and u['applied_at'] else '',
+            "가입승인일": u['approved_at'] if 'approved_at' in u.keys() and u['approved_at'] else '',
             "입사일": u['join_date'] or '', "퇴사일": u['retire_date'] or '', 
             "승인상태": u['status'] or '', "아이콘": icon, "profile_path": profile_path
         })

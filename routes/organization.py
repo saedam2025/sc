@@ -1,4 +1,4 @@
-DEPARTMENT_OPTIONS = ('본부', '북부지점', '기타')
+DEPARTMENT_OPTIONS = ('본부', '북부지점', '파견', '기타')
 ORGANIZATION_GROUPS = ('본부', '북부지점', '센터장', '코디', '강사', '기타')
 
 POSITION_GROUPS = {
@@ -11,12 +11,14 @@ POSITION_GROUPS = {
 
 
 def normalize_department(department):
-    """기존 자유입력 소속을 새 3개 부서 선택값으로 안전하게 표시한다."""
+    """기존 자유입력 소속을 표준 부서 선택값으로 안전하게 표시한다."""
     department = str(department or '').strip()
     if '북부지점' in department or '북부 지점' in department:
         return '북부지점'
     if department in {'본부', '본사'}:
         return '본부'
+    if department == '파견' or '파견' in department:
+        return '파견'
     return '기타'
 
 

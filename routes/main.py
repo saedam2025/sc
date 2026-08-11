@@ -300,7 +300,10 @@ def index():
     gallery_preview_items = []
     gallery_total_count = 0
     try:
-        gallery_total_count = conn.execute("SELECT COUNT(*) FROM gall2_posts").fetchone()[0]
+        # 메인 화면에는 사내갤러리(학교갤러리 범위 제외)만 표시한다.
+        gallery_total_count = conn.execute(
+            "SELECT COUNT(*) FROM gall2_posts WHERE school_id IS NULL"
+        ).fetchone()[0]
         gallery_rows = conn.execute('''
             SELECT p.id, p.title, p.author, p.created_at, t.name AS tab_name,
                    (
@@ -317,6 +320,7 @@ def index():
                    ) AS thumb_name
             FROM gall2_posts p
             LEFT JOIN gall2_tabs t ON p.tab_id = t.id
+            WHERE p.school_id IS NULL
             ORDER BY p.created_at DESC, p.id DESC
             LIMIT 5
         ''').fetchall()

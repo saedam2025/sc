@@ -113,7 +113,12 @@ def update_status():
         data = request.get_json()
         post_ids = data.get('post_ids', [])
         new_status = data.get('status')
-        current_user = session.get('user_name', '관리자')
+        current_user = str(
+            session.get('user_name')
+            or session.get('name')
+            or session.get('emp_no')
+            or '관리자'
+        ).strip()
 
         if not post_ids or not new_status:
             return jsonify({'status': 'fail', 'message': '잘못된 요청입니다.'}), 400
@@ -128,7 +133,11 @@ def update_status():
         conn.commit()
         conn.close()
 
-        return jsonify({'status': 'success'})
+        return jsonify({
+            'status': 'success',
+            'processor': current_user,
+            'updated_ids': post_ids,
+        })
     except Exception as e:
         print(f"상태 업데이트 중 에러 발생: {e}")
         return jsonify({'status': 'error', 'message': '상태 변경 중 오류가 발생했습니다.'}), 500
