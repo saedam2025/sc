@@ -22,7 +22,7 @@
 <div class="admin-container">
     <div class="admin-header">
         <div style="display:flex;flex-direction:column;gap:5px">
-            <h2>📝 새담 인재 계약관리 시스템</h2>
+            <h2>📝 새담 인재 인증계약관리 시스템</h2>
             <div style="font-size:.85rem;color:var(--text-gray,#64748b);font-weight:600"><i class="fa-solid fa-user-shield"></i> 현재 관리자: <span style="color:var(--saedam-navy)">{{ session.get('user_name') }} ({{ session.get('role') }})</span> · 인증전자계약</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
@@ -30,8 +30,8 @@
             <button type="button" class="btn-add-toggle" onclick="document.getElementById('excelFile').click()">📂 엑셀 업로드</button>
             <button type="button" class="btn-add-toggle" onclick="location.href='/verified-contract/admin/excel-template'">📄 엑셀 양식</button>
             <button type="button" class="btn-add-toggle" onclick="toggleInputForm()">+ 신규 등록</button>
-            <button type="button" class="btn-add-toggle" onclick="openCategoryModal()">⚙️ 계약구분 관리</button>
-            <button type="button" class="btn-add-toggle" onclick="toggleTermsForm()">📝 양식 관리</button>
+            <button type="button" class="btn-add-toggle" onclick="location.href='/verified-contract/admin/settings#categories'">⚙️ 계약구분 관리</button>
+            <button type="button" class="btn-add-toggle" onclick="location.href='/verified-contract/admin/settings'">📝 양식 관리</button>
         </div>
     </div>
 
@@ -67,6 +67,7 @@
         <button id="new-save-btn" type="button" style="background:var(--saedam-navy);color:#fff;border:0;width:100%;height:42px;border-radius:6px;cursor:pointer;font-weight:600" onclick="addNewLecturer()">계약 정보 저장하기</button>
     </div>
 
+    {# 양식·발송 리소스 관리는 /verified-contract/admin/settings 별도 페이지에서 렌더링한다.
     <div id="termsForm" class="input-section">
         <h3 style="margin-top:0;margin-bottom:15px;font-size:1.05rem;color:var(--saedam-navy)">계약서 양식 편집 및 미리보기</h3>
         <div class="company-setting-card">
@@ -93,9 +94,9 @@
                 <div class="input-group"><label>저장된 발송계정</label><select id="mail-account" onchange="fillMailAccount()">{% if not mail_accounts %}<option value="">등록된 계정 없음</option>{% endif %}{% for account in mail_accounts %}<option value="{{ account.id }}" {% if account.id==active_mail_account_id %}selected{% endif %}>{{ account.label }} · {{ account.email }}{% if account.id==active_mail_account_id %} (현재 사용){% endif %}</option>{% endfor %}</select></div>
                 <div class="input-group"><label>계정 이름</label><input id="mail-label" maxlength="80" placeholder="예: 새담 계약메일"></div>
                 <div class="input-group"><label>발송 메일주소</label><input id="mail-email" type="email" maxlength="254" placeholder="example@gmail.com"></div>
-                <div class="input-group"><label>메일 앱 비밀번호</label><input id="mail-pass" type="password" autocomplete="new-password" placeholder="변경할 때만 입력"></div>
+                <div class="input-group"><label>Google 앱 비밀번호</label><input id="mail-pass" type="password" autocomplete="new-password" placeholder="변경할 때만 입력"><small id="mail-pass-help" style="color:var(--text-gray,#64748b);font-size:.7rem;line-height:1.4">선택계정 수정 시 비밀번호를 바꿀 때만 입력하세요.</small></div>
             </div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap"><button type="button" class="action-btn" style="background:#64748b" onclick="saveMail(true)">+ 새 계정 추가</button><button type="button" class="action-btn" style="background:var(--saedam-blue)" onclick="saveMail(false)">선택계정 수정</button><button type="button" class="action-btn" style="background:#138a4b" onclick="applyMailAccount()">선택계정 사용</button></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap"><button id="mail-new-btn" type="button" class="action-btn" style="background:#64748b" onclick="toggleNewMailAccount()">+ 새 계정 추가</button><button id="mail-save-btn" type="button" class="action-btn" style="background:var(--saedam-blue)" onclick="saveMail()">선택계정 수정</button><button id="mail-apply-btn" type="button" class="action-btn" style="background:#138a4b" onclick="applyMailAccount()">선택계정 사용</button></div>
         </div>
         <div style="display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:end;margin-bottom:15px">
             <div class="input-group"><label>계약구분 선택</label><select id="term-category" onchange="loadTerms()">{% for cat in categories_list %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></div>
@@ -112,6 +113,7 @@
         </div>
         <div style="display:flex;gap:10px;margin-top:15px"><button type="button" style="flex:1;background:var(--saedam-blue);color:#fff;border:0;height:42px;border-radius:6px;font-weight:600;cursor:pointer" onclick="previewTerms()">새 창에서 미리보기</button><button type="button" style="flex:1;background:var(--saedam-navy);color:#fff;border:0;height:42px;border-radius:6px;font-weight:600;cursor:pointer" onclick="saveTerms()">양식 저장하기</button></div>
     </div>
+    #}
 
     <form class="filter-bar" method="GET" action="/verified-contract/admin">
         <div class="filter-group"><label>연도</label><select name="year"><option value="">전체</option>{% for y in years %}<option value="{{ y }}" {% if request.args.get('year')==y %}selected{% endif %}>{{ y }}년</option>{% endfor %}</select></div>
@@ -143,12 +145,12 @@
 <div id="evidenceModal" class="modal-overlay"><div class="modal-box" style="width:min(800px,94vw)"><div style="display:flex;justify-content:space-between"><h3 style="color:var(--saedam-navy)">계약 증거기록</h3><button onclick="closeEvidence()">닫기</button></div><div id="evidenceBody"></div></div></div>
 
 <script>
-const VC_CSRF={{ csrf_token|tojson }},VC_COMPANIES={{ companies.profiles|tojson }};let VC_MAIL_ACCOUNTS={{ mail_accounts|tojson }},categoryList={{ categories_list|tojson }};
+const VC_CSRF={{ csrf_token|tojson }},VC_COMPANIES={{ companies.profiles|tojson }};let VC_MAIL_ACCOUNTS={{ mail_accounts|tojson }},categoryList={{ categories_list|tojson }},mailAccountMode='edit';
 async function api(url,options={}){options.headers=Object.assign({},options.headers||{}, {'X-CSRF-Token':VC_CSRF});const r=await fetch(url,options);const d=await r.json().catch(()=>({status:'error',message:'처리 결과를 확인할 수 없습니다.'}));if(!r.ok)throw new Error(d.message||'처리 중 오류가 발생했습니다.');return d}
 function v(id){return document.getElementById(id).value.trim()}function selected(){return Array.from(document.querySelectorAll('.chk:checked')).map(c=>Number(c.value))}
 document.getElementById('check-all').onclick=function(){document.querySelectorAll('.chk').forEach(c=>c.checked=this.checked)}
 function toggleRowDetail(id){const row=document.getElementById(id);document.querySelectorAll('.detail-row').forEach(r=>{if(r.id!==id)r.style.display='none'});row.style.display=row.style.display==='table-row'?'none':'table-row'}
-function toggleInputForm(){const f=document.getElementById('inputForm');f.style.display=f.style.display==='block'?'none':'block';document.getElementById('termsForm').style.display='none'}
+function toggleInputForm(){const f=document.getElementById('inputForm');f.style.display=f.style.display==='block'?'none':'block'}
 async function addNewLecturer(){const btn=document.getElementById('new-save-btn');btn.disabled=true;const payload={contract_type:v('new-category'),company_profile_id:v('new-company'),signer_name:v('new-name'),signer_email:v('new-email'),school_name:v('new-school'),department:v('new-dept'),수수료:v('new-fee'),보조금:v('new-subsidy'),경력수당:v('new-career'),직책수당:v('new-position'),기타:v('new-etc'),근무시간:v('new-work-time'),계약기간:v('new-period'),비고1:v('new-note1'),비고2:v('new-note2'),비고3:v('new-note3'),비고4:v('new-note4'),expires_days:Number(v('new-expires'))};try{const d=await api('/verified-contract/admin/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});alert(d.message);location.reload()}catch(e){alert(e.message);btn.disabled=false}}
 async function uploadExcelFile(){const input=document.getElementById('excelFile');if(!input.files[0])return;if(!confirm('선택한 엑셀 파일의 데이터를 추가하시겠습니까?')){input.value='';return}const form=new FormData();form.append('excel_file',input.files[0]);try{const d=await api('/verified-contract/admin/upload-excel',{method:'POST',body:form});let m=d.message;if((d.errors||[]).length)m+='\\n\\n'+d.errors.slice(0,15).map(e=>`${e.row}행 ${e.name}: ${e.reason}`).join('\\n');alert(m);location.href='/verified-contract/admin?category='+encodeURIComponent('미작성')}catch(e){alert(e.message);input.value=''}}
 async function sendRemindMail(btn){const ids=selected();if(!ids.length){alert('메일을 발송할 대상을 선택해 주세요.');return}if(!confirm(`선택한 ${ids.length}명에게 계약 메일을 발송하시겠습니까?`))return;const old=btn.innerText;btn.disabled=true;btn.innerText='발송 중...';try{const d=await api('/verified-contract/admin/bulk-send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids,expires_days:Number(v('bulk-expires'))})});let m=d.message;if((d.failed||[]).length)m+='\\n'+d.failed.slice(0,10).map(e=>`${e.name}: ${e.reason}`).join('\\n');alert(m);location.reload()}catch(e){alert(e.message);btn.disabled=false;btn.innerText=old}}
@@ -167,10 +169,11 @@ function openCategoryModal(){renderCategories();document.getElementById('categor
 async function saveCategories(){try{const d=await api('/verified-contract/admin/categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({categories:categoryList})});alert(d.message);location.reload()}catch(e){alert(e.message)}}
 function fillCompany(){const p=VC_COMPANIES.find(x=>String(x.id)===v('company-profile'))||VC_COMPANIES[0]||{};document.getElementById('company-label').value=p.label||'';document.getElementById('company-name').value=p.company_name||'';document.getElementById('company-title').value=p.representative_title||'';document.getElementById('company-representative').value=p.representative_name||''}
 async function saveCompany(add){document.getElementById('company-action').value=add?'add':'save';try{const d=await api('/verified-contract/admin/settings/company',{method:'POST',body:new FormData(document.getElementById('companyForm'))});alert(d.message);location.reload()}catch(e){alert(e.message)}}
-function fillMailAccount(){const account=VC_MAIL_ACCOUNTS.find(item=>String(item.id)===v('mail-account'));document.getElementById('mail-label').value=account?.label||'';document.getElementById('mail-email').value=account?.email||'';document.getElementById('mail-pass').value='';document.getElementById('mail-pass').placeholder=account?.has_password?'변경할 때만 입력':'앱 비밀번호 입력'}
-async function saveMail(add){const accountId=v('mail-account');if(!add&&!accountId)return alert('수정할 발송계정을 선택해 주세요.');try{const d=await api('/verified-contract/admin/settings/mail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:add?'add':'save',account_id:accountId,label:v('mail-label'),email:v('mail-email'),password:v('mail-pass')})});alert(d.message);location.reload()}catch(e){alert(e.message)}}
+function setMailAccountMode(mode){mailAccountMode=mode;const isAdd=mode==='add',select=document.getElementById('mail-account'),password=document.getElementById('mail-pass');select.disabled=isAdd;password.required=isAdd;document.getElementById('mail-new-btn').textContent=isAdd?'신규 입력 취소':'+ 새 계정 추가';document.getElementById('mail-save-btn').textContent=isAdd?'새 계정 저장':'선택계정 수정';document.getElementById('mail-apply-btn').disabled=isAdd;document.getElementById('mail-pass-help').textContent=isAdd?'신규 계정 등록에는 Google에서 발급한 16자리 앱 비밀번호가 반드시 필요합니다. 공백이 있어도 저장할 때 자동 제거됩니다.':'선택계정 수정 시 비밀번호를 바꿀 때만 입력하세요.';password.placeholder=isAdd?'필수: Google 앱 비밀번호 16자리':(VC_MAIL_ACCOUNTS.find(item=>String(item.id)===v('mail-account'))?.has_password?'변경할 때만 입력':'앱 비밀번호 입력')}
+function fillMailAccount(){setMailAccountMode('edit');const account=VC_MAIL_ACCOUNTS.find(item=>String(item.id)===v('mail-account'));document.getElementById('mail-label').value=account?.label||'';document.getElementById('mail-email').value=account?.email||'';document.getElementById('mail-pass').value=''}
+function toggleNewMailAccount(){if(mailAccountMode==='add'){fillMailAccount();return}setMailAccountMode('add');document.getElementById('mail-label').value='';document.getElementById('mail-email').value='';document.getElementById('mail-pass').value='';document.getElementById('mail-label').focus()}
+async function saveMail(){const add=mailAccountMode==='add',accountId=v('mail-account'),label=v('mail-label').trim(),email=v('mail-email').trim(),password=v('mail-pass');if(!add&&!accountId)return alert('수정할 발송계정을 선택해 주세요.');if(!label)return alert('계정 이름을 입력해 주세요.');if(!email)return alert('발송 메일주소를 입력해 주세요.');if(add&&!password.trim())return alert('신규 계정의 Google 앱 비밀번호 16자리를 입력해 주세요.');try{const d=await api('/verified-contract/admin/settings/mail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:add?'add':'save',account_id:accountId,label,email,password})});alert(d.message);location.reload()}catch(e){alert(e.message)}}
 async function applyMailAccount(){const accountId=v('mail-account');if(!accountId)return alert('사용할 발송계정을 선택해 주세요.');try{const d=await api('/verified-contract/admin/settings/mail',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'select',account_id:accountId})});alert(d.message);location.reload()}catch(e){alert(e.message)}}
 async function showEvidence(id){try{const d=await api(`/verified-contract/admin/${id}/evidence`);let h=`<p><b>${escapeHtml(d.contract.signer_name)}</b> · ${escapeHtml(d.contract.title_snapshot)}</p><p style=\"word-break:break-all\">계약서 위변조 확인용 고유번호(SHA-256): ${escapeHtml(d.contract.pdf_sha256||'-')}</p>`;h+=(d.events||[]).map(e=>`<div class=\"evidence-event\"><b>${escapeHtml(e.event_display)} · ${escapeHtml(e.event_type)}</b>${escapeHtml(e.ip_address||'-')}</div>`).join('');document.getElementById('evidenceBody').innerHTML=h;document.getElementById('evidenceModal').style.display='flex'}catch(e){alert(e.message)}}function closeEvidence(){document.getElementById('evidenceModal').style.display='none'}function escapeHtml(x){const d=document.createElement('div');d.textContent=x??'';return d.innerHTML}
-document.querySelectorAll('.vc-editor-toolbar button').forEach(button=>button.addEventListener('mousedown',event=>event.preventDefault()));fillMailAccount();
 </script>
 {% endblock %}
