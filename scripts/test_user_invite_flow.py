@@ -132,6 +132,9 @@ def main():
         )
         assert len(FakeSMTP.messages) == 2
         assert all("www.saedam.org" in _decoded_message(message) for message in FakeSMTP.messages)
+        approval_message = _decoded_message(FakeSMTP.messages[-1])
+        assert "접속방법: 새담 홈페이지 http://www.saedam.org 접속 후 인트라넷 메뉴로 접속가능." in approval_message
+        assert "인트라넷 주소: https://works.saedam.org" in approval_message
     finally:
         user_mgmt.smtplib.SMTP = original_smtp
 
