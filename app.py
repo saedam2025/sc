@@ -1,4 +1,5 @@
 from flask import Flask, session, redirect, url_for, request, render_template, jsonify
+from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
 import sys
@@ -39,6 +40,7 @@ from routes.chat import chat_bp
 
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
+from routes.storage import PROFILE_ROOT
 from routes.usage_stats import (
     get_login_summary,
     record_login_activity,
@@ -390,7 +392,14 @@ def update_my_info():
     if 'emp_no' not in session:
         return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
 
-    data = request.get_json(silent=True) or {}
+    # 상단 개인 프로필 모달은 사진 업로드를 위해 multipart/form-data를 사용합니다.
+    # 기존 JSON 호출도 계속 호환되도록 둘 다 처리합니다.
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        data = request.form
+        profile_file = request.files.get('profile_image')
+    else:
+        data = request.get_json(silent=True) or {}
+        profile_file = None
 
     new_password = data.get('password')
     new_email = data.get('email', '')
@@ -422,6 +431,23 @@ def update_my_info():
             update_fields.append("profile_icon=?")
             params.append(new_profile_icon)
             session['profile_icon'] = new_profile_icon
+
+        if profile_file and profile_file.filename:
+            if 'profile_path' not in columns:
+                return jsonify({"status": "error", "message": "프로필 사진 저장 컬럼이 없습니다."}), 500
+
+            profile_root = str(PROFILE_ROOT)
+            os.makedirs(profile_root, exist_ok=True)
+            ext = os.path.splitext(profile_file.filename)[1]
+            raw_filename = f"myinfo_{session['emp_no']}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
+            safe_filename = secure_filename(raw_filename)
+            upload_path = os.path.join(profile_root, safe_filename)
+            profile_file.save(upload_path)
+
+            profile_path = f"/user/profile_img/{safe_filename}"
+            update_fields.append("profile_path=?")
+            params.append(profile_path)
+            session['profile_path'] = profile_path
 
         if new_password and 'password' in columns:
             update_fields.append("password=?")
