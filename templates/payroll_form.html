@@ -621,7 +621,10 @@
     async function refreshHistory(page=state.historyPagination.page||1){try{const data=await api(`history?page=${Math.max(1,Number(page||1))}`);state.history=data.history||[];state.historyPagination=data.pagination||state.historyPagination;renderHistory();}catch(error){toast(error.message,'error');}}
 
     function setupEvents(){
-        $$('.pm-tab').forEach(tab=>tab.addEventListener('click',()=>switchTab(tab.dataset.tab)));$$('[data-close-modal]').forEach(button=>button.addEventListener('click',event=>closeModal(event.target.closest('.pm-modal-backdrop'))));$$('.pm-modal-backdrop').forEach(backdrop=>backdrop.addEventListener('click',event=>{if(event.target===backdrop)closeModal(backdrop);}));
+        $$('.pm-tab').forEach(tab=>tab.addEventListener('click',()=>switchTab(tab.dataset.tab)));
+        $$('[data-close-modal]').forEach(button=>button.addEventListener('click',event=>closeModal(event.target.closest('.pm-modal-backdrop'))));
+        // 모달 바깥(backdrop)을 클릭하거나 드래그해도 닫히지 않도록 처리
+        // 모달은 X, 취소/닫기 버튼 또는 저장 완료 시에만 닫힙니다.
         $('#groupList').addEventListener('click',event=>{const button=event.target.closest('[data-group-id]');if(button)selectGroup(button.dataset.groupId);});$('#createGroupBtn').addEventListener('click',()=>openGroup());$('#editGroupBtn').addEventListener('click',()=>openGroup(activeGroup()));$('#groupForm').addEventListener('submit',saveGroup);
         $('#deleteGroupBtn').addEventListener('click',async()=>{const group=activeGroup();if(!group||!confirm(`'${group.name}' 작업그룹을 삭제하시겠습니까?`))return;try{await api(`groups/${group.id}`,{method:'DELETE'});state.groups=state.groups.filter(g=>String(g.id)!==String(group.id));state.activeGroupId=state.groups[0]?.id||null;renderAll();toast('작업그룹을 삭제했습니다.');}catch(error){toast(error.message,'error');}});
         $$('[data-group-command]').forEach(button=>button.addEventListener('click',()=>{document.execCommand(button.dataset.groupCommand,false);$('#groupEditor').focus();}));$$('.pm-variable').forEach(button=>button.addEventListener('click',()=>insertEditorValue(button.dataset.editorTarget,button.dataset.value)));$('#groupHtmlSourceBtn').addEventListener('click',()=>toggleSource('group'));
