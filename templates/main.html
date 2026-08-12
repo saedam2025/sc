@@ -427,6 +427,14 @@
     border-color: var(--card-border, var(--widget-border-color)) !important;
 }
 
+.day-col.is-today .day-num {
+    font-size: 1.60rem;
+}
+
+.day-col.is-today .day-num,
+.day-col.is-today .day-name {
+    transform: translateY(-5px);
+}
 </style>
 
 <div class="dashboard-wrapper">
@@ -585,9 +593,9 @@
                     <div class="cal-title-area">주간 자원관리 현황</div>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <span id="weekly-date-range" style="font-size:0.85rem; color:var(--text-muted); font-weight:500; margin-right: 10px;">로딩중...</span>
-                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(1)"><i class="fa-solid fa-chevron-right"></i></button>
-                        <button class="btn-action" style="padding: 4px 12px;" onclick="currentWeeklyStart = new Date(); renderWeeklySchedule();">오늘</button>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(-7)">    <i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="btn-action" style="padding: 4px 8px;" onclick="shiftWeeklySchedule(7)">    <i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="btn-action" style="padding: 4px 12px;" onclick="currentWeeklyStart = getMonday(new Date()); renderWeeklySchedule();">이번주</button>
                     </div>
                 </div>
                 <div id="weekly-schedule-container">
@@ -903,7 +911,20 @@
     window.allCalendarEvents = {{ events | tojson | safe }};
     const currentUser = '{{ current_user }}';
     const globalHolidays = {{ holidays_dict | tojson | safe }};
-    let currentWeeklyStart = new Date();
+    
+
+function getMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+
+    return d;
+}
+
+let currentWeeklyStart = getMonday(new Date());
 
     function escapeWeeklyTooltipHtml(value) {
         return String(value ?? '')
@@ -1146,7 +1167,7 @@
     function renderWeeklySchedule() {
         const container = document.getElementById('weekly-schedule-container');
         if (!container) return;
-        let html = ''; const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        let html = ''; const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
 
         const endDate = new Date(currentWeeklyStart); endDate.setDate(currentWeeklyStart.getDate() + 6);
         const startStr = `${currentWeeklyStart.getFullYear()}.${String(currentWeeklyStart.getMonth() + 1).padStart(2, '0')}.${String(currentWeeklyStart.getDate()).padStart(2, '0')}`;
@@ -1193,7 +1214,7 @@
 
             let textColorStyle = ''; let nameColorStyle = '';
             if (d.getDay() === 0) { textColorStyle = 'color: #ef4444 !important;'; nameColorStyle = 'color: #ef4444 !important;'; } 
-            else if (d.getDay() === 6) { textColorStyle = 'color: var(--blue-primary) !important;'; nameColorStyle = 'color: var(--blue-primary) !important;'; }
+            else if (d.getDay() === 6) { textColorStyle = 'color: #60a5fa !important;'; nameColorStyle = 'color: #60a5fa !important;'; }
 
             let holidayBadge = '';
             if (globalHolidays[dateStr]) {
