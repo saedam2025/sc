@@ -742,7 +742,11 @@ def save_weblink():
         
         parsed_uri = urllib.parse.urlparse(url)
         domain = f"{parsed_uri.scheme}://{parsed_uri.netloc}"
-        favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
+
+        if parsed_uri.netloc in ['works.saedam.org', 'www.saedam.org', 'saedam.org']:
+            favicon_url = "https://www.saedam.org/img_sub/favicon.ico"
+        else:
+            favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=64"
         
         conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by) VALUES (?, ?, ?, ?, ?)", 
                      (title, 'url', url, favicon_url, current_user))
