@@ -62,12 +62,14 @@
     .tab-btn.active { background: var(--card-bg, white); color: var(--text-dark, #0f172a); border: 1px solid var(--border-color, #cbd5e1); border-bottom: 1px solid var(--card-bg, white); border-top: 3px solid var(--primary-color, #3b82f6); z-index: 1; }
     
     .tab-btn.completed-tab.active { border-top: 3px solid #22c55e; color: #15803d; }
+    .tab-btn.reference-tab.active { border-top: 3px solid #14b8a6; color: #0f766e; }
     
     .search-container { padding-bottom: 10px; }
     
     /* 요약 카운트 뱃지 */
     .count-badge { background: var(--primary-color, #3b82f6); color: white; padding: 2px 6px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
     .tab-btn.completed-tab .count-badge { background: #22c55e; }
+    .tab-btn.reference-tab .count-badge { background: #14b8a6; }
     .tab-btn:not(.active) .count-badge { background: var(--text-gray, #94a3b8); }
     .tab-btn.archive-tab { position: relative; margin-left: 12px; background: var(--widget-bg, #f8fafc); border-color: var(--border-color, #e2e8f0); color: var(--text-dark, #475569); }
     .tab-btn.archive-tab::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 1px; background: var(--border-color, #cbd5e1); }
@@ -503,6 +505,9 @@
                 <button class="tab-btn completed-tab" id="tab-completed" onclick="switchTab('completed')">
                     결재/수신 완료 <span class="count-badge" id="count-completed">0</span>
                 </button>
+                <button class="tab-btn reference-tab" id="tab-reference" onclick="switchTab('reference')" title="내가 참조자로 지정된 최종 완료 문서">
+                    <i class="fa-solid fa-user-group"></i> 참조함 <span class="count-badge" id="count-reference">0</span>
+                </button>
                 <button class="tab-btn archive-tab" id="tab-archive" onclick="switchTab('archive')" title="완료된 문서를 모아두는 보관함">
                     <i class="fa-solid fa-box-archive"></i> 완료 문서함 <span class="archive-tab-note">보관함</span> <span class="count-badge" id="count-archive">0</span>
                 </button>
@@ -731,6 +736,7 @@ const docsData = {
     'pending': {{ pending_docs | tojson | safe }},
     'draft': {{ my_drafts | tojson | safe }},
     'completed': {{ completed_docs | tojson | safe }},
+    'reference': {{ reference_docs | tojson | safe }},
     'archive': {{ archive_docs | tojson | safe }}
 };
 const nextDocId = {{ next_id }};
@@ -953,6 +959,7 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTable();
     initDragAndDrop();
     initCustomSelects();
+    initParticipantSelection();
 });
 
 function initCustomSelects() {
@@ -973,7 +980,7 @@ function initCustomSelects() {
         options.forEach(opt => {
             opt.addEventListener('click', function(e) {
                 if (this.classList.contains('option-disabled')) {
-                    alert('1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.');
+                    alert('이미 다른 역할로 지정된 사람은 결재자로 중복 지정할 수 없습니다.');
                     return;
                 }
                 selected.innerHTML = this.innerHTML;
@@ -1014,14 +1021,68 @@ function validateApproverSelection(changedInputId) {
 function updateApproverOptionStates() {
     const app1 = document.getElementById('app1').value;
     const app2 = document.getElementById('app2').value;
+    const ccNames = new Set(Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value));
     document.querySelectorAll('#custom-app1 .select-items div[data-value]').forEach(opt => {
         const value = opt.getAttribute('data-value');
-        opt.classList.toggle('option-disabled', Boolean(value && value === app2));
+        opt.classList.toggle('option-disabled', Boolean(value && (value === app2 || ccNames.has(value))));
     });
     document.querySelectorAll('#custom-app2 .select-items div[data-value]').forEach(opt => {
         const value = opt.getAttribute('data-value');
-        opt.classList.toggle('option-disabled', Boolean(value && value === app1));
+        opt.classList.toggle('option-disabled', Boolean(value && (value === app1 || ccNames.has(value))));
     });
+    updateParticipantOptionStates();
+}
+
+function initParticipantSelection() {
+    document.querySelectorAll('.recv-cb, .cc-cb').forEach(cb => {
+        cb.addEventListener('change', updateApproverOptionStates);
+    });
+    updateApproverOptionStates();
+}
+
+function setParticipantDisabled(checkbox, disabled) {
+    checkbox.disabled = disabled;
+    const label = checkbox.closest('.org-user-label');
+    if (label) {
+        label.style.opacity = disabled ? '0.45' : '';
+        label.style.cursor = disabled ? 'not-allowed' : '';
+    }
+}
+
+function updateParticipantOptionStates() {
+    const appNames = new Set([
+        document.getElementById('app1').value,
+        document.getElementById('app2').value
+    ].filter(Boolean));
+    const receiverNames = new Set(Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value));
+    const ccNames = new Set(Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value));
+
+    document.querySelectorAll('.recv-cb').forEach(cb => setParticipantDisabled(cb, ccNames.has(cb.value)));
+    document.querySelectorAll('.cc-cb').forEach(cb => {
+        setParticipantDisabled(cb, appNames.has(cb.value) || receiverNames.has(cb.value) || cb.value === currentUser);
+    });
+
+    document.querySelectorAll('#custom-app1 .select-items div[data-value], #custom-app2 .select-items div[data-value]').forEach(opt => {
+        const value = opt.getAttribute('data-value');
+        if (value && ccNames.has(value)) opt.classList.add('option-disabled');
+    });
+}
+
+function validateParticipantSelection() {
+    const type = document.getElementById('draftType').value;
+    const primaryNames = ['보고서', '업무일지', '회의록'].includes(type)
+        ? Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value)
+        : [document.getElementById('app1').value, document.getElementById('app2').value].filter(Boolean);
+    const ccNames = Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value);
+    if (primaryNames.includes(currentUser) || ccNames.includes(currentUser)) {
+        alert('상신자 본인은 결재자, 수신자 또는 참조자로 지정할 수 없습니다.');
+        return false;
+    }
+    if (primaryNames.some(name => ccNames.includes(name))) {
+        alert('결재자/수신자와 참조자는 중복 지정할 수 없습니다.');
+        return false;
+    }
+    return true;
 }
 
 function closeAllSelect(elmnt) {
@@ -1119,6 +1180,7 @@ function updateCounts() {
     document.getElementById('count-pending').innerText = docsData['pending'].length;
     document.getElementById('count-draft').innerText = docsData['draft'].length;
     document.getElementById('count-completed').innerText = docsData['completed'].length;
+    document.getElementById('count-reference').innerText = docsData['reference'].length;
     document.getElementById('count-archive').innerText = docsData['archive'].length;
 }
 
@@ -1157,6 +1219,7 @@ function renderTable() {
         'pending': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">수신일시</th><th style="width:15%;">상태</th></tr>`,
         'draft': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">결재/수신자</th><th style="width:15%;">기안일시</th><th style="width:15%; text-align:left; padding-left:25px;">진행 상황</th></tr>`,
         'completed': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
+        'reference': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
         'archive': `<tr><th style="width:12%;">문서종류</th><th style="width:34%;">제목</th><th style="width:15%;">기안자</th><th style="width:19%;">결재/수신자</th><th style="width:12%;">완료일시</th><th style="width:8%;">상태</th></tr>`
     };
     document.getElementById('thead-data').innerHTML = headers[currentTab];
@@ -1167,7 +1230,8 @@ function renderTable() {
         String(doc.doc_type || '').toLowerCase().includes(searchTerm) ||
         (doc.approver_1 || '').toLowerCase().includes(searchTerm) ||
         (doc.approver_2 || '').toLowerCase().includes(searchTerm) ||
-        (doc.receivers || '').toLowerCase().includes(searchTerm)
+        (doc.receivers || '').toLowerCase().includes(searchTerm) ||
+        (doc.cc_receivers || '').toLowerCase().includes(searchTerm)
     );
 
     const totalPages = Math.ceil(data.length / itemsPerPage) || 1;
@@ -1186,7 +1250,7 @@ function renderTable() {
             const approverText = receiverText ? receiverText.substring(0,15) + (receiverText.length > 15 ? '...' : '') : `${approver1} / ${approver2}`;
             const displayCol = currentTab === 'pending' ? doc.drafter :
                                currentTab === 'draft' ? approverText : doc.drafter;
-            const dateCol = ['completed', 'archive'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
+            const dateCol = ['completed', 'reference', 'archive'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
             
             const statusCell = currentTab === 'draft' ? renderProgressBar(doc) : `<span class="status-badge st-${doc.status}">${doc.status}</span>`;
 
@@ -1223,7 +1287,7 @@ function switchTab(tab) {
     currentTab = tab; currentPage = 1;
     document.getElementById('searchInput').value = ''; searchTerm = '';
     
-    ['pending', 'draft', 'completed', 'archive'].forEach(t => {
+    ['pending', 'draft', 'completed', 'reference', 'archive'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('active', t === tab);
     });
     renderTable();
@@ -1286,6 +1350,7 @@ function openDraftModal(docType = '기안서', keepReferenceContent = false) {
     renderFileList();
 
     document.querySelectorAll('.recv-cb, .cc-cb').forEach(cb => cb.checked = false);
+    updateApproverOptionStates();
     
     toggleReceiverMode();
     document.getElementById('draft-step-1').style.display = 'block';
@@ -1298,6 +1363,7 @@ function toggleReceiverMode() {
     const isReceiverType = ['보고서', '업무일지', '회의록'].includes(type);
     document.getElementById('approval-line').style.display = isReceiverType ? 'none' : 'flex';
     document.getElementById('receiver-line').style.display = isReceiverType ? 'block' : 'none';
+    updateParticipantOptionStates();
 
     const today = new Date();
     const year = today.getFullYear();
@@ -1351,6 +1417,7 @@ function goToStep2() {
         if (!app1) return alert("1차 결재자는 필수입니다.");
         if (app2 && app1 === app2) return alert("1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.");
     }
+    if (!validateParticipantSelection()) return;
 
     const labelDrafter = (type === '보고서') ? '보고자' : '기안자';
     const labelDocNum = (type === '보고서') ? '보고서번호' : '문서번호';
@@ -1451,6 +1518,7 @@ function goToStep2() {
 async function submitApproval() {
     const type = document.getElementById('draftType').value;
     const title = document.getElementById('draftTitle').value;
+    if (!validateParticipantSelection()) return;
     let formData = new FormData();
     formData.append('doc_type', type);
     formData.append('title', title);

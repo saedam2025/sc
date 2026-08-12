@@ -1021,9 +1021,14 @@ function openRejectModal(i) {
     const u = currentUserData[i];
     document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-user-xmark" style="color:#d9480f;"></i> 가입 승인 거부`;
     document.getElementById('modalBody').innerHTML = `
-        <div style="padding:28px 25px; text-align:center; line-height:1.7;">
+        <div style="padding:22px 25px; line-height:1.7;">
+            <div style="text-align:center;">
             <p style="margin:0 0 10px;"><strong>${escapeMgmt(u.이름)}</strong>님의 가입 신청을 거부하시겠습니까?</p>
             <p style="margin:0; color:var(--text-gray); font-size:.9em;">거부 처리 후 <strong>${escapeMgmt(u.이메일 || '-')}</strong> 주소로 결과 메일을 발송합니다.</p>
+            </div>
+            <label for="reject_reason" style="display:block; margin:18px 0 7px; font-weight:700;">거부 사유 <span style="color:#d9480f;">(필수)</span></label>
+            <textarea id="reject_reason" class="glass-input" rows="4" maxlength="500" placeholder="신청자에게 안내할 거부 사유를 간단히 입력해주세요." style="width:100%; resize:vertical;"></textarea>
+            <div style="margin-top:5px; text-align:right; color:var(--text-gray); font-size:.78em;">최대 500자</div>
         </div>`;
     document.getElementById('adminArea').style.display = 'block';
     document.getElementById('modalSubmitBtn').innerText = '거부 실행';
@@ -1034,11 +1039,13 @@ function openRejectModal(i) {
 async function submitReject(dbId) {
     const adminPass = document.getElementById('adminPass').value;
     if (adminPass !== '1900') return alert('관리자 보안 암호가 일치하지 않습니다.');
+    const rejectionReason = document.getElementById('reject_reason').value.trim();
+    if (!rejectionReason) return alert('가입 승인 거부 사유를 입력해주세요.');
     if (!confirm('가입 승인을 거부하시겠습니까?')) return;
     const res = await fetch('/user/reject', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({admin_pass: adminPass, user_idx: dbId})
+        body: JSON.stringify({admin_pass: adminPass, user_idx: dbId, rejection_reason: rejectionReason})
     });
     const data = await res.json();
     alert(data.message);
