@@ -383,7 +383,8 @@ def init_db():
         address TEXT, bank_account TEXT, department TEXT, profile_path TEXT,
         profile_icon TEXT DEFAULT '👤',
         join_date TEXT, retire_date TEXT, status TEXT DEFAULT '대기',
-        applied_at DATETIME, approved_at DATETIME
+        applied_at DATETIME, approved_at DATETIME,
+        rejection_reason TEXT DEFAULT '', rejected_at DATETIME
     )''')
 
     # 인사관리에서 직급명과 권한 레벨을 화면으로 관리한다.
@@ -515,7 +516,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_type TEXT, title TEXT, drafter TEXT,
         approver_1 TEXT, approver_2 TEXT, status TEXT DEFAULT '대기',
-        doc_data TEXT, filename TEXT, filepath TEXT,
+        receivers TEXT DEFAULT '', cc_receivers TEXT DEFAULT '',
+        doc_data TEXT, filename TEXT, filepath TEXT, filesize TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')

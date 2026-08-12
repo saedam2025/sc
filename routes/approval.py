@@ -99,6 +99,18 @@ def _approval_names(value):
     }
 
 
+def _normalized_approval_names(value):
+    """쉼표 목록을 입력 순서대로 정리하고 중복 이름을 제거한다."""
+    names = []
+    seen = set()
+    for item in str(value or '').split(','):
+        name = item.strip()
+        if name and name not in seen:
+            names.append(name)
+            seen.add(name)
+    return names
+
+
 def can_view_approval(doc, current_user):
     if is_admin_session():
         return True
@@ -207,6 +219,16 @@ def index():
     ''', (current_user,)).fetchall()
     completed_docs = rows_to_dicts(completed_rows)
 
+    reference_rows = conn.execute('''
+        SELECT * FROM approvals
+        WHERE status = '완료'
+        ORDER BY updated_at DESC
+    ''').fetchall()
+    reference_docs = [
+        dict(row) for row in reference_rows
+        if current_user in _approval_names(row['cc_receivers'])
+    ]
+
     archive_rows = conn.execute('''
         SELECT * FROM approvals
         WHERE status = '완료'
@@ -223,13 +245,17 @@ def index():
     approver_users = [
         user for user in all_members
         if user['level'] <= current_user_level
-        and (user['name'] != current_user or current_user_level == 1)
+        and user['name'] != current_user
     ]
     receiver_users = [
         user for user in all_members
         if user['name'] != current_user
     ]
     receiver_grouped_users = group_approval_members(receiver_users)
+    reference_users = [
+        user for user in all_members
+        if user['name'] != current_user
+    ]
         
     conn.close()
 
@@ -238,10 +264,11 @@ def index():
                            pending_docs=pending_docs, 
                            my_drafts=my_drafts, 
                            completed_docs=completed_docs, 
+                           reference_docs=reference_docs,
                            archive_docs=archive_docs,
                            approver_users=approver_users,
                            receiver_grouped_users=receiver_grouped_users,
-                           reference_users=all_members,
+                           reference_users=reference_users,
                            next_id=next_id)
 
 @approval_bp.route('/submit', methods=['POST'])
@@ -254,8 +281,8 @@ def submit_approval():
     
     approver_1 = request.form.get('approver_1', '').strip()
     approver_2 = request.form.get('approver_2', '').strip()
-    receivers = request.form.get('receivers', '')
-    cc_receivers = request.form.get('cc_receivers', '')
+    receiver_names = _normalized_approval_names(request.form.get('receivers', ''))
+    cc_names = _normalized_approval_names(request.form.get('cc_receivers', ''))
     receiver_doc_types = ['보고서', '업무일지', '회의록']
 
     try:
@@ -280,26 +307,39 @@ def submit_approval():
 
     doc_data = json.dumps(doc_data_dict, ensure_ascii=False)
 
+    validation_conn = get_db()
+    try:
+        current_user_level = get_current_user_level(validation_conn, current_user)
+        members = get_approval_members(validation_conn)
+        member_names = {user['name'] for user in members}
+        eligible_approver_names = {
+            user['name'] for user in members
+            if user['level'] <= current_user_level and user['name'] != current_user
+        }
+    finally:
+        validation_conn.close()
+
+    selected_names = set(receiver_names) | set(cc_names) | {approver_1, approver_2}
+    selected_names.discard('')
+    if current_user in selected_names:
+        return jsonify({"status": "error", "message": "상신자 본인은 결재자, 수신자 또는 참조자로 지정할 수 없습니다."}), 400
+    unknown_names = selected_names - member_names
+    if unknown_names:
+        return jsonify({"status": "error", "message": "승인된 회원만 결재자, 수신자 또는 참조자로 지정할 수 있습니다."}), 400
+
     if doc_type in receiver_doc_types:
-        if not receivers.strip():
+        if not receiver_names:
             return jsonify({"status": "error", "message": "수신자를 최소 1명 이상 지정해주세요."}), 400
+        overlap = set(receiver_names) & set(cc_names)
+        if overlap:
+            return jsonify({"status": "error", "message": "수신자와 참조자는 중복 지정할 수 없습니다."}), 400
+        approver_1 = ''
+        approver_2 = ''
     else:
         if not approver_1:
             return jsonify({"status": "error", "message": "1차 결재자는 필수입니다."}), 400
         if approver_2 and approver_1 == approver_2:
             return jsonify({"status": "error", "message": "1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다."}), 400
-
-        validation_conn = get_db()
-        try:
-            current_user_level = get_current_user_level(validation_conn, current_user)
-            eligible_approver_names = {
-                user['name']
-                for user in get_approval_members(validation_conn)
-                if user['level'] <= current_user_level
-                and (user['name'] != current_user or current_user_level == 1)
-            }
-        finally:
-            validation_conn.close()
 
         if approver_1 not in eligible_approver_names:
             return jsonify({
@@ -311,6 +351,12 @@ def submit_approval():
                 "status": "error",
                 "message": "2차 결재자는 본인과 동급이거나 상위 레벨인 회원만 지정할 수 있습니다."
             }), 400
+        if ({approver_1, approver_2} - {''}) & set(cc_names):
+            return jsonify({"status": "error", "message": "결재자와 참조자는 중복 지정할 수 없습니다."}), 400
+        receiver_names = []
+
+    receivers = ','.join(receiver_names)
+    cc_receivers = ','.join(cc_names)
 
     if doc_type in receiver_doc_types:
         status = '완료'

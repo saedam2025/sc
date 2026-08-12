@@ -52,11 +52,13 @@ DEFAULT_INVITE_MAIL_SUBJECT = '[새담 인트라넷] 회원 가입 초대장'
 DEFAULT_INVITE_MAIL_BODY = (
     '안녕하세요. (사)새담청소년교육문화원입니다.\n'
     '새담 인트라넷 가입 신청을 위한 초대 메일입니다.\n'
-    '아래 가입 신청하기 버튼을 눌러 본인 정보를 입력해 주세요.\n'
+    '가입 신청하기 버튼을 눌러 본인 정보를 입력해 주세요.\n'
     '가입 승인 후 새담 홈페이지 www.saedam.org를 통해 인트라넷에 접속할 수 있습니다.'
 )
 PRIVACY_SECURITY_CONSENT_VERSION = '2026-08-10-v1'
 INTRANET_HOMEPAGE_URL = 'https://www.saedam.org'
+MEMBERSHIP_HOMEPAGE_URL = 'http://www.saedam.org'
+INTRANET_DIRECT_URL = 'https://works.saedam.org'
 PASSWORD_MAX_LENGTH = 12
 PASSWORD_ALLOWED_RE = re.compile(
     r'^[A-Za-z0-9!@#$%^&*()_+~`\-={}\[\]:;"\'<>,.?/|\\]{1,12}$'
@@ -90,6 +92,10 @@ def _ensure_hr_schema(conn):
         conn.execute("ALTER TABLE users ADD COLUMN applied_at DATETIME")
     if 'approved_at' not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN approved_at DATETIME")
+    if 'rejection_reason' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN rejection_reason TEXT DEFAULT ''")
+    if 'rejected_at' not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN rejected_at DATETIME")
     conn.execute('''
         UPDATE users
         SET applied_at = CASE
@@ -273,8 +279,8 @@ def _save_invite_mail_template(conn, subject, body):
 def send_real_email(target_email, invite_link, subject, content):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
-    SENDER_EMAIL = os.environ.get('MAIL_USERNAME') or "lunch9797@gmail.com"
-    SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD') or "txnbofpijgysjpfq"
+    SENDER_EMAIL = os.environ.get('MAIL_USERNAME') or "saedam2025@gmail.com"
+    SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD') or "wjuybedxstdmszdt"
 
     if not SENDER_EMAIL or not SENDER_PASSWORD: return False
 
@@ -328,7 +334,10 @@ def send_real_email(target_email, invite_link, subject, content):
         return False
 
 
-def send_membership_result_email(target_email, applicant_name, approved, emp_no='', position='', department=''):
+def send_membership_result_email(
+    target_email, applicant_name, approved, emp_no='', position='', department='',
+    rejection_reason=''
+):
     """가입 승인 또는 거부 결과를 신청자에게 안내한다."""
     target_email = _normalize_email(target_email)
     if not _is_valid_email(target_email):
@@ -352,8 +361,8 @@ def send_membership_result_email(target_email, applicant_name, approved, emp_no=
             f'소속부서: {department}',
             f'직급: {position}',
             '이제 새담 인트라넷에 로그인하여 이용하실 수 있습니다.',
-            '접속 방법: 새담 홈페이지(www.saedam.org)를 통해 인트라넷에 접속해 주세요.',
-            f'새담 홈페이지: {INTRANET_HOMEPAGE_URL}',
+            f'접속방법: 새담 홈페이지 {MEMBERSHIP_HOMEPAGE_URL} 접속 후 인트라넷 메뉴로 접속가능.',
+            f'인트라넷 주소: {INTRANET_DIRECT_URL}',
         ]
     else:
         subject = '[새담 인트라넷] 가입 승인 거부 안내'
@@ -361,11 +370,20 @@ def send_membership_result_email(target_email, applicant_name, approved, emp_no=
         accent_color = '#dc2626'
         detail_lines = [
             f'{safe_name}님, 새담 인트라넷 가입 신청이 승인되지 않았습니다.',
+            f'거부 사유: {str(rejection_reason or "").strip()}',
             '관련 문의가 필요한 경우 새담 인트라넷 관리자에게 연락해 주세요.',
         ]
 
     plain_content = '\n'.join(detail_lines)
     safe_content = '<br>'.join(escape(line) for line in detail_lines)
+    if approved:
+        safe_content = safe_content.replace(
+            escape(MEMBERSHIP_HOMEPAGE_URL),
+            f'<a href="{MEMBERSHIP_HOMEPAGE_URL}" target="_blank" style="color:#2563eb;">{MEMBERSHIP_HOMEPAGE_URL}</a>',
+        ).replace(
+            escape(INTRANET_DIRECT_URL),
+            f'<a href="{INTRANET_DIRECT_URL}" target="_blank" style="color:#2563eb;">{INTRANET_DIRECT_URL}</a>',
+        )
     message = MIMEMultipart('alternative')
     message['From'] = f"새담 인트라넷 <{sender_email}>"
     message['To'] = target_email
@@ -897,7 +915,13 @@ def reject_user():
     try:
         data = request.get_json(silent=True) or {}
         user_id = int(data['user_idx'])
+        rejection_reason = str(data.get('rejection_reason') or '').strip()
+        if not rejection_reason:
+            return jsonify({'status': 'error', 'message': '가입 승인 거부 사유를 입력해주세요.'}), 400
+        if len(rejection_reason) > 500:
+            return jsonify({'status': 'error', 'message': '거부 사유는 500자 이내로 입력해주세요.'}), 400
         conn = get_db()
+        _ensure_hr_schema(conn)
         user = conn.execute(
             "SELECT id, name, email, status FROM users WHERE id=?",
             (user_id,),
@@ -907,7 +931,11 @@ def reject_user():
         if user['status'] != '대기':
             return jsonify({'status': 'error', 'message': '이미 처리된 가입 신청입니다.'}), 409
 
-        conn.execute("UPDATE users SET status='거부' WHERE id=? AND status='대기'", (user_id,))
+        conn.execute('''
+            UPDATE users
+            SET status='거부', rejection_reason=?, rejected_at=CURRENT_TIMESTAMP
+            WHERE id=? AND status='대기'
+        ''', (rejection_reason, user_id))
         conn.commit()
         applicant_name = user['name']
         applicant_email = user['email']
@@ -919,7 +947,9 @@ def reject_user():
         if conn:
             conn.close()
 
-    mail_sent = send_membership_result_email(applicant_email, applicant_name, False)
+    mail_sent = send_membership_result_email(
+        applicant_email, applicant_name, False, rejection_reason=rejection_reason
+    )
     message = '가입 승인을 거부했습니다.'
     message += '\n승인 거부 메일을 발송했습니다.' if mail_sent else '\n거부 처리는 완료됐지만 결과 메일 발송에 실패했습니다.'
     return jsonify({'status': 'success', 'message': message, 'mail_sent': mail_sent})
