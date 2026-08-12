@@ -1261,19 +1261,10 @@ if (currentMyInfo) {
             if (profileImage) formData.append('profile_image', profileImage);
 
             try {
-const payload = {
-    password: password,
-    phone: phone,
-    email: email,
-    address: address,
-    profile_icon: profileIcon
-};
-
-const res = await fetch('/user/update_my_info', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload)
-});                
+                const res = await fetch('/user/update_my_info', {
+                    method: 'POST',
+                    body: formData
+                });                
                 const result = await res.json();
 
                 if (res.ok) {
