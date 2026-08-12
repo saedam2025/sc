@@ -102,13 +102,22 @@ def run() -> None:
         static_folder=str(Path(__file__).resolve().parent.parent / "static"),
     )
     app.secret_key = "verified-contract-test"
+    class DenyMenu(dict):
+        def get(self, _key, _default=None):
+            return False
+
     app.context_processor(
-        lambda: {"global_theme": "light", "current_user_level": 1}
+        lambda: {
+            "global_theme": "light",
+            "current_user_level": 1,
+            "menu_access": DenyMenu(),
+        }
     )
     app.register_blueprint(
         verified.verified_contract_bp,
         url_prefix="/verified-contract",
     )
+    app.add_url_rule("/logout", endpoint="logout", view_func=lambda: "")
     app.jinja_env.get_template("verified_contract/admin.html")
     app.jinja_env.get_template("verified_contract/public.html")
     client = app.test_client()
@@ -128,9 +137,22 @@ def run() -> None:
         / "verified_contract"
         / "admin.html"
     ).read_text(encoding="utf-8")
-    assert "저장된 발송계정" in admin_html
-    assert "선택계정 수정" in admin_html
+    assert "새담 인재 인증계약관리 시스템" in admin_html
+    assert "location.href='/verified-contract/admin/settings'" in admin_html
     assert "ckeditor.com" not in admin_html.lower()
+    admin_response = client.get("/verified-contract/admin")
+    assert admin_response.status_code == 200
+    rendered_admin = admin_response.get_data(as_text=True)
+    assert 'id="termsForm"' not in rendered_admin
+    assert "/verified-contract/admin/settings" in rendered_admin
+    settings_response = client.get("/verified-contract/admin/settings")
+    assert settings_response.status_code == 200
+    settings_html = settings_response.get_data(as_text=True)
+    assert "인증계약 양식관리" in settings_html
+    assert "발송메일계정" in settings_html
+    assert "발송회사" in settings_html
+    assert "발송계정 추가" in settings_html
+    assert "발송회사 추가" in settings_html
 
     response = client.post(
         "/verified-contract/admin/settings/mail",
@@ -167,6 +189,13 @@ def run() -> None:
     )
     assert response.status_code == 200, response.get_json()
     assert verified._mail_account_store()["active_account_id"] == "mail-1"
+    response = client.post(
+        "/verified-contract/admin/settings/mail",
+        json={"action": "delete", "account_id": second_mail_id},
+        headers={"X-CSRF-Token": "csrf-test"},
+    )
+    assert response.status_code == 200, response.get_json()
+    assert len(verified._mail_account_store()["accounts"]) == 1
 
     response = client.post(
         "/verified-contract/admin/settings/company",
@@ -182,6 +211,7 @@ def run() -> None:
     )
     assert response.status_code == 200, response.get_json()
     assert len(verified._company_settings()["profiles"]) == 4
+    added_company_id = verified._company_settings()["active_profile_id"]
     response = client.post(
         "/verified-contract/admin/settings/company",
         data={
@@ -196,6 +226,19 @@ def run() -> None:
     )
     assert response.status_code == 200, response.get_json()
     assert verified._company_profile("company-1")["company_name"] == "수정된 테스트회사"
+    response = client.post(
+        "/verified-contract/admin/settings/company",
+        data={"action": "select", "profile_id": added_company_id},
+        headers={"X-CSRF-Token": "csrf-test"},
+    )
+    assert response.status_code == 200, response.get_json()
+    response = client.post(
+        "/verified-contract/admin/settings/company",
+        data={"action": "delete", "profile_id": added_company_id},
+        headers={"X-CSRF-Token": "csrf-test"},
+    )
+    assert response.status_code == 200, response.get_json()
+    assert len(verified._company_settings()["profiles"]) == 3
 
     signer_name = "홍길동"
     response = client.post(
