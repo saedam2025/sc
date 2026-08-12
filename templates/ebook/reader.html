@@ -3,6 +3,73 @@
 {% block body_class %}leaflet-reader-body{% endblock %}
 {% block header %}{% endblock %}
 {% block content %}
+
+<style>
+/* =========================================================
+   PC e리플렛 뷰어 - 화면을 넓게 쓰고 페이지 상하 흰여백 제거
+   ========================================================= */
+@media (min-width: 769px) {
+  .leaflet-reader {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .leaflet-reader-stage {
+    width: 100% !important;
+    padding: 6px 18px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .leaflet-book {
+    width: min(96vw, 1600px) !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+  }
+
+  .leaflet-spread {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+  }
+
+  .leaflet-sheet {
+    flex: 0 0 50% !important;
+    width: 50% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  .leaflet-sheet img {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .leaflet-sheet figcaption {
+    position: absolute !important;
+    left: 10px !important;
+    bottom: 10px !important;
+    margin: 0 !important;
+    z-index: 3 !important;
+  }
+}
+</style>
+
 <main class="leaflet-reader" id="leafletReader">
   <header class="leaflet-reader-header">
     <a class="leaflet-reader-back" href="{{ url_for('ebook.library') }}" aria-label="리플렛 서재로"><i class="fa-solid fa-chevron-left"></i><span>서재</span></a>
