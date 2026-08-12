@@ -987,6 +987,22 @@ def admin_page():
     )
 
 
+@verified_contract_bp.route("/admin/settings")
+@admin_required
+def settings_page():
+    """계약 목록과 분리된 인증계약 양식·발송 리소스 관리 화면."""
+    companies = _company_settings()
+    mail_store = _mail_account_store()
+    return render_template(
+        "verified_contract/settings.html",
+        categories_list=_categories(),
+        companies=companies,
+        mail_accounts=_mail_accounts_for_view(mail_store),
+        active_mail_account_id=mail_store["active_account_id"],
+        csrf_token=_csrf_token(),
+    )
+
+
 @verified_contract_bp.route("/admin/create", methods=["POST"])
 @admin_required
 @_csrf_required
@@ -1847,6 +1863,24 @@ def save_mail_settings():
             }
         )
 
+    if action == "delete":
+        account = next((item for item in accounts if item["id"] == account_id), None)
+        if not account:
+            return jsonify({"status": "error", "message": "삭제할 발송계정을 찾을 수 없습니다."}), 404
+        accounts = [item for item in accounts if item["id"] != account_id]
+        if store["active_account_id"] == account_id:
+            store["active_account_id"] = accounts[0]["id"] if accounts else ""
+        store["accounts"] = accounts
+        _save_json(VERIFIED_MAIL_FILE, store)
+        return jsonify(
+            {
+                "status": "success",
+                "message": "발송계정을 삭제했습니다.",
+                "active_account_id": store["active_account_id"],
+                "accounts": _mail_accounts_for_view(store),
+            }
+        )
+
     label = str(data.get("label", "")).strip()
     email = str(data.get("email", data.get("username", ""))).strip().lower()
     password = re.sub(r"\s+", "", str(data.get("password", "")))
@@ -1854,6 +1888,15 @@ def save_mail_settings():
         return jsonify({"status": "error", "message": "계정 이름을 입력해 주세요."}), 400
     if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or len(email) > 254:
         return jsonify({"status": "error", "message": "발송 메일주소를 확인해 주세요."}), 400
+    duplicate = next(
+        (
+            item for item in accounts
+            if item["email"].lower() == email and item["id"] != account_id
+        ),
+        None,
+    )
+    if duplicate:
+        return jsonify({"status": "error", "message": "같은 발송 메일주소가 이미 등록되어 있습니다."}), 409
 
     if action == "add":
         if len(accounts) >= MAX_MAIL_ACCOUNTS:
@@ -1911,6 +1954,24 @@ def save_company_settings():
     profile_id = str(request.form.get("profile_id", "")).strip()
     action = str(request.form.get("action", "save")).strip()
     profiles = settings["profiles"]
+    if action == "select":
+        if not any(item["id"] == profile_id for item in profiles):
+            return jsonify({"status": "error", "message": "적용할 발송회사를 찾을 수 없습니다."}), 404
+        settings["active_profile_id"] = profile_id
+        _save_json(VERIFIED_COMPANY_FILE, settings)
+        return jsonify({"status": "success", "message": "선택한 회사를 기본 발송회사로 적용했습니다."})
+    if action == "delete":
+        if len(profiles) <= 1:
+            return jsonify({"status": "error", "message": "발송회사는 최소 1개 이상 필요합니다."}), 400
+        profile = next((item for item in profiles if item["id"] == profile_id), None)
+        if not profile:
+            return jsonify({"status": "error", "message": "삭제할 발송회사를 찾을 수 없습니다."}), 404
+        profiles = [item for item in profiles if item["id"] != profile_id]
+        if settings["active_profile_id"] == profile_id:
+            settings["active_profile_id"] = profiles[0]["id"]
+        settings["profiles"] = profiles
+        _save_json(VERIFIED_COMPANY_FILE, settings)
+        return jsonify({"status": "success", "message": "발송회사를 삭제했습니다."})
     if action == "add":
         if len(profiles) >= MAX_COMPANY_PROFILES:
             return jsonify(
