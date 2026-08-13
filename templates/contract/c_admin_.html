@@ -194,10 +194,6 @@
     <div class="admin-header">
         <div style="display: flex; flex-direction: column; gap: 5px;">
             <h2>📝 새담 인재 계약관리 시스템</h2>
-            <div style="font-size: 0.85rem; color: var(--text-gray, #64748b); font-weight: 600;">
-                <i class="fa-solid fa-user-shield"></i> 
-                현재 관리자: <span style="color: var(--saedam-navy);">{{ session.get('user_name') }} ({{ session.get('role') }})</span>
-            </div>
         </div>
 
      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
@@ -345,6 +341,7 @@
                         <div class="input-group" style="min-width:260px;">
                             <label>회사 도장 이미지 변경</label>
                             <input type="file" id="company-stamp-file" accept="image/png,image/jpeg">
+                            <small id="company-stamp-filename" style="color:var(--text-gray, #64748b);"></small>
                         </div>
                     </div>
 
@@ -885,6 +882,7 @@
 
         const img = document.getElementById('stamp-preview');
         const emptyText = document.getElementById('stamp-empty-text');
+        document.getElementById('company-stamp-filename').textContent = profile.stamp_original_name || '';
 
         if (profile.stamp_url) {
             img.src = profile.stamp_url + '?t=' + new Date().getTime();
@@ -940,6 +938,7 @@
             img.src = URL.createObjectURL(file);
             img.style.display = 'block';
             emptyText.style.display = 'none';
+            document.getElementById('company-stamp-filename').textContent = file.name;
         }
     });
 
@@ -968,6 +967,7 @@
         img.removeAttribute('src');
         img.style.display = 'none';
         emptyText.style.display = 'inline';
+        document.getElementById('company-stamp-filename').textContent = '';
     }
 
     function saveCompanySettings(action = 'save') {

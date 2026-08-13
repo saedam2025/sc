@@ -23,7 +23,6 @@
     <div class="admin-header">
         <div style="display:flex;flex-direction:column;gap:5px">
             <h2>📝 새담 인재 인증계약관리 시스템</h2>
-            <div style="font-size:.85rem;color:var(--text-gray,#64748b);font-weight:600"><i class="fa-solid fa-user-shield"></i> 현재 관리자: <span style="color:var(--saedam-navy)">{{ session.get('user_name') }} ({{ session.get('role') }})</span> · 인증전자계약</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
             <input type="file" id="excelFile" accept=".xlsx" style="display:none" onchange="uploadExcelFile()">
