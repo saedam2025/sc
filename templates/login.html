@@ -591,6 +591,19 @@
             transform: scale(1.08) translateY(-3px) !important; 
         }
 
+        .login-page-copyright {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 650px;
+            color: var(--text-gray);
+            font-size: 11px;
+            line-height: 1.5;
+            letter-spacing: 0.01em;
+            text-align: center;
+            opacity: 0.9;
+        }
+
         @media (max-width: 600px) {
             body { padding: 40px 15px 15px 15px; justify-content: flex-start; overflow-y: auto; }
             .login-wrapper { padding: 35px 25px; }
@@ -670,6 +683,8 @@
             <div class="widget-content text-small" id="widget-quote">로딩중...</div>
         </div>
     </div>
+
+    <footer class="login-page-copyright">Copyright © 2026 Saedam Youth Education &amp; Culture Center. All Rights Reserved.</footer>
 
     <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260810-3010" onerror="console.warn('테마 카탈로그를 불러오지 못해 내장 테마를 사용합니다.');"></script>
     <script>

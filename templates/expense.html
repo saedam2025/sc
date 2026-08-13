@@ -33,8 +33,6 @@
     .expense-title-wrap { display: flex; align-items: center; gap: 12px; }
     .expense-title-wrap img { height: 35px; object-fit: contain; mix-blend-mode: multiply; }
     .expense-header h2 { margin: 0; color: var(--expense-text); font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .expense-current-user { font-size: 0.85rem; color: var(--text-gray, #666666); white-space: nowrap; }
-    .expense-current-user strong { color: var(--expense-navy); }
     .expense-actions { display: flex; gap: 8px; align-items: center; }
     
     /* 버튼 류 테마 적용 */
@@ -237,7 +235,6 @@
                 <h2>지출결의 관리 시스템</h2>
             </div>
             <div class="expense-actions">
-                <div class="expense-current-user">현재 접속: <strong>{{ session.get('user_name') }}</strong></div>
                 <a href="/expense/submit" class="expense-link-btn" target="_blank" rel="noopener"><i class="fa-solid fa-upload"></i> 지출결의서 전송</a>
             </div>
         </div>
@@ -488,8 +485,8 @@ function escapeHtml(value) {
 
 function fileUrlFromPath(path) {
     if (!path) return '';
-    const safeName = String(path).split(/[\\/]/).pop();
-    return `/uploads/${encodeURIComponent(safeName)}`;
+    if (String(path).startsWith('/')) return String(path);
+    return '';
 }
 
 function combinedExpenseStatus(report) {
@@ -503,7 +500,7 @@ function attachmentHtml(files) {
     if (!Array.isArray(files) || files.length === 0) return '<span class="muted">-</span>';
     return `<div class="attachment-list">${files.map(file => `
         <div>
-            <a href="${fileUrlFromPath(file.path || file.name)}" target="_blank">${escapeHtml(file.name || '-')}</a>
+            <a href="${fileUrlFromPath(file.url || file.path || file.name)}" target="_blank">${escapeHtml(file.name || '-')}</a>
             <span class="attachment-size">(${escapeHtml(file.size_text || '-')})</span>
         </div>
     `).join('')}</div>`;
@@ -522,7 +519,7 @@ function receiptAttachmentHtml(files) {
     if (imageFiles.length === 0) return fileListHtml;
 
     const previewsHtml = imageFiles.map(file => {
-        const imageUrl = fileUrlFromPath(file.path || file.name);
+        const imageUrl = fileUrlFromPath(file.url || file.path || file.name);
         const fileName = file.name || '영수증 이미지';
         return `
             <div class="receipt-preview-card">

@@ -519,7 +519,10 @@
             const filteredUsers = users.filter(u => (u.name || '').toLowerCase() !== 'admin' && (u.emp_no || '').toLowerCase() !== 'admin');
             filteredUsers.sort((a, b) => (parseInt(a.level) || 999) - (parseInt(b.level) || 999));
             
-            const groups = { '본부': [], '북부지점': [], '센터장': [], '코디': [], '강사': [], '기타': [] };
+            const groupOrder = Array.isArray(data.organization_groups)
+                ? data.organization_groups
+                : ['본부', '센터장', '코디', '강사', '기타'];
+            const groups = Object.fromEntries(groupOrder.map(groupName => [groupName, []]));
             
             filteredUsers.forEach(u => {
                 const groupName = Object.prototype.hasOwnProperty.call(groups, u.organization_group)
@@ -532,7 +535,7 @@
             if(!container) return;
             
             let html = '';
-            ['본부', '북부지점', '센터장', '코디', '강사', '기타'].forEach(gName => {
+            groupOrder.forEach(gName => {
                 const members = groups[gName];
                 if (members.length === 0) return; 
                 

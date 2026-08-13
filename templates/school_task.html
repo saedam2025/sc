@@ -756,11 +756,19 @@
         fileArea.appendChild(title); fileArea.appendChild(document.createElement('br'));
         names.forEach((name, index) => {
             const href = paths[index] || '#';
+            let displayName = name;
+            if (displayName.startsWith('~e~')) {
+                try { displayName = decodeURIComponent(displayName.slice(3)); } catch (e) {}
+            } else if (String(href).includes('/school/file/') || String(href).includes('/static/school_uploads/')) {
+                displayName = displayName.replace(/^[0-9a-f]{32}_/i, '')
+                    .replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, '')
+                    .replace(/^\d{10,14}_/, '');
+            }
             const link = document.createElement('a');
             link.href = href; link.target = '_blank'; link.style.color = 'var(--saedam-blue)';
             link.style.textDecoration = 'none'; link.style.display = 'block';
             link.style.marginTop = '8px'; link.style.fontWeight = '600';
-            link.innerHTML = '<i class="fa-solid fa-download"></i> ' + escapeHtml(name);
+            link.innerHTML = '<i class="fa-solid fa-download"></i> ' + escapeHtml(displayName);
             fileArea.appendChild(link);
         });
     }

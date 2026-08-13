@@ -125,6 +125,8 @@
             --widget-bg: #ffffff;
             --widget-border: var(--border-color);
             --theme-line-color: var(--border-color);
+            --dashboard-top-line: linear-gradient(90deg, var(--primary-color, #2563eb) 0%, #0f766e 52%, #d97706 100%);
+            --nav-shadow: var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0));
             --input-bg: #f8fafc;
             --effect-color1: transparent;
             --effect-color2: transparent;
@@ -581,7 +583,6 @@
         }
 
         /* 로그인 테마의 글로우 테두리/그림자를 내부 메뉴와 카드에도 적용 */
-        .navbar,
         .dropdown-content,
         .modal-content,
         .user-profile,
@@ -591,6 +592,11 @@
         .weekly-schedule-widget {
             border-color: var(--card-border, var(--border-color)) !important;
             box-shadow: var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0)), inset 0 0 0 1px var(--card-border, transparent) !important;
+        }
+
+        .navbar {
+            border-color: var(--theme-line-color, var(--card-border, var(--border-color))) !important;
+            box-shadow: var(--nav-shadow, var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0))) !important;
         }
 
         .menu-item:hover,
@@ -616,11 +622,11 @@
 
         /* 네비게이션바 - 로그인 테마 배경(투명도) 및 블러 반영 */
         .navbar {
-            background: var(--card-bg, #ffffff);
+            background: var(--nav-bg, var(--card-bg, #ffffff));
             backdrop-filter: var(--card-backdrop, none);
             -webkit-backdrop-filter: var(--card-backdrop, none);
             border-bottom: 1px solid var(--card-border, var(--border-color)); 
-            box-shadow: var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0)), inset 0 0 0 1px var(--card-border, transparent);
+            box-shadow: var(--nav-shadow, var(--card-shadow, 0 0 0 rgba(0, 0, 0, 0)));
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -729,6 +735,14 @@
 
         .dropdown-content a:hover i {
             color: var(--primary-color, #2563eb);
+        }
+
+        /* 조직관리 추가 후에도 중간 폭 화면에서 상단 메뉴가 겹치지 않게 압축한다. */
+        @media (max-width: 1350px) {
+            .navbar { padding-left: 20px; padding-right: 20px; }
+            .menu-list { gap: 2px; }
+            .menu-item { padding: 10px 9px; gap: 5px; font-size: 0.85rem; }
+            .user-section { gap: 6px; }
         }
 
         /* 우측 유저 섹션 */
@@ -936,15 +950,13 @@
                         <!-- 4. 업무지원 메뉴 (기존 유지) -->
                         {% if menu_access.get('support_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or 'attendance' in request.path or 'contacts' in request.path or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
                                 {% if menu_access.get('payroll_main', true) %}<a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i>스마트 명세서 발송</a>{% endif %}
                                 {% if menu_access.get('ai_mail_main', true) %}<a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일 발송</a>{% endif %}
                                 {% if menu_access.get('excel_generator', true) %}<a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>{% endif %}
-                                {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태 관리</a>{% endif %}
-                                {% if menu_access.get('contacts_main', true) %}<a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>{% endif %}
                                 {% if menu_access.get('ebook_library', true) %}<a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>{% endif %}
                             </div>
                         </li>
@@ -966,10 +978,24 @@
                         </li>
                         {% endif %}
 
-                        <!-- 6. 통합관리 메뉴 -->
+                        <!-- 6. 조직관리 메뉴 -->
+                        {% if menu_access.get('organization_group', true) %}
+                        <li class="menu-item-wrapper dropdown">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/contacts') or request.path.startswith('/attendance') or request.path.startswith('/user/invite-sender') %}active{% endif %}">
+                                <i class="fa-solid fa-users-gear"></i> 조직관리
+                            </a>
+                            <div class="dropdown-content">
+                                {% if menu_access.get('contacts_main', true) %}<a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>{% endif %}
+                                {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태관리</a>{% endif %}
+                                {% if menu_access.get('organization_invite', false) %}<a href="{{ url_for('user_mgmt.invite_sender_page') }}"><i class="fa-solid fa-paper-plane"></i>가입초대메일발송</a>{% endif %}
+                            </div>
+                        </li>
+                        {% endif %}
+
+                        <!-- 7. 통합관리 메뉴 -->
                         {% if menu_access.get('admin_group', false) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/user') or request.path.startswith('/ebook/books') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or (request.path.startswith('/user') and not request.path.startswith('/user/invite-sender')) or request.path.startswith('/ebook/books') %}active{% endif %}">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
@@ -1824,6 +1850,7 @@ if (currentMyInfo) {
 
         document.addEventListener('DOMContentLoaded', renderSavedLoginThemeEffects);
     </script>
+    {% block scripts %}{% endblock %}
 
 </body>
 </html>

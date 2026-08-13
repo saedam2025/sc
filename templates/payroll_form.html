@@ -637,7 +637,7 @@
         $('#historyList').addEventListener('click',event=>{const item=event.target.closest('[data-history-id]');if(item)openHistoryDetail(item.dataset.historyId);});$('#historyPagination').addEventListener('click',event=>{const button=event.target.closest('[data-history-page]');if(button&&!button.disabled)refreshHistory(button.dataset.historyPage);});$('#refreshHistoryBtn').addEventListener('click',()=>refreshHistory(state.historyPagination.page||1));$('#stopSendBtn').addEventListener('click',async()=>{if(!confirm('발송을 중단하시겠습니까? 이미 전송된 메일은 취소되지 않습니다.'))return;try{await api('/payroll/stop',{method:'POST'});toast('발송 중단을 요청했습니다.','warning');$('#stopSendBtn').disabled=true;}catch(error){toast(error.message,'error');}});
     }
 
-    document.addEventListener('DOMContentLoaded',()=>{mountModals();ensureBodyModeControl();ensureTemplateMatchField();$('#sendDate').value=new Date().toISOString().slice(0,10);setupEvents();bootstrap();});
+    document.addEventListener('DOMContentLoaded',()=>{mountModals();ensureBodyModeControl();ensureTemplateMatchField();$('#sendDate').value=new Date().toISOString().slice(0,10);setupEvents();const requestedTab=new URLSearchParams(location.search).get('tab');if(['send','senders','templates','assets','history'].includes(requestedTab))switchTab(requestedTab);bootstrap();});
 })();
 </script>
 {% endraw %}

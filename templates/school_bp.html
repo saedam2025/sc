@@ -1905,9 +1905,16 @@
         return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 
-    function getOriginalFileName(name) {
-        const raw = String(name || '').trim();
+    function getOriginalFileName(name, path = '') {
+        let raw = String(name || '').trim();
         if(!raw) return '';
+        const isEncodedOriginal = raw.startsWith('~e~');
+        if(isEncodedOriginal) {
+            try { raw = decodeURIComponent(raw.slice(3)); } catch(e) {}
+            return raw;
+        }
+        const filePath = String(path || '');
+        if(!filePath.includes('/static/school_uploads/') && !filePath.includes('/school/file/')) return raw;
         let result = raw;
         result = result.replace(/^[0-9a-f]{32}_/i, '');
         result = result.replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, '');
@@ -1971,8 +1978,8 @@
             const paths = String(data.filepath || '').split(',');
             const links = [];
             names.forEach((n, i) => {
-                const originalName = getOriginalFileName(n);
                 const originalPath = String(paths[i] || '').trim();
+                const originalName = getOriginalFileName(n, originalPath);
                 const fileUrl = makeFileUrl(originalPath);
                 links.push(`<span style="display:inline-flex; align-items:center; gap:3px;"><a href="${escapeHtml(fileUrl)}" target="_blank" class="read-file-link" download="${escapeHtml(originalName)}">${escapeHtml(originalName)}</a></span>`);
             });
@@ -2029,7 +2036,7 @@
         if(!filename || !filepath) return '';
         const names = String(filename).split(',');
         const paths = String(filepath).split(',');
-        const links = names.map((n, i) => `<a href="${escapeHtml(String(paths[i] || '').trim())}" target="_blank" class="comment-file-link" download="${escapeHtml(getOriginalFileName(n))}">${escapeHtml(getOriginalFileName(n))}</a>`);
+        const links = names.map((n, i) => `<a href="${escapeHtml(String(paths[i] || '').trim())}" target="_blank" class="comment-file-link" download="${escapeHtml(getOriginalFileName(n, paths[i]))}">${escapeHtml(getOriginalFileName(n, paths[i]))}</a>`);
         return `<div class="comment-attachments"><span class="comment-file-prefix">@첨부파일:</span> ${links.join('<span style="color:var(--text-gray, #94a3b8);">/</span>')}</div>`;
     }
 
@@ -2294,7 +2301,7 @@
             return;
         }
         titleEl.style.display = 'block';
-        listEl.innerHTML = existingPostFiles.map((file, index) => `<div class="post-file-chip existing-file-item"><input type="hidden" name="existing_filenames" value="${escapeHtml(file.name)}"><input type="hidden" name="existing_filepaths" value="${escapeHtml(file.path)}"><span class="post-file-chip-name"><i class="fa-regular fa-file"></i> ${escapeHtml(getOriginalFileName(file.name))} <small>(${formatPostFileSize(file.size)})</small></span><button type="button" class="post-file-remove" onclick="removeExistingPostFile(${index})">삭제</button></div>`).join('');
+        listEl.innerHTML = existingPostFiles.map((file, index) => `<div class="post-file-chip existing-file-item"><input type="hidden" name="existing_filenames" value="${escapeHtml(file.name)}"><input type="hidden" name="existing_filepaths" value="${escapeHtml(file.path)}"><span class="post-file-chip-name"><i class="fa-regular fa-file"></i> ${escapeHtml(getOriginalFileName(file.name, file.path))} <small>(${formatPostFileSize(file.size)})</small></span><button type="button" class="post-file-remove" onclick="removeExistingPostFile(${index})">삭제</button></div>`).join('');
         updatePostFileSummary();
     }
 

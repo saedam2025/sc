@@ -8,7 +8,8 @@
     .content-container { z-index: auto !important; }
 
     /* 전체 배경 및 폰트 */
-    .dashboard-container { padding: 20px 0; background-color: transparent; color: var(--text-dark, #334155); letter-spacing: 0; }
+    /* 상단 간격은 base.html의 공통 50px 규칙만 사용한다. */
+    .dashboard-container { padding: 0 0 20px; background-color: transparent; color: var(--text-dark, #334155); letter-spacing: 0; }
     
     /* 메인 컨테이너 */
     .glass-box { 
@@ -476,10 +477,6 @@
                     <i class="fa-solid fa-signature" style="color:var(--primary-color);"></i> 사내 전자결재 시스템
                     <i class="fa-solid fa-circle-question" style="color:var(--text-gray); font-size: 0.65em; cursor: pointer; transition: 0.2s;" title="이용 매뉴얼 보기" onclick="openManualModal()" onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='var(--text-gray)'"></i>
                 </h2>
-                <div style="font-size: 0.85rem; color: var(--text-gray); font-weight: 600;">
-                    <i class="fa-solid fa-user-shield"></i> 
-                    현재 관리자: <span style="color: var(--primary-dark);">{{ current_user }}</span>
-                </div>
             </div>
         </div>
 
@@ -1585,23 +1582,15 @@ async function openDetailModal(docId) {
         let bodyHtml = (parsed['본문'] || "").replace(/자동채번/g, docNumberStr);
         
         // 🚀 결재 완료 상세창 첨부파일 렌더링
-        if(doc.filename) {
-            const fileNames = doc.filename.split(',').map(f => f.trim()).filter(f => f);
-            const filePaths = doc.filepath ? doc.filepath.split(',').map(p => p.trim()).filter(p => p) : fileNames;
-            
-            // 향후 서버(백엔드)에서 filesize 데이터를 보내준다면 이 부분에서 처리되어 즉시 나타납니다.
-            const fileSizes = doc.filesize ? String(doc.filesize).split(',').map(s => s.trim()) : [];
+        if(doc.attachments && doc.attachments.length) {
+            const attachments = doc.attachments;
             
             let fileLinksHtml = `<div style="display:flex; flex-direction:column; gap:8px;">`;
             
-            fileLinksHtml += fileNames.map((fname, idx) => {
-                // 경로 에러(404) 100% 해결: 
-                // 원본 DB에 저장된 어떠한 경로 형식(/uploads/경로 등)이든 순수 파일명만 정확히 추출하여 절대 경로(/uploads/파일명)로 연결
-                const safeName = (filePaths[idx] || fname).split(/[\/\\]/).pop();
-                const fUrl = `/uploads/${safeName}`;
-                
-                // 백엔드에서 서버 용량 정보가 들어오면 화면에 바로 붙이도록 준비
-                const sizeStr = fileSizes[idx] ? ` <span style="color:var(--text-gray, #94a3b8); font-weight:normal; line-height:1;">(${fileSizes[idx]})</span>` : '';
+            fileLinksHtml += attachments.map((attachment) => {
+                const fname = attachment.name;
+                const fUrl = attachment.url;
+                const sizeStr = attachment.size ? ` <span style="color:var(--text-gray, #94a3b8); font-weight:normal; line-height:1;">(${attachment.size})</span>` : '';
                 
                 return `
                     <div style="display:flex; align-items:center;">

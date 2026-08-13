@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    .invite-page { max-width: 920px; margin: 0 auto; padding: 50px 20px 80px; color: var(--text-dark); }
+    .invite-hero { display:flex; align-items:center; gap:18px; margin-bottom:24px; }
+    .invite-hero-icon { width:58px; height:58px; border-radius:18px; display:grid; place-items:center; flex:0 0 auto; color:#fff; font-size:1.35rem; background:linear-gradient(135deg,var(--primary-color),var(--primary-dark)); box-shadow:0 12px 26px color-mix(in srgb,var(--primary-color) 28%,transparent); }
+    .invite-hero h1 { margin:0; font-size:1.65rem; letter-spacing:-.04em; }
+    .invite-hero p { margin:7px 0 0; color:var(--text-gray); font-size:.92rem; line-height:1.55; }
+    .invite-card { background:var(--card-bg,#fff); border:1px solid var(--card-border,var(--border-color)); border-radius:24px; padding:30px; box-shadow:var(--card-shadow,0 16px 40px rgba(15,23,42,.08)); backdrop-filter:var(--card-backdrop,none); }
+    .invite-field { margin-bottom:22px; }
+    .invite-field label { display:block; margin-bottom:9px; font-size:.88rem; font-weight:750; color:var(--text-dark); }
+    .invite-required { color:#dc2626; }
+    .invite-input { width:100%; box-sizing:border-box; padding:13px 15px; border:1px solid var(--card-border,var(--border-color)); border-radius:12px; background:var(--input-bg,#f8fafc); color:var(--input-text,var(--text-dark)); font:inherit; outline:none; transition:.18s ease; }
+    .invite-input:focus { border-color:var(--primary-color); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary-color) 15%,transparent); }
+    textarea.invite-input { min-height:230px; resize:vertical; line-height:1.7; }
+    .invite-help { display:flex; gap:8px; align-items:flex-start; margin-top:9px; color:var(--text-gray); font-size:.78rem; line-height:1.55; }
+    .invite-help i { color:var(--primary-color); margin-top:2px; }
+    .invite-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-top:5px; flex-wrap:wrap; }
+    .invite-action-group { display:flex; gap:9px; flex-wrap:wrap; }
+    .invite-btn { border:1px solid var(--card-border,var(--border-color)); border-radius:11px; padding:11px 16px; background:var(--widget-bg,#f8fafc); color:var(--text-dark); font-weight:700; cursor:pointer; font-family:inherit; transition:.18s ease; }
+    .invite-btn:hover { transform:translateY(-1px); border-color:var(--primary-color); color:var(--primary-color); }
+    .invite-btn.primary { border-color:transparent; background:var(--primary-color); color:#fff; padding:12px 20px; box-shadow:0 8px 18px color-mix(in srgb,var(--primary-color) 24%,transparent); }
+    .invite-btn.primary:hover { background:var(--primary-dark); color:#fff; }
+    .invite-btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .invite-status { display:none; margin-bottom:18px; padding:13px 15px; border-radius:12px; font-size:.86rem; line-height:1.5; }
+    .invite-status.success { display:block; color:#166534; background:#dcfce7; border:1px solid #bbf7d0; }
+    .invite-status.error { display:block; color:#991b1b; background:#fee2e2; border:1px solid #fecaca; }
+    .invite-sender-section { margin-bottom:22px; }
+    .invite-sender-toggle { width:100%; display:flex; align-items:center; gap:12px; padding:14px 16px; border:1px solid var(--card-border,var(--border-color)); border-radius:13px; background:var(--widget-bg,#f8fafc); color:var(--text-dark); cursor:pointer; text-align:left; font-family:inherit; }
+    .invite-sender-toggle:hover { border-color:var(--primary-color); }
+    .invite-sender-toggle > i:first-child { color:var(--primary-color); font-size:1.05rem; }
+    .invite-sender-toggle-copy { min-width:0; flex:1; display:flex; flex-direction:column; gap:3px; }
+    .invite-sender-toggle-copy strong { font-size:.88rem; }
+    .invite-sender-toggle-copy small { color:var(--text-gray); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .invite-sender-toggle .toggle-arrow { transition:transform .18s ease; color:var(--text-gray); }
+    .invite-sender-toggle[aria-expanded="true"] .toggle-arrow { transform:rotate(180deg); }
+    .invite-sender-panel { margin-top:10px; padding:16px; border:1px solid var(--card-border,var(--border-color)); border-radius:14px; background:var(--widget-bg,#f8fafc); }
+    .invite-sender-panel[hidden] { display:none; }
+    .invite-sender-panel-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .invite-sender-panel-head p { margin:0; color:var(--text-gray); font-size:.76rem; line-height:1.5; }
+    .invite-sender-manage { flex:0 0 auto; color:var(--primary-color); text-decoration:none; font-size:.76rem; font-weight:750; }
+    .invite-sender-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .invite-sender-option { position:relative; display:block; padding:14px; border:1px solid var(--card-border,var(--border-color)); border-radius:12px; background:var(--card-bg,#fff); cursor:pointer; transition:.18s ease; }
+    .invite-sender-option:hover { border-color:var(--primary-color); transform:translateY(-1px); }
+    .invite-sender-option.selected { border-color:var(--primary-color); box-shadow:inset 0 0 0 1px var(--primary-color),0 8px 18px color-mix(in srgb,var(--primary-color) 10%,transparent); }
+    .invite-sender-option input { position:absolute; top:13px; right:13px; accent-color:var(--primary-color); }
+    .invite-sender-name { display:flex; align-items:center; gap:8px; padding-right:24px; font-weight:800; font-size:.86rem; }
+    .invite-sender-icon { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; color:var(--primary-color); background:color-mix(in srgb,var(--primary-color) 10%,#fff); }
+    .invite-sender-email { margin:8px 0 7px; color:var(--text-gray); font-size:.75rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .invite-sender-meta { display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--text-gray); font-size:.69rem; }
+    .invite-provider { padding:3px 7px; border-radius:999px; background:#e8f2ff; color:#1d4ed8; font-weight:800; }
+    .invite-connected { color:#087f5b; font-weight:750; }
+    .invite-unverified { color:#b45309; font-weight:750; }
+    .invite-sender-empty { grid-column:1/-1; text-align:center; padding:20px; color:var(--text-gray); font-size:.82rem; line-height:1.7; }
+    @media (max-width:640px) { .invite-page{padding:30px 12px 60px}.invite-card{padding:22px 18px}.invite-actions,.invite-action-group{align-items:stretch;flex-direction:column;width:100%}.invite-btn{width:100%}.invite-sender-grid{grid-template-columns:1fr}.invite-sender-panel-head{align-items:flex-start;flex-direction:column} }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="invite-page">
+    <div class="invite-hero">
+        <div class="invite-hero-icon"><i class="fa-solid fa-paper-plane"></i></div>
+        <div>
+            <h1>가입초대메일발송</h1>
+            <p>초대받을 이메일과 안내 내용을 확인한 뒤 인트라넷 가입 신청 링크를 발송합니다.</p>
+        </div>
+    </div>
+
+    <div id="inviteStatus" class="invite-status" role="status" aria-live="polite"></div>
+    <form id="inviteForm" class="invite-card">
+        <div class="invite-sender-section">
+            <button id="senderToggle" class="invite-sender-toggle" type="button" aria-expanded="false" aria-controls="senderPanel">
+                <i class="fa-solid fa-paper-plane"></i>
+                <span class="invite-sender-toggle-copy"><strong>발송메일 선택</strong><small id="selectedSenderSummary">발송계정을 불러오는 중입니다.</small></span>
+                <i class="fa-solid fa-chevron-down toggle-arrow"></i>
+            </button>
+            <div id="senderPanel" class="invite-sender-panel" hidden>
+                <div class="invite-sender-panel-head"><p>기존 발송계정 관리에 등록된 Gmail 또는 ZeptoMail 계정을 선택하세요.</p><a class="invite-sender-manage" href="/payroll?tab=senders"><i class="fa-solid fa-gear"></i> 발송계정 관리</a></div>
+                <div id="senderGrid" class="invite-sender-grid"></div>
+            </div>
+        </div>
+        <div class="invite-field">
+            <label for="inviteEmail">초대받을 이메일 주소 <span class="invite-required">*</span></label>
+            <input id="inviteEmail" class="invite-input" type="email" maxlength="254" autocomplete="email" placeholder="example@email.com" required>
+        </div>
+        <div class="invite-field">
+            <label for="inviteSubject">메일 제목 <span class="invite-required">*</span></label>
+            <input id="inviteSubject" class="invite-input" type="text" maxlength="200" required disabled>
+        </div>
+        <div class="invite-field">
+            <label for="inviteBody">메일 내용 <span class="invite-required">*</span></label>
+            <textarea id="inviteBody" class="invite-input" maxlength="5000" required disabled></textarea>
+            <div class="invite-help"><i class="fa-solid fa-circle-info"></i><span>가입 신청 버튼과 일회용 가입 링크는 메일 하단에 자동으로 추가됩니다.</span></div>
+        </div>
+        <div class="invite-actions">
+            <div class="invite-action-group">
+                <button id="restoreButton" class="invite-btn" type="button" disabled><i class="fa-solid fa-rotate-left"></i> 기본값 복원</button>
+                <button id="saveButton" class="invite-btn" type="button" disabled><i class="fa-solid fa-floppy-disk"></i> 템플릿만 저장</button>
+            </div>
+            <button id="sendButton" class="invite-btn primary" type="submit" disabled><i class="fa-solid fa-paper-plane"></i> 저장 후 메일 발송</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const form = document.getElementById('inviteForm');
+    const email = document.getElementById('inviteEmail');
+    const subject = document.getElementById('inviteSubject');
+    const body = document.getElementById('inviteBody');
+    const restoreButton = document.getElementById('restoreButton');
+    const saveButton = document.getElementById('saveButton');
+    const sendButton = document.getElementById('sendButton');
+    const status = document.getElementById('inviteStatus');
+    const senderToggle = document.getElementById('senderToggle');
+    const senderPanel = document.getElementById('senderPanel');
+    const senderGrid = document.getElementById('senderGrid');
+    const selectedSenderSummary = document.getElementById('selectedSenderSummary');
+    let defaultSubject = '';
+    let defaultBody = '';
+    let senders = [];
+    let selectedSenderId = '';
+    let templateReady = false;
+    let sendersReady = false;
+
+    function showStatus(message, kind) {
+        status.textContent = message;
+        status.className = `invite-status ${kind}`;
+        status.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function syncReady() {
+        subject.disabled = !templateReady;
+        body.disabled = !templateReady;
+        restoreButton.disabled = !templateReady;
+        saveButton.disabled = !templateReady;
+        sendButton.disabled = !(templateReady && sendersReady && selectedSenderId);
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    }
+
+    function selectSender(id) {
+        selectedSenderId = String(id || '');
+        const selected = senders.find(item => String(item.id) === selectedSenderId);
+        selectedSenderSummary.textContent = selected
+            ? `${selected.label} · ${selected.email}`
+            : '발송계정을 선택해주세요.';
+        senderGrid.querySelectorAll('.invite-sender-option').forEach(card => {
+            const checked = card.dataset.senderId === selectedSenderId;
+            card.classList.toggle('selected', checked);
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) radio.checked = checked;
+        });
+        syncReady();
+    }
+
+    function renderSenders() {
+        if (!senders.length) {
+            senderGrid.innerHTML = '<div class="invite-sender-empty"><i class="fa-solid fa-circle-exclamation"></i><br>사용 가능한 발송계정이 없습니다.<br>발송계정 관리에서 계정을 먼저 등록해주세요.</div>';
+            selectedSenderSummary.textContent = '등록된 발송계정이 없습니다.';
+            return;
+        }
+        senderGrid.innerHTML = senders.map(sender => {
+            const connected = sender.last_test_status === 'success';
+            const provider = sender.provider_short_label || sender.provider_label || sender.provider || '메일';
+            const icon = sender.provider === 'zeptomail' ? 'fa-solid fa-paper-plane' : 'fa-brands fa-google';
+            return `<label class="invite-sender-option" data-sender-id="${escapeHtml(sender.id)}"><input type="radio" name="senderOption" value="${escapeHtml(sender.id)}"><span class="invite-sender-name"><span class="invite-sender-icon"><i class="${icon}"></i></span>${escapeHtml(sender.label || sender.email)}</span><span class="invite-sender-email">${escapeHtml(sender.email)}</span><span class="invite-sender-meta"><span><span class="invite-provider">${escapeHtml(provider)}</span> ${escapeHtml(sender.smtp_host || '')} · ${escapeHtml(sender.smtp_port || '')}</span><span class="${connected ? 'invite-connected' : 'invite-unverified'}"><i class="fa-solid ${connected ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i> ${connected ? '연결 완료' : '테스트 필요'}</span></span></label>`;
+        }).join('');
+        senderGrid.querySelectorAll('input[name="senderOption"]').forEach(radio => radio.addEventListener('change', () => selectSender(radio.value)));
+    }
+
+    async function requestJson(url, options = {}) {
+        const response = await fetch(url, options);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || '요청을 처리하지 못했습니다.');
+        return data;
+    }
+
+    async function loadTemplate() {
+        try {
+            const data = await requestJson('/user/invite_mail_template', { headers: { Accept: 'application/json' } });
+            subject.value = data.subject || '';
+            body.value = data.body || '';
+            defaultSubject = data.default_subject || '';
+            defaultBody = data.default_body || '';
+            templateReady = true;
+            syncReady();
+        } catch (error) {
+            showStatus(error.message || '메일 템플릿을 불러오지 못했습니다.', 'error');
+        }
+    }
+
+    async function loadSenders() {
+        try {
+            const data = await requestJson('/user/invite_senders', { headers: { Accept: 'application/json' } });
+            senders = Array.isArray(data.senders) ? data.senders : [];
+            renderSenders();
+            sendersReady = senders.length > 0;
+            selectSender(data.active_sender_id || senders[0]?.id || '');
+        } catch (error) {
+            selectedSenderSummary.textContent = '발송계정을 불러오지 못했습니다.';
+            showStatus(error.message || '발송계정을 불러오지 못했습니다.', 'error');
+            syncReady();
+        }
+    }
+
+    senderToggle.addEventListener('click', () => {
+        const willOpen = senderPanel.hidden;
+        senderPanel.hidden = !willOpen;
+        senderToggle.setAttribute('aria-expanded', String(willOpen));
+    });
+
+    restoreButton.addEventListener('click', () => {
+        subject.value = defaultSubject;
+        body.value = defaultBody;
+    });
+
+    saveButton.addEventListener('click', async () => {
+        if (!subject.value.trim() || !body.value.trim()) return showStatus('메일 제목과 내용을 모두 입력해주세요.', 'error');
+        saveButton.disabled = true;
+        try {
+            const data = await requestJson('/user/invite_mail_template', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ subject: subject.value.trim(), body: body.value.trim() })
+            });
+            showStatus(data.message || '메일 템플릿을 저장했습니다.', 'success');
+        } catch (error) {
+            showStatus(error.message, 'error');
+        } finally {
+            saveButton.disabled = false;
+        }
+    });
+
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (!form.reportValidity()) return;
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 메일 발송 중...';
+        try {
+            const data = await requestJson('/user/send_invite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ email: email.value.trim(), subject: subject.value.trim(), body: body.value.trim(), sender_id: selectedSenderId })
+            });
+            showStatus(data.message || '가입 초대 메일을 발송했습니다.', 'success');
+            email.value = '';
+            email.focus();
+        } catch (error) {
+            showStatus(error.message, 'error');
+        } finally {
+            sendButton.disabled = false;
+            sendButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 저장 후 메일 발송';
+        }
+    });
+
+    syncReady();
+    Promise.all([loadTemplate(), loadSenders()]);
+})();
+</script>
+{% endblock %}

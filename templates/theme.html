@@ -711,6 +711,41 @@
             catalog: 'default',
             isDefault: true
         });
+        generatedThemes.push({
+            key: 'gallery:eleaflet',
+            name: 'e리플렛테마',
+            type: 'none',
+            vars: {
+                '--body-bg': '#f7f8f5',
+                '--app-bg': '#f7f8f5',
+                '--main-bg': '#f7f8f5',
+                '--nav-bg': '#ffffff',
+                '--nav-shadow': 'none',
+                '--primary-color': '#102e29',
+                '--primary-light': '#edf4f0',
+                '--primary-dark': '#102e29',
+                '--text-dark': '#14241f',
+                '--text-gray': '#64736d',
+                '--border-color': '#e1e7e2',
+                '--border-light': '#edf1ee',
+                '--theme-line-color': '#e1e7e2',
+                '--dashboard-top-line': 'linear-gradient(#102e29, #102e29)',
+                '--card-bg': '#ffffff',
+                '--card-border': '#e1e7e2',
+                '--card-shadow': '0 8px 28px rgba(22, 54, 45, 0.06)',
+                '--card-backdrop': 'none',
+                '--input-bg': '#fbfcfb',
+                '--input-text': '#14241f',
+                '--widget-bg': '#ffffff',
+                '--widget-hover': '#edf4f0',
+                '--widget-border': '#e1e7e2',
+                '--effect-color1': 'transparent',
+                '--effect-color2': 'transparent',
+                '--effect-color3': 'transparent'
+            },
+            catalog: 'gallery',
+            isDefault: false
+        });
         generatedThemes.push(
             ...SaedamThemeCatalog.createThemeCatalog('gallery', 2000),
             ...SaedamThemeCatalog.createAccentThemeCatalog(500),
@@ -945,7 +980,7 @@
             '--input-text', '--tooltip-bg', '--tooltip-text', '--effect-color1', '--effect-color2',
             '--effect-color3', '--card-bg', '--card-border', '--card-backdrop', '--card-shadow',
             '--input-bg', '--widget-bg', '--widget-hover', '--widget-border', '--widget-border-color',
-            '--theme-line-color', '--nav-bg'
+            '--theme-line-color', '--nav-bg', '--nav-shadow', '--dashboard-top-line'
         ];
 
         function resetPreviewThemeVars() {
