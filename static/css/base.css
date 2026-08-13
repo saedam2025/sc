@@ -1,7 +1,7 @@
 /* 기본 폰트 및 배경 설정 */
 :root {
     --primary-color: #4a90e2;
-    --nav-bg: rgba(255, 255, 255, 0.98);
+    --nav-bg: var(--card-bg, rgba(255, 255, 255, 0.98));
     --text-dark: #2c3e50;
     --border-light: #f0f2f5;
 }
@@ -131,8 +131,8 @@ body {
 /* 6. 하단 푸터 */
 .main-footer {
     max-width: 1200px;
-    margin: 40px auto 20px;
-    padding: 20px;
+    margin: 0px auto 0px;
+    padding: 0px;
     text-align: center;
     color: #b2bec3;
     font-size: 0.9rem;
