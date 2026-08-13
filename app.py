@@ -1,5 +1,4 @@
-from flask import Flask, session, redirect, url_for, request, render_template, jsonify
-from werkzeug.utils import secure_filename
+from flask import Flask, session, redirect, url_for, request, render_template, jsonify, abort
 from datetime import datetime
 import os
 import sys
@@ -41,6 +40,7 @@ from routes.chat import chat_bp
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
 from routes.storage import PROFILE_ROOT
+from routes.secure_files import delete_file, encrypted_storage_name, encrypt_upload, original_filename
 from routes.usage_stats import (
     get_login_summary,
     record_login_activity,
@@ -117,9 +117,7 @@ EXEMPT_ROUTES = [
     'document.company_logo',
     'expense.submit_expense',
     'expense.expense_template',
-    # e리플렛 서재·공유 뷰어·이미지는 학부모가 로그인 없이 열람한다.
-    'ebook.library',
-    'ebook.read_book',
+    # e리플렛 공유 뷰어와 이미지만 학부모가 로그인 없이 열람한다.
     'ebook.public_reader',
     'ebook.serve_cover',
     'ebook.serve_page_image',
@@ -127,6 +125,10 @@ EXEMPT_ROUTES = [
 
 @app.before_request
 def check_login():
+    # 예전 센터장 게시판 정적 첨부 경로는 차단하고, 권한검사를 거치는
+    # /school/file/<저장명> 라우트에서만 복호화해 제공한다.
+    if request.path and request.path.startswith('/static/school_uploads/'):
+        abort(404)
     # 1. 예외 경로이거나 정적 파일 요청이면 통과
     if request.endpoint in EXEMPT_ROUTES or (request.path and request.path.startswith('/static')):
         return None
@@ -408,6 +410,8 @@ def update_my_info():
     new_profile_icon = data.get('profile_icon', '👤')
 
     conn = get_db()
+    new_profile_file_path = None
+    old_profile_file_path = None
     try:
         # 실제 users 테이블에 컬럼이 있는지 확인
         columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
@@ -438,11 +442,19 @@ def update_my_info():
 
             profile_root = str(PROFILE_ROOT)
             os.makedirs(profile_root, exist_ok=True)
-            ext = os.path.splitext(profile_file.filename)[1]
-            raw_filename = f"myinfo_{session['emp_no']}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
-            safe_filename = secure_filename(raw_filename)
+            display_name = original_filename(profile_file.filename, 'profile-image')
+            safe_filename = encrypted_storage_name(display_name)
             upload_path = os.path.join(profile_root, safe_filename)
-            profile_file.save(upload_path)
+            encrypt_upload(profile_file, upload_path)
+            new_profile_file_path = upload_path
+
+            old_row = conn.execute(
+                "SELECT profile_path FROM users WHERE emp_no=?", (session['emp_no'],)
+            ).fetchone()
+            if old_row and old_row['profile_path']:
+                old_profile_file_path = os.path.join(
+                    profile_root, os.path.basename(str(old_row['profile_path']))
+                )
 
             profile_path = f"/user/profile_img/{safe_filename}"
             update_fields.append("profile_path=?")
@@ -463,10 +475,14 @@ def update_my_info():
             params
         )
         conn.commit()
+        if old_profile_file_path and old_profile_file_path != new_profile_file_path:
+            delete_file(old_profile_file_path)
 
         return jsonify({"status": "success", "message": "정보가 성공적으로 수정되었습니다."})
 
     except Exception as e:
+        if new_profile_file_path:
+            delete_file(new_profile_file_path)
         return jsonify({"status": "error", "message": str(e)}), 500
 
     finally:

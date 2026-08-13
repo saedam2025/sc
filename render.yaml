@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: saedam-intranet
+    runtime: python
+    buildCommand: bash render-build.sh
+    startCommand: gunicorn --workers 1 --threads 100 --timeout 120 --bind 0.0.0.0:$PORT app:app
+    numInstances: 1
+    disk:
+      name: saedam-data
+      mountPath: /mnt/data
+      sizeGB: 5
+    envVars:
+      - key: DATA_DIR
+        value: /mnt/data
