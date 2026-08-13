@@ -1,5 +1,12 @@
-{% extends 'ebook/public_base.html' %}
+{% extends 'base.html' %}
 {% block title %}새 e리플렛{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/leaflet.css') }}">
+<style>
+  body { font-family: 'Pretendard', sans-serif; }
+  .content-container > .leaflet-form-page { padding-top: 0; }
+</style>
+{% endblock %}
 {% block content %}
 <main class="leaflet-form-page">
   <header class="leaflet-form-head">
