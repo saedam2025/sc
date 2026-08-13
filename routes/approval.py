@@ -1,12 +1,21 @@
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, abort
 import os
 import json
-import time
 from datetime import datetime, timedelta
 from .database import get_db
 from .organization import ORGANIZATION_GROUPS, classify_organization_group
 from .security import is_admin_session
 from .storage import UPLOADS_ROOT
+from .secure_files import (
+    decode_filename_token,
+    delete_file,
+    encode_filename_token,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_upload,
+    original_filename,
+    plaintext_size,
+)
 
 approval_bp = Blueprint('approval', __name__)
 UPLOAD_FOLDER = str(UPLOADS_ROOT)
@@ -367,48 +376,51 @@ def submit_approval():
 
     files = request.files.getlist('file')
     filenames, filepaths, filesizes = [], [], []
-    for file in files:
-        if file and file.filename:
-            fname = file.filename
-            safe_filename = f"{int(time.time())}_{fname.replace(' ', '_')}"
-            fpath = os.path.join(UPLOAD_FOLDER, safe_filename)
-            file.save(fpath)
-            
-            # 🚀 신규 업로드 시 파일 사이즈 계산 로직 추가
-            try:
-                size_mb = os.path.getsize(fpath) / (1024 * 1024)
-                filesizes.append(f"{size_mb:.2f}MB")
-            except Exception:
-                filesizes.append("0.00MB")
-
-            filenames.append(fname)
-            filepaths.append(fpath)
+    try:
+        for file in files:
+            if file and file.filename:
+                fname = original_filename(file.filename)
+                fpath = os.path.join(UPLOAD_FOLDER, encrypted_storage_name(fname))
+                size_bytes = encrypt_upload(file, fpath)
+                filenames.append(encode_filename_token(fname))
+                filepaths.append(fpath)
+                filesizes.append(f"{size_bytes / (1024 * 1024):.2f}MB")
+    except Exception:
+        for fpath in filepaths:
+            delete_file(fpath)
+        raise
             
     filename_str = ','.join(filenames)
     filepath_str = ','.join(filepaths)
     filesize_str = ','.join(filesizes)
 
     conn = get_db()
-    cursor = conn.execute('''
-        INSERT INTO approvals (doc_type, title, drafter, approver_1, approver_2, receivers, cc_receivers, status, doc_data, filename, filepath, filesize)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (doc_type, title, current_user, approver_1, approver_2, receivers, cc_receivers, status, doc_data, filename_str, filepath_str, filesize_str))
-    approval_id = cursor.lastrowid
+    try:
+        cursor = conn.execute('''
+            INSERT INTO approvals (doc_type, title, drafter, approver_1, approver_2, receivers, cc_receivers, status, doc_data, filename, filepath, filesize)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (doc_type, title, current_user, approver_1, approver_2, receivers, cc_receivers, status, doc_data, filename_str, filepath_str, filesize_str))
+        approval_id = cursor.lastrowid
 
-    if status == '대기' and approver_1:
-        send_system_message(conn, approver_1, f"새 결재를 검토해주세요: [{doc_type}] {title}")
-    elif status == '1차승인' and approver_2:
-        send_system_message(conn, approver_2, f"새 결재를 검토해주세요 (전결 상신): [{doc_type}] {title}")
-    elif status == '완료':
-        if receivers:
-            for rec in receivers.split(','):
-                if rec.strip(): send_system_message(conn, rec.strip(), f"새 수신 문서가 도착했습니다: [{doc_type}] {title}")
-        if cc_receivers:
-            for cc in cc_receivers.split(','):
-                if cc.strip(): send_system_message(conn, cc.strip(), f"참조 문서가 등록되었습니다: [{doc_type}] {title}")
-
-    conn.commit()
-    conn.close()
+        if status == '대기' and approver_1:
+            send_system_message(conn, approver_1, f"새 결재를 검토해주세요: [{doc_type}] {title}")
+        elif status == '1차승인' and approver_2:
+            send_system_message(conn, approver_2, f"새 결재를 검토해주세요 (전결 상신): [{doc_type}] {title}")
+        elif status == '완료':
+            if receivers:
+                for rec in receivers.split(','):
+                    if rec.strip(): send_system_message(conn, rec.strip(), f"새 수신 문서가 도착했습니다: [{doc_type}] {title}")
+            if cc_receivers:
+                for cc in cc_receivers.split(','):
+                    if cc.strip(): send_system_message(conn, cc.strip(), f"참조 문서가 등록되었습니다: [{doc_type}] {title}")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        for fpath in filepaths:
+            delete_file(fpath)
+        raise
+    finally:
+        conn.close()
     return jsonify({"status": "success", "message": "성공적으로 상신되었습니다."})
 
 @approval_bp.route('/action/<int:doc_id>', methods=['POST'])
@@ -499,6 +511,17 @@ def get_detail(doc_id):
         return jsonify({"error": "Forbidden"}), 403
     
     doc_dict = dict(doc)
+    filename_tokens = [item.strip() for item in str(doc_dict.get('filename') or '').split(',') if item.strip()]
+    attachment_paths = [item.strip() for item in str(doc_dict.get('filepath') or '').split(',') if item.strip()]
+    size_tokens = [item.strip() for item in str(doc_dict.get('filesize') or '').split(',')]
+    doc_dict['attachments'] = [
+        {
+            'name': decode_filename_token(filename_tokens[index]) if index < len(filename_tokens) else os.path.basename(path),
+            'url': f"/approval/attachment/{doc_id}/{index}",
+            'size': size_tokens[index] if index < len(size_tokens) else '',
+        }
+        for index, path in enumerate(attachment_paths)
+    ]
     
     # 🚀 과거 작성된 문서 호환: DB에 filesize 정보가 없는 경우 서버 디스크에서 실시간으로 계산해서 전송
     if doc_dict.get('filepath') and not doc_dict.get('filesize'):
@@ -507,7 +530,7 @@ def get_detail(doc_id):
             fpath = fpath.strip()
             if os.path.exists(fpath):
                 try:
-                    size_bytes = os.path.getsize(fpath)
+                    size_bytes = plaintext_size(fpath)
                     sizes.append(f"{size_bytes / (1024 * 1024):.2f}MB")
                 except:
                     sizes.append("0.00MB")
@@ -516,3 +539,21 @@ def get_detail(doc_id):
         doc_dict['filesize'] = ','.join(sizes)
         
     return jsonify(doc_dict)
+
+
+@approval_bp.route('/attachment/<int:doc_id>/<int:file_index>')
+def approval_attachment(doc_id, file_index):
+    current_user = session.get('user_name')
+    conn = get_db()
+    doc = conn.execute("SELECT * FROM approvals WHERE id=?", (doc_id,)).fetchone()
+    conn.close()
+    if not doc:
+        abort(404)
+    if not can_view_approval(doc, current_user):
+        abort(403)
+    paths = [item.strip() for item in str(doc['filepath'] or '').split(',') if item.strip()]
+    names = [item.strip() for item in str(doc['filename'] or '').split(',') if item.strip()]
+    if file_index < 0 or file_index >= len(paths):
+        abort(404)
+    display_name = decode_filename_token(names[file_index]) if file_index < len(names) else os.path.basename(paths[file_index])
+    return encrypted_response(paths[file_index], display_name, as_attachment=True)

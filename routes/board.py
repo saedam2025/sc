@@ -1,7 +1,6 @@
-from flask import Blueprint, render_template, request, jsonify, session, current_app, redirect, url_for, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, request, jsonify, session, current_app, redirect, url_for, abort
 import os
-import uuid
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 from datetime import datetime, timezone, timedelta
 from .database import get_db
 from .security import admin_required
@@ -139,24 +138,30 @@ def board_write(board_en):
     current_kst = datetime.now(kst).strftime('%Y-%m-%d %H:%M:%S')
 
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO board_posts (board_en, title, content, author, is_notice, created_at) VALUES (?, ?, ?, ?, ?, ?)", 
-                   (board_en, title, content, author, is_notice, current_kst))
-    post_id = cursor.lastrowid
+    created_paths = []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO board_posts (board_en, title, content, author, is_notice, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                       (board_en, title, content, author, is_notice, current_kst))
+        post_id = cursor.lastrowid
 
-    for file in files:
-        if file and file.filename:
-            original_name = file.filename
-            ext = os.path.splitext(original_name)[1]
-            saved_name = f"{uuid.uuid4().hex}{ext}"
-            filepath = os.path.join(UPLOAD_FOLDER, saved_name)
-            file.save(filepath)
-            file_size = os.path.getsize(filepath)
-            cursor.execute("INSERT INTO board_files (post_id, original_name, saved_name, file_size) VALUES (?, ?, ?, ?)",
-                           (post_id, original_name, saved_name, file_size))
-            
-    conn.commit()
-    conn.close()
+        for file in files:
+            if file and file.filename:
+                original_name = original_filename(file.filename)
+                saved_name = encrypted_storage_name(original_name)
+                filepath = os.path.join(UPLOAD_FOLDER, saved_name)
+                file_size = encrypt_upload(file, filepath)
+                created_paths.append(filepath)
+                cursor.execute("INSERT INTO board_files (post_id, original_name, saved_name, file_size) VALUES (?, ?, ?, ?)",
+                               (post_id, original_name, saved_name, file_size))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        for filepath in created_paths:
+            delete_file(filepath)
+        raise
+    finally:
+        conn.close()
     return jsonify({"status": "success", "url": url_for('board.board_list', board_en=board_en)})
 
 @board_bp.route('/<board_en>/read/<int:post_id>')
@@ -244,27 +249,39 @@ def board_edit(board_en, post_id):
     title = request.form.get('title')
     content = request.form.get('content')
     is_notice = request.form.get('is_notice', 0, type=int)
-    conn.execute("UPDATE board_posts SET title=?, content=?, is_notice=? WHERE id=?", (title, content, is_notice, post_id))
-    deleted_files = request.form.getlist('deleted_files[]')
-    for file_id in deleted_files:
-        f = conn.execute("SELECT saved_name FROM board_files WHERE id=?", (file_id,)).fetchone()
-        if f:
-            path = os.path.join(UPLOAD_FOLDER, f['saved_name'])
-            if os.path.exists(path): os.remove(path)
-            conn.execute("DELETE FROM board_files WHERE id=?", (file_id,))
-    files = request.files.getlist('files[]')
-    for file in files:
-        if file and file.filename:
-            original_name = file.filename
-            ext = os.path.splitext(original_name)[1]
-            saved_name = f"{uuid.uuid4().hex}{ext}"
-            filepath = os.path.join(UPLOAD_FOLDER, saved_name)
-            file.save(filepath)
-            file_size = os.path.getsize(filepath)
-            conn.execute("INSERT INTO board_files (post_id, original_name, saved_name, file_size) VALUES (?, ?, ?, ?)",
-                           (post_id, original_name, saved_name, file_size))
-    conn.commit()
-    conn.close()
+    removed_paths = []
+    created_paths = []
+    try:
+        conn.execute("UPDATE board_posts SET title=?, content=?, is_notice=? WHERE id=?", (title, content, is_notice, post_id))
+        deleted_files = request.form.getlist('deleted_files[]')
+        for file_id in deleted_files:
+            f = conn.execute(
+                "SELECT saved_name FROM board_files WHERE id=? AND post_id=?",
+                (file_id, post_id)
+            ).fetchone()
+            if f:
+                removed_paths.append(os.path.join(UPLOAD_FOLDER, f['saved_name']))
+                conn.execute("DELETE FROM board_files WHERE id=? AND post_id=?", (file_id, post_id))
+        files = request.files.getlist('files[]')
+        for file in files:
+            if file and file.filename:
+                original_name = original_filename(file.filename)
+                saved_name = encrypted_storage_name(original_name)
+                filepath = os.path.join(UPLOAD_FOLDER, saved_name)
+                file_size = encrypt_upload(file, filepath)
+                created_paths.append(filepath)
+                conn.execute("INSERT INTO board_files (post_id, original_name, saved_name, file_size) VALUES (?, ?, ?, ?)",
+                               (post_id, original_name, saved_name, file_size))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        for filepath in created_paths:
+            delete_file(filepath)
+        raise
+    finally:
+        conn.close()
+    for filepath in removed_paths:
+        delete_file(filepath)
     return jsonify({"status": "success", "url": url_for('board.board_read', board_en=board_en, post_id=post_id)})
 
 @board_bp.route('/<board_en>/delete/<int:post_id>', methods=['POST'])
@@ -277,12 +294,11 @@ def board_delete(board_en, post_id):
         conn.close()
         return jsonify({"status": "error", "message": "삭제 권한이 없습니다."}), 403
     files = conn.execute("SELECT saved_name FROM board_files WHERE post_id=?", (post_id,)).fetchall()
-    for f in files:
-        filepath = os.path.join(UPLOAD_FOLDER, f['saved_name'])
-        if os.path.exists(filepath): os.remove(filepath)
     conn.execute("DELETE FROM board_posts WHERE id=?", (post_id,))
     conn.commit()
     conn.close()
+    for f in files:
+        delete_file(os.path.join(UPLOAD_FOLDER, f['saved_name']))
     return jsonify({"status": "success"})
 
 @board_bp.route('/admin/create', methods=['POST'])
@@ -311,7 +327,12 @@ def admin_setup_page():
 @board_bp.route('/download/<saved_name>')
 def download_file(saved_name):
     conn = get_db()
-    file_info = conn.execute("SELECT original_name FROM board_files WHERE saved_name=?", (saved_name,)).fetchone()
+    file_info = conn.execute("SELECT original_name, saved_name FROM board_files WHERE saved_name=?", (saved_name,)).fetchone()
     conn.close()
-    if file_info: return send_from_directory(UPLOAD_FOLDER, saved_name, as_attachment=True, download_name=file_info['original_name'])
-    return send_from_directory(UPLOAD_FOLDER, saved_name, as_attachment=True)
+    if not file_info:
+        abort(404)
+    return encrypted_response(
+        os.path.join(UPLOAD_FOLDER, file_info['saved_name']),
+        file_info['original_name'],
+        as_attachment=True,
+    )

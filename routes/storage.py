@@ -1,8 +1,8 @@
 """새담 인트라넷의 영구 저장 위치를 한 곳에서 관리한다.
 
-Render에서는 Persistent Disk의 표준 마운트인 ``/mnt/data``를 자동 사용하고,
-그 밖의 환경에서는 프로젝트의 ``data`` 폴더를 사용한다. 별도 환경변수는
-필요하지 않지만, DATA_DIR가 이미 설정된 배포 환경과도 호환된다.
+Render에서는 Persistent Disk의 표준 마운트인 ``/mnt/data``를 사용하고,
+그 밖의 환경에서는 프로젝트의 ``data`` 폴더를 사용한다. Render에서는
+영구 디스크가 빠진 채 임시 파일시스템으로 실행되는 것을 의도적으로 막는다.
 """
 
 from __future__ import annotations
@@ -14,15 +14,49 @@ from pathlib import Path
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 RENDER_DATA_ROOT = Path("/mnt/data")
+WINDOWS_LEGACY_RENDER_ROOT = Path(APP_ROOT.anchor) / "mnt" / "data"
+
+
+def _truthy_environment(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_render_runtime() -> bool:
+    return _truthy_environment("RENDER") or bool(
+        os.environ.get("RENDER_SERVICE_ID", "").strip()
+    )
+
+
+def _has_render_persistent_mount(path: Path) -> bool:
+    """DATA_DIR가 실제 /mnt/data Persistent Disk 아래인지 확인한다."""
+    try:
+        path.resolve().relative_to(RENDER_DATA_ROOT)
+    except ValueError:
+        return False
+    return RENDER_DATA_ROOT.is_dir() and os.path.ismount(str(RENDER_DATA_ROOT))
 
 
 def _detect_data_root() -> Path:
     configured = os.environ.get("DATA_DIR", "").strip()
     if configured:
-        return Path(configured).expanduser().resolve()
-    if RENDER_DATA_ROOT.is_dir():
-        return RENDER_DATA_ROOT
-    return APP_ROOT / "data"
+        root = Path(configured).expanduser().resolve()
+    elif os.name != "nt" and RENDER_DATA_ROOT.is_dir():
+        root = RENDER_DATA_ROOT
+    else:
+        root = APP_ROOT / "data"
+
+    if (
+        os.name != "nt"
+        and _is_render_runtime()
+        and not _truthy_environment("ALLOW_EPHEMERAL_DATA_ON_RENDER")
+        and not _has_render_persistent_mount(root)
+    ):
+        raise RuntimeError(
+            "Render Persistent Disk가 연결되지 않았습니다. /mnt/data에 디스크를 "
+            "마운트하고 DATA_DIR=/mnt/data로 설정해야 합니다. 임시 저장소로는 "
+            "데이터 보호를 위해 실행하지 않습니다."
+        )
+    return root
 
 
 DATA_ROOT = _detect_data_root()
@@ -46,6 +80,7 @@ VERIFIED_CONTRACT_ROOT = DATA_ROOT / "verified_contract"
 VERIFIED_CONTRACTS_ROOT = VERIFIED_CONTRACT_ROOT / "completed"
 VERIFIED_TERMS_ROOT = VERIFIED_CONTRACT_ROOT / "terms"
 VERIFIED_STAMP_ROOT = VERIFIED_CONTRACT_ROOT / "stamps"
+VERIFIED_LOGO_ROOT = VERIFIED_CONTRACT_ROOT / "logos"
 VERIFIED_SIGNATURE_ROOT = VERIFIED_CONTRACT_ROOT / "signatures"
 VERIFIED_PDF_FONT_ROOT = VERIFIED_CONTRACT_ROOT / "pdf_fonts"
 TERMS_ROOT = DATA_ROOT / "terms"
@@ -73,6 +108,7 @@ PERSISTENT_DIRECTORIES = (
     VERIFIED_CONTRACTS_ROOT,
     VERIFIED_TERMS_ROOT,
     VERIFIED_STAMP_ROOT,
+    VERIFIED_LOGO_ROOT,
     VERIFIED_SIGNATURE_ROOT,
     VERIFIED_PDF_FONT_ROOT,
     TERMS_ROOT,
@@ -111,15 +147,21 @@ def bootstrap_legacy_files() -> int:
     if DATA_ROOT.resolve() == APP_ROOT.resolve():
         return 0
 
-    mappings = (
+    mappings = []
+    # 과거 Windows에서 '/mnt/data'를 드라이브 루트로 오인해 저장한 자료가
+    # 있으면 프로젝트 data 폴더로 한 번만, 덮어쓰기 없이 복사한다.
+    if os.name == "nt" and WINDOWS_LEGACY_RENDER_ROOT.is_dir():
+        mappings.append((WINDOWS_LEGACY_RENDER_ROOT, DATA_ROOT))
+    mappings.extend((
         (APP_ROOT / "chat_uploads", CHAT_UPLOADS),
         (APP_ROOT / "memo_uploads", MEMO_UPLOADS),
         (APP_ROOT / "ai_mail_uploads", AI_MAIL_UPLOADS),
         (APP_ROOT / "id", PROFILE_ROOT),
         (APP_ROOT / "school_uploads", SCHOOL_UPLOADS),
+        (APP_ROOT / "static" / "school_uploads", SCHOOL_UPLOADS),
         (APP_ROOT / "uploads_deposit", DEPOSIT_UPLOADS),
         (APP_ROOT / "instance", SECURITY_ROOT),
-    )
+    ))
     return sum(_copy_missing_tree(source, target) for source, target in mappings)
 
 

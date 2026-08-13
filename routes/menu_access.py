@@ -48,8 +48,6 @@ MENU_GROUPS = (
             ('payroll_main', '스마트 명세서 발송', 'fa-envelope-open-text', 14),
             ('ai_mail_main', '스마트 메일 발송', 'fa-wand-magic-sparkles', 14),
             ('excel_generator', '입금용 엑셀 생성기', 'fa-file-excel', 14),
-            ('attendance_main', '근태 관리', 'fa-clock-rotate-left', 14),
-            ('contacts_main', '본사연락망', 'fa-address-book', 14),
             ('ebook_library', 'e리플렛', 'fa-book-open-reader', 14),
         ),
     },
@@ -64,6 +62,17 @@ MENU_GROUPS = (
             ('gallery_main', '사내 갤러리', 'fa-images', 14),
             ('board_manual', '업무메뉴얼', 'fa-book', 14),
             ('memo_main', '개인화이트보드', 'fa-chalkboard', 14),
+        ),
+    },
+    {
+        'key': 'organization_group',
+        'label': '조직관리',
+        'icon': 'fa-users-gear',
+        'default_max_level': 14,
+        'children': (
+            ('contacts_main', '본사연락망', 'fa-address-book', 14),
+            ('attendance_main', '근태관리', 'fa-clock-rotate-left', 14),
+            ('organization_invite', '가입초대메일발송', 'fa-paper-plane', 2),
         ),
     },
     {
@@ -236,6 +245,13 @@ def resolve_request_menu(path, endpoint='', view_args=None):
             'user_mgmt.serve_profile_image',
         }:
             return None
+        if endpoint in {
+            'user_mgmt.invite_sender_page',
+            'user_mgmt.invite_senders',
+            'user_mgmt.send_invite',
+            'user_mgmt.invite_mail_template',
+        }:
+            return 'organization_invite'
         return 'admin_people'
     if path.startswith('/contract/admin'):
         return 'contract_admin'

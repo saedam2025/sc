@@ -38,6 +38,7 @@ from .ai_mail import (
     _smtp_login,
 )
 from .database import get_db
+from .secure_files import original_filename
 
 
 payroll_bp = Blueprint('payroll', __name__)
@@ -73,6 +74,7 @@ MAX_TEMPLATE_BYTES = 2 * 1024 * 1024
 ASSET_LIMITS = {'banner': 10, 'logo': 5}
 DATA_IMAGE_RE = re.compile(r'^data:image/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=\s]+)$', re.I)
 TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+PAYROLL_IMAGE_ENCRYPTED_PREFIX = 'enc:'
 EXCEL_HEADER_ROW = 3
 EXCEL_DATA_START_ROW = EXCEL_HEADER_ROW + 1
 EXCEL_META_SHEET = '__sheet_name'
@@ -346,6 +348,28 @@ def _banner_value(value):
     return _image_value(value, '배너')
 
 
+def _protect_image_value(value):
+    text = str(value or '')
+    if not text or urlparse(text).scheme in ('http', 'https'):
+        return text
+    if text.startswith(PAYROLL_IMAGE_ENCRYPTED_PREFIX):
+        return text
+    return PAYROLL_IMAGE_ENCRYPTED_PREFIX + _encrypt_password(text)
+
+
+def _unprotect_image_value(value):
+    text = str(value or '')
+    if text.startswith(PAYROLL_IMAGE_ENCRYPTED_PREFIX):
+        return _decrypt_password(text[len(PAYROLL_IMAGE_ENCRYPTED_PREFIX):])
+    return text
+
+
+def _asset_plain_value(row):
+    if row and row['source_type'] == 'file-encrypted':
+        return _decrypt_password(row['source_value'])
+    return row['source_value'] if row else ''
+
+
 def _asset_dict(row):
     item = dict(row)
     item['preview_url'] = (
@@ -372,16 +396,16 @@ def _migrate_legacy_banners(conn, owner):
         ORDER BY id ASC
     ''', (owner,)).fetchall()
     existing = conn.execute('''
-        SELECT id, source_value FROM payroll_image_assets
+        SELECT id, source_type, source_value FROM payroll_image_assets
         WHERE owner_emp_no=? AND asset_kind='banner'
     ''', (owner,)).fetchall()
-    by_value = {row['source_value']: row['id'] for row in existing}
+    by_value = {_asset_plain_value(row): row['id'] for row in existing}
     count = len(existing)
     changed = False
     for group in rows:
         for index in (1, 2):
             column = f'banner{index}'
-            value = group[f'{column}_data']
+            value = _unprotect_image_value(group[f'{column}_data'])
             if not value or group[f'{column}_asset_id']:
                 continue
             asset_id = by_value.get(value)
@@ -397,8 +421,8 @@ def _migrate_legacy_banners(conn, owner):
                     suffix += 1
                 cursor = conn.execute('''
                     INSERT INTO payroll_image_assets (owner_emp_no, asset_kind, name, source_type, source_value)
-                    VALUES (?, 'banner', ?, 'file', ?)
-                ''', (owner, name, value))
+                    VALUES (?, 'banner', ?, 'file-encrypted', ?)
+                ''', (owner, name, _encrypt_password(value)))
                 asset_id = cursor.lastrowid
                 by_value[value] = asset_id
                 count += 1
@@ -406,6 +430,10 @@ def _migrate_legacy_banners(conn, owner):
                 conn.execute(
                     f'UPDATE payroll_workgroups SET {column}_asset_id=? WHERE id=? AND owner_emp_no=?',
                     (asset_id, group['id'], owner),
+                )
+                conn.execute(
+                    f'UPDATE payroll_workgroups SET {column}_data=NULL WHERE id=? AND owner_emp_no=?',
+                    (group['id'], owner),
                 )
                 changed = True
     if changed:
@@ -425,8 +453,8 @@ def _safe_body_html(value, allow_empty=False):
 
 def _group_dict(row, assets_by_id=None):
     item = dict(row)
-    item['banner1'] = item.pop('banner1_data', None)
-    item['banner2'] = item.pop('banner2_data', None)
+    item['banner1'] = _unprotect_image_value(item.pop('banner1_data', None))
+    item['banner2'] = _unprotect_image_value(item.pop('banner2_data', None))
     assets_by_id = assets_by_id or {}
     for key in ('banner1', 'banner2', 'logo'):
         asset = assets_by_id.get(item.get(f'{key}_asset_id'))
@@ -461,9 +489,9 @@ def _hydrate_group_assets(conn, group_row):
                 WHERE id=? AND owner_emp_no=? AND asset_kind=?
             ''', (asset_id, owner, expected_kind)).fetchone()
             if asset:
-                value = asset['source_value']
+                value = _asset_plain_value(asset)
         if field.startswith('banner') and not value:
-            value = group.get(f'{field}_data')
+            value = _unprotect_image_value(group.get(f'{field}_data'))
         group[f'{field}_value'] = value
     return group
 
@@ -702,7 +730,8 @@ def _sheet_type_from_first_row(first_row):
 def _load_excel(file_storage):
     if not file_storage or not file_storage.filename:
         raise ValueError('엑셀 파일을 업로드해주세요.')
-    if not file_storage.filename.lower().endswith('.xlsx'):
+    display_name = original_filename(file_storage.filename)
+    if not display_name.lower().endswith('.xlsx'):
         raise ValueError('.xlsx 형식의 엑셀 파일만 등록할 수 있습니다.')
     try:
         workbook = pd.ExcelFile(file_storage)
@@ -745,7 +774,7 @@ def _load_excel(file_storage):
             missing.append('예금주')
         if missing:
             invalid_sheets.append(
-                f"{file_storage.filename} / {sheet_name}: 필수 제목 누락 ({', '.join(missing)})"
+                f"{display_name} / {sheet_name}: 필수 제목 누락 ({', '.join(missing)})"
             )
             continue
 
@@ -777,7 +806,7 @@ def _load_excel(file_storage):
             detected_type = sheet_type or (target.get(type_column, '') if type_column else '')
             target[EXCEL_META_SHEET] = sheet_name
             target[EXCEL_META_ROW] = row_offset
-            target[EXCEL_META_FILE] = file_storage.filename
+            target[EXCEL_META_FILE] = display_name
             target[EXCEL_META_TYPE] = str(detected_type or '').strip()
             target[EXCEL_META_FORM] = ''
             sheet_targets.append(target)
@@ -793,7 +822,7 @@ def _load_excel(file_storage):
     frame.attrs['sheet_count'] = len(sheets)
     frame.attrs['invalid_sheets'] = invalid_sheets
     frame.attrs['skipped_count'] = skipped_count
-    frame.attrs['file_names'] = [file_storage.filename]
+    frame.attrs['file_names'] = [display_name]
     frame.attrs['file_count'] = 1
     return frame
 
@@ -812,7 +841,7 @@ def _load_excels(file_storages):
         for invalid_sheet in frame.attrs.get('invalid_sheets', [])
     ]
     combined.attrs['skipped_count'] = sum(int(frame.attrs.get('skipped_count', 0)) for frame in frames)
-    combined.attrs['file_names'] = [file_storage.filename for file_storage in files]
+    combined.attrs['file_names'] = [original_filename(file_storage.filename) for file_storage in files]
     combined.attrs['file_count'] = len(files)
     return combined
 
@@ -1258,8 +1287,8 @@ def create_group():
         return _error('작업그룹명, 명세서 폼, 메일 제목을 모두 입력해주세요.')
     try:
         body_html = _safe_body_html(data.get('body_html'), allow_empty=True)
-        banner1 = _banner_value(data.get('banner1')) if data.get('banner1') else None
-        banner2 = _banner_value(data.get('banner2')) if data.get('banner2') else None
+        banner1 = _protect_image_value(_banner_value(data.get('banner1'))) if data.get('banner1') else None
+        banner2 = _protect_image_value(_banner_value(data.get('banner2'))) if data.get('banner2') else None
     except ValueError as exc:
         return _error(str(exc))
     conn = _db()
@@ -1313,8 +1342,8 @@ def update_group(group_id):
         if form_type != AUTO_FORM_KEY and not form:
             return _error('선택한 명세서 폼을 찾을 수 없습니다.')
         body_html = _safe_body_html(data.get('body_html', current['body_html']), allow_empty=True)
-        banner1 = _banner_value(data.get('banner1')) if 'banner1' in data else (None if 'banner1_asset_id' in data else current['banner1_data'])
-        banner2 = _banner_value(data.get('banner2')) if 'banner2' in data else (None if 'banner2_asset_id' in data else current['banner2_data'])
+        banner1 = _protect_image_value(_banner_value(data.get('banner1'))) if 'banner1' in data else (None if 'banner1_asset_id' in data else current['banner1_data'])
+        banner2 = _protect_image_value(_banner_value(data.get('banner2'))) if 'banner2' in data else (None if 'banner2_asset_id' in data else current['banner2_data'])
         owner = _owner_emp_no()
         banner1_asset_id = _selected_asset_id(conn, owner, data.get('banner1_asset_id', current['banner1_asset_id']), 'banner', '광고 배너 1')
         banner2_asset_id = _selected_asset_id(conn, owner, data.get('banner2_asset_id', current['banner2_asset_id']), 'banner', '광고 배너 2')
@@ -1369,7 +1398,8 @@ def create_asset():
         return _error(str(exc))
     if not source_value:
         return _error('이미지 파일 또는 웹링크를 등록해주세요.')
-    source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file'
+    source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file-encrypted'
+    stored_value = source_value if source_type == 'url' else _encrypt_password(source_value)
     conn = _db()
     try:
         owner = _owner_emp_no()
@@ -1383,7 +1413,7 @@ def create_asset():
         cursor = conn.execute('''
             INSERT INTO payroll_image_assets (owner_emp_no, asset_kind, name, source_type, source_value)
             VALUES (?, ?, ?, ?, ?)
-        ''', (owner, kind, name, source_type, source_value))
+        ''', (owner, kind, name, source_type, stored_value))
         conn.commit()
         asset = _owned(conn, 'payroll_image_assets', cursor.lastrowid)
         return _ok('이미지 보관함에 등록했습니다.', asset=_asset_dict(asset))
@@ -1406,18 +1436,19 @@ def update_asset(asset_id):
         name = _clean_text(data.get('name', current['name']), 120)
         if not name:
             return _error('이미지 이름을 입력해주세요.')
-        source_value = current['source_value']
+        source_value = _asset_plain_value(current)
         if data.get('source_value'):
             source_value = _image_value(
                 data.get('source_value'),
                 '광고 이미지' if current['asset_kind'] == 'banner' else '회사 로고',
             )
-        source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file'
+        source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file-encrypted'
+        stored_value = source_value if source_type == 'url' else _encrypt_password(source_value)
         conn.execute('''
             UPDATE payroll_image_assets
             SET name=?, source_type=?, source_value=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=? AND owner_emp_no=?
-        ''', (name, source_type, source_value, asset_id, _owner_emp_no()))
+        ''', (name, source_type, stored_value, asset_id, _owner_emp_no()))
         conn.commit()
         return _ok('보관 이미지 정보를 수정했습니다.', asset=_asset_dict(_owned(conn, 'payroll_image_assets', asset_id)))
     except sqlite3.IntegrityError:
@@ -1461,7 +1492,7 @@ def asset_content(asset_id):
         asset = _owned(conn, 'payroll_image_assets', asset_id)
         if not asset:
             return _error('이미지를 찾을 수 없습니다.', 404)
-        match = DATA_IMAGE_RE.fullmatch(asset['source_value'] or '')
+        match = DATA_IMAGE_RE.fullmatch(_asset_plain_value(asset) or '')
         if not match:
             return _error('등록된 파일 이미지를 읽을 수 없습니다.', 404)
         payload = base64.b64decode(re.sub(r'\s+', '', match.group(2)))
@@ -1706,9 +1737,10 @@ def preview_template():
         selected = {}
         for key, asset_id in (('ad1_url', banner1_id), ('ad2_url', banner2_id), ('logo_url', logo_id)):
             if asset_id:
-                selected[key] = conn.execute('''
-                    SELECT source_value FROM payroll_image_assets WHERE id=? AND owner_emp_no=?
-                ''', (asset_id, owner)).fetchone()['source_value']
+                selected_row = conn.execute('''
+                    SELECT source_type,source_value FROM payroll_image_assets WHERE id=? AND owner_emp_no=?
+                ''', (asset_id, owner)).fetchone()
+                selected[key] = _asset_plain_value(selected_row)
         rendered = _render_form_source(
             source,
             send_date=_clean_text(data.get('send_date'), 20) or '2026-07-25',

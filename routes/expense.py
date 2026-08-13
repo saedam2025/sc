@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, session, send_file
+from flask import Blueprint, render_template, request, jsonify, session, send_file, abort
 import csv
 import html
 from io import BytesIO, StringIO
@@ -20,6 +20,19 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from .database import get_db
 from .storage import APP_ROOT, UPLOADS_ROOT
 from .security import is_admin_session
+from .secure_files import (
+    decode_filename_token,
+    delete_file,
+    encode_filename_token,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_stream,
+    encrypt_upload,
+    original_filename,
+    plaintext_size,
+    read_decrypted,
+    temporary_decrypted_path,
+)
 
 expense_bp = Blueprint('expense', __name__)
 
@@ -592,10 +605,6 @@ def _safe_expense_attachment_path(path):
 
 def _archive_attachment_name(original_name, stored_path):
     original_base = os.path.basename(_clean_text(original_name))
-    stored_extension = os.path.splitext(stored_path)[1]
-    original_root, original_extension = os.path.splitext(original_base)
-    if stored_extension and stored_extension.lower() != original_extension.lower():
-        original_base = f"{original_root or '첨부파일'}{stored_extension}"
     return _safe_archive_component(original_base, os.path.basename(stored_path) or '첨부파일')
 
 
@@ -648,7 +657,7 @@ def _build_expense_archive(report_entries):
                         used_paths,
                         f"{folder}/{group_name}/{archive_name}"
                     )
-                    archive.write(safe_path, archive_path)
+                    archive.writestr(archive_path, read_decrypted(safe_path))
                     file_count += 1
 
         summary_path = _unique_archive_path(used_paths, '선택_지출결의서_목록.csv')
@@ -793,12 +802,8 @@ def _send_expense_submission_email(report, items):
 def _delete_file_paths(path_text):
     deleted = 0
     for path in [p.strip() for p in (path_text or '').split(',') if p.strip()]:
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-                deleted += 1
-            except Exception:
-                pass
+        if os.path.exists(path) and delete_file(path):
+            deleted += 1
     return deleted
 
 
@@ -818,8 +823,8 @@ def _attachment_details(filename_text, filepath_text):
     details = []
     for index in range(max(len(names), len(paths))):
         path = paths[index] if index < len(paths) else ''
-        name = names[index] if index < len(names) else os.path.basename(path)
-        size = os.path.getsize(path) if path and os.path.exists(path) else None
+        name = decode_filename_token(names[index]) if index < len(names) else os.path.basename(path)
+        size = plaintext_size(path) if path and os.path.exists(path) else None
         details.append({
             'name': name,
             'path': path,
@@ -830,8 +835,7 @@ def _attachment_details(filename_text, filepath_text):
 
 
 def _safe_upload_name(filename):
-    base = os.path.basename(filename or '').replace(' ', '_')
-    return f"{int(time.time() * 1000)}_{base}"
+    return encrypted_storage_name(original_filename(filename))
 
 
 def _file_size(file):
@@ -862,7 +866,7 @@ def _validate_uploaded_files(files, max_count, allowed_extensions, label, max_fi
 
 def _parse_uploaded_expense_file(file):
     ext = os.path.splitext(file.filename or '')[1].lower()
-    fd, path = tempfile.mkstemp(suffix=ext, dir=UPLOAD_FOLDER)
+    fd, path = tempfile.mkstemp(prefix='saedam-expense-parse-', suffix=ext)
     os.close(fd)
     try:
         file.stream.seek(0)
@@ -877,7 +881,7 @@ def _parse_uploaded_expense_file(file):
 
 def _parse_uploaded_expense_file_with_errors(file):
     ext = os.path.splitext(file.filename or '')[1].lower()
-    fd, path = tempfile.mkstemp(suffix=ext, dir=UPLOAD_FOLDER)
+    fd, path = tempfile.mkstemp(prefix='saedam-expense-parse-', suffix=ext)
     os.close(fd)
     try:
         file.stream.seek(0)
@@ -901,11 +905,15 @@ def _save_regular_uploaded_files(files):
     for file in files:
         if not file or not file.filename:
             continue
-        original_name = file.filename
+        original_name = original_filename(file.filename)
         safe_name = _safe_upload_name(original_name)
         path = os.path.join(UPLOAD_FOLDER, safe_name)
-        file.save(path)
-        saved.append((original_name, path))
+        try:
+            encrypt_upload(file, path)
+            saved.append((encode_filename_token(original_name), path))
+        except Exception:
+            _delete_file_paths(','.join(item[1] for item in saved))
+            raise
     return saved
 
 
@@ -914,7 +922,7 @@ def _save_receipt_files(files):
     for file in files:
         if not file or not file.filename:
             continue
-        original_name = file.filename
+        original_name = original_filename(file.filename)
         ext = os.path.splitext(original_name)[1].lower()
         is_image = ext in RECEIPT_IMAGE_EXTENSIONS
         save_name = _safe_upload_name(original_name)
@@ -932,16 +940,19 @@ def _save_receipt_files(files):
                 buffer = BytesIO()
                 img.save(buffer, format='JPEG', optimize=True, quality=RECEIPT_IMAGE_QUALITY)
                 buffer.seek(0)
-                with open(path, 'wb') as f:
-                    f.write(buffer.read())
-                saved.append((original_name, path))
+                encrypt_stream(buffer, path)
+                saved.append((encode_filename_token(original_name), path))
                 continue
             except (UnidentifiedImageError, OSError, ValueError):
                 file.stream.seek(0)
 
         path = os.path.join(UPLOAD_FOLDER, save_name)
-        file.save(path)
-        saved.append((original_name, path))
+        try:
+            encrypt_upload(file, path)
+            saved.append((encode_filename_token(original_name), path))
+        except Exception:
+            _delete_file_paths(','.join(item[1] for item in saved))
+            raise
     return saved
 
 
@@ -1141,9 +1152,11 @@ def submit_expense():
 
     items = []
     parse_errors = []
-    for _, path in saved_excels:
+    for stored_name, path in saved_excels:
         try:
-            parsed, errors = parse_expense_file_with_errors(path)
+            display_name = decode_filename_token(stored_name)
+            with temporary_decrypted_path(path, display_name) as temporary_path:
+                parsed, errors = parse_expense_file_with_errors(temporary_path)
         except Exception:
             parsed, errors = [], []
         items.extend(parsed)
@@ -1261,15 +1274,17 @@ def sync_expense_from_approval(approval_id, conn=None):
         source_names = []
         source_paths = []
         for idx, path in enumerate(filepaths):
-            ext = os.path.splitext(path)[1].lower()
+            source_name = decode_filename_token(filenames[idx]) if idx < len(filenames) else os.path.basename(path)
+            ext = os.path.splitext(source_name)[1].lower()
             if ext not in EXCEL_EXTENSIONS:
                 continue
             try:
-                parsed = parse_expense_file(path)
+                with temporary_decrypted_path(path, source_name) as temporary_path:
+                    parsed = parse_expense_file(temporary_path)
             except Exception:
                 parsed = []
             if parsed:
-                source_names.append(filenames[idx] if idx < len(filenames) else os.path.basename(path))
+                source_names.append(filenames[idx] if idx < len(filenames) else encode_filename_token(source_name))
                 source_paths.append(path)
                 items.extend(parsed)
 
@@ -1504,6 +1519,10 @@ def report_detail(report_id):
     source_files = _attachment_details(report['source_filename'], report['source_filepath'])
     receipt_files = _attachment_details(report['receipt_filename'], report['receipt_filepath'])
     conn.close()
+    for kind, files in (('source', source_files), ('receipt', receipt_files)):
+        for index, item in enumerate(files):
+            item['url'] = f"/expense/api/report/{report_id}/attachment/{kind}/{index}"
+            item.pop('path', None)
     return jsonify({
         "status": "success",
         "report": dict(report),
@@ -1511,6 +1530,25 @@ def report_detail(report_id):
         "source_files": source_files,
         "receipt_files": receipt_files
     })
+
+
+@expense_bp.route('/api/report/<int:report_id>/attachment/<kind>/<int:file_index>')
+def report_attachment(report_id, kind, file_index):
+    if kind not in {'source', 'receipt'}:
+        abort(404)
+    conn = get_db()
+    report = conn.execute("SELECT * FROM expense_reports WHERE id=?", (report_id,)).fetchone()
+    conn.close()
+    if not report:
+        abort(404)
+    if not _can_manage_expenses() and report['drafter'] != session.get('user_name'):
+        abort(403)
+    prefix = 'source' if kind == 'source' else 'receipt'
+    files = _attachment_details(report[f'{prefix}_filename'], report[f'{prefix}_filepath'])
+    if file_index < 0 or file_index >= len(files):
+        abort(404)
+    item = files[file_index]
+    return encrypted_response(item['path'], item['name'], as_attachment=True)
 
 
 @expense_bp.route('/api/reports/email', methods=['POST'])
@@ -1723,19 +1761,26 @@ def delete_reports():
         return jsonify({"status": "error", "message": "삭제할 지출결의서를 선택해주세요."}), 400
 
     conn = get_db()
-    deleted_files = 0
+    file_paths_to_delete = []
     deleted_reports = 0
-    for report_id in ids:
-        report = conn.execute("SELECT * FROM expense_reports WHERE id=?", (report_id,)).fetchone()
-        if not report:
-            continue
-        deleted_files += _delete_file_paths(report['source_filepath'] if 'source_filepath' in report.keys() else '')
-        deleted_files += _delete_file_paths(report['receipt_filepath'] if 'receipt_filepath' in report.keys() else '')
-        conn.execute("DELETE FROM expense_items WHERE report_id=?", (report_id,))
-        conn.execute("DELETE FROM expense_reports WHERE id=?", (report_id,))
-        deleted_reports += 1
-    conn.commit()
-    conn.close()
+    try:
+        for report_id in ids:
+            report = conn.execute("SELECT * FROM expense_reports WHERE id=?", (report_id,)).fetchone()
+            if not report:
+                continue
+            for column in ('source_filepath', 'receipt_filepath'):
+                if column in report.keys():
+                    file_paths_to_delete.extend(_split_csv(report[column]))
+            conn.execute("DELETE FROM expense_items WHERE report_id=?", (report_id,))
+            conn.execute("DELETE FROM expense_reports WHERE id=?", (report_id,))
+            deleted_reports += 1
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    deleted_files = _delete_file_paths(','.join(file_paths_to_delete))
     return jsonify({
         "status": "success",
         "message": f"{deleted_reports}건을 삭제했습니다. 첨부파일 {deleted_files}개도 함께 삭제했습니다."

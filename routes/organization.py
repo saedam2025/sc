@@ -1,5 +1,6 @@
 DEPARTMENT_OPTIONS = ('본부', '북부지점', '파견', '기타')
 ORGANIZATION_GROUPS = ('본부', '북부지점', '센터장', '코디', '강사', '기타')
+MESSENGER_ORGANIZATION_GROUPS = ('본부', '센터장', '코디', '강사', '기타')
 
 POSITION_GROUPS = {
     '본부': {'대표이사', '이사', '실장', '팀장', '사원', '계약직'},
@@ -7,6 +8,13 @@ POSITION_GROUPS = {
     '코디': {'전담코디', '보조코디', '안전코디'},
     '강사': {'방과후강사', '맞춤형강사'},
     '기타': {'임시회원'},
+}
+
+MESSENGER_POSITION_GROUPS = {
+    '본부': {'대표이사', '이사', '실장', '팀장', '사원', '계약직'},
+    '센터장': {'센터장팀장', '센터장'},
+    '코디': {'전담코디', '보조코디', '안전코디'},
+    '강사': {'방과후강사', '맞춤형강사'},
 }
 
 
@@ -35,4 +43,29 @@ def classify_organization_group(department, position):
         if position in positions:
             return group
 
+    return '기타'
+
+
+def normalize_messenger_department(department):
+    """메신저에서는 본부와 북부지점을 하나의 본부 소속으로 표시한다."""
+    normalized = normalize_department(department)
+    return '본부' if normalized in {'본부', '북부지점'} else normalized
+
+
+def classify_messenger_organization_group(department, position):
+    """메신저 조직도를 합친 본부 소속과 직급 기준의 5개 그룹으로 분류한다."""
+    normalized_department = normalize_department(department)
+    compact_position = ''.join(
+        character for character in str(position or '').strip()
+        if not character.isspace() and character not in '()'
+    )
+    if (
+        normalized_department in {'본부', '북부지점'}
+        and compact_position in MESSENGER_POSITION_GROUPS['본부']
+    ):
+        return '본부'
+    for group in ('센터장', '코디', '강사'):
+        positions = MESSENGER_POSITION_GROUPS[group]
+        if compact_position in positions:
+            return group
     return '기타'

@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, Response, jsonify
-from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, request, redirect, url_for, Response, jsonify, abort
 from .database import get_db
 from .security import admin_required, load_credential_secret
 from .storage import GALLERY_ROOT
@@ -7,7 +6,9 @@ from cryptography.fernet import Fernet
 import base64
 import hashlib
 import os
+from io import BytesIO
 from PIL import Image
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_stream, encrypt_upload, is_encrypted_file, original_filename
 
 gallery_bp = Blueprint('gallery', __name__)
 
@@ -21,20 +22,32 @@ THUMB_FOLDER = os.path.join(BASE_GALLERY_PATH, 'thumbnails')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMB_FOLDER, exist_ok=True)
 
-def generate_thumb_from_raw(temp_path, filename):
-    thumb_name = f"thumb_{os.path.splitext(filename)[0]}.jpg"
+def _ensure_gallery_schema(conn):
+    columns = {row[1] for row in conn.execute('PRAGMA table_info(gallery)').fetchall()}
+    if 'original_name' not in columns:
+        conn.execute("ALTER TABLE gallery ADD COLUMN original_name TEXT NOT NULL DEFAULT ''")
+        conn.commit()
+
+
+def generate_thumb_from_upload(file_storage, filename):
+    thumb_name = encrypted_storage_name(f"thumb_{filename}.jpg")
     thumb_path = os.path.join(THUMB_FOLDER, thumb_name)
-    
     try:
-        with Image.open(temp_path) as img:
+        file_storage.stream.seek(0)
+        with Image.open(file_storage.stream) as img:
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             img.thumbnail((500, 500))
-            img.save(thumb_path, "JPEG", quality=85)
+            buffer = BytesIO()
+            img.save(buffer, "JPEG", quality=85)
+            buffer.seek(0)
+            encrypt_stream(buffer, thumb_path)
+        return thumb_name
     except Exception as e:
         print(f"썸네일 생성 오류: {e}")
-    
-    return thumb_name
+    finally:
+        file_storage.stream.seek(0)
+    return None
 
 @gallery_bp.route('/gallery')
 def index():
@@ -42,6 +55,7 @@ def index():
         active_tab_id = request.args.get('tab_id', 1, type=int)
         
         conn = get_db()
+        _ensure_gallery_schema(conn)
         
         # [수정] 탭 정보와 함께 각 탭에 속한 사진의 개수(photo_count)를 계산합니다.
         tabs_query = '''
@@ -116,39 +130,36 @@ def upload():
 
     for file in files:
         if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            ext = filename.split('.')[-1].lower()
+            display_name = original_filename(file.filename)
+            ext = os.path.splitext(display_name)[1].lstrip('.').lower()
             
             if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
                 continue
                 
             file_type = 'image'
-            title = title_base if title_base else filename
-            
-            temp_path = os.path.join(BASE_GALLERY_PATH, f"temp_{filename}")
-            file.save(temp_path)
-            
-            thumb_name = generate_thumb_from_raw(temp_path, filename)
-            
+            title = title_base if title_base else display_name
+            filename = encrypted_storage_name(display_name)
+            save_path = os.path.join(UPLOAD_FOLDER, filename)
+            thumb_name = None
             try:
-                with open(temp_path, 'rb') as f:
-                    encrypted_data = cipher.encrypt(f.read())
-                    
-                save_path = os.path.join(UPLOAD_FOLDER, filename)
-                with open(save_path, 'wb') as f:
-                    f.write(encrypted_data)
+                thumb_name = generate_thumb_from_upload(file, filename)
+                if not thumb_name:
+                    continue
+                encrypt_upload(file, save_path)
+
+                conn = get_db()
+                try:
+                    _ensure_gallery_schema(conn)
+                    conn.execute('INSERT INTO gallery (title, filename, thumb_name, file_type, tab_id, original_name) VALUES (?, ?, ?, ?, ?, ?)',
+                                 (title, filename, thumb_name, file_type, active_tab_id, display_name))
+                    conn.commit()
+                finally:
+                    conn.close()
             except Exception as e:
-                print(f"암호화 오류: {e}")
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-            
-            # [수정] 업로드 시 사진이 현재 선택된 탭(active_tab_id)에 정상적으로 저장됩니다.
-            conn = get_db()
-            conn.execute('INSERT INTO gallery (title, filename, thumb_name, file_type, tab_id) VALUES (?, ?, ?, ?, ?)',
-                         (title, filename, thumb_name, file_type, active_tab_id))
-            conn.commit()
-            conn.close()
+                delete_file(save_path)
+                if thumb_name:
+                    delete_file(os.path.join(THUMB_FOLDER, thumb_name))
+                print(f"갤러리 파일 저장 오류: {e}")
             
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'Dropzone' in request.headers.get('User-Agent', ''):
         return jsonify({"status": "success"})
@@ -166,8 +177,8 @@ def delete(id):
         try:
             target_file = os.path.join(UPLOAD_FOLDER, file['filename'])
             target_thumb = os.path.join(THUMB_FOLDER, file['thumb_name'])
-            if os.path.exists(target_file): os.remove(target_file)
-            if os.path.exists(target_thumb): os.remove(target_thumb)
+            delete_file(target_file)
+            delete_file(target_thumb)
         except Exception as e:
             print(f"파일 삭제 오류: {e}")
             
@@ -179,24 +190,32 @@ def delete(id):
 
 @gallery_bp.route('/gallery/raw/<filename>')
 def serve_file(filename):
+    conn = get_db()
+    _ensure_gallery_schema(conn)
+    row = conn.execute('SELECT title, original_name FROM gallery WHERE filename=?', (filename,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(file_path):
         return "파일을 찾을 수 없습니다.", 404
         
-    with open(file_path, 'rb') as f:
-        try:
-            decrypted_data = cipher.decrypt(f.read())
-        except:
-            return "파일 복호화에 실패했습니다.", 500
-    
-    ext = filename.split('.')[-1].lower()
-    mimetypes = {
-        'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp'
-    }
-    mimetype = mimetypes.get(ext, 'application/octet-stream')
-    
-    return Response(decrypted_data, mimetype=mimetype)
+    display_name = row['original_name'] or row['title'] or filename
+    if is_encrypted_file(file_path):
+        return encrypted_response(file_path, display_name, as_attachment=False)
+    try:
+        with open(file_path, 'rb') as source:
+            legacy_data = cipher.decrypt(source.read())
+        mimetype = {'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','gif':'image/gif','webp':'image/webp','bmp':'image/bmp'}.get(os.path.splitext(display_name)[1].lstrip('.').lower(), 'application/octet-stream')
+        return Response(legacy_data, mimetype=mimetype)
+    except Exception:
+        return "파일 복호화에 실패했습니다.", 500
 
 @gallery_bp.route('/gallery/thumb/<filename>')
 def serve_thumb(filename):
-    return send_from_directory(THUMB_FOLDER, filename)
+    conn = get_db()
+    allowed = conn.execute('SELECT 1 FROM gallery WHERE thumb_name=?', (filename,)).fetchone()
+    conn.close()
+    if not allowed:
+        abort(404)
+    return encrypted_response(os.path.join(THUMB_FOLDER, filename), 'thumbnail.jpg', as_attachment=False, mimetype='image/jpeg')

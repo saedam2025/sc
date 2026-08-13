@@ -1,14 +1,18 @@
-from flask import Blueprint, jsonify, session, request, render_template, current_app, send_file
+from flask import Blueprint, jsonify, session, request, render_template, current_app
 from datetime import datetime, timedelta
 from flask_socketio import join_room, leave_room
 import os
 import threading
-import unicodedata
 import uuid
 from .database import get_db
-from .organization import classify_organization_group, normalize_department
+from .organization import (
+    MESSENGER_ORGANIZATION_GROUPS,
+    classify_messenger_organization_group,
+    normalize_messenger_department,
+)
 from .socketio_ext import socketio
 from .storage import CHAT_UPLOADS, UPLOADS_ROOT
+from .secure_files import encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
 
 chat_bp = Blueprint('chat', __name__)
 CHAT_UPLOAD_FOLDER = str(CHAT_UPLOADS)
@@ -25,9 +29,7 @@ _chat_schema_ready = set()
 
 def _clean_original_filename(filename):
     """브라우저가 보낸 원본 파일명은 표시/다운로드용으로만 안전하게 보존한다."""
-    name = unicodedata.normalize('NFC', str(filename or '').replace('\\', '/').split('/')[-1])
-    name = ''.join(ch for ch in name if ch >= ' ' and ch != '\x7f').strip().strip('.')
-    return name[:255] or '첨부파일'
+    return original_filename(filename, '첨부파일')
 
 
 def _get_file_size(file_storage):
@@ -47,22 +49,9 @@ def _save_chat_attachment(file_storage):
 
     os.makedirs(CHAT_UPLOAD_FOLDER, exist_ok=True)
     # 원본명과 저장명을 분리해 한글명을 보존하고 동일 파일명의 덮어쓰기를 방지한다.
-    while True:
-        stored_path = os.path.join(CHAT_UPLOAD_FOLDER, uuid.uuid4().hex)
-        try:
-            descriptor = os.open(stored_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
-            break
-        except FileExistsError:
-            continue
-
+    stored_path = os.path.join(CHAT_UPLOAD_FOLDER, encrypted_storage_name(original_name))
     try:
-        with os.fdopen(descriptor, 'wb') as destination:
-            file_storage.stream.seek(0)
-            while True:
-                chunk = file_storage.stream.read(1024 * 1024)
-                if not chunk:
-                    break
-                destination.write(chunk)
+        encrypt_upload(file_storage, stored_path)
     except Exception:
         try:
             os.remove(stored_path)
@@ -90,7 +79,7 @@ def _get_attachment_metadata(filepath, sent_at):
     file_size = 0
     if filepath and _is_allowed_chat_path(filepath) and os.path.isfile(filepath):
         try:
-            file_size = os.path.getsize(filepath)
+            file_size = plaintext_size(filepath)
         except OSError:
             file_size = 0
 
@@ -961,14 +950,15 @@ def chat_organization():
 
     return jsonify({
         "status": "success",
+        "organization_groups": list(MESSENGER_ORGANIZATION_GROUPS),
         "users": [
             {
                 "emp_no": user['emp_no'] or '',
                 "name": user['name'] or '',
-                "department": normalize_department(user['department']),
+                "department": normalize_messenger_department(user['department']),
                 "position": user['position'] or '',
                 "level": user['level'] if user['level'] is not None else 99,
-                "organization_group": classify_organization_group(
+                "organization_group": classify_messenger_organization_group(
                     user['department'], user['position']
                 ),
                 "icon": user['profile_icon'] or '👤',
@@ -1180,11 +1170,10 @@ def chat_attachment(message_id):
 
     if not _is_allowed_chat_path(filepath) or not os.path.isfile(filepath):
         return jsonify({"status": "error", "message": "첨부파일을 찾을 수 없습니다."}), 404
-    return send_file(
+    return encrypted_response(
         filepath,
+        filename,
         as_attachment=request.args.get('download') == '1',
-        download_name=filename,
-        conditional=True,
     )
 
 @chat_bp.route('/get_chat_history/<other_user>')

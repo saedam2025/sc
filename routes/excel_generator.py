@@ -1,5 +1,5 @@
 from flask import Blueprint, request, send_file, render_template, abort, current_app, jsonify
-import io, os, re, zipfile, uuid
+import io, os, re, tempfile, zipfile
 import pandas as pd
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -10,6 +10,7 @@ from .storage import DEPOSIT_UPLOADS
 # 블루프린트 이름 지정
 excel_bp = Blueprint("excel_generator", __name__)
 DEPOSIT_CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "200"))  # 시트 누적 인원 기준 (기본 200)
+MAX_DEPOSIT_UPLOAD_BYTES = 20 * 1024 * 1024
 DEPOSIT_TARGET_COLUMNS = ["은행", "계좌번호", "예금주", "입금액"]
 
 def deposit_clean_account(acc):
@@ -97,9 +98,33 @@ def deposit_account_from_cell(value, number_format):
     return restored, " ".join(warnings), True
 
 def deposit_upload_path():
-    upload_root = str(DEPOSIT_UPLOADS)
-    os.makedirs(upload_root, exist_ok=True)
-    return os.path.join(upload_root, f"_upload_{uuid.uuid4().hex}.xlsx")
+    # 계좌정보가 든 원본을 Render 영구 디스크에 남기지 않는다.
+    descriptor, path = tempfile.mkstemp(prefix="saedam-deposit-", suffix=".xlsx")
+    os.close(descriptor)
+    return path
+
+
+def cleanup_legacy_deposit_uploads():
+    """이전 버전이 영구 디스크에 남겨둔 임시 계좌 엑셀만 안전하게 제거한다."""
+    root = os.path.realpath(str(DEPOSIT_UPLOADS))
+    if not os.path.isdir(root):
+        return 0
+    removed = 0
+    for name in os.listdir(root):
+        if not re.fullmatch(r'_upload_[0-9a-f]{32}\.xlsx', name):
+            continue
+        target = os.path.realpath(os.path.join(root, name))
+        try:
+            if os.path.commonpath([root, target]) != root or not os.path.isfile(target):
+                continue
+            os.remove(target)
+            removed += 1
+        except (OSError, ValueError):
+            continue
+    return removed
+
+
+cleanup_legacy_deposit_uploads()
 
 def deposit_extract_generated_rows(xlsx_bytes, expected_count):
     workbook = load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
@@ -227,10 +252,12 @@ def deposit_preview():
         return jsonify({"ok": False, "message": "파일이 없습니다."}), 400
     if not up.filename.lower().endswith(".xlsx"):
         return jsonify({"ok": False, "message": "xlsx 형식만 지원합니다."}), 400
+    if request.content_length and request.content_length > MAX_DEPOSIT_UPLOAD_BYTES:
+        return jsonify({"ok": False, "message": "업로드 파일은 20MB 이하만 사용할 수 있습니다."}), 413
 
     input_path = deposit_upload_path()
-    up.save(input_path)
     try:
+        up.save(input_path)
         sheets = deposit_read_sheets_as_list(input_path)
         if not sheets:
             return jsonify({"ok": False, "message": "추출할 데이터가 없습니다. (열 이름/헤더 3행 확인)"}), 400
@@ -252,11 +279,13 @@ def deposit_process():
         abort(400, "파일이 없습니다.")
     if not up.filename.lower().endswith(".xlsx"):
         abort(400, "xlsx 형식만 지원합니다.")
+    if request.content_length and request.content_length > MAX_DEPOSIT_UPLOAD_BYTES:
+        abort(413, "업로드 파일은 20MB 이하만 사용할 수 있습니다.")
 
     input_path = deposit_upload_path()
-    up.save(input_path)
 
     try:
+        up.save(input_path)
         sheets = deposit_read_sheets_as_list(input_path)
         if not sheets:
             abort(400, "추출할 데이터가 없습니다. (열 이름/헤더 3행 확인)")

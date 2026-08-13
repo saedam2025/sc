@@ -15,7 +15,6 @@ from __future__ import annotations
 import mimetypes
 import os
 import sqlite3
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -32,10 +31,10 @@ from flask import (
     session,
 )
 from werkzeug.security import check_password_hash, generate_password_hash
-from werkzeug.utils import secure_filename
 
 from .database import get_db
 from .storage import MEMO_UPLOADS
+from .secure_files import encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
 
 
 memo_bp = Blueprint("memo", __name__)
@@ -453,10 +452,9 @@ def upload_file():
     if size > MAX_UPLOAD_BYTES:
         return _json_error("5MB 이하의 파일만 보드에 붙일 수 있습니다.")
 
-    original_name = os.path.basename(uploaded.filename.replace("\\", "/"))
-    clean_name = secure_filename(original_name)
+    original_name = original_filename(uploaded.filename)
     extension = Path(original_name).suffix.lower()
-    stored_name = f"{uuid.uuid4().hex}{extension}"
+    stored_name = encrypted_storage_name(original_name)
     save_path = _upload_dir() / stored_name
 
     password = str(request.form.get("password") or "")
@@ -473,8 +471,8 @@ def upload_file():
         return _json_error(str(exc))
     reminder_minutes = _parse_reminder_minutes(request.form.get("reminder_minutes"))
 
-    uploaded.save(save_path)
-    if save_path.stat().st_size > MAX_UPLOAD_BYTES:
+    encrypt_upload(uploaded, save_path)
+    if plaintext_size(save_path) > MAX_UPLOAD_BYTES:
         save_path.unlink(missing_ok=True)
         return _json_error("5MB 이하의 파일만 보드에 붙일 수 있습니다.")
 
@@ -497,7 +495,7 @@ def upload_file():
             (
                 _owner_key(),
                 memo_type,
-                original_name or clean_name or "첨부파일",
+                original_name or "첨부파일",
                 stored_name,
                 next_z,
                 250 if memo_type == "image" else 140,
@@ -765,13 +763,11 @@ def memo_file(memo_id: int):
         original_name = os.path.basename(str(memo["content"] or path.name))
         inline = request.args.get("inline") == "1" and memo["type"] == "image"
         guessed_type, _ = mimetypes.guess_type(original_name)
-        return send_file(
+        return encrypted_response(
             path,
+            original_name,
             mimetype=guessed_type,
             as_attachment=not inline,
-            download_name=original_name,
-            conditional=True,
-            max_age=0,
         )
     finally:
         conn.close()

@@ -6,9 +6,12 @@ import shutil
 import platform
 import hmac
 import secrets
+import base64
+import mimetypes
+import tempfile
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from flask import Blueprint, render_template, request, jsonify, send_from_directory, session, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, abort
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -28,6 +31,16 @@ from .payroll import (
 )
 from .security import admin_required
 from .storage import APP_ROOT, DATA_ROOT
+from .secure_files import (
+    delete_file,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_stream,
+    encrypt_upload,
+    original_filename,
+    read_decrypted,
+    temporary_decrypted_path,
+)
 
 # Blueprint 설정
 document_bp = Blueprint('document', __name__)
@@ -517,6 +530,7 @@ def generate_certificate(idx):
     if 'emp_no' not in session: return abort(403)
     
     conn = None
+    pdf_path = None
     try:
         conn = get_db()
         row = conn.execute(
@@ -601,6 +615,8 @@ def generate_certificate(idx):
             flash(f"발급은 완료되었으나, 메일 전송이 실패했습니다.\n사유: {err_msg}")
             
     except Exception as e:
+        if pdf_path:
+            delete_file(pdf_path)
         flash(f"발급 중 오류 발생: {str(e)}")
     finally:
         if conn is not None:
@@ -638,11 +654,17 @@ def create_pdf_file(row, issue_no, company=None):
     html_content = template.render(**data)
 
     seal_path = company.get('seal_path') or SEAL_IMAGE
-    seal_uri = f"file:///{os.path.abspath(seal_path).replace(os.sep, '/')}"
+    if company.get('seal_path') and os.path.isfile(seal_path):
+        mime_type = mimetypes.guess_type(company.get('seal_filename') or '')[0] or 'image/png'
+        seal_uri = f"data:{mime_type};base64,{base64.b64encode(read_decrypted(seal_path)).decode('ascii')}"
+    else:
+        seal_uri = f"file:///{os.path.abspath(seal_path).replace(os.sep, '/')}"
     html_content = html_content.replace('src="seal.gif"', f'src="{seal_uri}"')
 
     file_name = f"{issue_no}_{row['성명']}.pdf".replace("/", "_")
     output_path = os.path.join(PDF_FOLDER, file_name)
+    descriptor, temporary_path = tempfile.mkstemp(prefix='saedam-certificate-', suffix='.pdf')
+    os.close(descriptor)
     
     options = {
         'enable-local-file-access': None,
@@ -652,12 +674,17 @@ def create_pdf_file(row, issue_no, company=None):
     }
     
     # 윈도우에서 PDF_CONFIG가 없어도(None) 에러가 나지 않도록 조건 처리
-    if PDF_CONFIG:
-        pdfkit.from_string(html_content, output_path, configuration=PDF_CONFIG, options=options)
-    else:
-        # PDF_CONFIG가 없다면 (로컬 개발 환경) 그냥 빈 파일 생성 또는 에러 우회
-        with open(output_path, "w", encoding="utf-8") as text_file:
-            text_file.write("PDF 생성 환경이 설정되지 않았습니다. (로컬 테스트용 텍스트 파일)")
+    try:
+        if PDF_CONFIG:
+            pdfkit.from_string(html_content, temporary_path, configuration=PDF_CONFIG, options=options)
+        else:
+            # PDF_CONFIG가 없다면 (로컬 개발 환경) 테스트 내용을 임시파일에 생성한다.
+            with open(temporary_path, "w", encoding="utf-8") as text_file:
+                text_file.write("PDF 생성 환경이 설정되지 않았습니다. (로컬 테스트용 텍스트 파일)")
+        with open(temporary_path, 'rb') as source:
+            encrypt_stream(source, output_path)
+    finally:
+        delete_file(temporary_path)
         
     return output_path
 
@@ -695,13 +722,12 @@ def send_email_to_instructor(to_email, name, pdf_path, cert_type, sender=None, c
             msg['To'] = to_email
             msg['Subject'] = subject
             msg.attach(MIMEText(contents, 'plain', 'utf-8'))
-            with open(pdf_path, "rb") as file_handle:
-                part = MIMEApplication(file_handle.read(), _subtype="pdf")
-                part.add_header(
-                    'Content-Disposition', 'attachment',
-                    filename=os.path.basename(pdf_path),
-                )
-                msg.attach(part)
+            part = MIMEApplication(read_decrypted(pdf_path), _subtype="pdf")
+            part.add_header(
+                'Content-Disposition', 'attachment',
+                filename=os.path.basename(pdf_path),
+            )
+            msg.attach(part)
             _send_registered_message(sender, msg)
             return True, ""
         except Exception as exc:
@@ -714,7 +740,8 @@ def send_email_to_instructor(to_email, name, pdf_path, cert_type, sender=None, c
     # [1차 시도] yagmail 사용
     try:
         yag = yagmail.SMTP(email_addr, email_pw)
-        yag.send(to=to_email, subject=subject, contents=contents, attachments=[pdf_path])
+        with temporary_decrypted_path(pdf_path, os.path.basename(pdf_path)) as temporary_pdf:
+            yag.send(to=to_email, subject=subject, contents=contents, attachments=[temporary_pdf])
         return True, ""
     except Exception as yag_err:
         # [2차 시도] yagmail 실패 시 smtplib 포트 587 (TLS) 직접 연결 방식으로 우회 발송
@@ -725,10 +752,9 @@ def send_email_to_instructor(to_email, name, pdf_path, cert_type, sender=None, c
             msg['Subject'] = subject
             msg.attach(MIMEText(contents, 'plain'))
             
-            with open(pdf_path, "rb") as f:
-                part = MIMEApplication(f.read(), _subtype="pdf")
-                part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
-                msg.attach(part)
+            part = MIMEApplication(read_decrypted(pdf_path), _subtype="pdf")
+            part.add_header('Content-Disposition', 'attachment', filename=os.path.basename(pdf_path))
+            msg.attach(part)
                 
             server = smtplib.SMTP("smtp.gmail.com", 587)
             server.starttls()  # 보안 연결
@@ -884,14 +910,13 @@ def _save_company_image(upload, folder, label):
         return '', ''
     # secure_filename()은 파일명이 전부 한글이면 확장자 앞의 점까지 제거할 수
     # 있으므로, 표시용 원본명에서 직접 확장자를 추출하고 저장명만 난수화한다.
-    original_name = str(upload.filename).replace('\\', '/').rsplit('/', 1)[-1]
-    original_name = original_name.replace('\x00', '').strip()[:255]
+    original_name = original_filename(upload.filename, 'image')
     extension = os.path.splitext(original_name)[1].lower()
     if extension not in {'.png', '.jpg', '.jpeg', '.gif', '.webp'}:
         raise ValueError(f'{label} 이미지는 PNG, JPG, GIF, WEBP 파일만 등록할 수 있습니다.')
-    stored_name = f"{secrets.token_hex(12)}{extension}"
+    stored_name = encrypted_storage_name(original_name)
     stored_path = os.path.join(folder, stored_name)
-    upload.save(stored_path)
+    encrypt_upload(upload, stored_path)
     return original_name, stored_path
 
 
@@ -903,12 +928,18 @@ def _company_form_values(current=None):
         raise ValueError('회사명을 입력해 주세요.')
     if not representative_name:
         raise ValueError('대표자 이름을 입력해 주세요.')
-    seal_filename, seal_path = _save_company_image(
-        request.files.get('seal'), CERT_SEAL_FOLDER, '인감',
-    )
-    logo_filename, logo_path = _save_company_image(
-        request.files.get('logo'), CERT_LOGO_FOLDER, '회사 로고',
-    )
+    seal_filename = seal_path = logo_filename = logo_path = ''
+    try:
+        seal_filename, seal_path = _save_company_image(
+            request.files.get('seal'), CERT_SEAL_FOLDER, '인감',
+        )
+        logo_filename, logo_path = _save_company_image(
+            request.files.get('logo'), CERT_LOGO_FOLDER, '회사 로고',
+        )
+    except Exception:
+        delete_file(seal_path)
+        delete_file(logo_path)
+        raise
     return {
         'company_name': company_name,
         'representative_name': representative_name,
@@ -926,6 +957,7 @@ def _company_form_values(current=None):
 @admin_required
 @_csrf_required
 def create_certificate_company():
+    values = None
     try:
         values = _company_form_values()
         conn = get_db()
@@ -950,8 +982,14 @@ def create_certificate_company():
         finally:
             conn.close()
     except ValueError as exc:
+        if values:
+            delete_file(values.get('seal_path'))
+            delete_file(values.get('logo_path'))
         return jsonify({'status': 'error', 'message': str(exc)}), 400
     except Exception as exc:
+        if values:
+            delete_file(values.get('seal_path'))
+            delete_file(values.get('logo_path'))
         return jsonify({'status': 'error', 'message': str(exc)}), 500
 
 
@@ -983,9 +1021,13 @@ def update_certificate_company(company_id):
                 SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?
             ''', (company_id,))
             conn.commit()
+            delete_file(row['seal_path'])
+            delete_file(row['logo_path'])
             return jsonify({'status': 'success', 'message': '회사를 삭제했습니다.'})
 
         values = _company_form_values(dict(row))
+        new_seal_path = values['seal_path'] if values['seal_path'] != row['seal_path'] else ''
+        new_logo_path = values['logo_path'] if values['logo_path'] != row['logo_path'] else ''
         conn.execute('''
             UPDATE certificate_companies
             SET company_name=?, representative_name=?, business_number=?,
@@ -1000,12 +1042,20 @@ def update_certificate_company(company_id):
             values['logo_filename'], values['logo_path'], company_id,
         ))
         conn.commit()
+        if new_seal_path:
+            delete_file(row['seal_path'])
+        if new_logo_path:
+            delete_file(row['logo_path'])
         return jsonify({'status': 'success', 'message': '회사 정보를 수정했습니다.'})
     except ValueError as exc:
         conn.rollback()
+        delete_file(locals().get('new_seal_path'))
+        delete_file(locals().get('new_logo_path'))
         return jsonify({'status': 'error', 'message': str(exc)}), 400
     except Exception as exc:
         conn.rollback()
+        delete_file(locals().get('new_seal_path'))
+        delete_file(locals().get('new_logo_path'))
         return jsonify({'status': 'error', 'message': str(exc)}), 500
     finally:
         conn.close()
@@ -1018,16 +1068,15 @@ def company_seal(company_id):
     try:
         ensure_certificate_schema(conn)
         row = conn.execute(
-            'SELECT seal_path FROM certificate_companies WHERE id=? AND is_active=1',
+            'SELECT seal_filename,seal_path FROM certificate_companies WHERE id=? AND is_active=1',
             (company_id,),
         ).fetchone()
     finally:
         conn.close()
     if not row or not row['seal_path'] or not os.path.isfile(row['seal_path']):
         abort(404)
-    response = send_from_directory(
-        os.path.dirname(row['seal_path']), os.path.basename(row['seal_path']),
-        max_age=0,
+    response = encrypted_response(
+        row['seal_path'], row['seal_filename'] or 'seal.png', as_attachment=False
     )
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
@@ -1042,16 +1091,15 @@ def company_logo(company_id):
     try:
         ensure_certificate_schema(conn)
         row = conn.execute(
-            'SELECT logo_path FROM certificate_companies WHERE id=? AND is_active=1',
+            'SELECT logo_filename,logo_path FROM certificate_companies WHERE id=? AND is_active=1',
             (company_id,),
         ).fetchone()
     finally:
         conn.close()
     if not row or not row['logo_path'] or not os.path.isfile(row['logo_path']):
         abort(404)
-    response = send_from_directory(
-        os.path.dirname(row['logo_path']), os.path.basename(row['logo_path']),
-        max_age=0,
+    response = encrypted_response(
+        row['logo_path'], row['logo_filename'] or 'logo.png', as_attachment=False
     )
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     response.headers['Pragma'] = 'no-cache'
@@ -1169,7 +1217,11 @@ def _save_certificate_workgroup(workgroup_id, data):
 def serve_pdf(filename):
     """관리자 페이지에서 발급된 PDF 보기"""
     if 'emp_no' not in session: return abort(403)
-    return send_from_directory(PDF_FOLDER, filename)
+    safe_name = os.path.basename(filename)
+    return encrypted_response(
+        os.path.join(PDF_FOLDER, safe_name), safe_name,
+        as_attachment=False, mimetype='application/pdf'
+    )
 
 @document_bp.route('/delete/<int:idx>')
 @admin_required
@@ -1185,15 +1237,13 @@ def delete_record(idx):
         ).fetchone()
         if row:
             filename = row['filename']
-            if filename:
-                p = os.path.join(PDF_FOLDER, filename)
-                if os.path.exists(p):
-                    os.remove(p)
             conn.execute(
                 'DELETE FROM certificate_requests WHERE id=?',
                 (idx,),
             )
             conn.commit()
+            if filename:
+                delete_file(os.path.join(PDF_FOLDER, filename))
             flash("기록이 성공적으로 삭제되었습니다.")
     except Exception as e:
         flash(f"삭제 중 오류: {str(e)}")
@@ -1223,17 +1273,15 @@ def delete_multiple():
             f'SELECT id, filename FROM certificate_requests WHERE id IN ({placeholders})',
             selected_ids,
         ).fetchall()
-        for row in rows:
-            if row['filename']:
-                path = os.path.join(PDF_FOLDER, row['filename'])
-                if os.path.exists(path):
-                    os.remove(path)
         conn.execute(
             f'DELETE FROM certificate_requests WHERE id IN ({placeholders})',
             selected_ids,
         )
         deleted_count = int(conn.execute('SELECT changes()').fetchone()[0])
         conn.commit()
+        for row in rows:
+            if row['filename']:
+                delete_file(os.path.join(PDF_FOLDER, row['filename']))
         flash(f"총 {deleted_count}건의 기록이 성공적으로 삭제되었습니다.")
     except Exception as e:
         flash(f"선택 삭제 중 오류: {str(e)}")

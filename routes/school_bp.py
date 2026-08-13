@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, send_from_directory
+from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, abort
 from routes.database import get_db
 from routes.organization import classify_organization_group
 from routes.menu_access import school_director_scope_enabled
@@ -6,15 +6,18 @@ import os
 import math
 import json
 import secrets
-from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import quote, unquote
+from routes.secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
+from routes.storage import SCHOOL_UPLOADS
 
 school_bp = Blueprint('school', __name__)
 
 SHARED_BOARD_CATEGORIES = {'community', '본부공지사항', 'reference', '자료실'}
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
+FILENAME_ENCODING_PREFIX = '~e~'
 
 def is_shared_board(category):
     """모든 센터장 업무공간에서 같은 게시물을 표시하는 게시판인지 반환한다."""
@@ -137,9 +140,54 @@ def school_admin_required(view):
     return wrapped
 
 def get_upload_dir():
-    upload_dir = os.path.join(current_app.root_path, 'static', 'school_uploads')
+    upload_dir = str(SCHOOL_UPLOADS)
     os.makedirs(upload_dir, exist_ok=True)
     return upload_dir
+
+
+def _stored_name_from_reference(reference):
+    return os.path.basename(str(reference or '').replace('\\', '/'))
+
+
+def _encode_filename(name):
+    """쉼표 구분형 레거시 DB에서도 실제 파일명을 손실 없이 보존한다."""
+    return FILENAME_ENCODING_PREFIX + quote(str(name or ''), safe='')
+
+
+def _decode_filename(name):
+    value = str(name or '')
+    if value.startswith(FILENAME_ENCODING_PREFIX):
+        return unquote(value[len(FILENAME_ENCODING_PREFIX):])
+    return value
+
+
+def _stored_path_from_reference(reference):
+    name = _stored_name_from_reference(reference)
+    if not name:
+        return ''
+    persistent_path = os.path.join(get_upload_dir(), name)
+    if os.path.exists(persistent_path):
+        return persistent_path
+    # 2026-08 이전 첨부는 Flask 정적 폴더에 저장되어 있었다. 새 파일은
+    # 영속 저장소만 사용하되, 기존 자료의 다운로드/삭제 호환성은 유지한다.
+    legacy_path = os.path.join(current_app.root_path, 'static', 'school_uploads', name)
+    return legacy_path if os.path.exists(legacy_path) else persistent_path
+
+
+def _delete_references(reference_csv):
+    for reference in str(reference_csv or '').split(','):
+        path = _stored_path_from_reference(reference.strip())
+        if path:
+            delete_file(path)
+
+
+def _secure_reference_csv(reference_csv):
+    """기존 정적 URL도 권한검사 다운로드 URL로 바꾸어 외부 노출을 막는다."""
+    references = [item.strip() for item in str(reference_csv or '').split(',') if item.strip()]
+    return ','.join(
+        url_for('school.serve_school_file', stored_name=_stored_name_from_reference(item))
+        for item in references
+    )
 
 def get_uploaded_file_size(file):
     """업로드 스트림 위치를 보존하면서 실제 바이트 크기를 계산한다."""
@@ -157,14 +205,10 @@ def get_uploaded_file_size(file):
         stream.seek(current_position)
     return max(0, int(size))
 
-def get_stored_file_size(filename):
-    if not filename:
+def get_stored_file_size(reference):
+    if not reference:
         return 0
-    file_path = os.path.join(get_upload_dir(), os.path.basename(filename))
-    try:
-        return os.path.getsize(file_path) if os.path.isfile(file_path) else 0
-    except OSError:
-        return 0
+    return plaintext_size(_stored_path_from_reference(reference))
 
 def init_school_comment_table(conn):
     conn.execute("""
@@ -246,15 +290,21 @@ def init_school_comment_table(conn):
 
 def save_uploaded_files(files):
     filenames, filepaths = [], []
-    for file in files:
-        if file and file.filename:
-            original_filename = file.filename.replace('/', '_').replace('\\', '_')
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-            safe_filename = f"{timestamp}_{original_filename}"
-            save_path = os.path.join(get_upload_dir(), safe_filename)
-            file.save(save_path)
-            filenames.append(safe_filename)
-            filepaths.append(f"/static/school_uploads/{safe_filename}")
+    saved_paths = []
+    try:
+        for file in files:
+            if file and file.filename:
+                display_name = original_filename(file.filename)
+                stored_name = encrypted_storage_name(display_name)
+                save_path = os.path.join(get_upload_dir(), stored_name)
+                encrypt_upload(file, save_path)
+                saved_paths.append(save_path)
+                filenames.append(_encode_filename(display_name))
+                filepaths.append(url_for('school.serve_school_file', stored_name=stored_name))
+    except Exception:
+        for save_path in saved_paths:
+            delete_file(save_path)
+        raise
     return (",".join(filenames) if filenames else None, ",".join(filepaths) if filepaths else None)
 
 @school_bp.route('/')
@@ -681,17 +731,42 @@ def serve_weblink_file(link_id):
     if not link or link['type'] != 'file' or not link['filepath']:
         return "파일을 찾을 수 없습니다.", 404
 
-    normalized_path = str(link['filepath']).replace('\\', os.sep).replace('/', os.sep)
-    file_path = os.path.abspath(normalized_path)
+    file_path = os.path.abspath(str(link['filepath']))
     if not os.path.isfile(file_path):
         return "파일을 찾을 수 없습니다.", 404
+    return encrypted_response(file_path, link['filename'] or os.path.basename(file_path), as_attachment=False)
 
-    return send_from_directory(
-        os.path.dirname(file_path),
-        os.path.basename(file_path),
-        as_attachment=False,
-        download_name=link['filename'] or os.path.basename(file_path)
-    )
+
+@school_bp.route('/file/<stored_name>')
+def serve_school_file(stored_name):
+    safe_stored_name = os.path.basename(stored_name)
+    conn = get_db()
+    try:
+        rows = conn.execute('''
+            SELECT p.school_id, p.category, p.filename, p.filepath
+            FROM school_posts p
+            WHERE COALESCE(p.filepath, '') LIKE ?
+            UNION ALL
+            SELECT p.school_id, p.category, c.filename, c.filepath
+            FROM school_post_comments c
+            JOIN school_posts p ON p.id=c.post_id
+            WHERE COALESCE(c.filepath, '') LIKE ?
+        ''', (f'%{safe_stored_name}%', f'%{safe_stored_name}%')).fetchall()
+        for row in rows:
+            if not can_access_post(conn, row['school_id'], row['category']):
+                continue
+            names = str(row['filename'] or '').split(',')
+            paths = str(row['filepath'] or '').split(',')
+            for index, reference in enumerate(paths):
+                if _stored_name_from_reference(reference) != safe_stored_name:
+                    continue
+                display_name = _decode_filename(names[index]) if index < len(names) else safe_stored_name
+                return encrypted_response(
+                    _stored_path_from_reference(reference), display_name, as_attachment=True
+                )
+    finally:
+        conn.close()
+    abort(404)
 
 # 🚀 [신규 API] 학교 전용 일정을 저장하는 완전히 분리된 라우터
 @school_bp.route('/save_task', methods=['POST'])
@@ -770,9 +845,11 @@ def get_post_api(post_id):
     conn.close()
 
     data = dict(post)
+    if data.get('filepath'):
+        data['filepath'] = _secure_reference_csv(data['filepath'])
     data['comment_count'] = comment_count
-    attachment_names = [name for name in str(data.get('filename') or '').split(',') if name]
-    data['attachment_sizes'] = [get_stored_file_size(name) for name in attachment_names]
+    attachment_paths = [path for path in str(data.get('filepath') or '').split(',') if path]
+    data['attachment_sizes'] = [get_stored_file_size(path) for path in attachment_paths]
     data['attachment_total_size'] = sum(data['attachment_sizes'])
     return jsonify(data)
 
@@ -800,30 +877,22 @@ def add_post():
     if sum(get_uploaded_file_size(file) for file in files) > POST_MAX_TOTAL_SIZE:
         conn.close()
         return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다.", 400
-    filenames, filepaths = [], []
-    
-    for file in files:
-        if file and file.filename != '':
-            original_filename = file.filename.replace('/', '_').replace('\\', '_')
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            safe_filename = f"{timestamp}_{original_filename}"
-            save_path = os.path.join(get_upload_dir(), safe_filename)
-            file.save(save_path)
-            filenames.append(safe_filename) 
-            filepaths.append(f"/static/school_uploads/{safe_filename}")
-            
-    filename_str = ",".join(filenames) if filenames else None
-    filepath_str = ",".join(filepaths) if filepaths else None
+    filename_str, filepath_str = save_uploaded_files(files)
         
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO school_posts (school_id, category, title, content, author, filename, filepath)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (school_id, category, title, content, author, filename_str, filepath_str))
-    
-    new_post_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO school_posts (school_id, category, title, content, author, filename, filepath)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (school_id, category, title, content, author, filename_str, filepath_str))
+        new_post_id = cursor.lastrowid
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        _delete_references(filepath_str)
+        raise
+    finally:
+        conn.close()
     
     return redirect_to_school(
         school_id,
@@ -872,59 +941,57 @@ def edit_post(post_id):
     old_filenames = old_filenames_str.split(',') if old_filenames_str else []
     old_filepaths_str = post['filepath']
     old_filepaths = old_filepaths_str.split(',') if old_filepaths_str else []
-    old_filepath_by_name = {
-        filename: (old_filepaths[index] if index < len(old_filepaths) else '')
-        for index, filename in enumerate(old_filenames)
-        if filename
-    }
-
     requested_existing = request.form.getlist('existing_filenames')
-    existing_filenames = []
-    for filename in requested_existing:
-        if filename in old_filepath_by_name and filename not in existing_filenames:
-            existing_filenames.append(filename)
-    existing_filepaths = [old_filepath_by_name[filename] for filename in existing_filenames]
+    requested_existing_paths = request.form.getlist('existing_filepaths')
+    old_pairs = list(zip(old_filenames, old_filepaths))
+    requested_pairs = list(zip(requested_existing, requested_existing_paths))
+    existing_pairs = []
+    for pair in requested_pairs:
+        if pair in old_pairs and pair not in existing_pairs:
+            existing_pairs.append(pair)
+    existing_filenames = [pair[0] for pair in existing_pairs]
+    existing_filepaths = [pair[1] for pair in existing_pairs]
 
     files = [f for f in request.files.getlist('file') if f and f.filename != '']
     if len(existing_filenames) + len(files) > POST_MAX_FILES:
         conn.close()
         return f"게시물 첨부파일은 최대 {POST_MAX_FILES}개까지 등록할 수 있습니다.", 400
 
-    existing_total_size = sum(get_stored_file_size(filename) for filename in existing_filenames)
+    existing_total_size = sum(get_stored_file_size(path) for path in existing_filepaths)
     uploaded_total_size = sum(get_uploaded_file_size(file) for file in files)
     if existing_total_size + uploaded_total_size > POST_MAX_TOTAL_SIZE:
         conn.close()
         return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다.", 400
 
-    for old_file in old_filenames:
-        if old_file and old_file not in existing_filenames:
-            file_path = os.path.join(get_upload_dir(), old_file)
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception as e:
-                pass
+    removed_references = [
+        old_pair[1] or old_pair[0]
+        for old_pair in old_pairs
+        if old_pair not in existing_pairs
+    ]
 
     new_filenames = existing_filenames.copy()
     new_filepaths = existing_filepaths.copy()
         
-    for file in files:
-        if file and file.filename != '':
-            original_filename = file.filename.replace('/', '_').replace('\\', '_')
-            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-            safe_filename = f"{timestamp}_{original_filename}"
-            save_path = os.path.join(get_upload_dir(), safe_filename)
-            file.save(save_path)
-            new_filenames.append(safe_filename)
-            new_filepaths.append(f"/static/school_uploads/{safe_filename}")
+    added_names, added_paths = save_uploaded_files(files)
+    if added_names:
+        new_filenames.extend(added_names.split(','))
+        new_filepaths.extend(added_paths.split(','))
             
     filename_str = ",".join(new_filenames) if new_filenames else None
     filepath_str = ",".join(new_filepaths) if new_filepaths else None
     
-    conn.execute('UPDATE school_posts SET title=?, content=?, filename=?, filepath=? WHERE id=?', 
-                 (title, content, filename_str, filepath_str, post_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute('UPDATE school_posts SET title=?, content=?, filename=?, filepath=? WHERE id=?',
+                     (title, content, filename_str, filepath_str, post_id))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        _delete_references(added_paths)
+        raise
+    finally:
+        conn.close()
+    for reference in removed_references:
+        delete_file(_stored_path_from_reference(reference))
     
     return redirect_to_school(
         school_id,
@@ -954,7 +1021,12 @@ def get_post_comments(post_id):
         ORDER BY COALESCE(parent_id, id) ASC, parent_id IS NOT NULL ASC, created_at ASC
     """, (post_id,)).fetchall()
     conn.close()
-    comments = [dict(r) for r in rows]
+    comments = []
+    for row in rows:
+        item = dict(row)
+        if item.get('filepath'):
+            item['filepath'] = _secure_reference_csv(item['filepath'])
+        comments.append(item)
     return jsonify({'comments': comments})
 
 @school_bp.route('/post/<int:post_id>/comments/add', methods=['POST'])
@@ -992,12 +1064,18 @@ def add_post_comment(post_id):
 
     filename_str, filepath_str = save_uploaded_files(files)
 
-    conn.execute("""
-        INSERT INTO school_post_comments (post_id, parent_id, content, author, filename, filepath)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (post_id, parent_id, content, author, filename_str, filepath_str))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("""
+            INSERT INTO school_post_comments (post_id, parent_id, content, author, filename, filepath)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (post_id, parent_id, content, author, filename_str, filepath_str))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        _delete_references(filepath_str)
+        raise
+    finally:
+        conn.close()
     return jsonify({'ok': True})
 
 @school_bp.route('/comments/<int:comment_id>/edit', methods=['POST'])
@@ -1011,7 +1089,7 @@ def edit_post_comment(comment_id):
     init_school_comment_table(conn)
     comment = conn.execute(
         """
-        SELECT c.author, p.school_id, p.category
+        SELECT c.id, c.author, c.filepath, p.school_id, p.category
         FROM school_post_comments c
         JOIN school_posts p ON p.id = c.post_id
         WHERE c.id=?
@@ -1073,9 +1151,15 @@ def delete_post_comment(comment_id):
         conn.close()
         return jsonify({'ok': False, 'message': '권한이 없습니다.'}), 403
 
+    file_rows = conn.execute(
+        "SELECT filepath FROM school_post_comments WHERE id=? OR parent_id=?",
+        (comment_id, comment_id),
+    ).fetchall()
     conn.execute("DELETE FROM school_post_comments WHERE id=? OR parent_id=?", (comment_id, comment_id))
     conn.commit()
     conn.close()
+    for row in file_rows:
+        _delete_references(row['filepath'])
     return jsonify({'ok': True})
 
 @school_bp.route('/post/delete/<int:post_id>', methods=['POST'])
@@ -1111,10 +1195,16 @@ def delete_post(post_id):
         conn.close()
         return "권한이 없습니다.", 403
 
+    comment_files = conn.execute(
+        'SELECT filepath FROM school_post_comments WHERE post_id=?', (post_id,)
+    ).fetchall()
     conn.execute('DELETE FROM school_post_comments WHERE post_id=?', (post_id,))
     conn.execute('DELETE FROM school_posts WHERE id=?', (post_id,))
     conn.commit()
     conn.close()
+    _delete_references(post['filepath'])
+    for row in comment_files:
+        _delete_references(row['filepath'])
     return redirect_to_school(school_id, category=category)
 
 @school_bp.route('/post/delete_multi', methods=['POST'])
@@ -1131,7 +1221,7 @@ def delete_multi():
     for pid in post_ids:
         post = conn.execute(
             """
-            SELECT id, school_id, author, category
+            SELECT id, school_id, author, category, filepath
             FROM school_posts
             WHERE id=?
             """,
@@ -1147,6 +1237,7 @@ def delete_multi():
         conn.close()
         return "공유 게시판 삭제 권한이 없습니다.", 403
 
+    deleted_references = []
     for post in posts_to_delete:
         if (
             is_shared_board(post['category'])
@@ -1154,10 +1245,18 @@ def delete_multi():
             or can_manage_schools()
         ):
             pid = post['id']
+            comment_files = conn.execute(
+                'SELECT filepath FROM school_post_comments WHERE post_id=?', (pid,)
+            ).fetchall()
             conn.execute("DELETE FROM school_post_comments WHERE post_id=?", (pid,))
             conn.execute("DELETE FROM school_posts WHERE id=?", (pid,))
+            deleted_references.append(post['filepath'])
+            for row in comment_files:
+                deleted_references.append(row['filepath'])
     conn.commit()
     conn.close()
+    for references in deleted_references:
+        _delete_references(references)
     return redirect_to_school(school_id, category=category)
 
 # -----------------------------------------------------------

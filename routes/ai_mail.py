@@ -30,6 +30,16 @@ from PIL import Image, UnidentifiedImageError
 
 from .database import AI_MAIL_UPLOADS, get_db
 from .security import load_credential_secret
+from .secure_files import (
+    delete_file,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_bytes,
+    encrypt_upload,
+    migrate_plaintext_file,
+    original_filename,
+    read_decrypted,
+)
 
 
 ai_mail_bp = Blueprint('ai_mail', __name__)
@@ -41,6 +51,7 @@ MAX_IMPORT_BYTES = 5 * 1024 * 1024
 MAX_TEMPLATE_IMAGE_BYTES = 3 * 1024 * 1024
 MAX_TEMPLATE_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_ATTACHMENT_FILES = 350
+MAX_CAMPAIGN_ATTACHMENT_BYTES = 512 * 1024 * 1024
 EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$')
 VARIABLE_NAMES = ('수신자명', '메일주소', '메모', '작업그룹명')
 ATTACHMENT_MODES = {'none', 'common', 'smart', 'smart_and_common'}
@@ -259,6 +270,7 @@ def bootstrap():
     owner = _owner_emp_no()
     conn = _db()
     try:
+        _migrate_owner_saved_files(conn, owner)
         groups = conn.execute('''
             SELECT g.*, COUNT(r.id) AS recipient_count
             FROM ai_mail_workgroups g
@@ -1021,8 +1033,8 @@ def _plain_from_html(body_html):
 
 
 def _storage_dir(kind, record_id):
-    directory = os.path.abspath(os.path.join(AI_MAIL_UPLOADS, kind, str(record_id)))
-    root = os.path.abspath(AI_MAIL_UPLOADS)
+    directory = os.path.realpath(os.path.join(AI_MAIL_UPLOADS, kind, str(record_id)))
+    root = os.path.realpath(AI_MAIL_UPLOADS)
     if os.path.commonpath([root, directory]) != root:
         raise ValueError('저장 경로가 올바르지 않습니다.')
     os.makedirs(directory, exist_ok=True)
@@ -1030,8 +1042,8 @@ def _storage_dir(kind, record_id):
 
 
 def _safe_saved_path(path):
-    root = os.path.abspath(AI_MAIL_UPLOADS)
-    target = os.path.abspath(path or '')
+    root = os.path.realpath(AI_MAIL_UPLOADS)
+    target = os.path.realpath(path or '')
     if not path or os.path.commonpath([root, target]) != root:
         raise ValueError('파일 경로가 올바르지 않습니다.')
     return target
@@ -1040,10 +1052,44 @@ def _safe_saved_path(path):
 def _delete_saved_file(path):
     try:
         target = _safe_saved_path(path)
-        if os.path.isfile(target):
-            os.remove(target)
+        delete_file(target)
     except (OSError, ValueError):
         pass
+
+
+def _read_saved_file(path, max_bytes=None):
+    """AI메일 저장소 파일을 권한 확인 후 복호화하며 기존 평문은 점진 이관한다."""
+    target = _safe_saved_path(path)
+    try:
+        migrate_plaintext_file(target)
+    except (OSError, ValueError):
+        # 동시 이관 중이거나 레거시 파일이 잠시 사용 중이어도 읽기 호환성은 유지한다.
+        pass
+    return read_decrypted(target, max_bytes=max_bytes)
+
+
+def _migrate_owner_saved_files(conn, owner):
+    """AI메일 메뉴 진입 시 해당 사용자의 기존 평문 파일을 일괄 암호화한다."""
+    rows = conn.execute('''
+        SELECT a.filepath
+        FROM ai_mail_template_assets a
+        JOIN ai_mail_templates t ON t.id=a.template_id
+        WHERE t.owner_emp_no=?
+        UNION
+        SELECT a.filepath
+        FROM ai_mail_campaign_attachments a
+        JOIN ai_mail_campaigns c ON c.id=a.campaign_id
+        WHERE c.owner_emp_no=?
+    ''', (owner, owner)).fetchall()
+    migrated = 0
+    for row in rows:
+        try:
+            target = _safe_saved_path(row['filepath'])
+            if os.path.isfile(target) and migrate_plaintext_file(target):
+                migrated += 1
+        except (OSError, ValueError):
+            continue
+    return migrated
 
 
 def _image_format_and_mime(stream):
@@ -1088,25 +1134,29 @@ def _save_template_image_bytes(conn, template_id, data, mime_type, original_name
         raise ValueError('템플릿 이미지 합계는 20MB 이하만 가능합니다.')
     subtype = mime_type.split('/', 1)[1]
     extension = '.jpg' if subtype == 'jpeg' else f'.{subtype}'
-    stored_name = f'{uuid.uuid4().hex}{extension}'
+    display_name = original_filename(original_name, f'image{extension}')
+    stored_name = encrypted_storage_name(display_name)
     target = os.path.join(_storage_dir('templates', template_id), stored_name)
-    with open(target, 'wb') as output:
-        output.write(data)
+    encrypt_bytes(data, target)
     content_id = f'ai-mail-template-{template_id}-{uuid.uuid4().hex}'
-    cursor = conn.execute('''
-        INSERT INTO ai_mail_template_assets (
-            template_id, original_name, stored_name, filepath, mime_type,
-            content_id, size_bytes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        template_id,
-        _clean_text(os.path.basename(original_name), 255) or f'image{extension}',
-        stored_name,
-        target,
-        mime_type,
-        content_id,
-        len(data)
-    ))
+    try:
+        cursor = conn.execute('''
+            INSERT INTO ai_mail_template_assets (
+                template_id, original_name, stored_name, filepath, mime_type,
+                content_id, size_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            template_id,
+            display_name,
+            stored_name,
+            target,
+            mime_type,
+            content_id,
+            len(data)
+        ))
+    except Exception:
+        delete_file(target)
+        raise
     return conn.execute('SELECT * FROM ai_mail_template_assets WHERE id=?', (cursor.lastrowid,)).fetchone()
 
 
@@ -1234,6 +1284,11 @@ def create_template():
         for path in saved_paths:
             _delete_saved_file(path)
         return _error('같은 이름의 템플릿이 이미 있습니다.', 409, code='TEMPLATE_DUPLICATE')
+    except sqlite3.DatabaseError as exc:
+        conn.rollback()
+        for path in saved_paths:
+            _delete_saved_file(path)
+        return _error(f'템플릿을 저장하지 못했습니다: {_clean_text(exc, 300)}', 500, code='TEMPLATE_DB_ERROR')
     except (ValueError, OSError) as exc:
         conn.rollback()
         for path in saved_paths:
@@ -1306,6 +1361,11 @@ def update_template(template_id):
         for path in saved_paths:
             _delete_saved_file(path)
         return _error('같은 이름의 템플릿이 이미 있습니다.', 409, code='TEMPLATE_DUPLICATE')
+    except sqlite3.DatabaseError as exc:
+        conn.rollback()
+        for path in saved_paths:
+            _delete_saved_file(path)
+        return _error(f'템플릿을 수정하지 못했습니다: {_clean_text(exc, 300)}', 500, code='TEMPLATE_DB_ERROR')
     except (ValueError, OSError) as exc:
         conn.rollback()
         for path in saved_paths:
@@ -1343,6 +1403,11 @@ def upload_template_image(template_id):
         if path:
             _delete_saved_file(path)
         return _error(str(exc), code='TEMPLATE_IMAGE_ERROR')
+    except sqlite3.DatabaseError as exc:
+        conn.rollback()
+        if path:
+            _delete_saved_file(path)
+        return _error(f'템플릿 이미지를 저장하지 못했습니다: {_clean_text(exc, 300)}', 500, code='TEMPLATE_IMAGE_DB_ERROR')
     finally:
         conn.close()
 
@@ -1362,7 +1427,9 @@ def download_template_asset(asset_id):
         path = _safe_saved_path(asset['filepath'])
         if not os.path.isfile(path):
             return _error('템플릿 이미지 파일이 손실되었습니다.', 404, code='ASSET_FILE_MISSING')
-        return send_file(path, mimetype=asset['mime_type'], download_name=asset['original_name'])
+        return encrypted_response(
+            path, asset['original_name'], as_attachment=False, mimetype=asset['mime_type']
+        )
     finally:
         conn.close()
 
@@ -1526,7 +1593,7 @@ def _safe_original_filename(value):
 def _save_campaign_attachment(conn, campaign_id, file_storage, kind):
     if kind not in {'common', 'smart'}:
         raise ValueError('첨부파일 방식은 common 또는 smart여야 합니다.')
-    original_name = _safe_original_filename(file_storage.filename)
+    original_name = original_filename(_safe_original_filename(file_storage.filename))
     extension = os.path.splitext(original_name)[1].lower()
     if extension in BLOCKED_ATTACHMENT_EXTENSIONS:
         raise ValueError(f'보안상 첨부할 수 없는 파일 형식입니다: {original_name}')
@@ -1535,20 +1602,26 @@ def _save_campaign_attachment(conn, campaign_id, file_storage, kind):
         raise ValueError(f'빈 파일은 첨부할 수 없습니다: {original_name}')
     if size > MAX_MESSAGE_BYTES:
         raise ValueError(f'18MB를 초과한 파일은 첨부할 수 없습니다: {original_name}')
+    campaign_bytes = int(conn.execute(
+        'SELECT COALESCE(SUM(size_bytes), 0) FROM ai_mail_campaign_attachments WHERE campaign_id=?',
+        (campaign_id,),
+    ).fetchone()[0] or 0)
+    if campaign_bytes + size > MAX_CAMPAIGN_ATTACHMENT_BYTES:
+        raise ValueError('한 발송작업의 첨부파일 합계는 512MB 이하만 등록할 수 있습니다.')
     count = conn.execute(
         'SELECT COUNT(*) FROM ai_mail_campaign_attachments WHERE campaign_id=?',
         (campaign_id,)
     ).fetchone()[0]
     if count >= MAX_ATTACHMENT_FILES:
         raise ValueError(f'한 발송작업에는 파일을 최대 {MAX_ATTACHMENT_FILES}개까지 등록할 수 있습니다.')
-    stored_name = f'{uuid.uuid4().hex}{extension}'
+    stored_name = encrypted_storage_name(original_name)
     target = os.path.join(_storage_dir('campaigns', campaign_id), stored_name)
     file_storage.stream.seek(0)
-    file_storage.save(target)
     digest = hashlib.sha256()
-    with open(target, 'rb') as saved:
-        for chunk in iter(lambda: saved.read(1024 * 1024), b''):
-            digest.update(chunk)
+    for chunk in iter(lambda: file_storage.stream.read(1024 * 1024), b''):
+        digest.update(chunk)
+    file_storage.stream.seek(0)
+    encrypt_upload(file_storage, target)
     mime_type = mimetypes.guess_type(original_name)[0] or 'application/octet-stream'
     try:
         cursor = conn.execute('''
@@ -1714,7 +1787,7 @@ def create_campaign():
             campaign=_campaign_dict(campaign),
             attachments=[_attachment_dict(row) for row in attachments]
         )
-    except (ValueError, OSError, sqlite3.IntegrityError) as exc:
+    except (ValueError, OSError, sqlite3.DatabaseError) as exc:
         conn.rollback()
         for path in saved_paths:
             _delete_saved_file(path)
@@ -1755,7 +1828,7 @@ def add_campaign_attachments(campaign_id):
         _campaign_event(conn, campaign_id, 'attachments_added', f'첨부파일 {len(added)}개를 추가했습니다.')
         conn.commit()
         return _success(f'첨부파일 {len(added)}개를 추가했습니다.', attachments=added)
-    except (ValueError, OSError, sqlite3.IntegrityError) as exc:
+    except (ValueError, OSError, sqlite3.DatabaseError) as exc:
         conn.rollback()
         for path in saved_paths:
             _delete_saved_file(path)
@@ -2301,7 +2374,10 @@ def download_campaign_attachment(campaign_id, attachment_id):
         path = _safe_saved_path(attachment['filepath'])
         if not os.path.isfile(path):
             return _error('첨부파일이 저장소에서 손실되었습니다.', 404, code='ATTACHMENT_FILE_MISSING')
-        return send_file(path, as_attachment=True, download_name=attachment['original_name'], mimetype=attachment['mime_type'])
+        return encrypted_response(
+            path, attachment['original_name'], as_attachment=True,
+            mimetype=attachment['mime_type']
+        )
     finally:
         conn.close()
 
@@ -2408,8 +2484,7 @@ def _send_campaign_worker(app, campaign_id, cancel_event=None):
                         for asset in inline_assets:
                             path = _safe_saved_path(asset['filepath'])
                             if os.path.isfile(path):
-                                with open(path, 'rb') as f:
-                                    img_data = f.read()
+                                img_data = _read_saved_file(path, MAX_TEMPLATE_IMAGE_BYTES)
                                 subtype = asset['mime_type'].split('/')[1] if '/' in asset['mime_type'] else 'jpeg'
                                 msg.get_payload()[1].add_related(img_data, maintype='image', subtype=subtype, cid=f"<{asset['content_id']}>")
 
@@ -2420,8 +2495,7 @@ def _send_campaign_worker(app, campaign_id, cancel_event=None):
                         if is_common or is_smart_matched:
                             path = _safe_saved_path(att['filepath'])
                             if os.path.isfile(path):
-                                with open(path, 'rb') as f:
-                                    att_data = f.read()
+                                att_data = _read_saved_file(path, MAX_MESSAGE_BYTES)
                                 maintype, subtype = att['mime_type'].split('/', 1) if '/' in att['mime_type'] else ('application', 'octet-stream')
                                 msg.add_attachment(att_data, maintype=maintype, subtype=subtype, filename=att['original_name'])
 

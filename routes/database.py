@@ -47,8 +47,10 @@ bootstrap_legacy_files()
 _bootstrap_main_database()
 
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys=ON')
+    conn.execute('PRAGMA busy_timeout=10000')
     return conn
 
 

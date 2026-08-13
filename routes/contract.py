@@ -11,6 +11,7 @@ import re
 import shutil
 import base64
 import mimetypes
+import tempfile
 from datetime import datetime, timedelta, timezone
 from hashids import Hashids
 from html import escape
@@ -30,6 +31,16 @@ from .storage import (
     DATA_ROOT,
     PDF_FONT_ROOT,
     TERMS_ROOT,
+)
+from .secure_files import (
+    delete_file,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_stream,
+    encrypt_upload,
+    original_filename,
+    read_decrypted,
+    temporary_decrypted_path,
 )
 
 # PDF 페이지 분할을 위한 라이브러리 (서버에 pip install PyPDF2 필요)
@@ -305,7 +316,8 @@ def normalize_company_settings(settings):
         "company_name": "(사)새담청소년교육문화원",
         "representative_title": "이사장",
         "representative_name": "",
-        "stamp_filename": ""
+        "stamp_filename": "",
+        "stamp_original_name": ""
     }
 
     if not isinstance(settings, dict):
@@ -343,7 +355,8 @@ def normalize_company_settings(settings):
         "company_name": str(settings.get("company_name", default_profile["company_name"])).strip() or default_profile["company_name"],
         "representative_title": str(settings.get("representative_title", default_profile["representative_title"])).strip() or default_profile["representative_title"],
         "representative_name": str(settings.get("representative_name", "")).strip(),
-        "stamp_filename": str(settings.get("stamp_filename", "")).strip()
+        "stamp_filename": str(settings.get("stamp_filename", "")).strip(),
+        "stamp_original_name": str(settings.get("stamp_original_name", "")).strip()
     })
     return {"active_profile_id": migrated["id"], "profiles": [migrated]}
 
@@ -402,13 +415,12 @@ def get_company_stamp_src(profile):
     if not stamp_path or not os.path.exists(stamp_path):
         return ""
 
-    mime_type, _ = mimetypes.guess_type(stamp_path)
+    mime_type, _ = mimetypes.guess_type(str(profile.get("stamp_original_name") or stamp_path))
     if not mime_type:
         mime_type = "image/png"
 
     try:
-        with open(stamp_path, 'rb') as f:
-            encoded = base64.b64encode(f.read()).decode('ascii')
+        encoded = base64.b64encode(read_decrypted(stamp_path)).decode('ascii')
         return f"data:{mime_type};base64,{encoded}"
     except Exception as e:
         print("도장 이미지 base64 변환 실패:", e)
@@ -801,6 +813,8 @@ def company_settings():
         if settings.get("active_profile_id") == profile_id:
             settings["active_profile_id"] = settings["profiles"][0].get("id")
         save_company_settings(settings)
+        if target.get("stamp_filename"):
+            delete_file(os.path.join(COMPANY_STAMP_DIR, os.path.basename(target["stamp_filename"])))
 
         return jsonify({"status": "success", "message": "회사 정보 세트가 삭제되었습니다."})
 
@@ -823,7 +837,8 @@ def company_settings():
             "company_name": company_name or "(사)새담청소년교육문화원",
             "representative_title": representative_title or "이사장",
             "representative_name": representative_name,
-            "stamp_filename": ""
+            "stamp_filename": "",
+            "stamp_original_name": ""
         }
         profiles.append(profile)
         settings["active_profile_id"] = profile_id
@@ -842,6 +857,7 @@ def company_settings():
         settings["active_profile_id"] = profile_id
 
     stamp_file = request.files.get('stamp_file')
+    new_stamp_path = None
     if stamp_file and stamp_file.filename:
         ext = os.path.splitext(stamp_file.filename)[1].lower()
         if ext not in ['.png', '.jpg', '.jpeg']:
@@ -850,13 +866,23 @@ def company_settings():
                 "message": "도장 이미지는 PNG, JPG, JPEG 파일만 등록할 수 있습니다."
             }), 400
 
-        stamp_filename = f"company_stamp_{profile_id}_{datetime.now(KST).strftime('%Y%m%d_%H%M%S')}{ext}"
+        display_name = original_filename(stamp_file.filename, f"stamp{ext}")
+        stamp_filename = encrypted_storage_name(display_name)
         stamp_path = os.path.join(COMPANY_STAMP_DIR, stamp_filename)
-        stamp_file.save(stamp_path)
+        new_stamp_path = stamp_path
+        old_stamp = str(profile.get("stamp_filename") or "")
+        encrypt_upload(stamp_file, stamp_path)
         profile["stamp_filename"] = stamp_filename
+        profile["stamp_original_name"] = display_name
 
     settings["profiles"] = profiles[:MAX_COMPANY_PROFILES]
-    save_company_settings(settings)
+    try:
+        save_company_settings(settings)
+    except Exception:
+        delete_file(new_stamp_path)
+        raise
+    if stamp_file and stamp_file.filename and old_stamp and old_stamp != stamp_filename:
+        delete_file(os.path.join(COMPANY_STAMP_DIR, os.path.basename(old_stamp)))
 
     return jsonify({
         "status": "success",
@@ -877,7 +903,15 @@ def company_stamp_file(filename):
     if not os.path.exists(file_path):
         return "파일을 찾을 수 없습니다.", 404
 
-    return send_file(file_path)
+    profile = next(
+        (
+            item for item in load_company_settings().get("profiles", [])
+            if os.path.basename(str(item.get("stamp_filename", ""))) == safe_name
+        ),
+        {},
+    )
+    display_name = str(profile.get("stamp_original_name") or safe_name.removesuffix('.sdf'))
+    return encrypted_response(file_path, display_name, as_attachment=False)
 
 
 @contract_bp.route('/admin/upload_excel', methods=['POST'])
@@ -947,8 +981,7 @@ def delete_contracts():
         finally:
             conn.close()
         for path in files_to_delete:
-            if os.path.isfile(path):
-                os.remove(path)
+            delete_file(path)
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"status": "error", "message": str(e)})
 
@@ -977,7 +1010,7 @@ def download_selected_contracts():
                         if os.path.exists(file_path):
                             if page_range == '1-2' and PdfReader is not None:
                                 try:
-                                    reader = PdfReader(file_path)
+                                    reader = PdfReader(io.BytesIO(read_decrypted(file_path)))
                                     writer = PdfWriter()
                                     for p in range(min(2, len(reader.pages))):
                                         writer.add_page(reader.pages[p])
@@ -989,10 +1022,10 @@ def download_selected_contracts():
                                     file_count += 1
                                 except Exception as pdf_e:
                                     print(f"PDF Split Error: {pdf_e}")
-                                    zf.write(file_path, arcname=filename)
+                                    zf.writestr(filename, read_decrypted(file_path))
                                     file_count += 1
                             else:
-                                zf.write(file_path, arcname=filename)
+                                zf.writestr(filename, read_decrypted(file_path))
                                 file_count += 1
             
             if file_count == 0:
@@ -1542,63 +1575,73 @@ def save_contract():
 
         filename = f"{contract_type}_{now_dt.strftime('%Y%m%d_%H%M%S')}.pdf"
         pdf_path = os.path.join(CONTRACTS_DIR, filename)
+        temp_descriptor, temporary_pdf_path = tempfile.mkstemp(prefix='saedam-contract-', suffix='.pdf')
+        os.close(temp_descriptor)
 
         if PDF_CONFIG:
-            pdfkit.from_string(
-                html_content,
-                pdf_path,
-                configuration=PDF_CONFIG,
-                options={
-                    'encoding': "UTF-8",
-                    'enable-local-file-access': None,
-                    'print-media-type': None,
-                    'disable-smart-shrinking': None,
-                    'dpi': '96',
-                    'page-size': 'A4',
-                    'margin-top': '20mm',
-                    'margin-right': '18mm',
-                    'margin-bottom': '20mm',
-                    'margin-left': '18mm'
-                }
-            )
-
-            user_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
-
-            conn = get_db()
             try:
-                changed = update_contract_record(conn, idx, {
-                    '연도': str(now_dt.year),
-                    '연락처': phone_value,
-                    'email': email_value,
-                    '거주지': address_value,
-                    '계약완료일시': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                    '파일명': filename,
-                    'IP': user_ip,
-                })
-                if changed != 1:
-                    raise ValueError('계약 기록을 찾을 수 없습니다.')
-                conn.commit()
-            except Exception:
-                conn.rollback()
-                raise
+                pdfkit.from_string(
+                    html_content,
+                    temporary_pdf_path,
+                    configuration=PDF_CONFIG,
+                    options={
+                        'encoding': "UTF-8",
+                        'enable-local-file-access': None,
+                        'print-media-type': None,
+                        'disable-smart-shrinking': None,
+                        'dpi': '96',
+                        'page-size': 'A4',
+                        'margin-top': '20mm',
+                        'margin-right': '18mm',
+                        'margin-bottom': '20mm',
+                        'margin-left': '18mm'
+                    }
+                )
+                with open(temporary_pdf_path, 'rb') as source:
+                    encrypt_stream(source, pdf_path)
+
+                user_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+
+                conn = get_db()
+                try:
+                    changed = update_contract_record(conn, idx, {
+                        '연도': str(now_dt.year),
+                        '연락처': phone_value,
+                        'email': email_value,
+                        '거주지': address_value,
+                        '계약완료일시': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                        '파일명': filename,
+                        'IP': user_ip,
+                    })
+                    if changed != 1:
+                        raise ValueError('계약 기록을 찾을 수 없습니다.')
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    delete_file(pdf_path)
+                    raise
+                finally:
+                    conn.close()
+
+                try:
+                    recipients = [addr for addr in [email_value, SENDER_EMAIL] if addr]
+                    if recipients:
+                        yag = yagmail.SMTP(SENDER_EMAIL, SENDER_PASSWORD)
+                        with temporary_decrypted_path(pdf_path, filename) as mail_pdf_path:
+                            yag.send(
+                                to=recipients,
+                                subject=f"[완료] {name_value}님 계약서",
+                                contents="계약이 완료되었습니다.",
+                                attachments=mail_pdf_path
+                            )
+                except Exception as mail_e:
+                    print("메일 발송 오류:", mail_e)
             finally:
-                conn.close()
-
-            try:
-                recipients = [addr for addr in [email_value, SENDER_EMAIL] if addr]
-                if recipients:
-                    yag = yagmail.SMTP(SENDER_EMAIL, SENDER_PASSWORD)
-                    yag.send(
-                        to=recipients,
-                        subject=f"[완료] {name_value}님 계약서",
-                        contents="계약이 완료되었습니다.",
-                        attachments=pdf_path
-                    )
-            except Exception as mail_e:
-                print("메일 발송 오류:", mail_e)
+                delete_file(temporary_pdf_path)
 
             return jsonify({"status": "success", "message": "계약이 완료되어 메일로 전송 되었습니다."})
 
+        delete_file(temporary_pdf_path)
         return jsonify({
             "status": "error",
             "message": f"PDF 엔진 오류: wkhtmltopdf를 찾을 수 없습니다. 현재 감지 경로={WKHTMLTOPDF_PATH}"
@@ -1623,11 +1666,8 @@ def download_pdf(idx):
         if not os.path.exists(pdf_path):
             return f"서버에서 파일을 찾을 수 없습니다. (파일명: {filename})", 404
             
-        return send_file(
-            pdf_path, 
-            mimetype='application/pdf',
-            as_attachment=False, 
-            download_name=filename
+        return encrypted_response(
+            pdf_path, filename, mimetype='application/pdf', as_attachment=False
         )
     except Exception as e:
         return f"파일 불러오기 중 오류 발생: {str(e)}", 500

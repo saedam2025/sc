@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_db
 from .security import hash_password, is_admin_session
-from .storage import CHAT_UPLOADS
+from .storage import CHAT_UPLOADS, MEMO_UPLOADS
 from .menu_access import (
     MENU_CATALOG,
     MENU_GROUPS,
@@ -74,15 +74,27 @@ THEME_VAR_KEYS = {
     '--primary-dark', '--text-dark', '--text-gray', '--border-color', '--border-light',
     '--card-bg', '--card-border', '--card-shadow', '--card-backdrop', '--input-bg',
     '--input-text', '--widget-bg', '--widget-hover', '--widget-border', '--widget-border-color',
-    '--theme-line-color',
+    '--theme-line-color', '--dashboard-top-line', '--nav-shadow',
     '--tooltip-bg', '--tooltip-text', '--effect-color1', '--effect-color2', '--effect-color3',
 }
 
 
 def _normalize_default_theme_background(theme):
-    """기존에 저장된 기본 테마의 흰색 페이지 배경도 새 기본색으로 보정한다."""
+    """기존에 저장된 기본/e리플렛 테마도 최신 공통 변수로 보정한다."""
     if not isinstance(theme, dict):
         return theme
+    normalized = dict(theme)
+    theme_vars = dict(normalized.get('vars') or {})
+    is_eleaflet_theme = (
+        str(theme.get('key') or '').strip().lower() == 'gallery:eleaflet'
+        or str(theme.get('name') or '').strip() == 'e리플렛테마'
+    )
+    if is_eleaflet_theme:
+        theme_vars['--nav-shadow'] = 'none'
+        theme_vars['--theme-line-color'] = '#e1e7e2'
+        normalized['vars'] = theme_vars
+        return normalized
+
     is_default_theme = (
         str(theme.get('catalog') or '').strip().lower() == 'default'
         or str(theme.get('key') or '').strip().lower() == 'default:0'
@@ -91,8 +103,6 @@ def _normalize_default_theme_background(theme):
     if not is_default_theme:
         return theme
 
-    normalized = dict(theme)
-    theme_vars = dict(normalized.get('vars') or {})
     for key in ('--body-bg', '--app-bg', '--main-bg'):
         theme_vars[key] = DEFAULT_THEME_PAGE_BACKGROUND
     normalized['vars'] = theme_vars
@@ -225,6 +235,7 @@ def _storage_roots():
     return [
         {'key': 'board', 'label': '게시판', 'path': os.path.join(data_root, 'board_uploads'), 'icon': 'fa-clipboard-list'},
         {'key': 'messenger', 'label': '사내메신저', 'path': str(CHAT_UPLOADS), 'icon': 'fa-comments'},
+        {'key': 'memo', 'label': '개인화이트보드', 'path': str(MEMO_UPLOADS), 'icon': 'fa-chalkboard'},
         {'key': 'school', 'label': '학교업무메뉴', 'path': SCHOOL_UPLOADS, 'icon': 'fa-school'},
         {'key': 'certificate', 'label': '증명발급', 'path': os.path.join(data_root, 'output_pdfs'), 'icon': 'fa-file-invoice'},
         {'key': 'contract', 'label': '계약시스템', 'path': os.path.join(data_root, 'contracts'), 'icon': 'fa-file-contract'},
@@ -236,14 +247,26 @@ def _storage_roots():
     ]
 
 
+def _is_sensitive_storage_target(path):
+    """암호화 키와 운영 DB는 디스크 관리 UI에서 열람·다운로드·삭제하지 않는다."""
+    target = os.path.realpath(path)
+    security_root = os.path.realpath(os.path.join(BASE_DIR, 'security'))
+    try:
+        if os.path.commonpath([security_root, target]) == security_root:
+            return True
+    except ValueError:
+        return True
+    return os.path.basename(target).lower() in {'saedam.db', 'contracts.db'}
+
+
 def _root_by_key(root_key):
     roots = {item['key']: item for item in _storage_roots()}
     return roots.get(root_key) or roots['app']
 
 
 def _safe_target(root_info, rel_path=''):
-    root = os.path.abspath(root_info['path'])
-    target = os.path.abspath(os.path.join(root, rel_path or ''))
+    root = os.path.realpath(root_info['path'])
+    target = os.path.realpath(os.path.join(root, rel_path or ''))
     try:
         if os.path.commonpath([root, target]) != root:
             abort(403)
@@ -491,6 +514,8 @@ def disk():
     rel_path = request.args.get('path', '')
     root_info = _root_by_key(root_key)
     root, target = _safe_target(root_info, rel_path)
+    if _is_sensitive_storage_target(target):
+        abort(403)
 
     roots = []
     for item in _storage_roots():
@@ -504,6 +529,8 @@ def disk():
     if os.path.exists(target) and os.path.isdir(target):
         for name in os.listdir(target):
             path = os.path.join(target, name)
+            if _is_sensitive_storage_target(path):
+                continue
             try:
                 stat = os.stat(path)
                 is_dir = os.path.isdir(path)
@@ -545,6 +572,8 @@ def disk_download():
     require_admin()
     root_info = _root_by_key(request.args.get('root', 'app'))
     root, target = _safe_target(root_info, request.args.get('path', ''))
+    if _is_sensitive_storage_target(target):
+        abort(403)
     if not os.path.isfile(target):
         abort(404)
     return send_file(target, as_attachment=True, download_name=os.path.basename(target))
@@ -555,6 +584,8 @@ def disk_delete():
     require_admin()
     root_info = _root_by_key(request.form.get('root', 'app'))
     root, target = _safe_target(root_info, request.form.get('path', ''))
+    if _is_sensitive_storage_target(target):
+        abort(403)
     if os.path.abspath(root) == os.path.abspath(target):
         return jsonify({'status': 'error', 'message': '최상위 폴더는 삭제할 수 없습니다.'}), 400
     if not os.path.exists(target):

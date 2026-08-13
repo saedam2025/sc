@@ -12,7 +12,9 @@ import os
 import re
 import secrets
 import shutil
+import threading
 import zipfile
+import tempfile
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from html import escape
@@ -48,6 +50,7 @@ from .storage import (
     TERMS_ROOT,
     VERIFIED_CONTRACT_ROOT,
     VERIFIED_CONTRACTS_ROOT,
+    VERIFIED_LOGO_ROOT,
     VERIFIED_PDF_FONT_ROOT,
     VERIFIED_SIGNATURE_ROOT,
     VERIFIED_STAMP_ROOT,
@@ -58,9 +61,21 @@ from .verified_contract_repository import (
     insert_verified_contract,
     update_verified_contract,
 )
+from .secure_files import (
+    delete_file,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_bytes,
+    encrypt_stream,
+    encrypt_upload,
+    original_filename,
+    read_decrypted,
+    temporary_decrypted_path,
+)
 
 
 verified_contract_bp = Blueprint("verified_contract", __name__)
+_settings_file_lock = threading.RLock()
 
 KST = timezone(timedelta(hours=9))
 UTC = timezone.utc
@@ -219,20 +234,32 @@ def _user_agent() -> str:
 
 
 def _json_file(path: Path, default):
-    try:
-        with path.open("r", encoding="utf-8") as handle:
-            value = json.load(handle)
-            return value
-    except (OSError, ValueError, TypeError):
+    backup = path.with_suffix(path.suffix + ".bak")
+    with _settings_file_lock:
+        for candidate in (path, backup):
+            try:
+                with candidate.open("r", encoding="utf-8") as handle:
+                    return json.load(handle)
+            except (OSError, ValueError, TypeError):
+                continue
         return default
 
 
 def _save_json(path: Path, value) -> None:
+    """설정 파일을 중간 손상 없이 교체하고 직전 정상본도 보존한다."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
-    with temporary.open("w", encoding="utf-8") as handle:
-        json.dump(value, handle, ensure_ascii=False, indent=2)
-    os.replace(temporary, path)
+    backup = path.with_suffix(path.suffix + ".bak")
+    backup_temporary = path.with_suffix(path.suffix + ".bak.tmp")
+    with _settings_file_lock:
+        with temporary.open("w", encoding="utf-8") as handle:
+            json.dump(value, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if path.is_file():
+            shutil.copy2(path, backup_temporary)
+            os.replace(backup_temporary, backup)
+        os.replace(temporary, path)
 
 
 def _copy_if_missing(source: Path, target: Path) -> bool:
@@ -250,6 +277,7 @@ def _bootstrap_verified_storage() -> None:
         VERIFIED_CONTRACTS_ROOT,
         VERIFIED_TERMS_ROOT,
         VERIFIED_STAMP_ROOT,
+        VERIFIED_LOGO_ROOT,
         VERIFIED_SIGNATURE_ROOT,
         VERIFIED_PDF_FONT_ROOT,
     ):
@@ -388,7 +416,13 @@ def _normalize_companies(value) -> dict:
         "company_name": "(사)새담청소년교육문화원",
         "representative_title": "이사장",
         "representative_name": "",
+        "business_number": "",
+        "address": "",
+        "phone": "",
+        "logo_filename": "",
+        "logo_original_name": "",
         "stamp_filename": "verified_default_stamp.png",
+        "stamp_original_name": "기본 도장.png",
     }
     profiles = []
     if isinstance(value, dict):
@@ -411,9 +445,11 @@ def _normalize_companies(value) -> dict:
 
 
 def _company_settings() -> dict:
-    value = _normalize_companies(_json_file(VERIFIED_COMPANY_FILE, {}))
-    _save_json(VERIFIED_COMPANY_FILE, value)
-    return value
+    stored = _json_file(VERIFIED_COMPANY_FILE, {})
+    normalized = _normalize_companies(stored)
+    if stored != normalized:
+        _save_json(VERIFIED_COMPANY_FILE, normalized)
+    return normalized
 
 
 def _company_profile(profile_id: str | None = None) -> dict:
@@ -433,7 +469,13 @@ def _company_snapshot(profile_id: str | None = None) -> dict:
         "company_name": str(profile.get("company_name", "")).strip(),
         "representative_title": str(profile.get("representative_title", "")).strip(),
         "representative_name": str(profile.get("representative_name", "")).strip(),
+        "business_number": str(profile.get("business_number", "")).strip(),
+        "address": str(profile.get("address", "")).strip(),
+        "phone": str(profile.get("phone", "")).strip(),
+        "logo_filename": os.path.basename(str(profile.get("logo_filename", ""))),
+        "logo_original_name": str(profile.get("logo_original_name", "")).strip(),
         "stamp_filename": os.path.basename(str(profile.get("stamp_filename", ""))),
+        "stamp_original_name": str(profile.get("stamp_original_name", "")).strip(),
     }
 
 
@@ -1000,6 +1042,42 @@ def settings_page():
         mail_accounts=_mail_accounts_for_view(mail_store),
         active_mail_account_id=mail_store["active_account_id"],
         csrf_token=_csrf_token(),
+    )
+
+
+@verified_contract_bp.route(
+    "/admin/settings/company/<string:profile_id>/<string:asset_kind>"
+)
+@admin_required
+def company_asset(profile_id: str, asset_kind: str):
+    """회사관리 카드에서 암호화된 로고·도장을 안전하게 미리보기한다."""
+    if asset_kind not in {"logo", "stamp"}:
+        return "지원하지 않는 회사 이미지입니다.", 404
+    profile = next(
+        (
+            item
+            for item in _company_settings()["profiles"]
+            if str(item.get("id", "")) == str(profile_id)
+        ),
+        None,
+    )
+    if not profile:
+        return "회사정보를 찾을 수 없습니다.", 404
+    filename = os.path.basename(str(profile.get(f"{asset_kind}_filename", "")))
+    if not filename:
+        return "등록된 이미지가 없습니다.", 404
+    root = VERIFIED_LOGO_ROOT if asset_kind == "logo" else VERIFIED_STAMP_ROOT
+    path = root / filename
+    if not path.is_file():
+        return "회사 이미지 파일을 찾을 수 없습니다.", 404
+    display_name = str(
+        profile.get(f"{asset_kind}_original_name") or filename
+    ).strip()
+    return encrypted_response(
+        path,
+        display_name,
+        as_attachment=False,
+        mimetype=mimetypes.guess_type(display_name)[0] or "image/png",
     )
 
 
@@ -1572,7 +1650,9 @@ def download_selected():
             if not path.is_file():
                 continue
             safe_signer = re.sub(r'[\\/:*?"<>|]+', "_", str(row["signer_name"]))[:60]
-            archive.write(path, arcname=f"{row['id']}_{safe_signer}_{path.name}")
+            archive.writestr(
+                f"{row['id']}_{safe_signer}_{path.name}", read_decrypted(path)
+            )
             count += 1
     if count == 0:
         return "선택한 항목에 완료된 계약서 파일이 없습니다.", 404
@@ -1731,7 +1811,7 @@ def admin_download(contract_id: int):
     path = VERIFIED_CONTRACTS_ROOT / os.path.basename(row["pdf_filename"])
     if not path.is_file():
         return "계약서 파일을 찾을 수 없습니다.", 404
-    return send_file(path, as_attachment=True, download_name=path.name)
+    return encrypted_response(path, path.name, as_attachment=True, mimetype='application/pdf')
 
 
 @verified_contract_bp.route("/admin/terms")
@@ -1971,6 +2051,12 @@ def save_company_settings():
             settings["active_profile_id"] = profiles[0]["id"]
         settings["profiles"] = profiles
         _save_json(VERIFIED_COMPANY_FILE, settings)
+        for key, root in (
+            ("logo_filename", VERIFIED_LOGO_ROOT),
+            ("stamp_filename", VERIFIED_STAMP_ROOT),
+        ):
+            if profile.get(key):
+                delete_file(root / os.path.basename(profile[key]))
         return jsonify({"status": "success", "message": "발송회사를 삭제했습니다."})
     if action == "add":
         if len(profiles) >= MAX_COMPANY_PROFILES:
@@ -1981,7 +2067,7 @@ def save_company_settings():
                 }
             ), 400
         profile_id = f"verified-{secrets.token_hex(8)}"
-        profile = {"id": profile_id, "stamp_filename": ""}
+        profile = {"id": profile_id, "logo_filename": "", "stamp_filename": ""}
         profiles.append(profile)
     else:
         profile = next((item for item in profiles if item["id"] == profile_id), None)
@@ -1995,19 +2081,55 @@ def save_company_settings():
             "representative_name": str(request.form.get("representative_name", "")).strip(),
         }
     )
+    for optional_field in ("business_number", "address", "phone"):
+        if optional_field in request.form:
+            profile[optional_field] = str(request.form.get(optional_field, "")).strip()
     if not profile["company_name"]:
         return jsonify({"status": "error", "message": "회사명을 입력해 주세요."}), 400
-    stamp = request.files.get("stamp_file")
-    if stamp and stamp.filename:
-        extension = Path(secure_filename(stamp.filename)).suffix.lower()
-        if extension not in {".png", ".jpg", ".jpeg"}:
-            return jsonify({"status": "error", "message": "도장은 PNG 또는 JPG 파일만 사용할 수 있습니다."}), 400
-        filename = f"stamp_{profile_id}_{datetime.now(KST).strftime('%Y%m%d%H%M%S')}{extension}"
-        stamp.save(VERIFIED_STAMP_ROOT / filename)
-        profile["stamp_filename"] = filename
+    if not profile["representative_name"]:
+        return jsonify({"status": "error", "message": "대표자 이름을 입력해 주세요."}), 400
+
+    new_asset_paths = []
+    replaced_assets = []
+    try:
+        for asset_kind, upload_key, root, fallback, label in (
+            ("logo", "logo_file", VERIFIED_LOGO_ROOT, "logo.png", "회사 로고"),
+            ("stamp", "stamp_file", VERIFIED_STAMP_ROOT, "stamp.png", "회사 도장"),
+        ):
+            upload = request.files.get(upload_key)
+            if not upload or not upload.filename:
+                continue
+            display_name = original_filename(upload.filename, fallback)
+            extension = Path(display_name).suffix.lower()
+            if extension not in {".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+                raise ValueError(f"{label}는 PNG, JPG, GIF 또는 WEBP 파일만 사용할 수 있습니다.")
+            filename = encrypted_storage_name(display_name)
+            new_path = root / filename
+            old_filename = str(profile.get(f"{asset_kind}_filename") or "")
+            encrypt_upload(upload, new_path)
+            new_asset_paths.append(new_path)
+            if old_filename and old_filename != filename:
+                replaced_assets.append((root, old_filename))
+            profile[f"{asset_kind}_filename"] = filename
+            profile[f"{asset_kind}_original_name"] = display_name
+    except ValueError as exc:
+        for path in new_asset_paths:
+            delete_file(path)
+        return jsonify({"status": "error", "message": str(exc)}), 400
+    except Exception:
+        for path in new_asset_paths:
+            delete_file(path)
+        raise
     settings["active_profile_id"] = profile_id
     settings["profiles"] = profiles
-    _save_json(VERIFIED_COMPANY_FILE, settings)
+    try:
+        _save_json(VERIFIED_COMPANY_FILE, settings)
+    except Exception:
+        for path in new_asset_paths:
+            delete_file(path)
+        raise
+    for root, old_filename in replaced_assets:
+        delete_file(root / os.path.basename(old_filename))
     return jsonify({"status": "success", "message": "인증전자계약 전용 회사정보를 저장했습니다."})
 
 
@@ -2261,10 +2383,10 @@ def _stamp_data_uri(company: dict) -> str:
     if not path.is_file():
         return ""
     mime, _ = mimetypes.guess_type(path.name)
-    return f"data:{mime or 'image/png'};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+    return f"data:{mime or 'image/png'};base64,{base64.b64encode(read_decrypted(path)).decode('ascii')}"
 
 
-def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, signed_at: datetime) -> Path:
+def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, signed_at: datetime):
     values = _public_values(row, contract_data, company)
     values["연락처"] = escape(str(contract_data.get("연락처", "")))
     values["거주지"] = escape(str(contract_data.get("거주지", "")))
@@ -2328,22 +2450,33 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
         raise RuntimeError("인증전자계약 전용 PDF 엔진(wkhtmltopdf)을 찾을 수 없습니다.")
     filename = f"verified_contract_{row['id']}_v{row['version']}_{signed_at.astimezone(KST).strftime('%Y%m%d_%H%M%S')}.pdf"
     path = VERIFIED_CONTRACTS_ROOT / filename
-    pdfkit.from_string(
-        html,
-        str(path),
-        configuration=configuration,
-        options={
-            "encoding": "UTF-8",
-            "enable-local-file-access": None,
-            "print-media-type": None,
-            "page-size": "A4",
-            "margin-top": "18mm",
-            "margin-right": "17mm",
-            "margin-bottom": "18mm",
-            "margin-left": "17mm",
-        },
-    )
-    return path
+    descriptor, temporary_path = tempfile.mkstemp(prefix='saedam-verified-', suffix='.pdf')
+    os.close(descriptor)
+    try:
+        pdfkit.from_string(
+            html,
+            temporary_path,
+            configuration=configuration,
+            options={
+                "encoding": "UTF-8",
+                "enable-local-file-access": None,
+                "print-media-type": None,
+                "page-size": "A4",
+                "margin-top": "18mm",
+                "margin-right": "17mm",
+                "margin-bottom": "18mm",
+                "margin-left": "17mm",
+            },
+        )
+        with open(temporary_path, 'rb') as source:
+            pdf_hash = hashlib.sha256(source.read()).hexdigest()
+            source.seek(0)
+            encrypt_stream(source, path)
+        return path, pdf_hash, temporary_path
+    except Exception:
+        delete_file(temporary_path)
+        delete_file(path)
+        raise
 
 
 @verified_contract_bp.route("/sign/<string:token>/complete", methods=["POST"])
@@ -2395,7 +2528,7 @@ def complete_contract(token: str):
 
     signature_filename = f"signature_{row['id']}_{secrets.token_hex(8)}.png"
     signature_path = VERIFIED_SIGNATURE_ROOT / signature_filename
-    signature_path.write_bytes(signature_bytes)
+    encrypt_bytes(signature_bytes, signature_path)
     signature_uri = f"data:image/png;base64,{base64.b64encode(signature_bytes).decode('ascii')}"
     contract_data = json.loads(row["contract_data_json"] or "{}")
     contract_data["연락처"] = phone
@@ -2409,10 +2542,11 @@ def complete_contract(token: str):
     company = json.loads(row["company_snapshot_json"] or "{}")
     signed_at = _now()
     try:
-        pdf_path = _build_pdf(row, pdf_contract_data, company, signature_uri, signed_at)
-        pdf_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
+        pdf_path, pdf_hash, temporary_pdf_path = _build_pdf(
+            row, pdf_contract_data, company, signature_uri, signed_at
+        )
     except Exception:
-        signature_path.unlink(missing_ok=True)
+        delete_file(signature_path)
         raise
 
     agreement_evidence = [
@@ -2425,8 +2559,9 @@ def complete_contract(token: str):
             "SELECT status FROM verified_contracts WHERE id=?", (row["id"],)
         ).fetchone()
         if not current or current["status"] != "pending":
-            pdf_path.unlink(missing_ok=True)
-            signature_path.unlink(missing_ok=True)
+            delete_file(pdf_path)
+            delete_file(signature_path)
+            delete_file(temporary_pdf_path)
             return jsonify({"status": "error", "message": "이미 처리된 계약입니다."}), 409
         update_verified_contract(
             conn,
@@ -2464,8 +2599,9 @@ def complete_contract(token: str):
         conn.commit()
     except Exception:
         conn.rollback()
-        pdf_path.unlink(missing_ok=True)
-        signature_path.unlink(missing_ok=True)
+        delete_file(pdf_path)
+        delete_file(signature_path)
+        delete_file(temporary_pdf_path)
         raise
     finally:
         conn.close()
@@ -2475,20 +2611,21 @@ def complete_contract(token: str):
     if sender and sender.lower() != row["signer_email"].lower():
         recipients.append(sender)
     try:
-        _send_mail(
-            recipients,
-            f"[계약완료] {row['title_snapshot']}",
-            (
-                f"{row['signer_name']}님의 인증전자계약이 완료되었습니다.<br>"
-                "첨부된 최종 계약서를 확인해 주세요.<br><br>"
-                "계약서 위변조 확인용 고유번호(SHA-256): "
-                f"<span style='font-family:monospace'>{pdf_hash}</span><br>"
-                "<span style='font-size:12px;color:#64748b'>"
-                "첨부 계약서가 이후 변경되지 않았는지 확인할 때 사용하는 번호이며, "
-                "별도로 입력하실 필요는 없습니다.</span>"
-            ),
-            attachments=str(pdf_path),
-        )
+        with temporary_decrypted_path(pdf_path, pdf_path.name) as mail_pdf_path:
+            _send_mail(
+                recipients,
+                f"[계약완료] {row['title_snapshot']}",
+                (
+                    f"{row['signer_name']}님의 인증전자계약이 완료되었습니다.<br>"
+                    "첨부된 최종 계약서를 확인해 주세요.<br><br>"
+                    "계약서 위변조 확인용 고유번호(SHA-256): "
+                    f"<span style='font-family:monospace'>{pdf_hash}</span><br>"
+                    "<span style='font-size:12px;color:#64748b'>"
+                    "첨부 계약서가 이후 변경되지 않았는지 확인할 때 사용하는 번호이며, "
+                    "별도로 입력하실 필요는 없습니다.</span>"
+                ),
+                attachments=mail_pdf_path,
+            )
         mail_status, mail_error = "sent", ""
     except Exception as exc:
         mail_status, mail_error = "failed", str(exc)[:500]
@@ -2511,6 +2648,7 @@ def complete_contract(token: str):
         conn.commit()
     finally:
         conn.close()
+        delete_file(temporary_pdf_path)
     return jsonify(
         {
             "status": "success",
@@ -2535,4 +2673,4 @@ def public_download(token: str):
     path = VERIFIED_CONTRACTS_ROOT / os.path.basename(row["pdf_filename"] or "")
     if not path.is_file():
         return "계약서 파일을 찾을 수 없습니다.", 404
-    return send_file(path, as_attachment=True, download_name=path.name)
+    return encrypted_response(path, path.name, as_attachment=True, mimetype='application/pdf')

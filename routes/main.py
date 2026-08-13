@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, jsonify, session, request, current_app, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, jsonify, session, request, current_app, abort, url_for
 from datetime import datetime, timedelta
 import holidays
 import os
@@ -8,6 +7,7 @@ import urllib.parse
 from .database import get_db
 from .board import init_board_db  # 💡 새로 추가: board.py에서 게시판 DB 초기화 함수 임포트
 from .storage import UPLOADS_ROOT
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 
 main_bp = Blueprint('main', __name__)
 
@@ -412,15 +412,21 @@ def save_board():
     filename, filepath = '', ''
     
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+        filename = original_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, encrypted_storage_name(filename))
+        encrypt_upload(file, filepath)
 
     conn = get_db()
-    conn.execute("INSERT INTO board (title, content, author, filename, filepath) VALUES (?, ?, ?, ?, ?)", 
-                 (title, content, author, filename, filepath))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("INSERT INTO board (title, content, author, filename, filepath) VALUES (?, ?, ?, ?, ?)",
+                     (title, content, author, filename, filepath))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_file(filepath)
+        raise
+    finally:
+        conn.close()
     return jsonify({"status": "success"})
 
 @main_bp.route('/update_board/<int:post_id>', methods=['POST'])
@@ -432,32 +438,80 @@ def update_board(post_id):
     file = request.files.get('file')
     conn = get_db()
     
-    if file and file.filename:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-        conn.execute("UPDATE board SET title=?, content=?, filename=?, filepath=? WHERE id=? AND author=?", 
-                     (title, content, filename, filepath, post_id, author))
-    else:
-        conn.execute("UPDATE board SET title=?, content=? WHERE id=? AND author=?", 
-                     (title, content, post_id, author))
-    
-    conn.commit()
-    conn.close()
+    old_file = conn.execute(
+        "SELECT filepath FROM board WHERE id=? AND author=?", (post_id, author)
+    ).fetchone()
+    old_path = old_file['filepath'] if old_file and old_file['filepath'] else ''
+
+    filepath = ''
+    try:
+        if file and file.filename:
+            filename = original_filename(file.filename)
+            filepath = os.path.join(UPLOAD_FOLDER, encrypted_storage_name(filename))
+            encrypt_upload(file, filepath)
+            conn.execute("UPDATE board SET title=?, content=?, filename=?, filepath=? WHERE id=? AND author=?",
+                         (title, content, filename, filepath, post_id, author))
+        else:
+            conn.execute("UPDATE board SET title=?, content=? WHERE id=? AND author=?",
+                         (title, content, post_id, author))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_file(filepath)
+        raise
+    finally:
+        conn.close()
+    if file and file.filename and old_path and old_path != filepath:
+        delete_file(old_path)
     return jsonify({"status": "success"})
 
 @main_bp.route('/delete_board/<int:post_id>', methods=['DELETE'])
 def delete_board(post_id):
     author = session.get('user_name')
     conn = get_db()
+    row = conn.execute(
+        "SELECT filepath FROM board WHERE id=? AND author=?", (post_id, author)
+    ).fetchone()
     conn.execute("DELETE FROM board WHERE id=? AND author=?", (post_id, author))
     conn.commit()
     conn.close()
+    if row and row['filepath']:
+        delete_file(row['filepath'])
     return jsonify({"status": "success"})
 
 @main_bp.route('/uploads/<name>')
 def download_file(name):
-    return send_from_directory(UPLOAD_FOLDER, name)
+    current_user = session.get('user_name')
+    if not current_user:
+        abort(401)
+
+    conn = get_db()
+    candidates = []
+    candidates.extend(conn.execute(
+        "SELECT filename, filepath FROM board WHERE filename=?", (name,)
+    ).fetchall())
+    candidates.extend(conn.execute(
+        "SELECT filename, filepath FROM messages WHERE filename=? AND (sender=? OR receiver=?)",
+        (name, current_user, current_user)
+    ).fetchall())
+    candidates.extend(conn.execute(
+        "SELECT filename, filepath FROM memos WHERE filename=? AND owner=?",
+        (name, current_user)
+    ).fetchall())
+    conn.close()
+
+    for row in candidates:
+        filepath = os.path.realpath(str(row['filepath'] or ''))
+        upload_root = os.path.realpath(UPLOAD_FOLDER)
+        try:
+            allowed = filepath and os.path.commonpath([upload_root, filepath]) == upload_root
+        except ValueError:
+            allowed = False
+        if allowed and os.path.isfile(filepath):
+            return encrypted_response(filepath, row['filename'] or name)
+
+    # DB 소유권 확인을 통과하지 못한 공유 업로드 파일은 파일명으로 직접 제공하지 않는다.
+    abort(404)
 
 UNREAD_CONDITION = "(is_read IN (0, '0', 'False', 'false') OR is_read IS NULL)"
 
@@ -553,23 +607,28 @@ def send_message():
     filename, filepath = '', ''
     
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+        filename = original_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, encrypted_storage_name(filename))
+        encrypt_upload(file, filepath)
 
     conn = get_db()
     
-    if receivers:
-        for rec in receivers:
-            if room_id:
-                conn.execute("INSERT INTO messages (sender, receiver, content, filename, filepath, room_id, is_read) VALUES (?, ?, ?, ?, ?, ?, 0)", 
-                             (sender, rec, content, filename, filepath, room_id))
-            else:
-                conn.execute("INSERT INTO messages (sender, receiver, content, filename, filepath, is_read) VALUES (?, ?, ?, ?, ?, 0)", 
-                             (sender, rec, content, filename, filepath))
-                             
-    conn.commit()
-    conn.close()
+    try:
+        if receivers:
+            for rec in receivers:
+                if room_id:
+                    conn.execute("INSERT INTO messages (sender, receiver, content, filename, filepath, room_id, is_read) VALUES (?, ?, ?, ?, ?, ?, 0)",
+                                 (sender, rec, content, filename, filepath, room_id))
+                else:
+                    conn.execute("INSERT INTO messages (sender, receiver, content, filename, filepath, is_read) VALUES (?, ?, ?, ?, ?, 0)",
+                                 (sender, rec, content, filename, filepath))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_file(filepath)
+        raise
+    finally:
+        conn.close()
     return jsonify({"status": "success"})
 
 @main_bp.route('/get_chat_history/<other_user>')
@@ -635,7 +694,11 @@ def delete_message(msg_id):
     conn = get_db()
     
     # 선택한 메시지가 그룹 채팅인지 1:1인지 확인 후 일괄 삭제
-    msg = conn.execute("SELECT room_id, content, sent_at FROM messages WHERE id=? AND sender=?", (msg_id, current_user)).fetchone()
+    msg = conn.execute(
+        "SELECT room_id, content, sent_at, filepath FROM messages WHERE id=? AND sender=?",
+        (msg_id, current_user)
+    ).fetchone()
+    removed_path = msg['filepath'] if msg and msg['filepath'] else ''
     if msg:
         if msg['room_id']:
             # 그룹 채팅일 경우 수신자별로 생성된 모든 동일 메시지를 지움
@@ -644,7 +707,13 @@ def delete_message(msg_id):
         else:
             conn.execute("DELETE FROM messages WHERE id=? AND sender=?", (msg_id, current_user))
         conn.commit()
-        
+        if removed_path:
+            remaining = conn.execute(
+                "SELECT 1 FROM messages WHERE filepath=? LIMIT 1", (removed_path,)
+            ).fetchone()
+            if not remaining:
+                delete_file(removed_path)
+
     conn.close()
     return jsonify({"status": "success"})
 
@@ -672,32 +741,42 @@ def save_my_memo():
     filename, filepath = '', ''
     
     if file and file.filename:
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
+        filename = original_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, encrypted_storage_name(filename))
+        encrypt_upload(file, filepath)
 
     conn = get_db()
     
     existing_memo = conn.execute("SELECT * FROM memos WHERE owner = ?", (owner,)).fetchone()
+    old_path = existing_memo['filepath'] if existing_memo and existing_memo['filepath'] else ''
     
-    if existing_memo:
-        if not filename:
-            filename = existing_memo['filename'] if existing_memo['filename'] else ''
-            filepath = existing_memo['filepath'] if existing_memo['filepath'] else ''
-            
-        conn.execute('''
-            UPDATE memos 
-            SET content = ?, filename = ?, filepath = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE owner = ?
-        ''', (content, filename, filepath, owner))
-    else:
-        conn.execute('''
-            INSERT INTO memos (owner, content, filename, filepath)
-            VALUES (?, ?, ?, ?)
-        ''', (owner, content, filename, filepath))
-        
-    conn.commit()
-    conn.close()
+    try:
+        if existing_memo:
+            if not filename:
+                filename = existing_memo['filename'] if existing_memo['filename'] else ''
+                filepath = existing_memo['filepath'] if existing_memo['filepath'] else ''
+
+            conn.execute('''
+                UPDATE memos
+                SET content = ?, filename = ?, filepath = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE owner = ?
+            ''', (content, filename, filepath, owner))
+        else:
+            conn.execute('''
+                INSERT INTO memos (owner, content, filename, filepath)
+                VALUES (?, ?, ?, ?)
+            ''', (owner, content, filename, filepath))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        if file and file.filename:
+            delete_file(filepath)
+        raise
+    finally:
+        conn.close()
+
+    if file and file.filename and old_path and old_path != filepath:
+        delete_file(old_path)
 
     return jsonify({"status": "success"})
 
@@ -723,18 +802,27 @@ def save_weblink():
     if not 1 <= user_level <= 5:
         conn.close()
         return jsonify({"status": "error", "message": "링크 등록 권한이 없습니다."}), 403
-    
+
+    created_path = None
     if link_type == 'file':
         file = request.files.get('file')
         if file and file.filename:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(filepath)
-            
-            url = f'/uploads/{filename}'
-            # 파일을 위한 특수 플래그로 favicon_url 설정
-            conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                         (title, 'file', url, 'FILE', current_user, filename, filepath))
+            try:
+                filename = original_filename(file.filename)
+                stored_name = encrypted_storage_name(filename)
+                filepath = os.path.join(UPLOAD_FOLDER, stored_name)
+                encrypt_upload(file, filepath)
+                created_path = filepath
+                # 파일을 위한 특수 플래그로 favicon_url 설정
+                cursor = conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, '', ?, ?, ?, ?)",
+                                      (title, 'file', 'FILE', current_user, filename, filepath))
+                url = url_for('main.serve_weblink_file', link_id=cursor.lastrowid)
+                conn.execute("UPDATE weblinks SET url=? WHERE id=?", (url, cursor.lastrowid))
+            except Exception:
+                conn.rollback()
+                delete_file(created_path)
+                conn.close()
+                raise
     else:
         url = request.form.get('url')
         if not url.startswith('http://') and not url.startswith('https://'):
@@ -751,7 +839,13 @@ def save_weblink():
         conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by) VALUES (?, ?, ?, ?, ?)", 
                      (title, 'url', url, favicon_url, current_user))
         
-    conn.commit()
+    try:
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_file(created_path)
+        conn.close()
+        raise
     conn.close()
     return jsonify({"status": "success"})
 
@@ -800,19 +894,27 @@ def delete_weblink(link_id):
         conn.close()
         return jsonify({"status": "error", "message": "존재하지 않는 링크입니다."}), 404
 
-    # 등록된 파일이 있다면 서버에서 물리 파일도 삭제
-    if 'type' in link.keys() and link['type'] == 'file' and link['filepath']:
-        if os.path.exists(link['filepath']):
-            try:
-                os.remove(link['filepath'])
-            except:
-                pass
-
+    file_to_delete = link['filepath'] if 'type' in link.keys() and link['type'] == 'file' else None
     conn.execute("DELETE FROM weblinks WHERE id=?", (link_id,))
     conn.commit()
     conn.close()
+    delete_file(file_to_delete)
     
     return jsonify({"status": "success"})
+
+
+@main_bp.route('/weblink-file/<int:link_id>')
+def serve_weblink_file(link_id):
+    conn = get_db()
+    link = conn.execute(
+        "SELECT type, filename, filepath FROM weblinks WHERE id=?", (link_id,)
+    ).fetchone()
+    conn.close()
+    if not link or link['type'] != 'file' or not link['filepath']:
+        abort(404)
+    return encrypted_response(
+        link['filepath'], link['filename'] or 'attachment', as_attachment=False
+    )
 
 
     # 메신저 메뉴 모듈화=====================================================

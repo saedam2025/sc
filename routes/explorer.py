@@ -4,10 +4,37 @@ import shutil
 from datetime import datetime
 from .database import get_db
 from .security import admin_required, hash_password
-from .storage import DATA_ROOT
+from .storage import DATA_ROOT, LEGACY_CONTRACT_DB_FILE, MAIN_DB_FILE, SECURITY_ROOT
 
 # 'explorer'라는 이름의 독립된 Blueprint 생성
 explorer_bp = Blueprint('explorer', __name__)
+
+
+def _is_sensitive_path(path):
+    target = os.path.realpath(path)
+    security_root = os.path.realpath(str(SECURITY_ROOT))
+    try:
+        if os.path.commonpath([security_root, target]) == security_root:
+            return True
+    except ValueError:
+        return True
+    return target in {
+        os.path.realpath(str(MAIN_DB_FILE)),
+        os.path.realpath(str(LEGACY_CONTRACT_DB_FILE)),
+    }
+
+
+def _safe_explorer_target(req_path):
+    root = os.path.realpath(str(DATA_ROOT))
+    target = os.path.realpath(os.path.join(root, req_path or ''))
+    try:
+        if os.path.commonpath([root, target]) != root:
+            abort(403)
+    except ValueError:
+        abort(403)
+    if _is_sensitive_path(target):
+        abort(403)
+    return root, target
 
 # ==========================================
 # [신규] Admin 비밀번호 변경 처리 라우트
@@ -42,12 +69,7 @@ def change_admin_password():
 @admin_required
 def file_explorer(req_path):
     # 탐색할 최상위 기본 경로 (Render 디스크 마운트 경로)
-    BASE_DIR = str(DATA_ROOT)
-    abs_path = os.path.abspath(os.path.join(BASE_DIR, req_path))
-
-    # [핵심 보안] 상위 폴더(../)로 넘어가려는 해킹 시도 차단
-    if not abs_path.startswith(os.path.abspath(BASE_DIR)):
-        abort(403)
+    BASE_DIR, abs_path = _safe_explorer_target(req_path)
     if not os.path.exists(abs_path):
         abort(404)
     if os.path.isfile(abs_path):
@@ -59,9 +81,12 @@ def file_explorer(req_path):
     total_files = 0
     app_used_bytes = 0
     for root, dirs, f_names in os.walk(BASE_DIR):
-        total_files += len(f_names)
+        dirs[:] = [name for name in dirs if not _is_sensitive_path(os.path.join(root, name))]
         for f in f_names:
             fp = os.path.join(root, f)
+            if _is_sensitive_path(fp):
+                continue
+            total_files += 1
             if os.path.exists(fp) and not os.path.islink(fp):
                 app_used_bytes += os.path.getsize(fp)
 
@@ -82,6 +107,13 @@ def file_explorer(req_path):
     files = []
     for filename in os.listdir(abs_path):
         filepath = os.path.join(abs_path, filename)
+        if _is_sensitive_path(filepath):
+            continue
+        try:
+            if os.path.commonpath([BASE_DIR, os.path.realpath(filepath)]) != BASE_DIR:
+                continue
+        except ValueError:
+            continue
         stat = os.stat(filepath)
         is_dir = os.path.isdir(filepath)
         size = stat.st_size if not is_dir else "-"

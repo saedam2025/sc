@@ -1,5 +1,4 @@
-from flask import Blueprint, abort, render_template, request, redirect, url_for, send_from_directory, Response, jsonify, session
-from werkzeug.utils import secure_filename
+from flask import Blueprint, abort, render_template, request, redirect, url_for, Response, jsonify, session
 from .database import get_db
 from .security import admin_required, load_credential_secret
 from .storage import GALL2_ROOT
@@ -10,6 +9,7 @@ import os
 from datetime import datetime
 from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_stream, is_encrypted_file, original_filename as clean_original_filename, plaintext_size
 
 gall2_bp = Blueprint('gall2', __name__)
 
@@ -28,8 +28,8 @@ SCHOOL_GALLERY_SCOPE_ID = 0
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(THUMB_FOLDER, exist_ok=True)
 
-def optimize_gallery_image(file, temp_path):
-    """업로드 이미지를 웹용 크기와 용량으로 줄여 임시 JPG 파일로 저장합니다."""
+def optimize_gallery_image(file):
+    """업로드 이미지를 웹용 JPG 메모리 스트림으로 변환합니다."""
     file.stream.seek(0)
     img = Image.open(file.stream)
     img = ImageOps.exif_transpose(img)
@@ -46,14 +46,10 @@ def optimize_gallery_image(file, temp_path):
     buffer = BytesIO()
     img.save(buffer, format="JPEG", optimize=True, quality=GALLERY_IMAGE_QUALITY)
     buffer.seek(0)
-    with open(temp_path, "wb") as f:
-        f.write(buffer.read())
+    return buffer
 
 def build_gallery_filename(original_filename):
-    safe_name = secure_filename(original_filename)
-    save_root = os.path.splitext(safe_name)[0] or "gallery_image"
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    return f"{save_root}_{timestamp}.jpg"
+    return encrypted_storage_name(original_filename)
 
 def format_file_size(size):
     if size is None:
@@ -69,10 +65,7 @@ def format_file_size(size):
 
 def get_gallery_file_size(filename):
     path = os.path.join(UPLOAD_FOLDER, filename)
-    try:
-        return os.path.getsize(path)
-    except OSError:
-        return 0
+    return plaintext_size(path)
 
 def ensure_gall2_schema():
     conn = get_db()
@@ -216,8 +209,8 @@ def delete_gallery_file(file_row):
     try:
         target_file = os.path.join(UPLOAD_FOLDER, file_row['filename'])
         target_thumb = os.path.join(THUMB_FOLDER, file_row['thumb_name'])
-        if os.path.exists(target_file): os.remove(target_file)
-        if os.path.exists(target_thumb): os.remove(target_thumb)
+        delete_file(target_file)
+        delete_file(target_thumb)
     except Exception as e:
         print(f"파일 삭제 오류: {e}")
 
@@ -228,20 +221,25 @@ def delete_gallery_post(conn, post_id):
     conn.execute('DELETE FROM gall2 WHERE post_id = ?', (post_id,))
     conn.execute('DELETE FROM gall2_posts WHERE id = ?', (post_id,))
 
-def generate_thumb_from_raw(temp_path, filename):
-    thumb_name = f"thumb_{os.path.splitext(filename)[0]}.jpg"
+def generate_thumb_from_stream(image_stream, filename):
+    thumb_name = encrypted_storage_name(f"thumb_{filename}.jpg")
     thumb_path = os.path.join(THUMB_FOLDER, thumb_name)
-    
     try:
-        with Image.open(temp_path) as img:
+        image_stream.seek(0)
+        with Image.open(image_stream) as img:
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             img.thumbnail((500, 500))
-            img.save(thumb_path, "JPEG", quality=85)
+            thumb_buffer = BytesIO()
+            img.save(thumb_buffer, "JPEG", quality=85)
+            thumb_buffer.seek(0)
+            encrypt_stream(thumb_buffer, thumb_path)
+        return thumb_name
     except Exception as e:
         print(f"썸네일 생성 오류: {e}")
-    
-    return thumb_name
+    finally:
+        image_stream.seek(0)
+    return None
 
 @gall2_bp.route('/gall2')
 def index():
@@ -304,7 +302,7 @@ def save_gallery_upload_request(school_id=None):
 
     for file in files:
         if file and file.filename != '':
-            original_filename = file.filename
+            original_filename = clean_original_filename(file.filename)
             ext = original_filename.split('.')[-1].lower()
             
             if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
@@ -314,42 +312,45 @@ def save_gallery_upload_request(school_id=None):
             filename = build_gallery_filename(original_filename)
             title = original_filename
             
-            temp_path = os.path.join(BASE_GALLERY_PATH, f"temp_{filename}")
             try:
-                optimize_gallery_image(file, temp_path)
+                optimized_stream = optimize_gallery_image(file)
             except (UnidentifiedImageError, OSError, ValueError) as e:
                 print(f"이미지 최적화 오류: {e}")
                 continue
-             
-            thumb_name = generate_thumb_from_raw(temp_path, filename)
-            
+              
+            thumb_name = generate_thumb_from_stream(optimized_stream, filename)
+            if not thumb_name:
+                continue
+
             saved_ok = False
+            save_path = os.path.join(UPLOAD_FOLDER, filename)
             try:
-                with open(temp_path, 'rb') as f:
-                    encrypted_data = cipher.encrypt(f.read())
-                     
-                save_path = os.path.join(UPLOAD_FOLDER, filename)
-                with open(save_path, 'wb') as f:
-                    f.write(encrypted_data)
+                optimized_stream.seek(0)
+                encrypt_stream(optimized_stream, save_path)
                 saved_ok = True
             except Exception as e:
                 print(f"암호화 오류: {e}")
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
 
             if not saved_ok:
+                delete_file(os.path.join(THUMB_FOLDER, thumb_name))
                 continue
-             
-            conn = get_db()
-            post_id = get_or_create_gallery_post(
-                conn, title_base, content, author, active_tab_id, upload_token,
-                school_id=school_id,
-            )
-            conn.execute('INSERT INTO gall2 (title, filename, thumb_name, file_type, tab_id, post_id) VALUES (?, ?, ?, ?, ?, ?)',
-                         (title, filename, thumb_name, file_type, active_tab_id, post_id))
-            conn.commit()
-            conn.close()
+              
+            try:
+                conn = get_db()
+                try:
+                    post_id = get_or_create_gallery_post(
+                        conn, title_base, content, author, active_tab_id, upload_token,
+                        school_id=school_id,
+                    )
+                    conn.execute('INSERT INTO gall2 (title, filename, thumb_name, file_type, tab_id, post_id) VALUES (?, ?, ?, ?, ?, ?)',
+                                 (title, filename, thumb_name, file_type, active_tab_id, post_id))
+                    conn.commit()
+                finally:
+                    conn.close()
+            except Exception as e:
+                delete_file(save_path)
+                delete_file(os.path.join(THUMB_FOLDER, thumb_name))
+                print(f"갤러리 DB 저장 오류: {e}")
             
     return None
 
@@ -663,6 +664,8 @@ def serve_encrypted_gallery_file(filename):
     if not os.path.exists(file_path):
         return "파일을 찾을 수 없습니다.", 404
         
+    if is_encrypted_file(file_path):
+        return encrypted_response(file_path, filename.removesuffix('.sdf'), as_attachment=False, mimetype='image/jpeg')
     with open(file_path, 'rb') as f:
         try:
             decrypted_data = cipher.decrypt(f.read())
@@ -694,4 +697,4 @@ def serve_thumb(filename):
 
 
 def serve_gallery_thumb_file(filename):
-    return send_from_directory(THUMB_FOLDER, filename)
+    return encrypted_response(os.path.join(THUMB_FOLDER, filename), 'thumbnail.jpg', as_attachment=False, mimetype='image/jpeg')

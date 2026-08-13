@@ -11,7 +11,7 @@ from pathlib import Path
 from flask import abort, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .storage import SECURITY_ROOT, bootstrap_legacy_files
+from .storage import DATA_ROOT, SECURITY_ROOT, bootstrap_legacy_files
 
 PASSWORD_HASH_PREFIXES = ("scrypt:", "pbkdf2:", "argon2:", "$2a$", "$2b$")
 ADMIN_MAX_LEVEL = 2
@@ -130,7 +130,25 @@ def _security_directory() -> Path:
     configured = (
         os.environ.get("SECURITY_DATA_DIR", "").strip()
     )
-    directory = Path(configured).expanduser() if configured else SECURITY_ROOT
+    directory = (
+        Path(configured).expanduser().resolve()
+        if configured
+        else SECURITY_ROOT.resolve()
+    )
+    render_runtime = os.environ.get("RENDER", "").strip().lower() in {
+        "1", "true", "yes", "on"
+    } or bool(os.environ.get("RENDER_SERVICE_ID", "").strip())
+    allow_ephemeral = os.environ.get(
+        "ALLOW_EPHEMERAL_DATA_ON_RENDER", ""
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if render_runtime and not allow_ephemeral:
+        try:
+            directory.relative_to(DATA_ROOT.resolve())
+        except ValueError as exc:
+            raise RuntimeError(
+                "SECURITY_DATA_DIR는 Render 영구 DATA_DIR 안에 있어야 합니다. "
+                "암호화 키가 재배포 때 사라지지 않도록 설정을 확인해 주세요."
+            ) from exc
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
@@ -174,3 +192,8 @@ def load_session_secret() -> str:
 
 def load_credential_secret() -> str:
     return _read_or_create_secret("CREDENTIAL_ENCRYPTION_KEY", "credentials.key")
+
+
+def load_file_secret() -> str:
+    """첨부파일 전용 키를 영속 저장소에서 불러온다."""
+    return _read_or_create_secret("FILE_ENCRYPTION_KEY", "files.key")

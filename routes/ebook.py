@@ -19,16 +19,15 @@ from flask import (
     redirect,
     render_template,
     request,
-    send_file,
     session,
     url_for,
 )
 from PIL import Image, UnidentifiedImageError
-from werkzeug.utils import secure_filename
 
 from .database import get_db
 from .security import is_admin_session
 from .storage import DATA_ROOT
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 
 
 ebook_bp = Blueprint("ebook", __name__)
@@ -233,7 +232,7 @@ def paginate_text(text: str, limit: int):
 
 
 def _save_validated_image(upload, folder: Path, max_bytes: int, formats, extensions):
-    raw_name = Path((upload.filename or "").replace("\\", "/")).name
+    raw_name = original_filename(upload.filename, "image")
     extension = Path(raw_name).suffix.lower()
     if extension not in extensions:
         raise ValueError("표지는 JPG, PNG, GIF, WEBP 이미지만 사용할 수 있습니다.")
@@ -251,11 +250,10 @@ def _save_validated_image(upload, folder: Path, max_bytes: int, formats, extensi
         raise ValueError("정상적인 이미지 파일이 아닙니다.") from exc
     finally:
         upload.stream.seek(0)
-    safe_stem = secure_filename(Path(raw_name).stem) or "image"
-    stored_name = f"{uuid.uuid4().hex}_{safe_stem}{extension}"
+    stored_name = encrypted_storage_name(raw_name)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / stored_name
-    upload.save(path)
+    encrypt_upload(upload, path)
     return raw_name, stored_name, str(path)
 
 
@@ -290,6 +288,29 @@ def _sanitize_page_html(raw_html: str, allowed_media_ids):
             tag.attrs = {}
     cleaned = str(soup).strip()
     return cleaned or "<p><br></p>"
+
+
+def _prune_unreferenced_text_media(conn, ebook_id: int):
+    """편집기에서 제거된 이미지의 DB 레코드를 정리하고 삭제할 파일 경로를 반환한다."""
+    used_ids = set()
+    for row in conn.execute(
+        "SELECT content_html FROM ebook_pages WHERE ebook_id=?", (ebook_id,)
+    ).fetchall():
+        used_ids.update(
+            int(value)
+            for value in re.findall(r'/ebook/media/(\d+)', row["content_html"] or "")
+        )
+    media_rows = conn.execute(
+        "SELECT id,filepath FROM ebook_media WHERE ebook_id=?", (ebook_id,)
+    ).fetchall()
+    orphaned = [row for row in media_rows if int(row["id"]) not in used_ids]
+    if orphaned:
+        placeholders = ",".join("?" for _ in orphaned)
+        conn.execute(
+            f"DELETE FROM ebook_media WHERE ebook_id=? AND id IN ({placeholders})",
+            (ebook_id, *(int(row["id"]) for row in orphaned)),
+        )
+    return [row["filepath"] for row in orphaned if row["filepath"]]
 
 
 def _get_leaflet(conn, ebook_id: int):
@@ -332,7 +353,7 @@ def _selected_images(files):
 
 
 def _save_page_image(upload, folder: Path):
-    raw_name = Path((upload.filename or "").replace("\\", "/")).name
+    raw_name = original_filename(upload.filename, "page")
     extension = Path(raw_name).suffix.lower()
     upload.stream.seek(0, os.SEEK_END)
     size = upload.stream.tell()
@@ -349,12 +370,11 @@ def _save_page_image(upload, folder: Path):
     finally:
         upload.stream.seek(0)
 
-    safe_name = secure_filename(raw_name) or f"page{extension}"
-    stored_name = f"{uuid.uuid4().hex}{extension}"
+    stored_name = encrypted_storage_name(raw_name)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / stored_name
-    upload.save(path)
-    return safe_name, str(path)
+    encrypt_upload(upload, path)
+    return raw_name, str(path)
 
 
 def _leaflet_pages(conn, ebook_id: int):
@@ -608,7 +628,11 @@ def serve_cover(ebook_id):
         conn.close()
     if not cover_path or not os.path.isfile(cover_path):
         abort(404)
-    return send_file(cover_path, conditional=True, max_age=3600)
+    return encrypted_response(
+        cover_path,
+        book["cover_filename"] or "cover.jpg",
+        as_attachment=False,
+    )
 
 
 @ebook_bp.route("/<int:ebook_id>/pages/<int:page_id>/image")
@@ -616,7 +640,7 @@ def serve_page_image(ebook_id, page_id):
     conn = get_db()
     try:
         row = conn.execute(
-            """SELECT p.image_path FROM ebook_pages p
+            """SELECT p.image_path,p.image_filename FROM ebook_pages p
                JOIN ebooks e ON e.id=p.ebook_id
                WHERE p.id=? AND p.ebook_id=? AND e.kind='leaflet'""",
             (page_id, ebook_id),
@@ -625,7 +649,9 @@ def serve_page_image(ebook_id, page_id):
         conn.close()
     if not row or not row["image_path"] or not os.path.isfile(row["image_path"]):
         abort(404)
-    return send_file(row["image_path"], conditional=True, max_age=3600)
+    return encrypted_response(
+        row["image_path"], row["image_filename"] or "page.jpg", as_attachment=False
+    )
 
 
 @ebook_bp.route("/<int:ebook_id>/delete", methods=["POST"])
@@ -767,13 +793,13 @@ def create_text_book():
     except ValueError as exc:
         conn.rollback()
         if saved_cover and os.path.isfile(saved_cover):
-            os.remove(saved_cover)
+            delete_file(saved_cover)
         flash(str(exc), "error")
         return render_template("ebook/text_form.html"), 400
     except Exception:
         conn.rollback()
         if saved_cover and os.path.isfile(saved_cover):
-            os.remove(saved_cover)
+            delete_file(saved_cover)
         raise
     finally:
         conn.close()
@@ -942,7 +968,7 @@ def edit_text_book(ebook_id):
             )
             conn.commit()
             if old_cover and old_cover != cover_path and os.path.isfile(old_cover):
-                os.remove(old_cover)
+                delete_file(old_cover)
             flash("eBook 정보를 수정했습니다.", "success")
             return redirect(url_for("ebook.edit_text_book", ebook_id=ebook_id))
         pages = [dict(row) for row in conn.execute(
@@ -966,6 +992,7 @@ def update_text_page(ebook_id, page_id):
     _require_admin()
     data = request.get_json(silent=True) or {}
     conn = get_db()
+    orphaned_paths = []
     try:
         _get_text_book(conn, ebook_id)
         allowed_ids = {
@@ -984,9 +1011,12 @@ def update_text_page(ebook_id, page_id):
         conn.execute(
             "UPDATE ebooks SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (ebook_id,)
         )
+        orphaned_paths = _prune_unreferenced_text_media(conn, ebook_id)
         conn.commit()
     finally:
         conn.close()
+    for path in orphaned_paths:
+        delete_file(path)
     return jsonify({"status": "success", "content_html": cleaned})
 
 
@@ -1024,6 +1054,7 @@ def add_text_page(ebook_id):
 def delete_text_page(ebook_id, page_id):
     _require_admin()
     conn = get_db()
+    orphaned_paths = []
     try:
         _get_text_book(conn, ebook_id)
         count = conn.execute(
@@ -1045,9 +1076,12 @@ def delete_text_page(ebook_id, page_id):
         conn.execute(
             "UPDATE ebooks SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (ebook_id,)
         )
+        orphaned_paths = _prune_unreferenced_text_media(conn, ebook_id)
         conn.commit()
     finally:
         conn.close()
+    for path in orphaned_paths:
+        delete_file(path)
     return jsonify({"status": "success"})
 
 
@@ -1076,8 +1110,12 @@ def upload_text_media(ebook_id):
     except ValueError as exc:
         conn.rollback()
         if saved_path and os.path.isfile(saved_path):
-            os.remove(saved_path)
+            delete_file(saved_path)
         return jsonify({"status": "error", "message": str(exc)}), 400
+    except Exception:
+        conn.rollback()
+        delete_file(saved_path)
+        raise
     finally:
         conn.close()
     media_id = cursor.lastrowid
@@ -1094,7 +1132,7 @@ def serve_text_media(media_id):
     conn = get_db()
     try:
         row = conn.execute(
-            """SELECT m.filepath FROM ebook_media m
+            """SELECT m.filepath,m.original_name FROM ebook_media m
                JOIN ebooks e ON e.id=m.ebook_id
                WHERE m.id=? AND e.kind='text'""",
             (media_id,),
@@ -1103,7 +1141,9 @@ def serve_text_media(media_id):
         conn.close()
     if not row or not os.path.isfile(row["filepath"]):
         abort(404)
-    return send_file(row["filepath"], conditional=True, max_age=3600)
+    return encrypted_response(
+        row["filepath"], row["original_name"] or "image", as_attachment=False
+    )
 
 
 @ebook_bp.route("/books/<int:ebook_id>/delete", methods=["POST"])
@@ -1127,10 +1167,6 @@ def delete_text_book(ebook_id):
     finally:
         conn.close()
     for path in paths:
-        if path and os.path.isfile(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+        delete_file(path)
     flash("eBook을 삭제했습니다.", "success")
     return redirect(url_for("ebook.text_library"))

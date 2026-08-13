@@ -1,5 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, send_from_directory
-from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, request, jsonify, url_for, session, redirect, abort
 from routes.db_handler import read_excel_db, write_excel_db, OWNER_FILE
 import pandas as pd
 import base64
@@ -16,10 +15,18 @@ from email.mime.multipart import MIMEMultipart
 from .database import get_db
 from .security import admin_required, hash_password, is_admin_session
 from .storage import DATA_ROOT, PROFILE_ROOT as _PROFILE_ROOT
+from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 from .organization import (
     DEPARTMENT_OPTIONS,
     classify_organization_group,
     normalize_department,
+)
+from .payroll import (
+    _ensure_sender_schema,
+    _payroll_sender_dict,
+    _sender_from_header,
+    _smtp_login_for_sender,
+    _verify_smtp_sender,
 )
 
 user_mgmt_bp = Blueprint('user_mgmt', __name__)
@@ -30,6 +37,11 @@ user_mgmt_bp = Blueprint('user_mgmt', __name__)
 # =====================================================================
 BASE_DIR = str(DATA_ROOT)
 PROFILE_ROOT = str(_PROFILE_ROOT)
+
+
+def _profile_disk_path(profile_path):
+    filename = os.path.basename(str(profile_path or '').replace('\\', '/'))
+    return os.path.join(PROFILE_ROOT, filename) if filename else ''
 # =====================================================================
 
 LEVEL_MAP = {
@@ -48,6 +60,7 @@ DEFAULT_POSITIONS = tuple(LEVEL_MAP.items())
 
 INVITE_MAIL_SUBJECT_KEY = 'user_invite_mail_subject'
 INVITE_MAIL_BODY_KEY = 'user_invite_mail_body'
+INVITE_SENDER_ID_KEY = 'user_invite_sender_id'
 DEFAULT_INVITE_MAIL_SUBJECT = '[새담 인트라넷] 회원 가입 초대장'
 DEFAULT_INVITE_MAIL_BODY = (
     '안녕하세요. (사)새담청소년교육문화원입니다.\n'
@@ -168,6 +181,18 @@ def _ensure_user_invite_schema(conn):
             used_user_id INTEGER
         )
     ''')
+    columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute('PRAGMA table_info(user_invites)').fetchall()
+    }
+    additions = {
+        'sender_id': 'INTEGER',
+        'sender_email': "TEXT NOT NULL DEFAULT ''",
+        'sender_provider': "TEXT NOT NULL DEFAULT ''",
+    }
+    for name, ddl in additions.items():
+        if name not in columns:
+            conn.execute(f'ALTER TABLE user_invites ADD COLUMN {name} {ddl}')
     conn.execute('CREATE INDEX IF NOT EXISTS idx_user_invites_email ON user_invites(email)')
 
 
@@ -177,6 +202,12 @@ def _invite_token_hash(token):
 
 def _normalize_email(value):
     return str(value or '').strip().lower()
+
+
+def _invite_sender_setting_key(owner_emp_no):
+    """관리자별 마지막 선택 발송계정 설정 키를 반환한다."""
+    owner = str(owner_emp_no or '').strip().lower()
+    return f'{INVITE_SENDER_ID_KEY}:{owner}'
 
 
 def _is_valid_email(value):
@@ -276,16 +307,19 @@ def _save_invite_mail_template(conn, subject, body):
     return clean_subject, clean_body
 
 
-def send_real_email(target_email, invite_link, subject, content):
+def send_real_email(target_email, invite_link, subject, content, sender=None):
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
     SENDER_EMAIL = os.environ.get('MAIL_USERNAME') or "saedam2025@gmail.com"
     SENDER_PASSWORD = os.environ.get('MAIL_PASSWORD') or "wjuybedxstdmszdt"
 
-    if not SENDER_EMAIL or not SENDER_PASSWORD: return False
+    sender_data = dict(sender) if sender is not None else None
+    if sender_data:
+        SENDER_EMAIL = str(sender_data.get('email') or '').strip().lower()
+    if not SENDER_EMAIL or (not sender_data and not SENDER_PASSWORD): return False
 
     msg = MIMEMultipart('alternative')
-    msg['From'] = f"새담 인트라넷 <{SENDER_EMAIL}>"
+    msg['From'] = _sender_from_header(sender_data) if sender_data else f"새담 인트라넷 <{SENDER_EMAIL}>"
     msg['To'] = target_email
     msg['Subject'] = subject
 
@@ -324,6 +358,20 @@ def send_real_email(target_email, invite_link, subject, content):
     ))
     msg.attach(MIMEText(body, 'html', 'utf-8'))
     try:
+        if sender_data:
+            server = _smtp_login_for_sender(sender_data)
+            try:
+                _verify_smtp_sender(server, sender_data)
+                server.sendmail(SENDER_EMAIL, target_email, msg.as_string())
+            finally:
+                try:
+                    server.quit()
+                except Exception:
+                    try:
+                        server.close()
+                    except Exception:
+                        pass
+            return True
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
@@ -428,6 +476,49 @@ def index():
         print(f"Admin 자동 생성 오류: {e}")
 
     return render_template('user_list.html')
+
+
+@user_mgmt_bp.route('/invite-sender')
+@admin_required
+def invite_sender_page():
+    """조직관리에서 가입초대 메일만 독립적으로 발송하는 화면."""
+    return render_template('organization_invite.html')
+
+
+@user_mgmt_bp.route('/invite_senders')
+@admin_required
+def invite_senders():
+    """가입초대 화면에서 기존 공용 발송계정을 선택할 수 있게 제공한다."""
+    owner = str(session.get('emp_no') or '').strip()
+    conn = get_db()
+    try:
+        _ensure_sender_schema(conn)
+        _ensure_admin_settings(conn)
+        rows = conn.execute('''
+            SELECT * FROM ai_mail_senders
+            WHERE owner_emp_no=? AND is_active=1
+            ORDER BY CASE WHEN last_test_status='success' THEN 0 ELSE 1 END,
+                     updated_at DESC, id DESC
+        ''', (owner,)).fetchall()
+        setting_key = _invite_sender_setting_key(owner)
+        saved = conn.execute(
+            'SELECT value FROM admin_settings WHERE key=?',
+            (setting_key,),
+        ).fetchone()
+        sender_ids = {int(row['id']) for row in rows}
+        try:
+            active_sender_id = int(saved['value']) if saved else None
+        except (TypeError, ValueError):
+            active_sender_id = None
+        if active_sender_id not in sender_ids:
+            active_sender_id = int(rows[0]['id']) if rows else None
+        return jsonify({
+            'status': 'success',
+            'senders': [_payroll_sender_dict(row) for row in rows],
+            'active_sender_id': active_sender_id,
+        })
+    finally:
+        conn.close()
 
 
 @user_mgmt_bp.route('/positions', methods=['GET', 'POST'])
@@ -624,10 +715,26 @@ def send_invite():
         email = _normalize_email(data.get('email'))
         if not _is_valid_email(email):
             return jsonify({"status": "error", "message": "올바른 이메일 주소를 입력해주세요."}), 400
+        try:
+            sender_id = int(data.get('sender_id'))
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "발송메일 계정을 선택해주세요."}), 400
 
         conn = get_db()
         try:
             _ensure_user_invite_schema(conn)
+            _ensure_sender_schema(conn)
+            _ensure_admin_settings(conn)
+            sender_row = conn.execute('''
+                SELECT * FROM ai_mail_senders
+                WHERE id=? AND owner_emp_no=? AND is_active=1
+            ''', (sender_id, str(session.get('emp_no') or '').strip())).fetchone()
+            if not sender_row:
+                return jsonify({
+                    "status": "error",
+                    "message": "선택한 발송메일 계정을 사용할 수 없습니다. 계정 상태를 확인해주세요.",
+                }), 400
+            sender = dict(sender_row)
             existing_user = conn.execute(
                 'SELECT id FROM users WHERE LOWER(TRIM(COALESCE(email, \'\'))) = ? LIMIT 1',
                 (email,),
@@ -646,16 +753,27 @@ def send_invite():
             )
             token = secrets.token_urlsafe(32)
             cursor = conn.execute('''
-                INSERT INTO user_invites (token_hash, email, status, sent_at)
-                VALUES (?, ?, 'sent', CURRENT_TIMESTAMP)
-            ''', (_invite_token_hash(token), email))
+                INSERT INTO user_invites (
+                    token_hash, email, status, sent_at,
+                    sender_id, sender_email, sender_provider
+                ) VALUES (?, ?, 'sent', CURRENT_TIMESTAMP, ?, ?, ?)
+            ''', (
+                _invite_token_hash(token), email, sender_id,
+                str(sender.get('email') or ''), str(sender.get('provider') or 'gmail'),
+            ))
             invite_id = cursor.lastrowid
+            conn.execute('''
+                INSERT INTO admin_settings (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    value=excluded.value, updated_at=CURRENT_TIMESTAMP
+            ''', (_invite_sender_setting_key(session.get('emp_no')), str(sender_id)))
             conn.commit()
         finally:
             conn.close()
 
         invite_link = url_for('user_mgmt.invite_page', token=token, _external=True)
-        if send_real_email(email, invite_link, subject, body):
+        if send_real_email(email, invite_link, subject, body, sender=sender):
             return jsonify({"status": "success", "message": "메일 내용을 저장하고 초대 메일을 발송했습니다."})
         failed_conn = get_db()
         try:
@@ -708,6 +826,8 @@ def invite_mail_template():
 
 @user_mgmt_bp.route('/register', methods=['POST'])
 def register():
+    conn = None
+    upload_path = None
     try:
         data = request.form
         profile_file = request.files.get('profile_image')
@@ -795,12 +915,10 @@ def register():
         profile_path = None
         if profile_file and profile_file.filename != '':
             os.makedirs(PROFILE_ROOT, exist_ok=True)
-            ext = os.path.splitext(profile_file.filename)[1]
-            # 안전한 파일명 생성
-            raw_filename = f"id_{data.get('name')}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-            safe_filename = secure_filename(raw_filename)
+            display_name = original_filename(profile_file.filename, 'profile-image')
+            safe_filename = encrypted_storage_name(display_name)
             upload_path = os.path.join(PROFILE_ROOT, safe_filename)
-            profile_file.save(upload_path)
+            encrypt_upload(profile_file, upload_path)
             
             # HTML에서 이미지를 불러올 라우트 주소
             profile_path = f"/user/profile_img/{safe_filename}"
@@ -835,12 +953,21 @@ def register():
             if updated.rowcount < 1:
                 conn.rollback()
                 conn.close()
+                delete_file(upload_path)
                 return jsonify({'status': 'error', 'message': '이미 가입신청된 링크입니다.'}), 410
         
         conn.commit()
         conn.close()
+        upload_path = None
         return jsonify({"status": "success", "message": "가입 신청이 완료되었습니다."})
     except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
+        delete_file(upload_path)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/approve', methods=['POST'])
@@ -963,7 +1090,7 @@ def delete_pending_user():
         data = request.get_json(silent=True) or {}
         user_id = int(data['user_idx'])
         conn = get_db()
-        user = conn.execute("SELECT id, status FROM users WHERE id=?", (user_id,)).fetchone()
+        user = conn.execute("SELECT id, status, profile_path FROM users WHERE id=?", (user_id,)).fetchone()
         if not user:
             return jsonify({'status': 'error', 'message': '삭제할 가입 신청을 찾을 수 없습니다.'}), 404
         if user['status'] != '대기':
@@ -971,6 +1098,7 @@ def delete_pending_user():
 
         conn.execute("DELETE FROM users WHERE id=? AND status='대기'", (user_id,))
         conn.commit()
+        delete_file(_profile_disk_path(user['profile_path']))
         return jsonify({'status': 'success', 'message': '가입 신청을 영구 삭제했습니다.'})
     except Exception as e:
         if conn:
@@ -1000,6 +1128,8 @@ def retire_user():
 @user_mgmt_bp.route('/update', methods=['POST'])
 @admin_required
 def update_user():
+    conn = None
+    upload_path = None
     try:
         data = request.form
         user_id = int(data.get('user_idx', 0))
@@ -1024,12 +1154,14 @@ def update_user():
         
         if profile_file and profile_file.filename != '':
             os.makedirs(PROFILE_ROOT, exist_ok=True)
-            ext = os.path.splitext(profile_file.filename)[1]
-            raw_filename = f"id_update_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
-            safe_filename = secure_filename(raw_filename)
+            display_name = original_filename(profile_file.filename, 'profile-image')
+            safe_filename = encrypted_storage_name(display_name)
             upload_path = os.path.join(PROFILE_ROOT, safe_filename)
-            profile_file.save(upload_path)
+            encrypt_upload(profile_file, upload_path)
             profile_path = f"/user/profile_img/{safe_filename}"
+            old_profile = conn.execute(
+                "SELECT profile_path FROM users WHERE id=?", (user_id,)
+            ).fetchone()
             conn.execute("UPDATE users SET profile_path=? WHERE id=?", (profile_path, user_id))
 
         # 새로 입력받은 비밀번호 (앞뒤 공백 제거)
@@ -1065,10 +1197,20 @@ def update_user():
             ))
         
         conn.commit()
+        if profile_file and profile_file.filename != '' and old_profile:
+            delete_file(_profile_disk_path(old_profile['profile_path']))
         conn.close()
+        upload_path = None
         
         return jsonify({"status": "success", "message": "정보 수정 완료"})
     except Exception as e:
+        if conn is not None:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
+        delete_file(upload_path)
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @user_mgmt_bp.route('/delete', methods=['POST'])
@@ -1079,9 +1221,12 @@ def delete_user():
         user_id = int(data['user_idx'])
         
         conn = get_db()
+        user = conn.execute("SELECT profile_path FROM users WHERE id=?", (user_id,)).fetchone()
         conn.execute("DELETE FROM users WHERE id=?", (user_id,))
         conn.commit()
         conn.close()
+        if user:
+            delete_file(_profile_disk_path(user['profile_path']))
         
         return jsonify({"status": "success", "message": "삭제 완료"})
     except Exception as e:
@@ -1139,4 +1284,7 @@ def get_user_list():
 # ==============================================================================
 @user_mgmt_bp.route('/profile_img/<filename>')
 def serve_profile_image(filename):
-    return send_from_directory(PROFILE_ROOT, filename)
+    path = os.path.join(PROFILE_ROOT, os.path.basename(filename))
+    if not os.path.isfile(path):
+        abort(404)
+    return encrypted_response(path, filename.removesuffix('.sdf'), as_attachment=False)
