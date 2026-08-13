@@ -959,7 +959,7 @@ def chat_organization():
                 "position": user['position'] or '',
                 "level": user['level'] if user['level'] is not None else 99,
                 "organization_group": classify_messenger_organization_group(
-                    user['department'], user['position']
+                    user['department'], user['position'], user['level']
                 ),
                 "icon": user['profile_icon'] or '👤',
             }

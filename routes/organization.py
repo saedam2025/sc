@@ -52,8 +52,17 @@ def normalize_messenger_department(department):
     return '본부' if normalized in {'본부', '북부지점'} else normalized
 
 
-def classify_messenger_organization_group(department, position):
-    """메신저 조직도를 합친 본부 소속과 직급 기준의 5개 그룹으로 분류한다."""
+def classify_messenger_organization_group(department, position, level=None):
+    """메신저 조직도를 직급 레벨과 직급명 기준의 5개 그룹으로 분류한다."""
+    try:
+        position_level = int(level)
+    except (TypeError, ValueError):
+        position_level = None
+
+    # 직급 레벨관리에서 신규 직급을 추가해도 1~6레벨은 모두 본부로 묶는다.
+    if position_level is not None and 1 <= position_level <= 6:
+        return '본부'
+
     normalized_department = normalize_department(department)
     compact_position = ''.join(
         character for character in str(position or '').strip()
