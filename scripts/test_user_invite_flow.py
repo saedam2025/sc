@@ -89,6 +89,72 @@ def main():
         conn.close()
 
         client = app_module.app.test_client()
+        with client.session_transaction() as login_session:
+            login_session["emp_no"] = "admin"
+            login_session["user_name"] = "admin"
+            login_session["user_level"] = 0
+
+        conn = _connect(db_path)
+        user_mgmt._ensure_sender_schema(conn)
+        conn.execute(
+            """INSERT OR IGNORE INTO ai_mail_senders
+               (owner_emp_no,label,email,encrypted_app_password,is_active,last_test_status)
+               VALUES ('admin','초대 테스트 계정','invite-sender@example.test','encrypted-test',1,'success')"""
+        )
+        sender_id = conn.execute(
+            "SELECT id FROM ai_mail_senders WHERE owner_emp_no='admin' AND email='invite-sender@example.test'"
+        ).fetchone()["id"]
+        conn.commit()
+        conn.close()
+
+        sender_page = client.get("/user/invite-sender")
+        sender_page_html = sender_page.get_data(as_text=True)
+        assert sender_page.status_code == 200
+        assert 'id="senderPanel" class="invite-sender-panel" hidden' in sender_page_html
+        assert "sender_id: selectedSenderId" in sender_page_html
+
+        sender_list = client.get("/user/invite_senders", headers={"Accept": "application/json"})
+        assert sender_list.status_code == 200
+        listed_sender = next(
+            item for item in sender_list.get_json()["senders"] if item["id"] == sender_id
+        )
+        assert listed_sender["email"] == "invite-sender@example.test"
+        assert "encrypted_app_password" not in listed_sender
+
+        selected_mail = {}
+        original_send_real_email = user_mgmt.send_real_email
+        user_mgmt.send_real_email = lambda *args, **kwargs: selected_mail.update(
+            {"args": args, "sender": kwargs.get("sender")}
+        ) or True
+        try:
+            selected_response = client.post(
+                "/user/send_invite",
+                json={
+                    "email": "selected-invite@example.test",
+                    "subject": "가입 초대",
+                    "body": "가입 신청 안내",
+                    "sender_id": sender_id,
+                },
+            )
+        finally:
+            user_mgmt.send_real_email = original_send_real_email
+        assert selected_response.status_code == 200
+        assert selected_mail["sender"]["id"] == sender_id
+        assert selected_mail["sender"]["email"] == "invite-sender@example.test"
+
+        conn = _connect(db_path)
+        saved_invite = conn.execute(
+            "SELECT sender_id,sender_email FROM user_invites WHERE email='selected-invite@example.test'"
+        ).fetchone()
+        selected_setting = conn.execute(
+            "SELECT value FROM admin_settings WHERE key=?",
+            (user_mgmt._invite_sender_setting_key("admin"),),
+        ).fetchone()
+        conn.close()
+        assert saved_invite["sender_id"] == sender_id
+        assert saved_invite["sender_email"] == "invite-sender@example.test"
+        assert selected_setting["value"] == str(sender_id)
+
         invite_page = client.get(f"/user/invite_page/{token}")
         invite_html = invite_page.get_data(as_text=True)
         assert invite_page.status_code == 200
