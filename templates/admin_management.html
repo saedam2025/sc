@@ -462,7 +462,7 @@
                             </td>
                             <td>{{ file.size }}</td>
                             <td>{{ file.mtime }}</td>
-                            <td><button class="btn btn-danger btn-small" onclick='deleteDiskItem({{ selected_root.key|tojson }}, {{ file.rel_path|tojson }})'><i class="fa-solid fa-trash"></i>삭제</button></td>
+                            <td><button type="button" class="btn btn-danger btn-small" onclick='deleteDiskItem({{ selected_root.key|tojson }}, {{ file.rel_path|tojson }})'><i class="fa-solid fa-trash"></i>삭제</button></td>
                         </tr>
                         {% else %}
                         <tr><td colspan="4" class="empty-note">표시할 파일이 없습니다.</td></tr>
@@ -750,13 +750,23 @@ async function deleteBoard(boardId, boardName, postCount, commentCount) {
 
 async function deleteDiskItem(root, path) {
     if (!confirm(`삭제하시겠습니까?\n${path}`)) return;
-    const formData = new FormData();
-    formData.append('root', root);
-    formData.append('path', path);
-    const res = await fetch('/admin/disk/delete', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (!res.ok) return alert(data.message || '삭제에 실패했습니다.');
-    location.reload();
+    try {
+        const formData = new FormData();
+        formData.append('root', root);
+        formData.append('path', path);
+        const res = await fetch('/admin/disk/delete', {
+            method: 'POST',
+            body: formData,
+            cache: 'no-store',
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.message || '삭제에 실패했습니다.');
+        const refreshUrl = new URL(window.location.href);
+        refreshUrl.searchParams.set('_refresh', Date.now().toString());
+        window.location.replace(refreshUrl.toString());
+    } catch (error) {
+        alert(`삭제 요청을 완료하지 못했습니다.\n${error.message || error}`);
+    }
 }
 
 function applyBulkMenuLevel() {
