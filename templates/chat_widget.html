@@ -507,6 +507,31 @@
         }
     };
 
+    async function updateOrgOnlineStatus() {
+        try {
+            const res = await fetch('/get_active_users', {
+                method: 'GET',
+                cache: 'no-store'
+            });
+
+            if (!res.ok) return;
+
+            const data = await res.json();
+            const activeUsers = new Set(data.active_users || []);
+
+            document.querySelectorAll('.org-status-dot[data-user]').forEach(dot => {
+                const userName = dot.dataset.user;
+                const isOnline = activeUsers.has(userName);
+
+                dot.classList.toggle('status-online', isOnline);
+                dot.classList.toggle('status-offline', !isOnline);
+                dot.style.backgroundColor = isOnline ? '#34D399' : '#cbd5e1';  
+            });
+        } catch (e) {
+            console.error('접속자 상태 조회 실패:', e);
+        }
+    }
+
     async function loadOrgChart() {
         try {
             const res = await fetch('/api/chat/organization', {
@@ -579,6 +604,7 @@
                 html += `</div></div>`;
             });
             container.innerHTML = html;
+            await updateOrgOnlineStatus();
         } catch(e) {
             document.getElementById('orgChartListContainer').innerHTML = `<div style="text-align:center; color:#ef4444; padding:20px;">${e.message}</div>`;
         }
@@ -670,6 +696,10 @@
             if(emptyDiv) emptyDiv.style.display = 'block';
         }
         setInterval(updateMessageBadge, 60000);
-        window.addEventListener('focus', updateMessageBadge);
+        setInterval(updateOrgOnlineStatus, 60000);
+        window.addEventListener('focus', () => {
+            updateMessageBadge();
+            updateOrgOnlineStatus();
+        });
     });
 </script>
