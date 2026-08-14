@@ -23,7 +23,7 @@ from .contract_repository import (
     update_contract_record,
 )
 from .database import get_db
-from .security import is_admin_session
+from .security import has_menu_permission
 from .storage import (
     APP_ROOT as _APP_ROOT,
     COMPANY_STAMP_ROOT,
@@ -687,7 +687,7 @@ def insert_contracts_df(df):
 
 @contract_bp.route('/admin', methods=['GET', 'POST'])
 def admin_page():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return "<script>alert('관리자 권한이 필요합니다.'); location.href='/';</script>", 403
 
     page = request.args.get('page', 1, type=int)
@@ -749,7 +749,7 @@ def admin_page():
 
 @contract_bp.route('/admin/categories', methods=['GET', 'POST'])
 def manage_categories():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
     
     old_cats = load_categories()
@@ -776,7 +776,7 @@ def manage_categories():
 @contract_bp.route('/admin/company_settings', methods=['GET', 'POST', 'DELETE'])
 def company_settings():
     """양식관리 화면에서 계약서에 찍힐 회사명/대표/도장 프로필을 최대 3세트까지 관리한다."""
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     settings = load_company_settings()
@@ -894,7 +894,7 @@ def company_settings():
 @contract_bp.route('/admin/company_stamp/<path:filename>')
 def company_stamp_file(filename):
     """양식관리 화면에서 등록된 도장 이미지를 미리보기로 보여준다."""
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return "권한이 없습니다.", 403
 
     safe_name = os.path.basename(filename)
@@ -916,7 +916,7 @@ def company_stamp_file(filename):
 
 @contract_bp.route('/admin/upload_excel', methods=['POST'])
 def upload_excel():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     if 'excel_file' not in request.files: return jsonify({'status': 'error', 'message': '파일 없음'}), 400
@@ -936,7 +936,7 @@ def upload_excel():
 
 @contract_bp.route('/admin/add', methods=['POST'])
 def admin_add():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     try:
@@ -958,7 +958,7 @@ def admin_add():
 
 @contract_bp.route('/admin/delete', methods=['POST'])
 def delete_contracts():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     indices = request.json.get('indices', [])
@@ -987,7 +987,7 @@ def delete_contracts():
 
 @contract_bp.route('/admin/download_selected')
 def download_selected_contracts():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     id_param = request.args.get('ids', '')
@@ -1044,7 +1044,7 @@ def download_selected_contracts():
 
 @contract_bp.route('/admin/terms', methods=['GET'])
 def get_terms():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     contract_type = request.args.get('type', '방과후강사')
@@ -1073,7 +1073,7 @@ def get_terms():
 
 @contract_bp.route('/admin/terms', methods=['POST'])
 def save_terms():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     data = request.json
@@ -1110,7 +1110,7 @@ def save_terms():
 
 @contract_bp.route('/admin/preview', methods=['POST'])
 def preview_contract():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     contract_type = request.form.get('type', '방과후강사')
@@ -1675,7 +1675,7 @@ def download_pdf(idx):
 
 @contract_bp.route('/admin/preview_pdf/<int:idx>')
 def preview_pdf(idx):
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return "<script>alert('권한이 없습니다.'); history.back();</script>", 403
 
     try:
@@ -1850,7 +1850,7 @@ def admin_logout():
 
 @contract_bp.route('/admin/send_remind_mail', methods=['POST'])
 def send_remind_mail():
-    if not is_admin_session():
+    if not has_menu_permission('contract_admin'):
         return jsonify({'status': 'error', 'message': '권한이 없습니다.'}), 403
 
     indices = request.json.get('indices', [])

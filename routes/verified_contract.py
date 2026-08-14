@@ -42,7 +42,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
 from .database import get_db
-from .security import admin_required, load_credential_secret
+from .security import load_credential_secret, menu_permission_required
 from .storage import (
     APP_ROOT,
     COMPANY_STAMP_ROOT,
@@ -907,7 +907,7 @@ def _resolve_company_snapshot(value: object) -> dict:
 
 
 @verified_contract_bp.route("/admin")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def admin_page():
     page = max(1, request.args.get("page", 1, type=int))
     status_filter = str(request.args.get("status", "")).strip()
@@ -1030,7 +1030,7 @@ def admin_page():
 
 
 @verified_contract_bp.route("/admin/settings")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def settings_page():
     """계약 목록과 분리된 인증계약 양식·발송 리소스 관리 화면."""
     companies = _company_settings()
@@ -1048,7 +1048,7 @@ def settings_page():
 @verified_contract_bp.route(
     "/admin/settings/company/<string:profile_id>/<string:asset_kind>"
 )
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def company_asset(profile_id: str, asset_kind: str):
     """회사관리 카드에서 암호화된 로고·도장을 안전하게 미리보기한다."""
     if asset_kind not in {"logo", "stamp"}:
@@ -1082,7 +1082,7 @@ def company_asset(profile_id: str, asset_kind: str):
 
 
 @verified_contract_bp.route("/admin/create", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def create_contract():
     data = request.get_json(silent=True) or {}
@@ -1201,7 +1201,7 @@ def create_contract():
 
 
 @verified_contract_bp.route("/admin/excel-template")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def download_excel_template():
     workbook = Workbook()
     sheet = workbook.active
@@ -1303,7 +1303,7 @@ def download_excel_template():
 
 
 @verified_contract_bp.route("/admin/upload-excel", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def upload_excel():
     uploaded = request.files.get("excel_file")
@@ -1459,7 +1459,7 @@ def upload_excel():
 
 
 @verified_contract_bp.route("/admin/bulk-send", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def bulk_send_invitations():
     data = request.get_json(silent=True) or {}
@@ -1590,7 +1590,7 @@ def bulk_send_invitations():
 
 
 @verified_contract_bp.route("/admin/bulk-revoke", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def bulk_revoke():
     try:
@@ -1620,7 +1620,7 @@ def bulk_revoke():
 
 
 @verified_contract_bp.route("/admin/download-selected")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def download_selected():
     try:
         ids = sorted({int(value) for value in request.args.get("ids", "").split(",") if value})
@@ -1666,7 +1666,7 @@ def download_selected():
 
 
 @verified_contract_bp.route("/admin/<int:contract_id>/resend", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def resend_invitation(contract_id: int):
     token = secrets.token_urlsafe(32)
@@ -1740,7 +1740,7 @@ def resend_invitation(contract_id: int):
 
 
 @verified_contract_bp.route("/admin/<int:contract_id>/revoke", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def revoke_contract(contract_id: int):
     conn = get_db()
@@ -1761,7 +1761,7 @@ def revoke_contract(contract_id: int):
 
 
 @verified_contract_bp.route("/admin/<int:contract_id>/evidence")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def evidence(contract_id: int):
     conn = get_db()
     try:
@@ -1797,7 +1797,7 @@ def evidence(contract_id: int):
 
 
 @verified_contract_bp.route("/admin/<int:contract_id>/download")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def admin_download(contract_id: int):
     conn = get_db()
     try:
@@ -1815,7 +1815,7 @@ def admin_download(contract_id: int):
 
 
 @verified_contract_bp.route("/admin/terms")
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def get_terms():
     contract_type = str(request.args.get("type", "")).strip()
     if contract_type not in _categories():
@@ -1834,7 +1834,7 @@ def get_terms():
 
 
 @verified_contract_bp.route("/admin/terms", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def save_terms():
     data = request.get_json(silent=True) or {}
@@ -1858,7 +1858,7 @@ def save_terms():
 
 
 @verified_contract_bp.route("/admin/categories", methods=["GET", "POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 def add_category():
     if request.method == "GET":
         return jsonify({"status": "success", "categories": _categories()})
@@ -1921,7 +1921,7 @@ def add_category():
 
 
 @verified_contract_bp.route("/admin/settings/mail", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def save_mail_settings():
     data = request.get_json(silent=True) or {}
@@ -2027,7 +2027,7 @@ def save_mail_settings():
 
 
 @verified_contract_bp.route("/admin/settings/company", methods=["POST"])
-@admin_required
+@menu_permission_required("verified_contract_admin")
 @_csrf_required
 def save_company_settings():
     settings = _company_settings()

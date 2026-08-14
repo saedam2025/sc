@@ -29,7 +29,7 @@ from .payroll import (
     _smtp_login_for_sender,
     _verify_smtp_sender,
 )
-from .security import admin_required
+from .security import menu_permission_required
 from .storage import APP_ROOT, DATA_ROOT
 from .secure_files import (
     delete_file,
@@ -420,7 +420,7 @@ def apply2(token=None):
 
 # --- [내부 라우트: 관리자용] ---
 @document_bp.route('/admin')
-@admin_required
+@menu_permission_required("document_admin")
 def admin_list():
     """인트라넷 관리자용 신청 현황 목록 (페이징 및 검색 추가)"""
     if 'emp_no' not in session:
@@ -524,7 +524,7 @@ def _workgroup_bundle(conn, workgroup_id):
     return dict(row) if row else None
 
 @document_bp.route('/generate/<int:idx>')
-@admin_required
+@menu_permission_required("document_admin")
 def generate_certificate(idx):
     """관리자가 발급 버튼을 눌렀을 때 실행"""
     if 'emp_no' not in session: return abort(403)
@@ -862,19 +862,19 @@ def _certificate_settings_payload():
 
 
 @document_bp.route('/admin/settings')
-@admin_required
+@menu_permission_required("document_admin")
 def certificate_settings():
     return render_template('certificate/settings.html')
 
 
 @document_bp.route('/api/settings')
-@admin_required
+@menu_permission_required("document_admin")
 def certificate_settings_api():
     return jsonify({'status': 'success', **_certificate_settings_payload()})
 
 
 @document_bp.route('/api/senders/<int:sender_id>', methods=['DELETE'])
-@admin_required
+@menu_permission_required("document_admin")
 @_csrf_required
 def delete_certificate_sender(sender_id):
     conn = get_db()
@@ -954,7 +954,7 @@ def _company_form_values(current=None):
 
 
 @document_bp.route('/api/companies', methods=['POST'])
-@admin_required
+@menu_permission_required("document_admin")
 @_csrf_required
 def create_certificate_company():
     values = None
@@ -994,7 +994,7 @@ def create_certificate_company():
 
 
 @document_bp.route('/api/companies/<int:company_id>', methods=['POST', 'PATCH', 'DELETE'])
-@admin_required
+@menu_permission_required("document_admin")
 @_csrf_required
 def update_certificate_company(company_id):
     conn = get_db()
@@ -1062,7 +1062,7 @@ def update_certificate_company(company_id):
 
 
 @document_bp.route('/company-seal/<int:company_id>')
-@admin_required
+@menu_permission_required("document_admin")
 def company_seal(company_id):
     conn = get_db()
     try:
@@ -1115,7 +1115,7 @@ def _json_bool(data, key, default=True):
 
 
 @document_bp.route('/api/workgroups', methods=['POST'])
-@admin_required
+@menu_permission_required("document_admin")
 @_csrf_required
 def create_certificate_workgroup():
     data = request.get_json(silent=True) or {}
@@ -1123,7 +1123,7 @@ def create_certificate_workgroup():
 
 
 @document_bp.route('/api/workgroups/<int:workgroup_id>', methods=['PATCH', 'PUT', 'DELETE'])
-@admin_required
+@menu_permission_required("document_admin")
 @_csrf_required
 def update_certificate_workgroup(workgroup_id):
     if request.method == 'DELETE':
@@ -1213,7 +1213,7 @@ def _save_certificate_workgroup(workgroup_id, data):
         conn.close()
 
 @document_bp.route('/pdf/<filename>')
-@admin_required
+@menu_permission_required("document_admin")
 def serve_pdf(filename):
     """관리자 페이지에서 발급된 PDF 보기"""
     if 'emp_no' not in session: return abort(403)
@@ -1224,7 +1224,7 @@ def serve_pdf(filename):
     )
 
 @document_bp.route('/delete/<int:idx>')
-@admin_required
+@menu_permission_required("document_admin")
 def delete_record(idx):
     """신청 기록 및 파일 단건 삭제"""
     if 'emp_no' not in session: return abort(403)
@@ -1253,7 +1253,7 @@ def delete_record(idx):
     return redirect(url_for('document.admin_list'))
 
 @document_bp.route('/delete_multiple', methods=['POST'])
-@admin_required
+@menu_permission_required("document_admin")
 def delete_multiple():
     """여러 건 동시 선택 삭제"""
     if 'emp_no' not in session: return abort(403)
@@ -1294,7 +1294,7 @@ def delete_multiple():
 
 # 안내 메일 전송 기능 (admin.html 모달 전송용)
 @document_bp.route('/send_simple_email', methods=['POST'])
-@admin_required
+@menu_permission_required("document_admin")
 def send_simple_email():
     if 'emp_no' not in session: return abort(403)
     
@@ -1367,7 +1367,7 @@ def send_simple_email():
     return redirect(url_for('document.admin_list'))
 
 @document_bp.route('/edit', methods=['POST'])
-@admin_required
+@menu_permission_required("document_admin")
 def edit_record_post():
     """모달창에서 전송된 수정 데이터를 SQLite에 반영"""
     if 'emp_no' not in session: return abort(403)

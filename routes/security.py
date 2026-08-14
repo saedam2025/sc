@@ -95,6 +95,18 @@ def is_admin_session(max_level: int = ADMIN_MAX_LEVEL) -> bool:
     )
 
 
+def has_menu_permission(menu_key: str) -> bool:
+    """로그인 세션이 현재 저장된 메뉴 접근권한을 만족하는지 반환한다."""
+    if not session.get("emp_no"):
+        return False
+
+    # menu_access는 공통 보안 도우미를 import하지 않지만, 향후 의존성 변경에도
+    # 순환 import가 생기지 않도록 실제 검사 시점에 불러온다.
+    from .menu_access import menu_is_allowed
+
+    return menu_is_allowed(menu_key)
+
+
 def _permission_denied(status_code: int):
     wants_json = (
         request.is_json
@@ -106,6 +118,22 @@ def _permission_denied(status_code: int):
     if wants_json:
         return jsonify({"status": "error", "message": message}), status_code
     abort(status_code)
+
+
+def menu_permission_required(menu_key: str):
+    """하드코딩된 관리자 레벨 대신 메뉴 권한관리 설정으로 접근을 제한한다."""
+    def decorator(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            if not session.get("emp_no"):
+                return _permission_denied(401)
+            if not has_menu_permission(menu_key):
+                return _permission_denied(403)
+            return func(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def admin_required(view=None, *, max_level: int = ADMIN_MAX_LEVEL):
