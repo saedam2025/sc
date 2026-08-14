@@ -20,6 +20,12 @@ MAIL_SETTINGS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..
 
 HQ_POSITIONS = ['대표이사', '이사', '실장', '팀장', '사원', '계약직']
 CENTER_POSITIONS = ['센터장(팀장)', '센터장 팀장', '센터장']
+# 연락망에 기본적으로 노출하지 않는 기존 직급.
+# 구성원 관리에서 새로 만든 직급은 아래 목록에 없으므로 자동으로 본부 연락망에 포함됩니다.
+NON_CONTACT_POSITIONS = {
+    '최고관리자', '전담코디', '보조코디', '안전코디',
+    '방과후강사', '맞춤형강사', '임시회원',
+}
 MANUAL_CONTACT_GROUPS = [
     ('headquarters', '본부'),
     ('north_branch', '북부지점'),
@@ -287,6 +293,46 @@ def _contact_from_user(row):
     }
 
 
+
+def _load_contact_position_groups(conn):
+    """구성원 관리의 동적 직급을 연락망 분류에 반영한다.
+
+    기존 고정 직급은 그대로 유지하고, hr_positions에서 새로 생성된 직급은
+    기본적으로 본부 연락망에 포함한다. 직급명에 '센터장'이 들어간 신규 직급은
+    센터장 연락망으로 분류한다.
+    """
+    headquarters = list(HQ_POSITIONS)
+    centers = list(CENTER_POSITIONS)
+
+    # 구버전 DB처럼 hr_positions 테이블이 아직 없는 경우에도 기존 동작을 유지한다.
+    table_exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='hr_positions' LIMIT 1"
+    ).fetchone()
+    if not table_exists:
+        return headquarters, centers
+
+    rows = conn.execute("""
+        SELECT name
+        FROM hr_positions
+        ORDER BY level ASC, sort_order ASC, name ASC
+    """).fetchall()
+
+    for row in rows:
+        position = _clean_text(row['name'])
+        if not position or position in NON_CONTACT_POSITIONS:
+            continue
+
+        compact_position = re.sub(r'\s+', '', position)
+        if position in centers or '센터장' in compact_position:
+            if position not in centers:
+                centers.append(position)
+            continue
+
+        if position not in headquarters:
+            headquarters.append(position)
+
+    return headquarters, centers
+
 def _load_user_contacts(conn, positions):
     placeholders = ','.join(['?'] * len(positions))
     rows = conn.execute(f"""
@@ -321,8 +367,9 @@ def _load_custom_contacts(conn):
     return [_contact_from_user(row) for row in rows]
 
 
-def _load_center_contacts(conn):
-    contacts = _load_user_contacts(conn, CENTER_POSITIONS)
+def _load_center_contacts(conn, positions=None):
+    positions = positions or CENTER_POSITIONS
+    contacts = _load_user_contacts(conn, positions)
     team_rows = conn.execute("SELECT emp_no, team_no FROM contact_center_teams").fetchall()
     team_map = {str(row['emp_no']): int(row['team_no']) for row in team_rows}
     school_cols = _columns(conn, 'schools')
@@ -554,8 +601,9 @@ def contact_list():
     _init_saved_directory_table(conn)
 
     manual_contact_groups = _load_manual_contact_groups(conn)
-    headquarters_contacts = _load_user_contacts(conn, HQ_POSITIONS)
-    center_contacts = _load_center_contacts(conn)
+    headquarters_positions, center_positions = _load_contact_position_groups(conn)
+    headquarters_contacts = _load_user_contacts(conn, headquarters_positions)
+    center_contacts = _load_center_contacts(conn, center_positions)
     school_contacts = _load_school_contacts(conn)
     custom_contacts = _load_custom_contacts(conn)
     center_contact_groups = _group_center_contacts(center_contacts)
@@ -699,10 +747,11 @@ def save_center_team():
 
     conn = get_db()
     _init_center_team_table(conn)
-    placeholders = ','.join(['?'] * len(CENTER_POSITIONS))
+    _, center_positions = _load_contact_position_groups(conn)
+    placeholders = ','.join(['?'] * len(center_positions))
     user = conn.execute(
         f"SELECT emp_no FROM users WHERE emp_no = ? AND position IN ({placeholders})",
-        (emp_no, *CENTER_POSITIONS),
+        (emp_no, *center_positions),
     ).fetchone()
     if not user:
         conn.close()
