@@ -47,6 +47,15 @@ def _clean_text(value):
     return str(value or '').strip()
 
 
+def _is_hidden_contact_name(value):
+    """연락망에서 숨길 관리자 계정/표시용 이름인지 확인한다.
+
+    '관리자', '관리자5', '관리자03'처럼 성명이 '관리자'로 시작하면
+    연락망의 인명 목록에서는 표시하지 않는다.
+    """
+    return _clean_text(value).startswith('관리자')
+
+
 def _html_text(value):
     return escape(_clean_text(value))
 
@@ -152,6 +161,7 @@ def _find_user_for_role(conn, positions, department_keyword=None):
         SELECT name, phone, email
         FROM users
         WHERE emp_no != 'admin'
+          AND TRIM(COALESCE(name, '')) NOT LIKE '관리자%'
           AND COALESCE(status, '승인') = '승인'
           AND COALESCE(retire_date, '') = ''
           AND position IN ({placeholders})
@@ -262,6 +272,8 @@ def _load_manual_contact_groups(conn):
     grouped = {key: [] for key, _ in MANUAL_CONTACT_GROUPS}
     for row in rows:
         data = dict(row)
+        if _is_hidden_contact_name(data.get('person_name')):
+            continue
         data['organization_name'] = _dash(data.get('organization_name'))
         data['role_title'] = _dash(data.get('role_title'))
         data['person_name'] = _dash(data.get('person_name'))
@@ -340,6 +352,7 @@ def _load_user_contacts(conn, positions):
                phone, email, level
         FROM users
         WHERE emp_no != 'admin'
+          AND TRIM(COALESCE(name, '')) NOT LIKE '관리자%'
           AND COALESCE(status, '승인') = '승인'
           AND COALESCE(retire_date, '') = ''
           AND position IN ({placeholders})
@@ -358,6 +371,7 @@ def _load_custom_contacts(conn):
                phone, email, level
         FROM users
         WHERE emp_no != 'admin'
+          AND TRIM(COALESCE(name, '')) NOT LIKE '관리자%'
           AND COALESCE(status, '승인') = '승인'
           AND COALESCE(retire_date, '') = ''
           AND (TRIM(COALESCE(custom_department, '')) <> ''
@@ -525,7 +539,9 @@ def _load_school_contacts(conn):
             u.phone AS director_phone,
             u.email AS director_email
         FROM schools s
-        LEFT JOIN users u ON s.center_director_id = u.emp_no
+        LEFT JOIN users u
+          ON s.center_director_id = u.emp_no
+         AND TRIM(COALESCE(u.name, '')) NOT LIKE '관리자%'
     """
     if has_is_active:
         query += " WHERE COALESCE(s.is_active, 1) = 1"
