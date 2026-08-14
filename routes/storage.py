@@ -88,6 +88,7 @@ COMPANY_STAMP_ROOT = DATA_ROOT / "company_stamps"
 PDF_FONT_ROOT = DATA_ROOT / "pdf_fonts"
 SECURITY_ROOT = DATA_ROOT / "security"
 LEGACY_ARCHIVE_ROOT = DATA_ROOT / "legacy_archive"
+LEGACY_BOOTSTRAP_MARKER = SECURITY_ROOT / ".legacy_files_bootstrapped"
 
 
 PERSISTENT_DIRECTORIES = (
@@ -141,10 +142,25 @@ def _copy_missing_tree(source: Path, target: Path) -> int:
     return copied
 
 
+def delete_storage_target(path: str | os.PathLike[str]) -> None:
+    """파일/폴더를 삭제하고 운영체제에서 실제로 제거됐는지 확인한다."""
+    target = Path(path)
+    if target.is_dir():
+        shutil.rmtree(target)
+    else:
+        target.unlink()
+    if os.path.lexists(target):
+        raise OSError("삭제 요청 후에도 파일이 남아 있습니다.")
+
+
 def bootstrap_legacy_files() -> int:
     """예전 프로젝트 폴더의 영구 파일을 최초 실행 때 자동 통합한다."""
     ensure_storage_directories()
     if DATA_ROOT.resolve() == APP_ROOT.resolve():
+        return 0
+    # 이 작업은 마이그레이션이다. 매번 누락 파일을 다시 복사하면 사용자가
+    # 디스크 관리에서 삭제한 파일이 다음 요청/재시작 때 되살아난다.
+    if LEGACY_BOOTSTRAP_MARKER.is_file():
         return 0
 
     mappings = []
@@ -162,7 +178,12 @@ def bootstrap_legacy_files() -> int:
         (APP_ROOT / "uploads_deposit", DEPOSIT_UPLOADS),
         (APP_ROOT / "instance", SECURITY_ROOT),
     ))
-    return sum(_copy_missing_tree(source, target) for source, target in mappings)
+    copied = sum(_copy_missing_tree(source, target) for source, target in mappings)
+    LEGACY_BOOTSTRAP_MARKER.write_text(
+        "legacy file migration completed\n",
+        encoding="utf-8",
+    )
+    return copied
 
 
 ensure_storage_directories()

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_db
 from .security import hash_password, is_admin_session
-from .storage import CHAT_UPLOADS, MEMO_UPLOADS
+from .storage import CHAT_UPLOADS, MEMO_UPLOADS, delete_storage_target
 from .menu_access import (
     MENU_CATALOG,
     MENU_GROUPS,
@@ -590,11 +590,14 @@ def disk_delete():
         return jsonify({'status': 'error', 'message': '최상위 폴더는 삭제할 수 없습니다.'}), 400
     if not os.path.exists(target):
         return jsonify({'status': 'error', 'message': '파일을 찾을 수 없습니다.'}), 404
-    if os.path.isdir(target):
-        shutil.rmtree(target)
-    else:
-        os.remove(target)
-    return jsonify({'status': 'success'})
+    try:
+        delete_storage_target(target)
+    except OSError as exc:
+        return jsonify({
+            'status': 'error',
+            'message': f'삭제하지 못했습니다: {exc}',
+        }), 500
+    return jsonify({'status': 'success', 'message': '파일을 삭제했습니다.'})
 
 
 @admin_bp.route('/themes')
