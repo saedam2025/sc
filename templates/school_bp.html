@@ -626,15 +626,21 @@
 
     /* 조직도 트리를 위한 CSS */
     .org-chart-box { border: 1px solid #cbd5e1 !important; border-radius: 8px; max-height: 220px; overflow-y: auto; padding: 12px; background: #f8fafc !important; }
+    .director-search { position:relative; margin-bottom:8px; }
+    .director-search > i { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:.8rem; pointer-events:none; }
+    .director-search input { width:100%; box-sizing:border-box; padding:10px 12px 10px 34px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; color:#334155; font-size:.85rem; outline:none; }
+    .director-search input:focus { border-color:var(--school-blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--school-blue) 14%, transparent); }
     .org-dept { margin-bottom: 6px; }
     .org-dept summary { font-size: 0.9rem; font-weight: 700; color: #1e3a8a; cursor: pointer; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; transition: 0.2s; background: #ffffff !important; border: 1px solid #e2e8f0; }
     .org-dept summary::-webkit-details-marker { display: none; }
     .org-dept summary:hover { background: #eff6ff !important; border-color: #bfdbfe; }
     .dept-count { font-size: 0.75rem; color: #64748b; font-weight: normal; margin-left: auto; background: white; padding: 2px 8px; border-radius: 12px; border: 1px solid #cbd5e1; }
     .org-users { margin-left: 14px; padding-left: 14px; border-left: 2px solid #e2e8f0; display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-    .org-user-label { display: flex; align-items: center; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #334155; margin: 0; padding: 6px 8px; border-radius: 6px; transition: 0.2s; }
+    .org-user-label { width:100%; border:0; background:transparent; text-align:left; display:flex; align-items:center; font-size:0.85rem; font-weight:600; cursor:pointer; color:#334155; margin:0; padding:6px 8px; border-radius:6px; transition:0.2s; }
+    .org-user-label[hidden], .org-dept[hidden] { display:none !important; }
     .org-user-label:hover { background: #e2e8f0 !important; color: #3b82f6; }
     .org-role { font-size: 0.8em; color: #94a3b8; font-weight: 500; margin-left: 6px; }
+    .director-search-empty { padding:16px 8px; color:#94a3b8; font-size:.82rem; text-align:center; }
     details[open] > summary i.fa-folder { display: none; }
     details[open] > summary i.fa-folder-open { display: inline-block !important; }
     details:not([open]) > summary i.fa-folder-open { display: none; }
@@ -832,7 +838,7 @@
             const dirName = tr.data('director-name');
             $('#edit_selectedDirId').val(dirId || '');
             if(dirName && dirName !== 'None') {
-                $('#edit_selectedDirName').html('<i class="fas fa-check-circle"></i> 기존 지정됨: ' + dirName);
+                $('#edit_selectedDirName').html('<i class="fas fa-check-circle"></i> 기존 지정됨: ' + escapeHtml(dirName));
             } else {
                 $('#edit_selectedDirName').html('<span style="color:#ef4444;">지정된 센터장이 없습니다.</span>');
             }
@@ -1277,6 +1283,10 @@
             
             <div class="form-group">
                 <label>센터장 담당 지정 (조직도 선택)</label>
+                <div class="director-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" data-director-search-for="regOrgChart" placeholder="센터장 이름 검색" oninput="filterDirectorCandidates('regOrgChart', this.value)">
+                </div>
                 <div id="regOrgChart" class="org-chart-box" data-loaded="false">로딩 중...</div>
                 <input type="hidden" name="center_director_id" id="selectedDirId" required>
                 <div id="selectedDirName" style="margin-top:8px; color:var(--school-blue); font-weight:bold;"></div>
@@ -1332,9 +1342,16 @@
             
             <div class="form-group">
                 <label>센터장 담당 지정 (조직도 선택)</label>
+                <div class="director-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" data-director-search-for="editOrgChart" placeholder="센터장 이름 검색" oninput="filterDirectorCandidates('editOrgChart', this.value)">
+                </div>
                 <div id="editOrgChart" class="org-chart-box" data-loaded="false">로딩 중...</div>
-                <input type="hidden" name="center_director_id" id="edit_selectedDirId" required>
+                <input type="hidden" name="center_director_id" id="edit_selectedDirId">
                 <div id="edit_selectedDirName" style="margin-top:8px; color:var(--school-blue); font-weight:bold;"></div>
+                <button type="button" class="btn" style="margin-top:8px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3;" onclick="clearDirectorAssignment('edit_selectedDirId', 'edit_selectedDirName')">
+                    <i class="fa-solid fa-user-slash"></i> 센터장 지정 해제
+                </button>
             </div>
             <div style="text-align:right; margin-top:25px;">
                 <button type="button" class="btn" style="background:var(--school-soft); margin-right:5px;" onclick="closeModal('editModal')">취소</button>
@@ -2165,7 +2182,7 @@
             let html = '';
             for (const [groupName, groupUsers] of Object.entries(groups)) {
                 html += `
-                <details class="org-dept" ${groupUsers.length > 0 ? 'open' : ''}>
+                <details class="org-dept" data-director-group ${groupUsers.length > 0 ? 'open' : ''}>
                     <summary>
                         <i class="fa-solid fa-folder" style="color:#f59e0b;"></i>
                         <i class="fa-solid fa-folder-open" style="color:#f59e0b; display:none;"></i>
@@ -2178,18 +2195,21 @@
                     html += `<div style="padding: 6px 8px; color:var(--text-gray, #94a3b8); font-size:0.8rem;">해당 그룹에 등록된 직원이 없습니다.</div>`;
                 } else {
                     groupUsers.forEach(u => {
+                        const searchText = `${u.name || ''} ${u.position || ''} ${u.emp_no || ''}`.toLocaleLowerCase('ko-KR');
                         html += `
-                            <div class="org-user-label" onclick="selectDirector('${targetIdInput}', '${targetNameDisplay}', '${u.emp_no}', '${u.name}')">
+                            <button type="button" class="org-user-label" data-director-candidate data-search="${escapeHtml(searchText)}" data-emp-no="${escapeHtml(u.emp_no)}" data-name="${escapeHtml(u.name)}" onclick="selectDirectorCandidate(this, '${targetIdInput}', '${targetNameDisplay}')">
                                 <i class="fa-solid fa-user" style="color:var(--text-gray, #cbd5e1); margin-right:4px;"></i>
                                 ${escapeHtml(u.name)} <span class="org-role">${escapeHtml(u.position)}</span>
-                            </div>
+                            </button>
                         `;
                     });
                 }
                 html += `</div></details>`;
             }
-            container.innerHTML = html;
+            container.innerHTML = html + '<div class="director-search-empty" hidden>검색 결과가 없습니다.</div>';
             container.dataset.loaded = 'true';
+            const searchInput = document.querySelector(`[data-director-search-for="${containerId}"]`);
+            filterDirectorCandidates(containerId, searchInput ? searchInput.value : '');
         } catch (e) {
             container.innerHTML = '<div style="color:#ef4444; padding:10px;">직원 정보를 불러오지 못했습니다.</div>';
         }
@@ -2198,6 +2218,40 @@
     function selectDirector(inputId, displayId, empNo, name) {
         document.getElementById(inputId).value = empNo;
         document.getElementById(displayId).innerHTML = `<i class="fas fa-check-circle"></i> 선택됨: ${escapeHtml(name)}`;
+    }
+
+    function selectDirectorCandidate(candidate, inputId, displayId) {
+        selectDirector(inputId, displayId, candidate.dataset.empNo, candidate.dataset.name);
+    }
+
+    function clearDirectorAssignment(inputId, displayId) {
+        document.getElementById(inputId).value = '';
+        document.getElementById(displayId).innerHTML = '<span style="color:#ef4444;"><i class="fa-solid fa-user-slash"></i> 센터장 지정을 해제합니다.</span>';
+    }
+
+    function filterDirectorCandidates(containerId, query) {
+        const container = document.getElementById(containerId);
+        if (!container || container.dataset.loaded !== 'true') return;
+        const keyword = String(query || '').trim().toLocaleLowerCase('ko-KR');
+        let totalMatches = 0;
+
+        container.querySelectorAll('[data-director-group]').forEach(group => {
+            let groupMatches = 0;
+            const candidates = group.querySelectorAll('[data-director-candidate]');
+            candidates.forEach(candidate => {
+                const matches = !keyword || (candidate.dataset.search || '').includes(keyword);
+                candidate.hidden = !matches;
+                if (matches) groupMatches += 1;
+            });
+            group.hidden = Boolean(keyword) && groupMatches === 0;
+            const count = group.querySelector('.dept-count');
+            if (count) count.textContent = `${keyword ? groupMatches : candidates.length}명`;
+            if (keyword && groupMatches > 0) group.open = true;
+            totalMatches += groupMatches;
+        });
+
+        const empty = container.querySelector('.director-search-empty');
+        if (empty) empty.hidden = !keyword || totalMatches > 0;
     }
     
     function toggleAll(src) { $('.post-checkbox').prop('checked', src.checked); }
