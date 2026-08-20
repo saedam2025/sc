@@ -18,6 +18,25 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 active_users = {}
 ACTIVE_TIMEOUT = 5  # 5분(300초) 이내에 활동이 없으면 접속 종료로 간주
 
+
+def _is_mobile_main_request():
+    """휴대폰의 메인 요청만 모바일 전용 화면으로 분리한다."""
+    requested_view = str(request.args.get('view') or '').strip().lower()
+    if requested_view == 'desktop':
+        return False
+    if requested_view == 'mobile':
+        return True
+
+    if str(request.headers.get('Sec-CH-UA-Mobile') or '').strip() == '?1':
+        return True
+
+    user_agent = str(request.headers.get('User-Agent') or '').lower()
+    mobile_tokens = (
+        'android', 'iphone', 'ipad', 'ipod', 'windows phone',
+        'iemobile', 'opera mini', 'mobile',
+    )
+    return any(token in user_agent for token in mobile_tokens)
+
 @main_bp.before_request
 def update_last_active():
     """요청이 들어올 때마다 현재 사용자의 마지막 활동 시간을 갱신합니다."""
@@ -330,7 +349,8 @@ def index():
 
     conn.close()
 
-    return render_template('main.html', 
+    main_template = 'main_mobile.html' if _is_mobile_main_request() else 'main.html'
+    return render_template(main_template,
                            weblinks=weblinks, current_user_level=current_user_level,
                            events=events, today_grouped=today_grouped, weekly_grouped=weekly_grouped,
                            cats=cats, today_str=today.strftime('%d'), holidays_dict=holidays_dict,
