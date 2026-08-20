@@ -163,7 +163,16 @@ def test_assigned_level_7_can_open_school_workspace(database):
             updated_by TEXT,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        INSERT INTO schools(center_director_id, is_active) VALUES ('dir-team-1', 1);
+        CREATE TABLE admin_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO schools(center_director_id, is_active) VALUES
+            ('dir-team-1', 1),
+            ('another-director', 1);
+        INSERT INTO admin_settings(key, value) VALUES
+            ('school_director_scope_enabled', '1');
         INSERT INTO menu_access_permissions(menu_key, max_level) VALUES
             ('school_group', 6),
             ('school_workspace', 6),
@@ -189,10 +198,30 @@ def test_assigned_level_7_can_open_school_workspace(database):
             assert access['school_group'] is True
             assert access['school_workspace'] is True
             assert access['school_calendar'] is True
+            assert menu_access.center_director_mode_active(7) is True
             assert menu_access.enforce_request_menu_access() is None
+            assert school_routes.can_manage_schools() is False
 
             connection = connect(database)
             assert school_routes.can_access_school(connection, 1) is True
+            assert school_routes.can_access_school(connection, 2) is False
+            connection.close()
+
+            # 체크를 끄면 레벨 7의 기존 본사 권한으로 되돌아간다.
+            connection = connect(database)
+            connection.execute(
+                "UPDATE admin_settings SET value='0' WHERE key='school_director_scope_enabled'"
+            )
+            connection.commit()
+            connection.close()
+            assert menu_access.center_director_mode_active(7) is False
+            assert school_routes.can_manage_schools() is True
+            connection = connect(database)
+            assert school_routes.can_access_school(connection, 2) is True
+            connection.execute(
+                "UPDATE admin_settings SET value='1' WHERE key='school_director_scope_enabled'"
+            )
+            connection.commit()
             connection.close()
 
             # 직급 변경 후 재로그인 전처럼 세션 레벨이 오래된 값이어도
