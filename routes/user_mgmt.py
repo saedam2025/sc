@@ -13,7 +13,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from .database import get_db
-from .security import admin_required, hash_password, is_admin_session
+from .security import admin_required, hash_password, is_admin_session, menu_permission_required
 from .storage import DATA_ROOT, PROFILE_ROOT as _PROFILE_ROOT
 from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 from .organization import (
@@ -479,14 +479,14 @@ def index():
 
 
 @user_mgmt_bp.route('/invite-sender')
-@admin_required
+@menu_permission_required('organization_invite')
 def invite_sender_page():
     """조직관리에서 가입초대 메일만 독립적으로 발송하는 화면."""
     return render_template('organization_invite.html')
 
 
 @user_mgmt_bp.route('/invite_senders')
-@admin_required
+@menu_permission_required('organization_invite')
 def invite_senders():
     """가입초대 화면에서 기존 공용 발송계정을 선택할 수 있게 제공한다."""
     owner = str(session.get('emp_no') or '').strip()
@@ -708,7 +708,7 @@ def invite_page(token):
         conn.close()
 
 @user_mgmt_bp.route('/send_invite', methods=['POST'])
-@admin_required
+@menu_permission_required('organization_invite')
 def send_invite():
     try:
         data = request.get_json(silent=True) or {}
@@ -792,7 +792,7 @@ def send_invite():
 
 
 @user_mgmt_bp.route('/invite_mail_template', methods=['GET', 'POST'])
-@admin_required
+@menu_permission_required('organization_invite')
 def invite_mail_template():
     conn = get_db()
     try:
