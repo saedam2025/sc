@@ -1,9 +1,17 @@
 from flask import Blueprint, jsonify, session, request, render_template, current_app
 from datetime import datetime, timedelta
 from flask_socketio import join_room, leave_room
+import json
 import os
 import threading
 import uuid
+from urllib.parse import quote
+
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+    WebPushException = Exception
 from .database import get_db
 from .organization import (
     MESSENGER_ORGANIZATION_GROUPS,
@@ -236,6 +244,19 @@ def _ensure_chat_tables_impl(conn):
         hidden_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY(message_uid, user_name)
     )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS chat_push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_name TEXT NOT NULL,
+        endpoint TEXT NOT NULL UNIQUE,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        user_agent TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        last_success_at DATETIME,
+        failure_count INTEGER NOT NULL DEFAULT 0
+    )''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_push_user ON chat_push_subscriptions(user_name)")
 
     message_columns = {
         row['name'] for row in conn.execute("PRAGMA table_info(messages)").fetchall()
@@ -855,6 +876,174 @@ def _emit_chat_event(conn, room_key, actor, event_type, **payload):
             namespace='/chat',
         )
 
+def _chat_push_config():
+    return {
+        'public_key': str(os.getenv('VAPID_PUBLIC_KEY') or '').strip(),
+        'private_key': str(os.getenv('VAPID_PRIVATE_KEY') or '').strip(),
+        'subject': str(os.getenv('VAPID_SUBJECT') or '').strip(),
+    }
+
+
+def _chat_push_ready():
+    c = _chat_push_config()
+    return bool(webpush and c['public_key'] and c['private_key'] and c['subject'])
+
+
+def _push_body(content, filename):
+    text = str(content or '').strip()
+    if text:
+        return text[:180]
+    return f"📎 {filename}" if filename else '새 메시지가 도착했습니다.'
+
+
+def _send_chat_push(conn, target_user, room_key, actor, content='', filename='', message_id=None):
+    if not _chat_push_ready() or not target_user or target_user == actor:
+        return 0
+    if bool(_room_setting(conn, target_user, room_key)['notifications_muted']):
+        return 0
+    rows = conn.execute('''
+        SELECT endpoint, p256dh, auth FROM chat_push_subscriptions
+        WHERE user_name=? ORDER BY id ASC
+    ''', (target_user,)).fetchall()
+    if not rows:
+        return 0
+    is_group = ',' in str(room_key)
+    if is_group:
+        info = _room_info(conn, room_key, target_user)
+        title = info.get('display_name') or '새담 사내메신저'
+        body = f"{actor}: {_push_body(content, filename)}"
+    else:
+        title = actor or '새담 사내메신저'
+        body = _push_body(content, filename)
+    payload = {
+        'title': title,
+        'body': body,
+        'tag': f"saedam-chat-{quote(str(room_key), safe='')}",
+        'partner': str(room_key),
+        'url': f"/chat_popup/{quote(str(room_key), safe='')}",
+        'message_id': message_id,
+    }
+    cfg = _chat_push_config()
+    sent = 0
+    changed = False
+    for row in rows:
+        try:
+            webpush(
+                subscription_info={
+                    'endpoint': row['endpoint'],
+                    'keys': {'p256dh': row['p256dh'], 'auth': row['auth']},
+                },
+                data=json.dumps(payload, ensure_ascii=False),
+                vapid_private_key=cfg['private_key'],
+                vapid_claims={'sub': cfg['subject']},
+                ttl=3600,
+                timeout=5,
+            )
+            conn.execute('''
+                UPDATE chat_push_subscriptions
+                SET last_success_at=CURRENT_TIMESTAMP, failure_count=0,
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE endpoint=?
+            ''', (row['endpoint'],))
+            sent += 1
+            changed = True
+        except WebPushException as exc:
+            status = getattr(getattr(exc, 'response', None), 'status_code', None)
+            if status in (404, 410):
+                conn.execute('DELETE FROM chat_push_subscriptions WHERE endpoint=?', (row['endpoint'],))
+            else:
+                conn.execute('''
+                    UPDATE chat_push_subscriptions
+                    SET failure_count=failure_count+1, updated_at=CURRENT_TIMESTAMP
+                    WHERE endpoint=?
+                ''', (row['endpoint'],))
+                current_app.logger.warning('메신저 Web Push 실패 user=%s status=%s', target_user, status)
+            changed = True
+        except Exception:
+            current_app.logger.exception('메신저 Web Push 예외 user=%s', target_user)
+    if changed:
+        conn.commit()
+    return sent
+
+
+@chat_bp.route('/chat-push-sw.js')
+def chat_push_service_worker():
+    response = current_app.send_static_file('js/chat_push_sw.js')
+    response.headers['Content-Type'] = 'application/javascript; charset=utf-8'
+    response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+
+@chat_bp.route('/api/chat/push/public-key')
+def chat_push_public_key():
+    if not session.get('user_name'):
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    cfg = _chat_push_config()
+    if not _chat_push_ready():
+        return jsonify({'status': 'error', 'configured': False, 'message': '서버의 Web Push(VAPID) 설정이 필요합니다.'}), 503
+    return jsonify({'status': 'success', 'configured': True, 'public_key': cfg['public_key']})
+
+
+@chat_bp.route('/api/chat/push/subscribe', methods=['POST'])
+def chat_push_subscribe():
+    user = session.get('user_name')
+    if not user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    if not _chat_push_ready():
+        return jsonify({'status': 'error', 'message': 'Web Push 서버 설정이 필요합니다.'}), 503
+    data = request.get_json(silent=True) or {}
+    keys = data.get('keys') or {}
+    endpoint = str(data.get('endpoint') or '').strip()
+    p256dh = str(keys.get('p256dh') or '').strip()
+    auth = str(keys.get('auth') or '').strip()
+    if not endpoint.startswith('https://') or not p256dh or not auth:
+        return jsonify({'status': 'error', 'message': '푸시 구독 정보가 올바르지 않습니다.'}), 400
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    conn.execute('''
+        INSERT INTO chat_push_subscriptions (user_name, endpoint, p256dh, auth, user_agent)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(endpoint) DO UPDATE SET
+            user_name=excluded.user_name,
+            p256dh=excluded.p256dh,
+            auth=excluded.auth,
+            user_agent=excluded.user_agent,
+            updated_at=CURRENT_TIMESTAMP,
+            failure_count=0
+    ''', (user, endpoint, p256dh, auth, str(request.headers.get('User-Agent') or '')[:500]))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success', 'subscribed': True})
+
+
+@chat_bp.route('/api/chat/push/unsubscribe', methods=['POST'])
+def chat_push_unsubscribe():
+    user = session.get('user_name')
+    if not user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    endpoint = str((request.get_json(silent=True) or {}).get('endpoint') or '').strip()
+    if endpoint:
+        conn = get_db()
+        _ensure_chat_tables(conn)
+        conn.execute('DELETE FROM chat_push_subscriptions WHERE user_name=? AND endpoint=?', (user, endpoint))
+        conn.commit()
+        conn.close()
+    return jsonify({'status': 'success', 'subscribed': False})
+
+
+@chat_bp.route('/api/chat/push/test', methods=['POST'])
+def chat_push_test():
+    user = session.get('user_name')
+    if not user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    sent = _send_chat_push(conn, user, user, '새담 사내메신저', content='휴대폰 푸시 알림 테스트입니다.')
+    conn.close()
+    return jsonify({'status': 'success', 'sent': sent})
+
+
 @chat_bp.app_context_processor
 def inject_chat_data():
     current_user = session.get('user_name')
@@ -1118,6 +1307,11 @@ def send_message():
             content=content[:120],
             filename=filename,
         )
+        for receiver in receivers:
+            _send_chat_push(
+                conn, receiver, room_id, sender,
+                content=content, filename=filename, message_id=first_message_id,
+            )
     else:
         for partner, message_id in emitted_rooms:
             _emit_chat_event(
@@ -1125,6 +1319,10 @@ def send_message():
                 message_id=message_id,
                 content=content[:120],
                 filename=filename,
+            )
+            _send_chat_push(
+                conn, partner, sender, sender,
+                content=content, filename=filename, message_id=message_id,
             )
     conn.close()
     return jsonify({
