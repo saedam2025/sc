@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import tempfile
 from pathlib import Path
 
 
@@ -123,6 +124,55 @@ PERSISTENT_DIRECTORIES = (
 def ensure_storage_directories() -> None:
     for directory in PERSISTENT_DIRECTORIES:
         directory.mkdir(parents=True, exist_ok=True)
+
+
+def verify_storage_ready() -> dict[str, object]:
+    """실행 저장소가 쓰기 가능하고 Render에서는 영구 디스크인지 확인한다.
+
+    시작 로그에 경로를 남길 수 있도록 상태도 함께 반환한다. 확인 파일은 같은
+    파일시스템에 생성·동기화한 직후 삭제하므로 사용자 데이터에는 영향을 주지 않는다.
+    """
+    ensure_storage_directories()
+    if (
+        os.name != "nt"
+        and _is_render_runtime()
+        and not _has_render_persistent_mount(DATA_ROOT)
+    ):
+        raise RuntimeError(
+            "Render Persistent Disk가 연결되지 않았습니다. /mnt/data 마운트와 "
+            "DATA_DIR=/mnt/data 설정을 확인해 주세요."
+        )
+
+    probe_path: Path | None = None
+    try:
+        descriptor, probe_name = tempfile.mkstemp(
+            prefix=".storage-write-check-",
+            dir=str(DATA_ROOT),
+        )
+        probe_path = Path(probe_name)
+        with os.fdopen(descriptor, "wb") as probe:
+            probe.write(b"saedam-storage-ready\n")
+            probe.flush()
+            os.fsync(probe.fileno())
+    except OSError as exc:
+        raise RuntimeError(f"데이터 저장소에 쓸 수 없습니다: {DATA_ROOT}") from exc
+    finally:
+        if probe_path is not None:
+            try:
+                probe_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    return {
+        "data_root": str(DATA_ROOT),
+        "database": str(MAIN_DB_FILE),
+        "render": _is_render_runtime(),
+        "persistent_disk": (
+            _has_render_persistent_mount(DATA_ROOT)
+            if os.name != "nt" and _is_render_runtime()
+            else None
+        ),
+    }
 
 
 def _copy_missing_tree(source: Path, target: Path) -> int:
