@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/manual.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/manual_editor.css') }}">
+
+<div class="manual-editor-page" id="manualEditorPage" data-manual-id="{{ manual.id }}">
+  <header class="manual-editor-top">
+    <div class="manual-editor-top-left">
+      <a class="manual-back" href="{{ url_for('manual.list_manuals') }}">← 새담메뉴얼</a>
+      <div>
+        <strong>메뉴얼 작성</strong>
+        <span id="saveState">{{ '작성완료' if manual.status == 'published' else '작성중' }}</span>
+      </div>
+    </div>
+
+    <div class="manual-editor-actions">
+      <label class="manual-btn manual-btn-light" for="txtImportInput">TXT 불러오기</label>
+      <input id="txtImportInput" type="file" accept=".txt,text/plain" hidden>
+      <button class="manual-btn manual-btn-light" type="button" id="saveBtn">임시저장</button>
+      <button class="manual-btn manual-btn-light" type="button" id="previewBtn">미리보기</button>
+      <button class="manual-btn manual-btn-primary" type="button" id="publishBtn">작성완료</button>
+    </div>
+  </header>
+
+  <section class="manual-meta-card">
+    <div class="manual-field manual-field-title">
+      <label for="manualTitle">메뉴얼 제목</label>
+      <input id="manualTitle" type="text" maxlength="200" value="{{ manual.title }}" placeholder="메뉴얼 제목">
+    </div>
+    <div class="manual-field">
+      <label for="manualDescription">설명</label>
+      <input id="manualDescription" type="text" maxlength="1000" value="{{ manual.description }}" placeholder="메뉴얼에 대한 간단한 설명">
+    </div>
+
+    <div class="manual-thumbnail-field">
+      <label>목록 썸네일</label>
+      <div class="manual-thumbnail-row">
+        <div class="manual-thumbnail-preview" id="thumbnailPreview">
+          {% if manual.thumbnail_source == 'uploaded' and manual.thumbnail %}
+          <img src="{{ manual.thumbnail }}" alt="메뉴얼 썸네일" id="thumbnailPreviewImage">
+          <div class="manual-thumbnail-empty" id="thumbnailEmpty" hidden>
+            <strong>텍스트 표지</strong>
+            <span>썸네일 미등록</span>
+          </div>
+          {% else %}
+          <img src="" alt="메뉴얼 썸네일" id="thumbnailPreviewImage" hidden>
+          <div class="manual-thumbnail-empty" id="thumbnailEmpty">
+            <strong>텍스트 표지</strong>
+            <span>썸네일 미등록</span>
+          </div>
+          {% endif %}
+        </div>
+        <div class="manual-thumbnail-actions">
+          <label class="manual-btn manual-btn-light manual-thumb-upload" for="thumbnailInput">썸네일 업로드</label>
+          <input id="thumbnailInput" type="file" accept="image/*" hidden>
+          <button class="manual-btn manual-btn-light" type="button" id="thumbnailDeleteBtn"
+                  {% if manual.thumbnail_source != 'uploaded' or not manual.thumbnail %}hidden{% endif %}>썸네일 삭제</button>
+          <small>업로드하지 않으면 목록에서 기존 텍스트 표지를 사용합니다.</small>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="manual-editor-shell">
+    <aside class="manual-editor-toc">
+      <div class="manual-editor-toc-head">
+        <div>
+          <span>목차</span>
+          <small>드래그하여 순서 변경</small>
+        </div>
+        <button type="button" id="addSectionBtn" title="목차 추가">＋</button>
+      </div>
+
+      <div class="manual-editor-toc-list" id="editorTocList">
+        {% for section in sections %}
+        <button class="manual-editor-toc-item"
+                type="button"
+                draggable="true"
+                data-section-key="section-{{ loop.index }}">
+          <span class="num">{{ loop.index }}</span>
+          <span class="toc-text">{{ section.title }}</span>
+          <span class="drag">⋮⋮</span>
+        </button>
+        {% endfor %}
+      </div>
+
+      <button class="manual-add-section-wide" type="button" id="addSectionBtnBottom">
+        ＋ 목차 추가
+      </button>
+    </aside>
+
+    <main class="manual-editor-content" id="sectionContainer">
+      {% for section in sections %}
+      <section class="manual-edit-section"
+               id="section-{{ loop.index }}"
+               data-section-key="section-{{ loop.index }}">
+        <div class="manual-edit-section-head">
+          <div class="section-number">{{ loop.index }}</div>
+          <div class="section-head-fields">
+            <input class="section-title-input"
+                   type="text"
+                   maxlength="200"
+                   value="{{ section.title }}"
+                   placeholder="목차 제목">
+            <input class="section-desc-input"
+                   type="text"
+                   maxlength="1000"
+                   value="{{ section.description }}"
+                   placeholder="이 목차에 대한 간단한 설명 (선택)">
+          </div>
+          <button class="section-delete-btn" type="button" title="목차 삭제">삭제</button>
+        </div>
+
+        <div class="saedam-editor-toolbar" role="toolbar" aria-label="본문 편집 도구">
+          <button type="button" data-format="h3">소제목</button>
+          <button type="button" data-command="bold" title="굵게"><b>B</b></button>
+          <button type="button" data-command="italic" title="기울임"><i>I</i></button>
+          <button type="button" data-command="underline" title="밑줄"><u>U</u></button>
+
+          <select class="manual-font-size-select" title="글자 크기">
+            <option value="">글자크기</option>
+            <option value="12px">12</option>
+            <option value="14px">14</option>
+            <option value="16px">16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+            <option value="24px">24</option>
+            <option value="28px">28</option>
+            <option value="32px">32</option>
+          </select>
+          <label class="manual-color-control" title="글자색">
+            <span>글자색</span>
+            <input class="manual-font-color-input" type="color" value="#182a2c">
+          </label>
+
+          <span class="toolbar-divider"></span>
+          <button type="button" data-command="insertUnorderedList">• 목록</button>
+          <button type="button" data-command="insertOrderedList">1. 목록</button>
+          <button type="button" data-action="link">링크</button>
+
+          <span class="toolbar-divider"></span>
+          <button type="button" data-action="table">표 삽입</button>
+          <button type="button" data-action="table-row-add" title="선택 셀 아래 행 추가">행＋</button>
+          <button type="button" data-action="table-row-delete" title="선택된 행 삭제">행−</button>
+          <button type="button" data-action="table-col-add" title="선택 셀 오른쪽 열 추가">열＋</button>
+          <button type="button" data-action="table-col-delete" title="선택된 열 삭제">열−</button>
+          <button type="button" data-action="table-cell-size" title="선택 셀의 폭과 높이 조절">셀 크기</button>
+
+          <span class="toolbar-divider"></span>
+          <button type="button" data-action="note">안내</button>
+          <button type="button" data-action="warn">주의</button>
+          <button type="button" data-action="danger">경고</button>
+          <button type="button" data-action="image">이미지</button>
+          <input class="section-image-input" type="file" accept="image/*" hidden>
+        </div>
+
+        <div class="saedam-rich-editor"
+             contenteditable="true"
+             data-placeholder="이곳에 메뉴얼 내용을 작성하세요.">{{ section.content_html|safe }}</div>
+      </section>
+      {% endfor %}
+    </main>
+  </div>
+
+  <footer class="manual-editor-footer">
+    <span>자동 임시저장: 변경사항이 있으면 약 60초마다 저장됩니다.</span>
+    <button type="button" class="manual-danger-link" id="deleteManualBtn">이 메뉴얼 삭제</button>
+  </footer>
+</div>
+
+<div class="manual-toast" id="manualToast" aria-live="polite"></div>
+
+<script>
+window.SAEDAM_MANUAL_EDITOR = {
+  manualId: {{ manual.id }},
+  status: {{ manual.status|tojson }},
+  saveUrl: {{ url_for('manual.save_manual', manual_id=manual.id)|tojson }},
+  publishUrl: {{ url_for('manual.publish_manual', manual_id=manual.id)|tojson }},
+  unpublishUrl: {{ url_for('manual.unpublish_manual', manual_id=manual.id)|tojson }},
+  previewUrl: {{ url_for('manual.preview_manual', manual_id=manual.id)|tojson }},
+  listUrl: {{ url_for('manual.list_manuals')|tojson }},
+  deleteUrl: {{ url_for('manual.delete_manual', manual_id=manual.id)|tojson }},
+  uploadImageUrl: {{ url_for('manual.upload_image')|tojson }},
+  deleteImageUrl: {{ url_for('manual.delete_image')|tojson }},
+  uploadThumbnailUrl: {{ url_for('manual.upload_thumbnail')|tojson }},
+  deleteThumbnailUrl: {{ url_for('manual.delete_thumbnail')|tojson }},
+  uploadTxtUrl: {{ url_for('manual.upload_txt')|tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/manual_editor.js') }}"></script>
+{% endblock %}
