@@ -11,6 +11,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 import routes.chat as chat
 import routes.menu_access as menu_access
+import routes.school_bp as school_routes
 from routes.school_bp import build_school_post_list_queries, is_shared_board
 
 
@@ -189,6 +190,22 @@ def test_assigned_level_7_can_open_school_workspace(database):
             assert access['school_workspace'] is True
             assert access['school_calendar'] is True
             assert menu_access.enforce_request_menu_access() is None
+
+            connection = connect(database)
+            assert school_routes.can_access_school(connection, 1) is True
+            connection.close()
+
+            # 직급 변경 후 재로그인 전처럼 세션 레벨이 오래된 값이어도
+            # 실제 학교 지정이 접근권한보다 우선해야 한다.
+            session['user_level'] = 12
+            access = menu_access.build_menu_access(12)
+            assert access['school_group'] is True
+            assert access['school_workspace'] is True
+            assert menu_access.enforce_request_menu_access() is None
+
+            connection = connect(database)
+            assert school_routes.can_access_school(connection, 1) is True
+            connection.close()
     finally:
         menu_access.get_db = original_get_db
 
