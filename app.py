@@ -30,6 +30,7 @@ from routes.school_task import school_task_bp
 from routes.contacts import contacts_bp
 from routes.admin_management import admin_bp, get_active_theme
 from routes.ebook import ebook_bp, init_ebook_schema
+from routes.manual import manual_bp, init_manual_schema
 
 # [수정] gall2.py가 routes 폴더 안에 있다면 아래와 같이 수정해야 합니다.
 from routes.gall2 import gall2_bp
@@ -76,6 +77,7 @@ with app.app_context():
     try:
         init_db()
         init_ebook_schema()
+        init_manual_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -199,6 +201,7 @@ def _classify_menu(path):
         ('/contacts', '본사연락망'),
         ('/memo', '개인화이트보드'),
         ('/excel-generator', '입금용 엑셀 생성기'),
+        ('/manual', '새담메뉴얼'),
         ('/ebook/books', 'eBook'),
         ('/ebook', 'e리플렛'),
         ('/notifications', '알림'),
@@ -730,6 +733,7 @@ app.register_blueprint(contacts_bp)
 app.register_blueprint(gall2_bp)
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(ebook_bp, url_prefix='/ebook')
+app.register_blueprint(manual_bp, url_prefix='/manual')
 
 # 🚀 새로 분리한 메신저 블루프린트 등록 추가
 

@@ -16,3 +16,4 @@ Pillow
 opencv-python-headless
 PyPDF2
 xlsxwriter
+pywebpush>=2.0.0
