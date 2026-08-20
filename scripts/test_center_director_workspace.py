@@ -136,6 +136,12 @@ def test_org_chart_function_names_are_isolated():
     assert 'id="edit_selectedDirId" required' not in school_template
     assert 'function filterDirectorCandidates(' in school_template
 
+    assert '#orgChartModal .org-status-item' in chat_template
+    assert '#orgChartModal .org-status-dot' in chat_template
+    assert '#orgChartModal .status-online' in chat_template
+    assert 'animation: chat-presence-pulse' in chat_template
+    assert "await updateOrgOnlineStatus();" in chat_template
+
 
 def test_assigned_level_7_can_open_school_workspace(database):
     connection = connect(database)
