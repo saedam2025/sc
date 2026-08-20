@@ -10,7 +10,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     manifestUrl: {{ url_for('static', filename='saedam_manifest.webmanifest') | tojson }}
 };
 </script>
-<script src="{{ url_for('static', filename='js/chat_push.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat_push.js', v='20260820-1') }}"></script>
 <style>
     .chat-rank-badge {
         display: none;
@@ -68,7 +68,9 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             
             <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
                 <i id="chatNotificationButton" class="fa-solid fa-bell" role="button" tabindex="0" aria-pressed="true" onclick="toggleChatAlerts()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChatAlerts();}" title="메시지 알림음 켜짐 · 눌러서 끄기" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
-                <i id="chatPushButton" class="fa-solid fa-mobile-screen" role="button" tabindex="0" aria-pressed="false" onclick="toggleChatPush()" title="휴대폰 푸시 알림 설정" style="font-size:1rem;color:#94a3b8;cursor:pointer;padding:5px;"></i>
+                <button id="chatPushButton" type="button" aria-pressed="false" onclick="toggleChatPush()" title="휴대폰 푸시 알림 설정" style="appearance:none;border:0;background:transparent;color:#94a3b8;cursor:pointer;padding:5px;line-height:1;">
+                    <i id="chatPushButtonIcon" class="fa-solid fa-mobile-screen" aria-hidden="true" style="font-size:1rem;"></i>
+                </button>
                 <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
                 <i class="fa-solid fa-plus" onclick="document.getElementById('expandedChatModal').style.display='block'" title="메신저 크게 보기" style="font-size: 1.25rem; color: var(--blue-primary); cursor:pointer; padding: 5px;"></i>
             </div>
@@ -648,13 +650,19 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
 
     function updateChatPushButton() {
         const b = document.getElementById('chatPushButton');
+        const icon = document.getElementById('chatPushButtonIcon');
         if (!b) return;
         const api = window.SaedamChatPush;
         const enabled = !!(api && api.isSubscribed());
-        b.className = enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen';
+        const busy = !!(api && api.isBusy && api.isBusy());
+        if (icon) icon.className = busy
+            ? 'fa-solid fa-spinner fa-spin'
+            : (enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen');
         b.style.color = enabled ? 'var(--blue-primary)' : '#94a3b8';
+        b.disabled = busy;
         b.setAttribute('aria-pressed', String(enabled));
-        b.title = enabled ? '휴대폰 푸시 알림 켜짐 · 눌러서 끄기' : '휴대폰 푸시 알림 꺼짐 · 눌러서 켜기';
+        b.title = busy ? '휴대폰 푸시 알림 설정 중' : (enabled ? '휴대폰 푸시 알림 켜짐 · 눌러서 끄기' : '휴대폰 푸시 알림 꺼짐 · 눌러서 켜기');
+        b.setAttribute('aria-label', b.title);
     }
 
     async function toggleChatPush() {
@@ -665,7 +673,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             alert(enabled ? '휴대폰 푸시 알림이 켜졌습니다.' : '이 기기의 휴대폰 푸시 알림을 껐습니다.');
         } catch (e) {
             console.error(e);
-            alert(e?.message || '휴대폰 푸시 알림 설정에 실패했습니다.');
+            alert((e && e.message) || '휴대폰 푸시 알림 설정에 실패했습니다.');
         }
     }
 
@@ -688,7 +696,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             && Notification.permission === 'granted'
             && document.visibilityState !== 'visible'
         ) {
-            const title = room?.display_name || event.actor || '새담 사내메신저';
+            const title = (room && room.display_name) || event.actor || '새담 사내메신저';
             const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');
             const notification = new Notification(title, { body, tag: 'chat-' + event.partner });
             notification.onclick = () => {
