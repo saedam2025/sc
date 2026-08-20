@@ -725,6 +725,7 @@ def init_db():
     )''')
 
     # 명세서 발송 작업공간: 화면의 임시 배열이 아니라 사용자별로 영구 저장한다.
+    # 자동적용 구분 문구는 payroll_mail_templates.match_keywords에 함께 보관한다.
     c.execute('''CREATE TABLE IF NOT EXISTS payroll_workgroups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         owner_emp_no TEXT NOT NULL,
