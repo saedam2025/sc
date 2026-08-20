@@ -1,0 +1,421 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script>
+window.SAEDAM_CHAT_PUSH_CONFIG = {
+    swUrl: {{ url_for('chat.chat_push_service_worker') | tojson }},
+    publicKeyUrl: {{ url_for('chat.chat_push_public_key') | tojson }},
+    subscribeUrl: {{ url_for('chat.chat_push_subscribe') | tojson }},
+    unsubscribeUrl: {{ url_for('chat.chat_push_unsubscribe') | tojson }},
+    testUrl: {{ url_for('chat.chat_push_test') | tojson }},
+    manifestUrl: {{ url_for('static', filename='saedam_manifest.webmanifest') | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/chat_push.js', v='20260820-1') }}"></script>
+
+<style>
+    .navbar { display: none !important; }
+    .content-container {
+        max-width: none !important;
+        padding: 0 0 calc(92px + env(safe-area-inset-bottom)) !important;
+    }
+    .main-content { background: #f4f7fb !important; }
+    .mobile-home {
+        --mobile-blue: var(--primary-color, #2563eb);
+        --mobile-text: var(--text-dark, #0f172a);
+        --mobile-muted: var(--text-gray, #64748b);
+        width: 100%;
+        max-width: 720px;
+        min-height: 100vh;
+        margin: 0 auto;
+        color: var(--mobile-text);
+        background: #f4f7fb;
+        font-family: 'Pretendard', sans-serif;
+    }
+    .mobile-hero {
+        position: relative;
+        overflow: hidden;
+        padding: calc(18px + env(safe-area-inset-top)) 20px 26px;
+        color: #fff;
+        background: linear-gradient(145deg, color-mix(in srgb, var(--mobile-blue) 92%, #0f172a), var(--mobile-blue) 60%, #0f766e);
+        border-radius: 0 0 28px 28px;
+        box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+    }
+    .mobile-hero::after {
+        content: '';
+        position: absolute;
+        width: 190px;
+        height: 190px;
+        right: -75px;
+        top: -95px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.13);
+    }
+    .mobile-topbar,
+    .mobile-profile-row,
+    .mobile-attendance,
+    .mobile-section-head,
+    .mobile-list-row,
+    .mobile-bottom-nav {
+        display: flex;
+        align-items: center;
+    }
+    .mobile-topbar { justify-content: space-between; position: relative; z-index: 1; }
+    .mobile-brand { display: flex; align-items: center; gap: 9px; font-size: .82rem; font-weight: 800; letter-spacing: .08em; }
+    .mobile-brand img { width: 78px; height: 28px; object-fit: contain; border-radius: 8px; background: #fff; padding: 3px 6px; }
+    .mobile-top-actions { display: flex; gap: 8px; }
+    .mobile-icon-button {
+        width: 38px;
+        height: 38px;
+        border: 1px solid rgba(255,255,255,.28);
+        border-radius: 12px;
+        color: #fff;
+        background: rgba(255,255,255,.13);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+    .mobile-icon-button:disabled { opacity: .65; }
+    .mobile-profile-row { gap: 14px; margin-top: 24px; position: relative; z-index: 1; }
+    .mobile-avatar {
+        width: 58px;
+        height: 58px;
+        flex: 0 0 58px;
+        border: 3px solid rgba(255,255,255,.8);
+        border-radius: 20px;
+        background: #fff;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        font-size: 1.8rem;
+        box-shadow: 0 8px 20px rgba(15,23,42,.18);
+    }
+    .mobile-avatar img { width: 100%; height: 100%; object-fit: contain; }
+    .mobile-greeting { min-width: 0; flex: 1; }
+    .mobile-greeting small { display: block; margin-bottom: 4px; color: rgba(255,255,255,.76); font-size: .76rem; }
+    .mobile-greeting strong { display: block; font-size: 1.25rem; letter-spacing: -.03em; }
+    .mobile-greeting span { display: block; margin-top: 4px; color: rgba(255,255,255,.82); font-size: .78rem; }
+    .mobile-attendance { gap: 10px; margin-top: 20px; position: relative; z-index: 1; }
+    .mobile-attendance button {
+        min-height: 44px;
+        flex: 1;
+        border: 1px solid rgba(255,255,255,.28);
+        border-radius: 14px;
+        color: #fff;
+        background: rgba(255,255,255,.13);
+        font: inherit;
+        font-size: .87rem;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .mobile-attendance button:first-child { color: var(--mobile-blue); background: #fff; }
+    .mobile-attendance i { margin-right: 6px; }
+    .mobile-body { padding: 20px 16px 0; }
+    .mobile-section { margin-bottom: 16px; padding: 18px; border: 1px solid #e4eaf2; border-radius: 22px; background: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.055); }
+    .mobile-section-head { justify-content: space-between; gap: 12px; margin-bottom: 15px; }
+    .mobile-section-title { display: flex; align-items: center; gap: 9px; font-size: 1rem; font-weight: 900; letter-spacing: -.025em; }
+    .mobile-section-title i { color: var(--mobile-blue); }
+    .mobile-section-link { border: 0; padding: 4px; color: var(--mobile-muted); background: none; text-decoration: none; font-size: .76rem; font-weight: 700; cursor: pointer; }
+    .mobile-quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .mobile-quick {
+        min-width: 0;
+        padding: 13px 4px 11px;
+        border: 1px solid #e7edf5;
+        border-radius: 16px;
+        color: var(--mobile-text);
+        background: #f8fafc;
+        text-align: center;
+        text-decoration: none;
+        font-size: .71rem;
+        font-weight: 800;
+    }
+    .mobile-quick i { width: 36px; height: 36px; margin: 0 auto 7px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--mobile-blue); background: color-mix(in srgb, var(--mobile-blue) 11%, #fff); font-size: 1rem; }
+    .mobile-notification-host { min-height: 120px; }
+    .mobile-notification-host .noti-grid-container { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .mobile-notification-host .noti-main-card { align-items: stretch !important; gap: 10px; padding: 12px !important; }
+    .mobile-notification-host .noti-main-card > div:last-child { justify-content: space-between; gap: 8px !important; }
+    .mobile-notification-host .noti-card-value { font-size: .83rem !important; }
+    .mobile-notification-host .design-card { min-height: 92px; }
+    .mobile-date-chip { padding: 5px 9px; border-radius: 999px; color: var(--mobile-blue); background: color-mix(in srgb, var(--mobile-blue) 9%, #fff); font-size: .7rem; font-weight: 800; }
+    .mobile-list { display: flex; flex-direction: column; }
+    .mobile-list-row { min-height: 48px; gap: 11px; padding: 9px 0; border-bottom: 1px solid #edf1f6; color: var(--mobile-text); text-decoration: none; }
+    .mobile-list-row:last-child { border-bottom: 0; }
+    .mobile-list-icon { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: var(--mobile-blue); background: #eff6ff; font-size: .86rem; }
+    .mobile-list-main { min-width: 0; flex: 1; }
+    .mobile-list-main strong { display: block; overflow: hidden; color: var(--mobile-text); text-overflow: ellipsis; white-space: nowrap; font-size: .86rem; }
+    .mobile-list-main span { display: block; margin-top: 3px; overflow: hidden; color: var(--mobile-muted); text-overflow: ellipsis; white-space: nowrap; font-size: .72rem; }
+    .mobile-list-meta { flex: 0 0 auto; color: #94a3b8; font-size: .7rem; }
+    .mobile-unread { min-width: 20px; padding: 3px 6px; border-radius: 999px; color: #fff; background: #ef4444; text-align: center; font-size: .65rem; font-weight: 900; }
+    .mobile-empty { padding: 24px 8px; color: #94a3b8; text-align: center; font-size: .8rem; }
+    .mobile-desktop-link { display: block; margin: 22px 0 2px; color: #94a3b8; text-align: center; text-decoration: none; font-size: .72rem; }
+    .mobile-bottom-nav {
+        position: fixed;
+        z-index: 2500;
+        left: 50%;
+        bottom: 0;
+        width: min(100%, 720px);
+        min-height: 66px;
+        padding: 7px 10px calc(7px + env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        justify-content: space-around;
+        border-top: 1px solid #dfe6ef;
+        background: rgba(255,255,255,.96);
+        backdrop-filter: blur(16px);
+        box-shadow: 0 -8px 30px rgba(15,23,42,.08);
+        box-sizing: border-box;
+    }
+    .mobile-nav-item { min-width: 64px; border: 0; color: #7c8a9e; background: none; text-align: center; text-decoration: none; font: inherit; cursor: pointer; }
+    .mobile-nav-item i { display: block; margin-bottom: 4px; font-size: 1.05rem; }
+    .mobile-nav-item span { display: block; font-size: .67rem; font-weight: 800; }
+    .mobile-nav-item.active { color: var(--mobile-blue); }
+    .mobile-more-backdrop { display: none; position: fixed; z-index: 2700; inset: 0; background: rgba(15,23,42,.4); }
+    .mobile-more-backdrop.open { display: block; }
+    .mobile-more-sheet { position: absolute; left: 50%; bottom: 0; width: min(100%, 720px); padding: 12px 18px calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); border-radius: 28px 28px 0 0; background: #fff; box-sizing: border-box; }
+    .mobile-sheet-handle { width: 42px; height: 5px; margin: 0 auto 18px; border-radius: 999px; background: #d8e0ea; }
+    .mobile-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .mobile-more-grid a { padding: 14px 4px; border-radius: 15px; color: #334155; background: #f5f7fa; text-align: center; text-decoration: none; font-size: .7rem; font-weight: 800; }
+    .mobile-more-grid i { display: block; margin-bottom: 7px; color: var(--mobile-blue); font-size: 1rem; }
+    @media (max-width: 370px) {
+        .mobile-quick-grid, .mobile-more-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .mobile-body { padding-left: 12px; padding-right: 12px; }
+        .mobile-section { padding: 15px; }
+    }
+</style>
+
+<div class="mobile-home">
+    <header class="mobile-hero">
+        <div class="mobile-topbar">
+            <div class="mobile-brand">
+                <img src="{{ url_for('static', filename='logo01.gif') }}" alt="새담">
+                <span>INTRANET</span>
+            </div>
+            <div class="mobile-top-actions">
+                <button id="mobilePushButton" class="mobile-icon-button" type="button" onclick="toggleMobilePush()" title="메시지 푸시 알림">
+                    <i id="mobilePushIcon" class="fa-solid fa-mobile-screen-button"></i>
+                </button>
+                <a class="mobile-icon-button" href="{{ url_for('logout') }}" title="로그아웃"><i class="fa-solid fa-right-from-bracket"></i></a>
+            </div>
+        </div>
+
+        <div class="mobile-profile-row" onclick="openMyInfoModal()" role="button" tabindex="0">
+            <div class="mobile-avatar">
+                {% if current_user_profile_path %}
+                <img src="{{ current_user_profile_path }}" alt="내 프로필">
+                {% elif user_profile_paths and user_profile_paths.get(current_user) %}
+                <img src="{{ user_profile_paths.get(current_user) }}" alt="내 프로필">
+                {% else %}
+                {{ user_icons.get(current_user, '👤') if user_icons else '👤' }}
+                {% endif %}
+            </div>
+            <div class="mobile-greeting">
+                <small id="mobileTodayLabel">오늘도 좋은 하루 보내세요</small>
+                <strong>{{ current_user }}님</strong>
+                <span>{{ session.get('department', '소속미지정') }} · {{ session.get('position', '직급미지정') }}</span>
+            </div>
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </div>
+
+        <div class="mobile-attendance">
+            <button type="button" onclick="recordMobileAttendance('in')"><i class="fa-solid fa-arrow-right-to-bracket"></i>출근</button>
+            <button type="button" onclick="recordMobileAttendance('out')"><i class="fa-solid fa-arrow-right-from-bracket"></i>퇴근</button>
+        </div>
+    </header>
+
+    <main class="mobile-body">
+        <section class="mobile-section" id="mobile-notifications">
+            <div class="mobile-section-head">
+                <div class="mobile-section-title"><i class="fa-solid fa-grid-2"></i>빠른 업무</div>
+            </div>
+            <div class="mobile-quick-grid">
+                {% if menu_access.get('approval_main', true) %}<a class="mobile-quick" href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>{% endif %}
+                {% if menu_access.get('school_workspace', true) %}<a class="mobile-quick" href="/school"><i class="fa-solid fa-school"></i>학교업무</a>{% endif %}
+                {% if menu_access.get('board_noti', true) %}<a class="mobile-quick" href="/board/noti"><i class="fa-solid fa-bullhorn"></i>공지사항</a>{% endif %}
+                {% if menu_access.get('attendance_main', true) %}<a class="mobile-quick" href="/attendance"><i class="fa-solid fa-clock"></i>근태관리</a>{% endif %}
+                {% if menu_access.get('contacts_main', true) %}<a class="mobile-quick" href="/contacts"><i class="fa-solid fa-address-book"></i>연락망</a>{% endif %}
+                {% if menu_access.get('memo_main', true) %}<a class="mobile-quick" href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>메모장</a>{% endif %}
+                {% if menu_access.get('expense_main', true) %}<a class="mobile-quick" href="/expense"><i class="fa-solid fa-receipt"></i>지출결의</a>{% endif %}
+                {% if menu_access.get('gallery_main', true) %}<a class="mobile-quick" href="/gall2"><i class="fa-regular fa-images"></i>갤러리</a>{% endif %}
+            </div>
+        </section>
+
+        <section class="mobile-section">
+            <div class="mobile-section-head">
+                <div class="mobile-section-title"><i class="fa-solid fa-bell"></i>업무 알림</div>
+                <button class="mobile-section-link" type="button" onclick="loadMobileNotifications()"><i class="fa-solid fa-rotate-right"></i> 새로고침</button>
+            </div>
+            <div id="mobileNotificationArea" class="mobile-notification-host">
+                <div class="mobile-empty"><i class="fa-solid fa-spinner fa-spin"></i> 업무 알림을 불러오는 중입니다.</div>
+            </div>
+        </section>
+
+        <section class="mobile-section" id="mobile-schedule">
+            <div class="mobile-section-head">
+                <div class="mobile-section-title"><i class="fa-regular fa-calendar-check"></i>오늘 일정</div>
+                <span class="mobile-date-chip" id="mobileDateChip">오늘</span>
+            </div>
+            <div class="mobile-list">
+                {% set schedule_state = namespace(count=0) %}
+                {% for cat in cats %}
+                    {% for item in today_grouped.get(cat, []) %}
+                    {% set schedule_state.count = schedule_state.count + 1 %}
+                    <a class="mobile-list-row" href="/school/calendar">
+                        <span class="mobile-list-icon"><i class="fa-solid fa-calendar-day"></i></span>
+                        <span class="mobile-list-main">
+                            <strong>{{ item.extendedProps.task_title or item.title }}</strong>
+                            <span>{{ cat }} · {{ item.extendedProps.owner }}{% if item.extendedProps.task_time %} · {{ item.extendedProps.task_time }}{% endif %}</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-right mobile-list-meta"></i>
+                    </a>
+                    {% endfor %}
+                {% endfor %}
+                {% if schedule_state.count == 0 %}<div class="mobile-empty">오늘 등록된 일정이 없습니다.</div>{% endif %}
+            </div>
+        </section>
+
+        <section class="mobile-section">
+            <div class="mobile-section-head">
+                <div class="mobile-section-title"><i class="fa-solid fa-bullhorn"></i>공지사항</div>
+                <a class="mobile-section-link" href="/board/noti">전체보기 <i class="fa-solid fa-chevron-right"></i></a>
+            </div>
+            <div class="mobile-list">
+                {% for post in board_posts[:5] %}
+                <a class="mobile-list-row" href="/board/noti/read/{{ post.id if post.id else post['id'] }}">
+                    <span class="mobile-list-icon"><i class="fa-regular fa-file-lines"></i></span>
+                    <span class="mobile-list-main">
+                        <strong>{{ post.title }}</strong>
+                        <span>{{ post.author }}</span>
+                    </span>
+                    <span class="mobile-list-meta">{{ (post.created_at or post.date)[:10] }}</span>
+                </a>
+                {% else %}
+                <div class="mobile-empty">등록된 공지사항이 없습니다.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="mobile-section" id="mobile-chat">
+            <div class="mobile-section-head">
+                <div class="mobile-section-title"><i class="fa-regular fa-comments"></i>최근 메시지</div>
+                <button class="mobile-section-link" type="button" onclick="toggleMobileMore(true)">업무 메뉴 <i class="fa-solid fa-grid-2"></i></button>
+            </div>
+            <div class="mobile-list">
+                {% for room in chat_partners[:5] %}
+                <a class="mobile-list-row" href="{{ url_for('chat_popup', partner=room.name) }}">
+                    <span class="mobile-list-icon"><i class="fa-solid {{ 'fa-user-group' if ',' in room.name else 'fa-user' }}"></i></span>
+                    <span class="mobile-list-main"><strong>{{ room.name }}</strong><span>대화방 열기</span></span>
+                    {% if room.unread %}<span class="mobile-unread">{{ room.unread }}</span>{% else %}<i class="fa-solid fa-chevron-right mobile-list-meta"></i>{% endif %}
+                </a>
+                {% else %}
+                <div class="mobile-empty">최근 대화가 없습니다.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <a class="mobile-desktop-link" href="/?view=desktop"><i class="fa-solid fa-display"></i> PC 화면으로 보기</a>
+    </main>
+</div>
+
+<nav class="mobile-bottom-nav" aria-label="모바일 주요 메뉴">
+    <a class="mobile-nav-item active" href="/"><i class="fa-solid fa-house"></i><span>홈</span></a>
+    <a class="mobile-nav-item" href="#mobile-schedule"><i class="fa-regular fa-calendar"></i><span>일정</span></a>
+    <a class="mobile-nav-item" href="#mobile-chat"><i class="fa-regular fa-comment-dots"></i><span>메시지</span></a>
+    <a class="mobile-nav-item" href="#mobile-notifications"><i class="fa-regular fa-bell"></i><span>알림</span></a>
+    <button class="mobile-nav-item" type="button" onclick="toggleMobileMore(true)"><i class="fa-solid fa-bars"></i><span>전체메뉴</span></button>
+</nav>
+
+<div id="mobileMoreBackdrop" class="mobile-more-backdrop" onclick="if(event.target===this) toggleMobileMore(false)">
+    <div class="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="전체 메뉴">
+        <div class="mobile-sheet-handle"></div>
+        <div class="mobile-section-head">
+            <div class="mobile-section-title">전체 메뉴</div>
+            <button class="mobile-section-link" type="button" onclick="toggleMobileMore(false)"><i class="fa-solid fa-xmark"></i> 닫기</button>
+        </div>
+        <div class="mobile-more-grid">
+            {% if menu_access.get('approval_main', true) %}<a href="/approval"><i class="fa-solid fa-file-signature"></i>사내결재</a>{% endif %}
+            {% if menu_access.get('school_workspace', true) %}<a href="/school"><i class="fa-solid fa-school"></i>학교관리</a>{% endif %}
+            {% if menu_access.get('board_noti', true) %}<a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>게시판</a>{% endif %}
+            {% if menu_access.get('gallery_main', true) %}<a href="/gall2"><i class="fa-regular fa-images"></i>갤러리</a>{% endif %}
+            {% if menu_access.get('contacts_main', true) %}<a href="/contacts"><i class="fa-solid fa-address-book"></i>연락망</a>{% endif %}
+            {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock"></i>근태관리</a>{% endif %}
+            {% if menu_access.get('memo_main', true) %}<a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>메모장</a>{% endif %}
+            {% if menu_access.get('board_manual', true) %}<a href="/manual"><i class="fa-solid fa-book-open"></i>업무매뉴얼</a>{% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleMobileMore(open) {
+        const backdrop = document.getElementById('mobileMoreBackdrop');
+        if (!backdrop) return;
+        backdrop.classList.toggle('open', !!open);
+        document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    async function recordMobileAttendance(type) {
+        const label = type === 'in' ? '출근' : '퇴근';
+        if (!confirm(`현재 시간으로 ${label} 처리하시겠습니까?`)) return;
+        try {
+            const response = await fetch(`/api/attendance/${type}`, {method: 'POST'});
+            const result = await response.json();
+            alert(result.message || (response.ok ? `${label} 처리되었습니다.` : '처리 중 오류가 발생했습니다.'));
+        } catch (error) {
+            alert('서버와 통신하지 못했습니다. 잠시 후 다시 시도해주세요.');
+        }
+    }
+
+    async function loadMobileNotifications() {
+        const area = document.getElementById('mobileNotificationArea');
+        if (!area || area.dataset.loading === 'true') return;
+        area.dataset.loading = 'true';
+        try {
+            const response = await fetch('/widget/notifications', {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) throw new Error('notification request failed');
+            area.innerHTML = await response.text();
+        } catch (error) {
+            area.innerHTML = '<div class="mobile-empty">업무 알림을 불러오지 못했습니다.<br>새로고침 버튼을 눌러 다시 시도해주세요.</div>';
+        } finally {
+            area.dataset.loading = 'false';
+        }
+    }
+
+    function updateMobilePushButton() {
+        const api = window.SaedamChatPush;
+        const button = document.getElementById('mobilePushButton');
+        const icon = document.getElementById('mobilePushIcon');
+        if (!button || !icon) return;
+        const enabled = !!(api && api.isSubscribed());
+        const busy = !!(api && api.isBusy && api.isBusy());
+        button.disabled = busy;
+        icon.className = busy ? 'fa-solid fa-spinner fa-spin' : (enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen');
+        button.title = busy ? '푸시 알림 설정 중' : (enabled ? '메시지 푸시 알림 켜짐' : '메시지 푸시 알림 꺼짐');
+        button.setAttribute('aria-pressed', String(enabled));
+    }
+
+    async function toggleMobilePush() {
+        if (!window.SaedamChatPush) return alert('푸시 알림 모듈을 불러오지 못했습니다.');
+        try {
+            const enabled = await window.SaedamChatPush.toggle();
+            alert(enabled ? '메시지 푸시 알림을 켰습니다.' : '이 기기의 메시지 푸시 알림을 껐습니다.');
+        } catch (error) {
+            alert((error && error.message) || '푸시 알림 설정에 실패했습니다.');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const now = new Date();
+        const fullDate = new Intl.DateTimeFormat('ko-KR', {month: 'long', day: 'numeric', weekday: 'short'}).format(now);
+        const greeting = document.getElementById('mobileTodayLabel');
+        const chip = document.getElementById('mobileDateChip');
+        if (greeting) greeting.textContent = `${fullDate}, 오늘도 좋은 하루 보내세요`;
+        if (chip) chip.textContent = fullDate;
+        loadMobileNotifications();
+        window.addEventListener('chat-push-state-changed', updateMobilePushButton);
+        updateMobilePushButton();
+        if (window.SaedamChatPush) window.SaedamChatPush.init().catch(function (error) { console.warn(error); });
+    });
+</script>
+{% endblock %}
