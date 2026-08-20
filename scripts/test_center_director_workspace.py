@@ -10,6 +10,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 import routes.chat as chat
+import routes.menu_access as menu_access
 from routes.school_bp import build_school_post_list_queries, is_shared_board
 
 
@@ -130,6 +131,56 @@ def test_org_chart_function_names_are_isolated():
     assert 'async function loadDirectorAssignmentOrgChart(' in school_template
     assert "loadDirectorAssignmentOrgChart('regOrgChart'" in school_template
     assert "loadDirectorAssignmentOrgChart('editOrgChart'" in school_template
+    assert '센터장 이름 검색' in school_template
+    assert '센터장 지정 해제' in school_template
+    assert 'id="edit_selectedDirId" required' not in school_template
+    assert 'function filterDirectorCandidates(' in school_template
+
+
+def test_assigned_level_7_can_open_school_workspace(database):
+    connection = connect(database)
+    connection.executescript(
+        """
+        CREATE TABLE schools (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            center_director_id TEXT,
+            is_active INTEGER DEFAULT 1
+        );
+        CREATE TABLE menu_access_permissions (
+            menu_key TEXT PRIMARY KEY,
+            max_level INTEGER NOT NULL,
+            updated_by TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO schools(center_director_id, is_active) VALUES ('dir-team-1', 1);
+        INSERT INTO menu_access_permissions(menu_key, max_level) VALUES
+            ('school_group', 6),
+            ('school_workspace', 6),
+            ('school_calendar', 6);
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    original_get_db = menu_access.get_db
+    menu_access.get_db = lambda: connect(database)
+    try:
+        app = Flask(__name__)
+        app.secret_key = 'level-7-school-director-test'
+        with app.test_request_context('/school'):
+            from flask import session
+
+            session['user_name'] = '센터장팀장'
+            session['emp_no'] = 'dir-team-1'
+            session['user_level'] = 7
+
+            access = menu_access.build_menu_access(7)
+            assert access['school_group'] is True
+            assert access['school_workspace'] is True
+            assert access['school_calendar'] is True
+            assert menu_access.enforce_request_menu_access() is None
+    finally:
+        menu_access.get_db = original_get_db
 
 
 def main():
@@ -137,6 +188,9 @@ def main():
         test_chat_organization(os.path.join(directory, 'chat.db'))
         test_shared_boards(os.path.join(directory, 'school.db'))
         test_org_chart_function_names_are_isolated()
+        test_assigned_level_7_can_open_school_workspace(
+            os.path.join(directory, 'level-7-director.db')
+        )
     print('Center director workspace test: PASS')
 
 
