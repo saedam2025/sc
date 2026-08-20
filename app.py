@@ -516,10 +516,7 @@ def activity_feed():
         activity_user_level = int(session.get('user_level', 99))
     except (TypeError, ValueError):
         activity_user_level = 99
-    is_center_director = (
-        activity_user_level == 8
-        and session.get('user_name') != 'admin'
-    )
+    is_center_director = center_director_mode_active(activity_user_level, conn)
     activity_emp_no = session.get('emp_no')
 
     def table_exists(table_name):
