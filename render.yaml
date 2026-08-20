@@ -12,3 +12,7 @@ services:
     envVars:
       - key: DATA_DIR
         value: /mnt/data
+      # 실수로 임시 파일시스템 실행을 허용하지 않는다. Persistent Disk가
+      # 빠진 배포는 시작 단계에서 실패하여 명세서 데이터 유실을 막는다.
+      - key: ALLOW_EPHEMERAL_DATA_ON_RENDER
+        value: "false"

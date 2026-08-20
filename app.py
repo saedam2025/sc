@@ -40,7 +40,7 @@ from routes.chat import chat_bp
 
 # 데이터베이스 모듈 임포트
 from routes.database import get_db, init_db
-from routes.storage import PROFILE_ROOT
+from routes.storage import PROFILE_ROOT, verify_storage_ready
 from routes.secure_files import delete_file, encrypted_storage_name, encrypt_upload, original_filename
 from routes.usage_stats import (
     get_login_summary,
@@ -75,6 +75,7 @@ socketio.init_app(app)
 # =====================================================================
 with app.app_context():
     try:
+        storage_status = verify_storage_ready()
         init_db()
         init_ebook_schema()
         init_manual_schema()
@@ -85,9 +86,22 @@ with app.app_context():
                 print(f"✅ 기존 사용자 비밀번호 {migrated_passwords}건 해시 전환 완료.")
         finally:
             password_conn.close()
+        print(
+            "✅ 영구 저장소 확인 완료: "
+            f"DB={storage_status['database']}, "
+            f"Persistent Disk={storage_status['persistent_disk']}"
+        )
         print("✅ 데이터베이스 초기화 및 필수 폴더 생성 완료.")
     except Exception as e:
         print(f"❌ 데이터베이스 초기화 실패: {e}")
+        # Render에서는 저장소/DB 초기화 실패를 숨긴 채 서비스를 시작하면
+        # 작업그룹과 광고 이미지가 저장된 것처럼 보였다가 유실될 수 있다.
+        # 배포 자체를 실패시켜 Persistent Disk 설정을 먼저 바로잡게 한다.
+        if os.name != 'nt' and (
+            os.environ.get('RENDER', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+            or os.environ.get('RENDER_SERVICE_ID', '').strip()
+        ):
+            raise
 
     # 필수 정적 폴더 확인
     os.makedirs('static', exist_ok=True)
