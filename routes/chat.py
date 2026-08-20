@@ -982,7 +982,9 @@ def chat_push_public_key():
     cfg = _chat_push_config()
     if not _chat_push_ready():
         return jsonify({'status': 'error', 'configured': False, 'message': '서버의 Web Push(VAPID) 설정이 필요합니다.'}), 503
-    return jsonify({'status': 'success', 'configured': True, 'public_key': cfg['public_key']})
+    response = jsonify({'status': 'success', 'configured': True, 'public_key': cfg['public_key']})
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 
 @chat_bp.route('/api/chat/push/subscribe', methods=['POST'])
