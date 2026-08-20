@@ -6,6 +6,7 @@ from .database import get_db
 
 
 SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
+SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
 
 MENU_GROUPS = (
     {
@@ -155,6 +156,41 @@ def center_director_mode_active(user_level=None, conn=None):
     return level == 8 and school_director_scope_enabled(conn)
 
 
+def has_active_school_assignment(user_level=None, conn=None):
+    """레벨 7·8 회원이 활성 학교의 센터장으로 지정됐는지 반환한다."""
+    if is_master_admin() or not session.get('emp_no'):
+        return False
+    try:
+        level = int(session.get('user_level', 99) if user_level is None else user_level)
+    except (TypeError, ValueError):
+        return False
+    if level not in {7, 8}:
+        return False
+
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
+    try:
+        row = conn.execute(
+            '''
+            SELECT 1
+            FROM schools
+            WHERE center_director_id = ?
+              AND COALESCE(is_active, 1) = 1
+            LIMIT 1
+            ''',
+            (session.get('emp_no'),),
+        ).fetchone()
+        return row is not None
+    except Exception:
+        # 초기 설치처럼 schools 테이블이 아직 준비되지 않은 경우에는
+        # 일반 메뉴 권한만 적용한다.
+        return False
+    finally:
+        if owns_connection:
+            conn.close()
+
+
 def load_menu_max_levels(conn=None):
     """저장된 값을 기본 권한과 합쳐 모든 메뉴 키를 반환한다."""
     owns_connection = conn is None
@@ -209,10 +245,17 @@ def menu_is_allowed(menu_key, user_level=None, max_levels=None):
 
 def build_menu_access(user_level=None):
     levels = load_menu_max_levels()
-    return {
+    access = {
         key: menu_is_allowed(key, user_level=user_level, max_levels=levels)
         for key in MENU_CATALOG
     }
+    # 센터장(팀장)은 일반 메뉴 상한이 레벨 7보다 낮더라도 실제 담당 학교와
+    # 학교일정표에는 접근할 수 있어야 한다.
+    if has_active_school_assignment(user_level=user_level):
+        access['school_group'] = True
+        for menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS:
+            access[menu_key] = True
+    return access
 
 
 def _admin_menu_key(path):
@@ -308,6 +351,8 @@ def enforce_request_menu_access():
     if not session.get('emp_no'):
         return None
     menu_key = resolve_request_menu(request.path or '', request.endpoint or '', request.view_args)
+    if menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS and has_active_school_assignment():
+        return None
     if center_director_mode_active():
         if request.path == '/':
             return redirect('/school')
