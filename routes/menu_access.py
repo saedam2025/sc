@@ -128,7 +128,7 @@ def ensure_menu_access_schema(conn):
 
 
 def school_director_scope_enabled(conn=None):
-    """레벨 8 센터장을 담당 센터 공간으로 제한하는 정책(기본 사용)."""
+    """레벨 7·8 센터장을 담당 센터 공간으로 제한하는 정책(기본 사용)."""
     owns_connection = conn is None
     if owns_connection:
         conn = get_db()
@@ -146,14 +146,14 @@ def school_director_scope_enabled(conn=None):
 
 
 def center_director_mode_active(user_level=None, conn=None):
-    """레벨 8 센터장 전용모드가 현재 회원에게 적용되는지 반환한다."""
+    """레벨 7 센터장(팀장)·레벨 8 센터장 전용모드 적용 여부를 반환한다."""
     if is_master_admin():
         return False
     try:
         level = int(session.get('user_level', 99) if user_level is None else user_level)
     except (TypeError, ValueError):
         level = 99
-    return level == 8 and school_director_scope_enabled(conn)
+    return level in {7, 8} and school_director_scope_enabled(conn)
 
 
 def has_active_school_assignment(user_level=None, conn=None):
@@ -334,6 +334,8 @@ def resolve_request_menu(path, endpoint='', view_args=None):
             'archive': 'board_archive',
             'manual': 'board_manual',
         }.get(board_key)
+    if path.startswith('/gall2/school/'):
+        return 'school_workspace'
     if path.startswith('/gall2'):
         return 'gallery_main'
     if path.startswith('/memo'):

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, abort
 from routes.database import get_db
 from routes.organization import classify_organization_group
-from routes.menu_access import school_director_scope_enabled
+from routes.menu_access import center_director_mode_active, school_director_scope_enabled
 import os
 import math
 import json
@@ -56,13 +56,14 @@ def can_manage_shared_board():
 
 def can_manage_schools():
     """본사 계정만 학교 기본정보를 관리할 수 있다."""
-    return (
-        session.get('user_name') == 'admin'
-        or (
-            bool(session.get('emp_no'))
-            and 1 <= get_session_user_level() <= 7
-        )
-    )
+    if session.get('user_name') == 'admin':
+        return True
+    level = get_session_user_level()
+    if not session.get('emp_no') or not 1 <= level <= 7:
+        return False
+    # 전용모드가 켜진 레벨 7 센터장(팀장)은 본사 관리자가 아니라
+    # 담당 학교 센터장 권한으로 동작한다.
+    return not center_director_mode_active(level)
 
 
 def can_access_school(conn, school_id):
@@ -81,6 +82,8 @@ def can_access_school(conn, school_id):
     ).fetchone()
     if assigned_school is not None:
         return True
+    if center_director_mode_active(get_session_user_level(), conn):
+        return False
     if can_manage_schools():
         return True
     if get_session_user_level() != 8:
@@ -106,6 +109,8 @@ def can_access_post(conn, school_id, category):
             ).fetchone()
             if active_assignment is not None:
                 return True
+        if center_director_mode_active(get_session_user_level(), conn):
+            return False
         if can_manage_schools():
             return True
         if not session.get('emp_no') or get_session_user_level() != 8:
@@ -344,12 +349,12 @@ def school_list():
         ).fetchone()
 
     # 메뉴 권한관리의 '센터장 지정공간 제한'이 켜진 경우만 담당 학교로 이동한다.
-    director_scope_applies = user_level == 8 and school_director_scope_enabled(conn)
+    director_scope_applies = center_director_mode_active(user_level, conn)
     # 직급/레벨 세션이 변경 전 값이어도 실제 담당 학교가 있는 일반 회원은
     # 자신의 학교로 이동시킨다. 레벨 1~7 관리자는 기존 전체 목록을 유지한다.
     assigned_member_scope_applies = (
         assigned_school is not None
-        and user_level != 8
+        and user_level not in {7, 8}
         and not can_manage_schools()
     )
     if director_scope_applies or assigned_member_scope_applies:
@@ -369,7 +374,7 @@ def school_list():
             conn.close()
             return "담당으로 지정된 학교가 없습니다. 본사 관리자에게 문의해주세요.", 403
 
-    # 지정공간 제한을 끄면 레벨 8은 전체 목록과 공간을 열람할 수 있다.
+    # 지정공간 제한을 끄면 레벨 7·8은 기존 레벨 권한으로 목록과 공간을 열람한다.
     # 학교 등록·수정·삭제는 school_admin_required로 계속 본사 권한만 허용된다.
     if not can_manage_schools() and user_level != 8:
         conn.close()

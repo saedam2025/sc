@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, Response, jsonify, session
 from .database import get_db
+from .menu_access import center_director_mode_active
 from .security import admin_required, load_credential_secret
 from .storage import GALL2_ROOT
 from cryptography.fernet import Fernet
@@ -356,7 +357,7 @@ def save_gallery_upload_request(school_id=None):
 
 
 def require_school_gallery_access(conn, school_key):
-    """본사 담당자 또는 해당 센터에 실제 지정된 레벨 8 센터장만 허용한다."""
+    """본사 담당자 또는 해당 학교에 실제 지정된 센터장만 허용한다."""
     school = conn.execute('''
         SELECT id, school_name, access_key, center_director_id, COALESCE(is_active, 1) AS is_active
         FROM schools
@@ -371,11 +372,14 @@ def require_school_gallery_access(conn, school_key):
         user_level = 99
     is_headquarters = (
         session.get('user_name') == 'admin'
-        or (session.get('emp_no') and 1 <= user_level <= 7)
+        or (
+            session.get('emp_no')
+            and 1 <= user_level <= 7
+            and not center_director_mode_active(user_level, conn)
+        )
     )
     is_assigned_director = (
-        user_level == 8
-        and str(school['center_director_id'] or '') == str(session.get('emp_no') or '')
+        str(school['center_director_id'] or '') == str(session.get('emp_no') or '')
         and int(school['is_active'] or 0) == 1
     )
     if not is_headquarters and not is_assigned_director:
