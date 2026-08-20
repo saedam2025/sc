@@ -69,13 +69,6 @@ def can_access_school(conn, school_id):
     """본사 계정 또는 해당 학교에 지정된 센터장만 접근을 허용한다."""
     if not session.get('emp_no'):
         return False
-    if can_manage_schools():
-        return True
-    if get_session_user_level() != 8:
-        return False
-    if not school_director_scope_enabled(conn):
-        return True
-
     assigned_school = conn.execute(
         """
         SELECT 1
@@ -84,14 +77,35 @@ def can_access_school(conn, school_id):
           AND center_director_id = ?
           AND COALESCE(is_active, 1) = 1
         """,
-        (school_id, session.get('emp_no'))
+        (school_id, session.get('emp_no')),
     ).fetchone()
-    return assigned_school is not None
+    if assigned_school is not None:
+        return True
+    if can_manage_schools():
+        return True
+    if get_session_user_level() != 8:
+        return False
+    if not school_director_scope_enabled(conn):
+        return True
+    return False
 
 
 def can_access_post(conn, school_id, category):
     """본부공지사항·자료실은 전역 공개하고, 그 외 글은 담당 학교에만 공개한다."""
     if is_shared_board(category):
+        if session.get('emp_no'):
+            active_assignment = conn.execute(
+                """
+                SELECT 1
+                FROM schools
+                WHERE center_director_id = ?
+                  AND COALESCE(is_active, 1) = 1
+                LIMIT 1
+                """,
+                (session.get('emp_no'),),
+            ).fetchone()
+            if active_assignment is not None:
+                return True
         if can_manage_schools():
             return True
         if not session.get('emp_no') or get_session_user_level() != 8:
@@ -316,11 +330,9 @@ def school_list():
     user_level = get_session_user_level()
     emp_no = session.get('emp_no')
 
-    # 메뉴 권한관리의 '센터장 지정공간 제한'이 켜진 경우만 담당 학교로 이동한다.
-    director_scope_applies = user_level == 8 and school_director_scope_enabled(conn)
-    if director_scope_applies:
-        # 해당 사번(emp_no)이 센터장으로 지정된 활성 상태의 최신 학교를 찾습니다.
-        my_school = conn.execute(
+    assigned_school = None
+    if emp_no:
+        assigned_school = conn.execute(
             """
             SELECT id, access_key
             FROM schools
@@ -328,8 +340,21 @@ def school_list():
             ORDER BY year DESC
             LIMIT 1
             """,
-            (emp_no,)
+            (emp_no,),
         ).fetchone()
+
+    # 메뉴 권한관리의 '센터장 지정공간 제한'이 켜진 경우만 담당 학교로 이동한다.
+    director_scope_applies = user_level == 8 and school_director_scope_enabled(conn)
+    # 직급/레벨 세션이 변경 전 값이어도 실제 담당 학교가 있는 일반 회원은
+    # 자신의 학교로 이동시킨다. 레벨 1~7 관리자는 기존 전체 목록을 유지한다.
+    assigned_member_scope_applies = (
+        assigned_school is not None
+        and user_level != 8
+        and not can_manage_schools()
+    )
+    if director_scope_applies or assigned_member_scope_applies:
+        # 해당 사번(emp_no)이 센터장으로 지정된 활성 상태의 최신 학교를 찾습니다.
+        my_school = assigned_school
         
         if my_school:
             conn.close()

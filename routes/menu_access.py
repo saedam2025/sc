@@ -157,14 +157,8 @@ def center_director_mode_active(user_level=None, conn=None):
 
 
 def has_active_school_assignment(user_level=None, conn=None):
-    """레벨 7·8 회원이 활성 학교의 센터장으로 지정됐는지 반환한다."""
+    """현재 회원이 활성 학교의 센터장으로 실제 지정됐는지 반환한다."""
     if is_master_admin() or not session.get('emp_no'):
-        return False
-    try:
-        level = int(session.get('user_level', 99) if user_level is None else user_level)
-    except (TypeError, ValueError):
-        return False
-    if level not in {7, 8}:
         return False
 
     owns_connection = conn is None
@@ -249,8 +243,9 @@ def build_menu_access(user_level=None):
         key: menu_is_allowed(key, user_level=user_level, max_levels=levels)
         for key in MENU_CATALOG
     }
-    # 센터장(팀장)은 일반 메뉴 상한이 레벨 7보다 낮더라도 실제 담당 학교와
-    # 학교일정표에는 접근할 수 있어야 한다.
+    # 센터장 지정은 직급 레벨이나 로그인 당시 세션 값보다 우선한다.
+    # 실제 담당 학교가 있으면 일반 메뉴 상한과 무관하게 업무공간과
+    # 학교일정표를 표시한다.
     if has_active_school_assignment(user_level=user_level):
         access['school_group'] = True
         for menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS:
