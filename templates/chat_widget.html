@@ -1,5 +1,16 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="{{ url_for('static', filename='js/chat_notifications.js') }}"></script>
+<script>
+window.SAEDAM_CHAT_PUSH_CONFIG = {
+    swUrl: {{ url_for('chat.chat_push_service_worker') | tojson }},
+    publicKeyUrl: {{ url_for('chat.chat_push_public_key') | tojson }},
+    subscribeUrl: {{ url_for('chat.chat_push_subscribe') | tojson }},
+    unsubscribeUrl: {{ url_for('chat.chat_push_unsubscribe') | tojson }},
+    testUrl: {{ url_for('chat.chat_push_test') | tojson }},
+    manifestUrl: {{ url_for('static', filename='saedam_manifest.webmanifest') | tojson }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/chat_push.js') }}"></script>
 <style>
     .chat-rank-badge {
         display: none;
@@ -57,6 +68,7 @@
             
             <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
                 <i id="chatNotificationButton" class="fa-solid fa-bell" role="button" tabindex="0" aria-pressed="true" onclick="toggleChatAlerts()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChatAlerts();}" title="메시지 알림음 켜짐 · 눌러서 끄기" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
+                <i id="chatPushButton" class="fa-solid fa-mobile-screen" role="button" tabindex="0" aria-pressed="false" onclick="toggleChatPush()" title="휴대폰 푸시 알림 설정" style="font-size:1rem;color:#94a3b8;cursor:pointer;padding:5px;"></i>
                 <i class="fa-solid fa-users" onclick="document.getElementById('orgChartModal').style.display='block'" title="조직도 보기 및 새 메시지" style="font-size: 1.15rem; color: var(--blue-primary); border: 1px solid #bfdbfe; padding: 5px; border-radius: 6px; background: #eff6ff; cursor: pointer;"></i>
                 <i class="fa-solid fa-plus" onclick="document.getElementById('expandedChatModal').style.display='block'" title="메신저 크게 보기" style="font-size: 1.25rem; color: var(--blue-primary); cursor:pointer; padding: 5px;"></i>
             </div>
@@ -634,6 +646,29 @@
         }
     }
 
+    function updateChatPushButton() {
+        const b = document.getElementById('chatPushButton');
+        if (!b) return;
+        const api = window.SaedamChatPush;
+        const enabled = !!(api && api.isSubscribed());
+        b.className = enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen';
+        b.style.color = enabled ? 'var(--blue-primary)' : '#94a3b8';
+        b.setAttribute('aria-pressed', String(enabled));
+        b.title = enabled ? '휴대폰 푸시 알림 켜짐 · 눌러서 끄기' : '휴대폰 푸시 알림 꺼짐 · 눌러서 켜기';
+    }
+
+    async function toggleChatPush() {
+        if (!window.SaedamChatPush) return alert('푸시 알림 모듈을 불러오지 못했습니다.');
+        try {
+            const enabled = await window.SaedamChatPush.toggle();
+            updateChatPushButton();
+            alert(enabled ? '휴대폰 푸시 알림이 켜졌습니다.' : '이 기기의 휴대폰 푸시 알림을 껐습니다.');
+        } catch (e) {
+            console.error(e);
+            alert(e?.message || '휴대폰 푸시 알림 설정에 실패했습니다.');
+        }
+    }
+
     window.handleIncomingChatAlert = function(event, roomOverride) {
         if (!event || event.type !== 'message' || event.actor === chatWidgetCurrentUser) return false;
         const room = roomOverride || (
@@ -646,8 +681,10 @@
             return false;
         }
 
+        const webPushSubscribed = !!(window.SaedamChatPush && window.SaedamChatPush.isSubscribed());
         if (
-            'Notification' in window
+            !webPushSubscribed
+            && 'Notification' in window
             && Notification.permission === 'granted'
             && document.visibilityState !== 'visible'
         ) {
@@ -690,6 +727,11 @@
         initializeChatWidgetSocket();
         updateChatAlertButton();
         window.addEventListener('chat-alert-setting-changed', updateChatAlertButton);
+        updateChatPushButton();
+        window.addEventListener('chat-push-state-changed', updateChatPushButton);
+        if (window.SaedamChatPush) {
+            window.SaedamChatPush.init().then(updateChatPushButton).catch(error => console.warn('Web Push 초기화 실패:', error));
+        }
         const unreadItems = document.querySelectorAll('.unread-msg-item');
         if(unreadItems.length === 0) {
             const emptyDiv = document.getElementById('unreadMsgEmpty');

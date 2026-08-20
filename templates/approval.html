@@ -475,7 +475,6 @@
             <div style="display: flex; flex-direction: column; gap: 5px;">
                 <h2 style="display:flex; align-items:center; gap:10px;">
                     <i class="fa-solid fa-signature" style="color:var(--primary-color);"></i> 사내 전자결재 시스템
-                    <i class="fa-solid fa-circle-question" style="color:var(--text-gray); font-size: 0.65em; cursor: pointer; transition: 0.2s;" title="이용 매뉴얼 보기" onclick="openManualModal()" onmouseover="this.style.color='var(--primary-color)'" onmouseout="this.style.color='var(--text-gray)'"></i>
                 </h2>
             </div>
         </div>
@@ -715,15 +714,6 @@
             </button>
         </div>
         <input type="hidden" id="currentDocId">
-    </div>
-</div>
-
-<div id="manualModal" class="modal">
-    <div id="manualModalContent" class="modal-content" style="max-width: 800px; height: 70vh; padding: 35px 30px;">
-        <span onclick="closeManualModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1; z-index: 10;">&times;</span>
-        
-        {% include 'manual/approval_manual.html' %}
-        
     </div>
 </div>
 
@@ -1295,14 +1285,6 @@ function changePage(p) { currentPage = p; renderTable(); }
 
 function closeDraftModal() { document.getElementById('draftModal').style.display = 'none'; }
 function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; }
-function closeManualModal() { document.getElementById('manualModal').style.display = 'none'; }
-
-function openManualModal() {
-    const manualModal = document.getElementById('manualModal');
-    manualModal.style.display = 'block';
-    document.getElementById('manualModalContent').scrollTop = 0;
-}
-
 function selectDraftType(docType) {
     document.getElementById('draftType').value = docType;
     document.querySelectorAll('.document-type-card').forEach(card => {
