@@ -142,6 +142,10 @@ def test_org_chart_function_names_are_isolated():
     assert 'animation: chat-presence-pulse' in chat_template
     assert "await updateOrgOnlineStatus();" in chat_template
 
+    assert '@media (min-width: 1101px) and (max-width: 2000px) and (max-height: 1200px)' in school_template
+    assert 'grid-template-columns: 278px minmax(420px, 1fr) 282px' in school_template
+    assert '.dashboard-container.school-detail-spacing .school-chat-card { height: 300px; }' in school_template
+
 
 def test_assigned_level_7_can_open_school_workspace(database):
     connection = connect(database)
