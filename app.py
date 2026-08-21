@@ -31,6 +31,10 @@ from routes.contacts import contacts_bp
 from routes.admin_management import admin_bp, get_active_theme
 from routes.ebook import ebook_bp, init_ebook_schema
 from routes.manual import manual_bp, init_manual_schema
+from routes.parent_notifications import (
+    ensure_parent_notification_schema,
+    parent_notification_bp,
+)
 
 # [수정] gall2.py가 routes 폴더 안에 있다면 아래와 같이 수정해야 합니다.
 from routes.gall2 import gall2_bp
@@ -79,6 +83,7 @@ with app.app_context():
         init_db()
         init_ebook_schema()
         init_manual_schema()
+        ensure_parent_notification_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -137,6 +142,13 @@ EXEMPT_ROUTES = [
     'ebook.public_reader',
     'ebook.serve_cover',
     'ebook.serve_page_image',
+    # 학부모는 인트라넷 계정 없이 비밀 등록 링크와 별도 푸시 구독을 사용한다.
+    'parent_notifications.parent_register',
+    'parent_notifications.parent_push_public_key',
+    'parent_notifications.parent_push_subscribe',
+    'parent_notifications.parent_push_worker',
+    # 강사 전용 링크의 안내 화면만 공개하고 출결·발송 API는 로그인을 요구한다.
+    'parent_notifications.instructor_page',
 ]
 
 @app.before_request
@@ -342,6 +354,8 @@ def login():
 
     emp_no = str(data.get('emp_no', '')).strip()
     password = str(data.get('password', '')).strip()
+    if len(emp_no) > 15 or len(password) > 15:
+        return jsonify({"status": "error", "message": "사번과 비밀번호는 15자 이내로 입력해주세요."}), 400
     
     conn = get_db()
     user_row = conn.execute(
@@ -745,6 +759,7 @@ app.register_blueprint(gall2_bp)
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(ebook_bp, url_prefix='/ebook')
 app.register_blueprint(manual_bp, url_prefix='/manual')
+app.register_blueprint(parent_notification_bp)
 
 # 🚀 새로 분리한 메신저 블루프린트 등록 추가
 
