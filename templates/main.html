@@ -332,6 +332,7 @@
     .weekly-tooltip-label { color: #9ca3af; font-weight: 700; }
     .weekly-tooltip-value { color: #f9fafb; overflow-wrap: anywhere; white-space: pre-wrap; }
     .weekly-tooltip-detail { margin-top: 9px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.16); }
+    .my-weekly-tooltip-item { cursor: help; }
 
     .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px 25px; padding: 20px 25px; }
     .full-width { grid-column: 1 / -1; }
@@ -545,20 +546,16 @@
             <div class="scroll-area" style="flex: 1;">
                 <div id="weblink-container" class="weather-weblink-grid">
                     {% for link in weblinks %}
-                    <div class="weather-pill" data-id="{{ link.id }}" onclick="window.open('{{ link.url }}', '_blank')" title="{{ link.title }}">
+                    {% set weblink_target = url_for('main.serve_weblink_file', link_id=link.id) if link.type == 'file' else link.url %}
+                    <div class="weather-pill" data-id="{{ link.id }}" onclick="window.open('{{ weblink_target }}', '_blank')" title="{{ link.title }}">
                         {% if (link.created_by|string == current_user|string) or (current_user_level|default(0)|int <= 2) %}
                         <div class="weblink-delete-btn" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" style="position: absolute; top: -4px; right: -4px; z-index: 10; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"><i class="fa-solid fa-xmark"></i></div>
                         {% endif %}
                         
                         {% if link.favicon_url == 'FILE' %}
-                            {% set ext = link.url.split('.')[-1] | lower %}
-                            {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'] %}
-                                <img src="{{ link.url }}" alt="thumb" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover; border: 1px solid var(--widget-border-color);">
-                            {% else %}
-                                <div style="width: 24px; height: 24px; background: #ffffff; border-radius: 4px; border: 1px solid var(--widget-border-color); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-sub);">
-                                    <i class="fa-solid fa-file"></i>
-                                </div>
-                            {% endif %}
+                            <div style="width: 24px; height: 24px; background: #ffffff; border-radius: 4px; border: 1px solid var(--widget-border-color); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-sub);">
+                                <i class="fa-solid fa-file-arrow-down"></i>
+                            </div>
                         {% else %}
                             <img src="{{ link.favicon_url }}" alt="icon" onerror="this.style.display='none'" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;">
                         {% endif %}
@@ -634,7 +631,7 @@
                 {% if gallery_preview_items %}
                 <div class="company-gallery-list">
                     {% for item in gallery_preview_items %}
-                    <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.index') }}'">
+                    <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.index', post_id=item.id) }}'">
                         {% if item.thumb_name %}
                         <img class="company-gallery-thumb" src="{{ url_for('gall2.serve_thumb', filename=item.thumb_name) }}" alt="{{ item.title }}" loading="lazy">
                         {% else %}
@@ -866,11 +863,12 @@
                     // 제목이 6자를 초과하면 말줄임표(...) 처리
                     const rawTitle = info.title || '';
                     const displayTitle = rawTitle.length > 6 ? rawTitle.substring(0, 6) + '...' : rawTitle;
+                    const encodedTooltipData = encodeURIComponent(JSON.stringify(info));
                     
-                    html += `<div style="display: flex; align-items: center; gap: 8px; margin-bottom: ${itemMarginBottom}; padding-bottom: ${itemPaddingBottom}; border-bottom: ${itemBorderBottom};">`
+                    html += `<div class="my-weekly-tooltip-item" data-tooltip="${encodedTooltipData}" style="display: flex; align-items: center; gap: 8px; margin-bottom: ${itemMarginBottom}; padding-bottom: ${itemPaddingBottom}; border-bottom: ${itemBorderBottom};">`
                          + `<span style="background: ${info.color}; color: white; font-size: 0.65rem; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-align: center; min-width: 32px; flex-shrink: 0;">${escapeWeeklyTooltipHtml(info.category)}</span>`
                          // 글자 크기를 0.65rem으로 변경하고 두께를 높여 가독성 확보
-                         + `<div style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; min-width: 0; line-height: 1.4; flex: 1; white-space: nowrap;">${escapeWeeklyTooltipHtml(displayTitle)}</div>`
+                         + `<div style="font-size: 0.75rem; color: var(--text-main); font-weight: 700; min-width: 0; line-height: 1.4; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeWeeklyTooltipHtml(displayTitle)}</div>`
                          + (info.time && info.time !== '종일' ? `<div style="color:var(--text-muted); font-size:0.75rem; white-space:nowrap; flex-shrink:0;">${info.time}</div>` : '')
                          + `</div>`;
                 });
@@ -1118,7 +1116,7 @@ let currentWeeklyStart = getMonday(new Date());
 
         const globalTooltip = document.getElementById('global-tooltip');
         document.addEventListener('mouseover', (e) => {
-            const item = e.target.closest('.weekly-event-item');
+            const item = e.target.closest('.weekly-event-item, .my-weekly-tooltip-item');
             if (item) {
                 const encodedData = item.getAttribute('data-tooltip');
                 if (encodedData) {
@@ -1136,13 +1134,13 @@ let currentWeeklyStart = getMonday(new Date());
             }
         });
         document.addEventListener('mousemove', (e) => {
-            if (e.target.closest('.weekly-event-item') && globalTooltip.style.visibility === 'visible') {
+            if (e.target.closest('.weekly-event-item, .my-weekly-tooltip-item') && globalTooltip.style.visibility === 'visible') {
                 positionWeeklyTooltipAboveCursor(globalTooltip, e);
             }
         });
         document.addEventListener('mouseout', (e) => {
-            const item = e.target.closest('.weekly-event-item');
-            const nextItem = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.weekly-event-item') : null;
+            const item = e.target.closest('.weekly-event-item, .my-weekly-tooltip-item');
+            const nextItem = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('.weekly-event-item, .my-weekly-tooltip-item') : null;
             if (item && nextItem !== item) {
                 globalTooltip.style.visibility = 'hidden';
                 globalTooltip.style.opacity = '0';

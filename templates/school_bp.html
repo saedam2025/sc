@@ -1253,19 +1253,14 @@
                     </div>
                     <div id="school-weblink-container" class="school-link-grid">
                         {% for link in weblinks %}
-                        {% set weblink_target = url_for('school.serve_weblink_file', link_id=link.id) if link.favicon_url == 'FILE' else link.url %}
+                        {% set weblink_target = url_for('school.serve_weblink_file', link_id=link.id) if link.type == 'file' else link.url %}
                         <div class="school-link-item" data-id="{{ link.id }}" onclick="window.open('{{ weblink_target }}', '_blank')" title="{{ link.title }}">
                             {% if can_manage_weblinks %}
                             <button type="button" class="school-link-delete" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제"><i class="fa-solid fa-xmark"></i></button>
                             {% endif %}
 
                             {% if link.favicon_url == 'FILE' %}
-                                {% set ext = link.url.split('.')[-1] | lower %}
-                                {% if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'] %}
-                                    <img src="{{ weblink_target }}" alt="thumb" style="width:16px; height:16px; border-radius:4px; object-fit:cover; border:1px solid var(--school-border);">
-                                {% else %}
-                                    <div class="school-link-icon-img" style="color:var(--school-blue);"><i class="fa-solid fa-file"></i></div>
-                                {% endif %}
+                                <div class="school-link-icon-img" style="color:var(--school-blue);"><i class="fa-solid fa-file-arrow-down"></i></div>
                             {% else %}
                                 <img src="{{ link.favicon_url }}" alt="icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width:16px; height:16px; border-radius:4px; object-fit:cover;">
                                 <div class="school-link-icon-img" style="display:none; color:var(--school-blue);"><i class="fa-solid fa-globe"></i></div>
@@ -1302,7 +1297,7 @@
                     {% if gallery_preview_items %}
                     <div class="company-gallery-list">
                         {% for item in gallery_preview_items %}
-                        <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.school_gallery', school_key=school.access_key) }}'">
+                        <div class="company-gallery-item" onclick="location.href='{{ url_for('gall2.school_gallery', school_key=school.access_key, post_id=item.id) }}'">
                             {% if item.thumb_name %}
                             <img class="company-gallery-thumb" src="{{ url_for('gall2.school_gallery_serve_thumb', school_key=school.access_key, filename=item.thumb_name) }}" alt="{{ item.title }}" loading="lazy">
                             {% else %}

@@ -950,7 +950,7 @@
                         <!-- 4. 업무지원 메뉴 (기존 유지) -->
                         {% if menu_access.get('support_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or request.path.startswith('/parent-notifications') or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
@@ -958,6 +958,7 @@
                                 {% if menu_access.get('ai_mail_main', true) %}<a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일 발송</a>{% endif %}
                                 {% if menu_access.get('excel_generator', true) %}<a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>{% endif %}
                                 {% if menu_access.get('ebook_library', true) %}<a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>{% endif %}
+                                {% if menu_access.get('parent_notifications', false) %}<a href="/parent-notifications"><i class="fa-solid fa-bell"></i>학부모알림전송</a>{% endif %}
                             </div>
                         </li>
                         {% endif %}
@@ -965,14 +966,14 @@
                         <!-- 5. 업무공간 메뉴 (기존 유지) -->
                         {% if menu_access.get('workspace_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') or request.path.startswith('/manual') %}active{% endif %}">
                                 <i class="fa-solid fa-layer-group"></i> 업무공간
                             </a>
                             <div class="dropdown-content">
                                 {% if menu_access.get('board_noti', true) %}<a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>사내 게시판</a>{% endif %}
                                 {% if menu_access.get('board_archive', true) %}<a href="/board/archive"><i class="fa-solid fa-folder-open"></i>사내 자료실</a>{% endif %}
                                 {% if menu_access.get('gallery_main', true) %}<a href="/gall2"><i class="fa-regular fa-images"></i>사내 갤러리</a>{% endif %}
-                                {% if menu_access.get('board_manual', true) %}<a href="/board/manual"><i class="fa-solid fa-book"></i>업무메뉴얼</a>{% endif %}
+                                {% if menu_access.get('board_manual', true) %}<a href="{{ url_for('manual.list_manuals') }}"><i class="fa-solid fa-book"></i>업무메뉴얼</a>{% endif %}
                                 {% if menu_access.get('memo_main', true) %}<a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>개인화이트보드</a>{% endif %}
                             </div>
                         </li>

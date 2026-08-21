@@ -85,7 +85,7 @@
         <section class="submit-shell">
             <header class="submit-head">
                 <h1 class="submit-title"><i class="fa-solid fa-receipt"></i> 지출결의서 전송</h1>
-                <a class="template-link" href="/expense/template"><i class="fa-solid fa-file-excel"></i> 엑셀양식 다운로드</a>
+                <a class="template-link" href="{{ url_for('expense.expense_template') }}"><i class="fa-solid fa-file-excel"></i> 엑셀양식 다운로드</a>
             </header>
             <div class="submit-body">
                 <form id="expenseSubmitForm" enctype="multipart/form-data">

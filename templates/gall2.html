@@ -538,6 +538,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
     }
 
     .post-detail-summary {
@@ -658,6 +659,138 @@
         margin-top: 15px;
         padding-top: 15px;
         border-top: 1px solid var(--border-color);
+    }
+
+    .edit-photo-manager {
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 7px;
+        background: var(--widget-bg, #f4f7fa);
+    }
+
+    .edit-photo-manager-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+        font-size: 0.8rem;
+        font-weight: 800;
+    }
+
+    .edit-photo-list {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 7px;
+        margin-bottom: 10px;
+    }
+
+    .edit-photo-item {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: #fff;
+    }
+
+    .edit-photo-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .edit-photo-delete {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(185, 28, 28, 0.92);
+        color: #fff;
+        cursor: pointer;
+    }
+
+    .edit-photo-dropzone {
+        min-height: 104px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 14px;
+        border: 2px dashed var(--card-border, var(--border-color));
+        border-radius: 8px;
+        background: var(--input-bg, var(--card-bg, #fff));
+        color: var(--text-gray);
+        text-align: center;
+        cursor: pointer;
+        transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+    .edit-photo-dropzone:hover,
+    .edit-photo-dropzone:focus,
+    .edit-photo-dropzone.is-dragover {
+        border-color: var(--primary-color);
+        background: color-mix(in srgb, var(--primary-color) 7%, var(--card-bg, #fff));
+        outline: none;
+    }
+    .edit-photo-dropzone.is-dragover { transform: scale(1.01); }
+    .edit-photo-dropzone.is-disabled { opacity: .55; cursor: not-allowed; }
+    .edit-photo-dropzone i { color: var(--primary-color); font-size: 1.45rem; }
+    .edit-photo-dropzone strong { color: var(--text-dark); font-size: .8rem; }
+    .edit-photo-dropzone span { font-size: .72rem; line-height: 1.45; overflow-wrap: anywhere; }
+    .edit-selected-wrap { margin-top: 9px; }
+    .edit-selected-title { margin-bottom: 6px; color: var(--text-dark); font-size: .76rem; font-weight: 800; }
+    .edit-selected-previews {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 7px;
+    }
+    .edit-selected-preview {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        border: 2px solid color-mix(in srgb, var(--primary-color) 55%, var(--card-border, #dbe4ee));
+        border-radius: 7px;
+        background: #fff;
+    }
+    .edit-selected-preview img { width: 100%; aspect-ratio: 1 / 1; display: block; object-fit: cover; }
+    .edit-selected-preview-name {
+        display: block;
+        padding: 5px 6px;
+        color: var(--text-dark);
+        font-size: .66rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .edit-selected-preview-size {
+        display: block;
+        padding: 0 6px 5px;
+        color: var(--text-gray);
+        font-size: .64rem;
+        font-weight: 700;
+    }
+    .edit-selected-preview-fallback {
+        display: none;
+        aspect-ratio: 1 / 1;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
+        background: var(--widget-bg, #eef2f7);
+        color: var(--text-gray);
+        font-size: .66rem;
+        text-align: center;
+    }
+    .edit-selected-remove {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(15, 23, 42, .86);
+        color: #fff;
+        cursor: pointer;
     }
 
     .slideshow-stop-button {
@@ -951,6 +1084,23 @@
                 <div id="postEditForm" class="post-edit-form">
                     <input id="modalEditTitle" class="gallery-input" type="text" maxlength="120" style="margin-bottom:10px;">
                     <textarea id="modalEditContent" class="gallery-textarea"></textarea>
+                    <div class="edit-photo-manager">
+                        <div class="edit-photo-manager-title">
+                            <span>게시물 사진 관리</span>
+                            <span id="editPhotoCount"></span>
+                        </div>
+                        <div id="modalEditImages" class="edit-photo-list"></div>
+                        <div id="modalEditPhotoDropzone" class="edit-photo-dropzone" role="button" tabindex="0" aria-label="추가할 사진 선택">
+                            <input id="modalAddPhotos" type="file" accept="image/*" multiple hidden>
+                            <i class="fas fa-cloud-arrow-up"></i>
+                            <strong>사진을 끌어다 놓거나 클릭해서 선택</strong>
+                            <span id="modalEditUploadHint">추가할 사진을 선택해 주세요.</span>
+                        </div>
+                        <div id="modalEditSelectedWrap" class="edit-selected-wrap" hidden>
+                            <div class="edit-selected-title">추가 예정 사진</div>
+                            <div id="modalEditSelectedPreviews" class="edit-selected-previews"></div>
+                        </div>
+                    </div>
                     <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
                         <button type="button" id="btnCancelEdit" class="btn-gallery">취소</button>
                         <button type="button" id="btnSaveEdit" class="btn-gallery primary">저장</button>
@@ -977,10 +1127,15 @@
     const galleryBulkDeleteUrl = "{{ url_for('gall2.school_gallery_delete_bulk', school_key=school_gallery.access_key) if school_gallery else url_for('gall2.delete_bulk') }}";
     const galleryUpdateUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/update{% else %}/gall2/post/__post_id__/update{% endif %}";
     const galleryDeleteUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/delete{% else %}/gall2/post/__post_id__/delete{% endif %}";
+    const galleryAddImagesUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/images/add{% else %}/gall2/post/__post_id__/images/add{% endif %}";
+    const galleryDeleteImageUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/image/__image_id__/delete{% else %}/gall2/post/__post_id__/image/__image_id__/delete{% endif %}";
     const currentPage = {{ pagination.page if pagination else 1 }};
     let activePost = null;
     let activeImageIndex = 0;
     let slideshowTimer = null;
+    let editPhotoFiles = [];
+    let editPhotoPreviewUrls = [];
+    let editPhotoPreviewGeneration = 0;
 
     function fileUrl(template, filename) {
         return template.replace('__filename__', encodeURIComponent(filename));
@@ -1040,6 +1195,149 @@
         document.getElementById('modalCount').classList.remove('active');
     }
 
+    function renderEditPhotoManager() {
+        const images = activePost && activePost.images ? activePost.images : [];
+        document.getElementById('editPhotoCount').textContent = `${images.length}/20장`;
+        document.getElementById('modalEditImages').innerHTML = images.map(image => `
+            <div class="edit-photo-item">
+                <img src="${fileUrl(thumbUrlTemplate, image.thumb_name)}" alt="${escapeHtml(image.title || '게시물 사진')}">
+                <button type="button" class="edit-photo-delete" data-image-id="${image.id}" title="이 사진 삭제"><i class="fas fa-times"></i></button>
+            </div>
+        `).join('') || '<div style="grid-column:1/-1; color:var(--text-gray); font-size:.78rem;">등록된 사진이 없습니다.</div>';
+        refreshEditPhotoDropzone();
+    }
+
+    function refreshEditPhotoDropzone() {
+        const currentCount = activePost && activePost.images ? activePost.images.length : 0;
+        const remaining = Math.max(0, 20 - currentCount - editPhotoFiles.length);
+        const dropzone = document.getElementById('modalEditPhotoDropzone');
+        const hint = document.getElementById('modalEditUploadHint');
+        dropzone.classList.toggle('is-disabled', remaining === 0);
+        dropzone.setAttribute('aria-disabled', remaining === 0 ? 'true' : 'false');
+        if (editPhotoFiles.length > 0) {
+            const totalSize = editPhotoFiles.reduce((sum, file) => sum + Number(file.size || 0), 0);
+            const remainingText = remaining > 0 ? ` · ${remaining}장 더 추가 가능` : ' · 추가 가능 수량을 모두 선택했습니다.';
+            hint.textContent = `${editPhotoFiles.length}장 선택 · 총 ${formatEditPhotoSize(totalSize)}${remainingText} · 저장 버튼을 누르면 함께 업로드됩니다.`;
+        } else {
+            hint.textContent = remaining > 0
+                ? `최대 ${remaining}장까지 추가할 수 있습니다.`
+                : '사진이 20장 등록되어 더 추가할 수 없습니다.';
+        }
+    }
+
+    function formatEditPhotoSize(bytes) {
+        const size = Number(bytes || 0);
+        if (size < 1024) return `${size} B`;
+        if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function setEditPhotoFiles(fileList) {
+        const currentCount = activePost && activePost.images ? activePost.images.length : 0;
+        const remaining = Math.max(0, 20 - currentCount - editPhotoFiles.length);
+        if (remaining === 0) {
+            alert('게시물당 사진은 최대 20장입니다.');
+            return;
+        }
+        const selected = Array.from(fileList || []).filter(file =>
+            String(file.type || '').startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name || '')
+        );
+        if (selected.length === 0) {
+            alert('이미지 파일을 선택해 주세요.');
+            return;
+        }
+        const selectedKeys = new Set(editPhotoFiles.map(file =>
+            `${file.name}|${file.size}|${file.lastModified}|${file.type}`
+        ));
+        const uniqueFiles = selected.filter(file => {
+            const key = `${file.name}|${file.size}|${file.lastModified}|${file.type}`;
+            if (selectedKeys.has(key)) return false;
+            selectedKeys.add(key);
+            return true;
+        });
+        if (uniqueFiles.length === 0) {
+            alert('이미 선택한 사진입니다.');
+            return;
+        }
+        if (uniqueFiles.length > remaining) {
+            alert(`현재 ${remaining}장까지 추가할 수 있어 앞의 ${remaining}장만 선택됩니다.`);
+        }
+        editPhotoFiles = editPhotoFiles.concat(uniqueFiles.slice(0, remaining));
+        replaceEditPhotoPreviewUrls();
+        document.getElementById('modalAddPhotos').value = '';
+        refreshEditPhotoDropzone();
+    }
+
+    function resetEditPhotoFiles() {
+        editPhotoFiles = [];
+        replaceEditPhotoPreviewUrls();
+        document.getElementById('modalAddPhotos').value = '';
+        refreshEditPhotoDropzone();
+    }
+
+    function replaceEditPhotoPreviewUrls() {
+        const generation = ++editPhotoPreviewGeneration;
+        editPhotoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+        editPhotoPreviewUrls = editPhotoFiles.map(file => URL.createObjectURL(file));
+        renderEditPhotoSelectionPreviews();
+        buildLightweightEditPhotoPreviews(generation);
+    }
+
+    async function buildLightweightEditPhotoPreviews(generation) {
+        if (typeof createImageBitmap !== 'function') return;
+        for (let index = 0; index < editPhotoFiles.length; index += 1) {
+            if (generation !== editPhotoPreviewGeneration) return;
+            const file = editPhotoFiles[index];
+            let bitmap = null;
+            try {
+                bitmap = await createImageBitmap(file, {
+                    imageOrientation: 'from-image',
+                    resizeWidth: 480,
+                    resizeQuality: 'high'
+                });
+                const scale = Math.min(1, 480 / Math.max(bitmap.width, bitmap.height));
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+                canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+                const context = canvas.getContext('2d', { alpha: false });
+                context.fillStyle = '#ffffff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                const thumbnailBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+                if (!thumbnailBlob || generation !== editPhotoPreviewGeneration || editPhotoFiles[index] !== file) continue;
+                const thumbnailUrl = URL.createObjectURL(thumbnailBlob);
+                URL.revokeObjectURL(editPhotoPreviewUrls[index]);
+                editPhotoPreviewUrls[index] = thumbnailUrl;
+                renderEditPhotoSelectionPreviews();
+            } catch (error) {
+                console.warn('추가 사진 미리보기 생성 실패:', file.name, error);
+            } finally {
+                if (bitmap) bitmap.close();
+            }
+        }
+    }
+
+    function renderEditPhotoSelectionPreviews() {
+        const wrap = document.getElementById('modalEditSelectedWrap');
+        const container = document.getElementById('modalEditSelectedPreviews');
+        wrap.hidden = editPhotoFiles.length === 0;
+        container.innerHTML = editPhotoFiles.map((file, index) => `
+            <div class="edit-selected-preview">
+                <img src="${editPhotoPreviewUrls[index]}" alt="${escapeHtml(file.name)} 미리보기" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="edit-selected-preview-fallback"><i class="far fa-image"></i>&nbsp;미리보기 생성 중</div>
+                <button type="button" class="edit-selected-remove" data-selected-index="${index}" title="추가 목록에서 제외"><i class="fas fa-times"></i></button>
+                <span class="edit-selected-preview-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</span>
+                <span class="edit-selected-preview-size">${formatEditPhotoSize(file.size)}</span>
+            </div>
+        `).join('');
+    }
+
+    function reloadWithActivePost() {
+        if (!activePost) return window.location.reload();
+        const separator = galleryIndexUrl.includes('?') ? '&' : '?';
+        window.location.href = `${galleryIndexUrl}${separator}page=${currentPage}&post_id=${activePost.id}`;
+    }
+
     function setModalImage(index) {
         if (!activePost || !activePost.images || activePost.images.length === 0) return;
         activeImageIndex = index;
@@ -1067,7 +1365,9 @@
         document.getElementById('modalContent').textContent = activePost.content || '등록된 내용이 없습니다.';
         document.getElementById('modalEditTitle').value = activePost.title || '';
         document.getElementById('modalEditContent').value = activePost.content || '';
+        resetEditPhotoFiles();
         document.getElementById('postEditForm').style.display = 'none';
+        renderEditPhotoManager();
 
         const thumbs = document.getElementById('modalThumbs');
         thumbs.innerHTML = '';
@@ -1100,6 +1400,8 @@
 
     document.addEventListener("DOMContentLoaded", function() {
         document.body.appendChild(document.getElementById('postModal'));
+        const requestedPostId = new URLSearchParams(window.location.search).get('post_id');
+        if (requestedPostId) openGalleryPost(requestedPostId);
     });
 
     function getSelectedPostIds() {
@@ -1267,15 +1569,17 @@
     };
 
     document.getElementById('btnModalEdit').addEventListener('click', function() {
+        renderEditPhotoManager();
         document.getElementById('postEditForm').style.display = 'block';
         document.getElementById('modalEditTitle').focus();
     });
 
     document.getElementById('btnCancelEdit').addEventListener('click', function() {
+        resetEditPhotoFiles();
         document.getElementById('postEditForm').style.display = 'none';
     });
 
-    document.getElementById('btnSaveEdit').addEventListener('click', function() {
+    document.getElementById('btnSaveEdit').addEventListener('click', async function() {
         if (!activePost) return;
         const title = document.getElementById('modalEditTitle').value.trim();
         const content = document.getElementById('modalEditContent').value.trim();
@@ -1283,16 +1587,106 @@
             alert('제목을 입력해 주세요.');
             return;
         }
-        fetch(galleryUpdateUrlTemplate.replace('__post_id__', activePost.id), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, content })
-        }).then(res => res.json()).then(data => {
-            if (data.status === 'success') {
-                window.location.reload();
-            } else {
-                alert(data.message || '수정에 실패했습니다.');
+        if ((activePost.images || []).length + editPhotoFiles.length > 20) {
+            alert('게시물당 사진은 최대 20장입니다.');
+            return;
+        }
+        const originalButtonHtml = this.innerHTML;
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+        let detailsSaved = false;
+        try {
+            const updateResponse = await fetch(galleryUpdateUrlTemplate.replace('__post_id__', activePost.id), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content })
+            });
+            const updateData = await updateResponse.json();
+            if (!updateResponse.ok || updateData.status !== 'success') {
+                throw new Error(updateData.message || '게시물 수정에 실패했습니다.');
             }
+            detailsSaved = true;
+
+            if (editPhotoFiles.length > 0) {
+                this.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 사진 ${editPhotoFiles.length}장 업로드 중...`;
+                const formData = new FormData();
+                editPhotoFiles.forEach(file => formData.append('file', file));
+                const uploadResponse = await fetch(galleryAddImagesUrlTemplate.replace('__post_id__', activePost.id), {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadResponse.json();
+                if (!uploadResponse.ok || uploadData.status !== 'success') {
+                    throw new Error(uploadData.message || '추가 사진 업로드에 실패했습니다.');
+                }
+            }
+            reloadWithActivePost();
+        } catch (error) {
+            const prefix = detailsSaved ? '제목과 내용은 저장됐지만 사진 업로드에 실패했습니다.\n' : '';
+            alert(prefix + (error.message || '저장 중 오류가 발생했습니다.'));
+        } finally {
+            this.disabled = false;
+            this.innerHTML = originalButtonHtml;
+        }
+    });
+
+    const editPhotoDropzone = document.getElementById('modalEditPhotoDropzone');
+    const editPhotoInput = document.getElementById('modalAddPhotos');
+    editPhotoDropzone.addEventListener('click', function(event) {
+        if (event.target === editPhotoInput) return;
+        if (!this.classList.contains('is-disabled')) editPhotoInput.click();
+    });
+    editPhotoDropzone.addEventListener('keydown', function(event) {
+        if ((event.key === 'Enter' || event.key === ' ') && !this.classList.contains('is-disabled')) {
+            event.preventDefault();
+            editPhotoInput.click();
+        }
+    });
+    editPhotoInput.addEventListener('change', function() {
+        setEditPhotoFiles(this.files);
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        editPhotoDropzone.addEventListener(eventName, function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!this.classList.contains('is-disabled')) this.classList.add('is-dragover');
+        });
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        editPhotoDropzone.addEventListener(eventName, function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.classList.remove('is-dragover');
+        });
+    });
+    editPhotoDropzone.addEventListener('drop', function(event) {
+        if (!this.classList.contains('is-disabled')) setEditPhotoFiles(event.dataTransfer && event.dataTransfer.files);
+    });
+
+    document.getElementById('modalEditSelectedPreviews').addEventListener('click', function(event) {
+        const button = event.target.closest('.edit-selected-remove');
+        if (!button) return;
+        const index = Number(button.dataset.selectedIndex);
+        if (!Number.isInteger(index) || index < 0 || index >= editPhotoFiles.length) return;
+        editPhotoFiles.splice(index, 1);
+        replaceEditPhotoPreviewUrls();
+        refreshEditPhotoDropzone();
+    });
+
+    document.getElementById('modalEditImages').addEventListener('click', function(event) {
+        const button = event.target.closest('.edit-photo-delete');
+        if (!button || !activePost) return;
+        if (!confirm('이 사진만 게시물에서 삭제할까요?')) return;
+        const imageId = button.dataset.imageId;
+        const url = galleryDeleteImageUrlTemplate
+            .replace('__post_id__', activePost.id)
+            .replace('__image_id__', imageId);
+        button.disabled = true;
+        fetch(url, { method: 'POST' }).then(async res => ({ ok: res.ok, data: await res.json() })).then(({ ok, data }) => {
+            if (ok && data.status === 'success') reloadWithActivePost();
+            else alert(data.message || '사진 삭제에 실패했습니다.');
+        }).catch(() => alert('사진 삭제 중 오류가 발생했습니다.')).finally(() => {
+            button.disabled = false;
         });
     });
 

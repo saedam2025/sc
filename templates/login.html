@@ -641,11 +641,11 @@
             <div class="form-left">
                 <div>
                     <div class="input-group">
-                        <input type="text" id="emp_no" placeholder="사번을 입력하세요">
+                        <input type="text" id="emp_no" maxlength="15" placeholder="사번을 입력하세요">
                         <i class="fa-solid fa-user-tie"></i>
                     </div>
                     <div class="input-group">
-                        <input type="password" id="password" placeholder="비밀번호를 입력하세요" onkeypress="handleEnter(event)">
+                        <input type="password" id="password" maxlength="15" placeholder="비밀번호를 입력하세요" onkeypress="handleEnter(event)">
                         <i class="fa-solid fa-lock"></i>
                     </div>
                 </div>
@@ -1424,6 +1424,7 @@
             const emp_no = document.getElementById('emp_no').value;
             const password = document.getElementById('password').value;
             if(!emp_no || !password) { alert('사번과 비밀번호를 모두 입력해주세요.'); return; }
+            if(emp_no.length > 15 || password.length > 15) { alert('사번과 비밀번호는 15자 이내로 입력해주세요.'); return; }
 
             try {
                 const res = await fetch('/login', {
