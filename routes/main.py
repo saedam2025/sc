@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, session, request, current_app, abort, url_for
+from flask import Blueprint, render_template, jsonify, session, request, current_app, abort, url_for, send_file
 from datetime import datetime, timedelta
 import holidays
 import os
@@ -6,13 +6,28 @@ import json
 import urllib.parse
 from .database import get_db
 from .board import init_board_db  # 💡 새로 추가: board.py에서 게시판 DB 초기화 함수 임포트
-from .storage import UPLOADS_ROOT
-from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
+from .storage import APP_ROOT, UPLOADS_ROOT
+from .secure_files import delete_file, encrypted_file_is_readable, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
 
 main_bp = Blueprint('main', __name__)
 
 UPLOAD_FOLDER = str(UPLOADS_ROOT)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def _weblink_file_path(filepath):
+    """DB의 레거시 절대 경로를 현재 환경의 영구 업로드 경로로 변환한다."""
+    stored_name = os.path.basename(str(filepath or '').replace('\\', '/'))
+    return os.path.join(UPLOAD_FOLDER, stored_name) if stored_name else ''
+
+
+def _bundled_weblink_fallback(filename, encrypted_path):
+    """키가 유실된 레거시 파일과 동일한 번들 원본이 있을 때만 복구 경로를 반환한다."""
+    safe_name = original_filename(filename)
+    candidate = APP_ROOT / 'static' / safe_name
+    if candidate.is_file() and candidate.stat().st_size == plaintext_size(encrypted_path):
+        return candidate
+    return None
 
 # === 실시간 접속자 상태 관리를 위한 전역 변수 ===
 active_users = {}
@@ -245,7 +260,11 @@ def index():
         today_grouped[cat].sort(key=lambda x: x['start'])
         weekly_grouped[cat].sort(key=lambda x: x['start'])
 
-    kr_holidays = holidays.KR(years=[today_date.year, today_date.year + 1])
+    # 실행 환경/라이브러리 기본 언어와 무관하게 공휴일명을 한국어로 고정한다.
+    kr_holidays = holidays.KR(
+        years=[today_date.year, today_date.year + 1],
+        language='ko',
+    )
     holidays_dict = {str(date): str(name) for date, name in kr_holidays.items()}
 
 
@@ -830,12 +849,12 @@ def save_weblink():
             try:
                 filename = original_filename(file.filename)
                 stored_name = encrypted_storage_name(filename)
-                filepath = os.path.join(UPLOAD_FOLDER, stored_name)
-                encrypt_upload(file, filepath)
-                created_path = filepath
+                file_path = os.path.join(UPLOAD_FOLDER, stored_name)
+                encrypt_upload(file, file_path)
+                created_path = file_path
                 # 파일을 위한 특수 플래그로 favicon_url 설정
                 cursor = conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, '', ?, ?, ?, ?)",
-                                      (title, 'file', 'FILE', current_user, filename, filepath))
+                                      (title, 'file', 'FILE', current_user, filename, stored_name))
                 url = url_for('main.serve_weblink_file', link_id=cursor.lastrowid)
                 conn.execute("UPDATE weblinks SET url=? WHERE id=?", (url, cursor.lastrowid))
             except Exception:
@@ -914,7 +933,7 @@ def delete_weblink(link_id):
         conn.close()
         return jsonify({"status": "error", "message": "존재하지 않는 링크입니다."}), 404
 
-    file_to_delete = link['filepath'] if 'type' in link.keys() and link['type'] == 'file' else None
+    file_to_delete = _weblink_file_path(link['filepath']) if 'type' in link.keys() and link['type'] == 'file' else None
     conn.execute("DELETE FROM weblinks WHERE id=?", (link_id,))
     conn.commit()
     conn.close()
@@ -932,9 +951,15 @@ def serve_weblink_file(link_id):
     conn.close()
     if not link or link['type'] != 'file' or not link['filepath']:
         abort(404)
-    return encrypted_response(
-        link['filepath'], link['filename'] or 'attachment', as_attachment=False
-    )
+    file_path = _weblink_file_path(link['filepath'])
+    if not file_path or not os.path.isfile(file_path):
+        abort(404)
+    if not encrypted_file_is_readable(file_path):
+        fallback = _bundled_weblink_fallback(link['filename'], file_path)
+        if fallback:
+            return send_file(fallback, as_attachment=True, download_name=link['filename'] or fallback.name)
+        return "이 파일은 이전 암호화 키로 저장되어 복구할 수 없습니다. 파일을 삭제한 뒤 다시 등록해 주세요.", 409
+    return encrypted_response(file_path, link['filename'] or 'attachment', as_attachment=True)
 
 
     # 메신저 메뉴 모듈화=====================================================

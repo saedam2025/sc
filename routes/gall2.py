@@ -23,6 +23,7 @@ UPLOAD_FOLDER = os.path.join(BASE_GALLERY_PATH, 'uploads')
 THUMB_FOLDER = os.path.join(BASE_GALLERY_PATH, 'thumbnails')
 GALLERY_IMAGE_MAX_SIZE = (1920, 1080)
 GALLERY_IMAGE_QUALITY = 85
+GALLERY_MAX_PHOTOS_PER_POST = 20
 POSTS_PER_PAGE = 18
 SCHOOL_GALLERY_SCOPE_ID = 0
 
@@ -356,6 +357,92 @@ def save_gallery_upload_request(school_id=None):
     return None
 
 
+def append_gallery_files(conn, post_id, files):
+    """기존 게시물에 사진을 추가하고 생성된 파일 수를 반환한다."""
+    candidates = [file for file in files if file and file.filename]
+    if not candidates:
+        raise ValueError('추가할 사진을 선택해 주세요.')
+
+    current_count = conn.execute(
+        'SELECT COUNT(*) FROM gall2 WHERE post_id=?', (post_id,)
+    ).fetchone()[0]
+    if current_count + len(candidates) > GALLERY_MAX_PHOTOS_PER_POST:
+        remaining = max(0, GALLERY_MAX_PHOTOS_PER_POST - current_count)
+        raise ValueError(f'게시물당 사진은 최대 {GALLERY_MAX_PHOTOS_PER_POST}장입니다. 현재 {remaining}장까지 추가할 수 있습니다.')
+
+    created_paths = []
+    added = 0
+    try:
+        for file in candidates:
+            original_name = clean_original_filename(file.filename)
+            extension = os.path.splitext(original_name)[1].lower().lstrip('.')
+            if extension not in {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}:
+                continue
+
+            try:
+                optimized_stream = optimize_gallery_image(file)
+            except (UnidentifiedImageError, OSError, ValueError):
+                continue
+
+            filename = build_gallery_filename(original_name)
+            thumb_name = generate_thumb_from_stream(optimized_stream, filename)
+            if not thumb_name:
+                continue
+
+            image_path = os.path.join(UPLOAD_FOLDER, filename)
+            thumb_path = os.path.join(THUMB_FOLDER, thumb_name)
+            created_paths.extend([image_path, thumb_path])
+            optimized_stream.seek(0)
+            encrypt_stream(optimized_stream, image_path)
+            conn.execute('''
+                INSERT INTO gall2 (title, filename, thumb_name, file_type, tab_id, post_id)
+                VALUES (?, ?, ?, 'image', 1, ?)
+            ''', (original_name, filename, thumb_name, post_id))
+            added += 1
+    except Exception:
+        for path in created_paths:
+            delete_file(path)
+        raise
+
+    if added == 0:
+        for path in created_paths:
+            delete_file(path)
+        raise ValueError('추가할 수 있는 이미지 파일이 없습니다.')
+    return added
+
+
+def gallery_post_for_scope(conn, post_id, school_id):
+    if school_id is None:
+        return conn.execute(
+            'SELECT id FROM gall2_posts WHERE id=? AND school_id IS NULL', (post_id,)
+        ).fetchone()
+    return conn.execute(
+        'SELECT id FROM gall2_posts WHERE id=? AND school_id=?', (post_id, school_id)
+    ).fetchone()
+
+
+def delete_gallery_image_for_scope(conn, post_id, image_id, school_id):
+    if school_id is None:
+        image = conn.execute('''
+            SELECT g.* FROM gall2 g
+            JOIN gall2_posts p ON p.id=g.post_id
+            WHERE g.id=? AND g.post_id=? AND p.school_id IS NULL
+        ''', (image_id, post_id)).fetchone()
+    else:
+        image = conn.execute('''
+            SELECT g.* FROM gall2 g
+            JOIN gall2_posts p ON p.id=g.post_id
+            WHERE g.id=? AND g.post_id=? AND p.school_id=?
+        ''', (image_id, post_id, school_id)).fetchone()
+    if not image:
+        return False
+    conn.execute('DELETE FROM gall2 WHERE id=?', (image_id,))
+    conn.execute('UPDATE gall2_posts SET updated_at=CURRENT_TIMESTAMP WHERE id=?', (post_id,))
+    conn.commit()
+    delete_gallery_file(image)
+    return True
+
+
 def require_school_gallery_access(conn, school_key):
     """본사 담당자 또는 해당 학교에 실제 지정된 센터장만 허용한다."""
     school = conn.execute('''
@@ -442,6 +529,39 @@ def school_gallery_update_post(school_key, post_id):
         if cursor.rowcount != 1:
             return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
         conn.commit()
+        return jsonify({'status': 'success'})
+    finally:
+        conn.close()
+
+
+@gall2_bp.route('/school/<string:school_key>/gallery/post/<int:post_id>/images/add', methods=['POST'])
+def school_gallery_add_images(school_key, post_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        require_school_gallery_access(conn, school_key)
+        if not gallery_post_for_scope(conn, post_id, SCHOOL_GALLERY_SCOPE_ID):
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+        try:
+            added = append_gallery_files(conn, post_id, request.files.getlist('file'))
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({'status': 'error', 'message': str(exc)}), 400
+        conn.execute('UPDATE gall2_posts SET updated_at=CURRENT_TIMESTAMP WHERE id=?', (post_id,))
+        conn.commit()
+        return jsonify({'status': 'success', 'added': added})
+    finally:
+        conn.close()
+
+
+@gall2_bp.route('/school/<string:school_key>/gallery/post/<int:post_id>/image/<int:image_id>/delete', methods=['POST'])
+def school_gallery_delete_image(school_key, post_id, image_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        require_school_gallery_access(conn, school_key)
+        if not delete_gallery_image_for_scope(conn, post_id, image_id, SCHOOL_GALLERY_SCOPE_ID):
+            return jsonify({'status': 'error', 'message': '사진을 찾을 수 없습니다.'}), 404
         return jsonify({'status': 'success'})
     finally:
         conn.close()
@@ -552,6 +672,39 @@ def update_post(post_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
+
+
+@gall2_bp.route('/gall2/post/<int:post_id>/images/add', methods=['POST'])
+@admin_required
+def add_post_images(post_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        if not gallery_post_for_scope(conn, post_id, None):
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+        try:
+            added = append_gallery_files(conn, post_id, request.files.getlist('file'))
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({'status': 'error', 'message': str(exc)}), 400
+        conn.execute('UPDATE gall2_posts SET updated_at=CURRENT_TIMESTAMP WHERE id=?', (post_id,))
+        conn.commit()
+        return jsonify({'status': 'success', 'added': added})
+    finally:
+        conn.close()
+
+
+@gall2_bp.route('/gall2/post/<int:post_id>/image/<int:image_id>/delete', methods=['POST'])
+@admin_required
+def delete_post_image(post_id, image_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        if not delete_gallery_image_for_scope(conn, post_id, image_id, None):
+            return jsonify({'status': 'error', 'message': '사진을 찾을 수 없습니다.'}), 404
+        return jsonify({'status': 'success'})
+    finally:
+        conn.close()
 
 @gall2_bp.route('/gall2/post/<int:post_id>/delete', methods=['POST'])
 @admin_required

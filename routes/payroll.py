@@ -9,6 +9,7 @@ import ssl
 import threading
 import time
 import uuid
+import zlib
 from datetime import datetime, timezone
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -38,6 +39,7 @@ from .ai_mail import (
     _smtp_login,
 )
 from .database import get_db
+from .security import has_menu_permission
 from .secure_files import original_filename
 
 
@@ -69,11 +71,55 @@ DEFAULT_FORMS = {
         'match_keywords': '퇴직자, 퇴직, 퇴사, 정산',
     },
 }
+FORM_PRESETS = {
+    'classic': {
+        'name': '기존 기본형',
+        'description': '현재 기본 명세서와 같은 안정적인 표 형식',
+        'filename': 'payroll/employee_worker.html',
+        'layout_type': 'classic',
+    },
+    'landscape': {
+        'name': '모던 가로형',
+        'description': '넓은 화면과 인쇄에 맞춘 샤프한 가로 명세서',
+        'filename': 'payroll/preset_landscape.html',
+        'layout_type': 'landscape',
+    },
+    'portrait': {
+        'name': '모던 세로형',
+        'description': '모바일 열람과 세로 인쇄에 맞춘 세련된 명세서',
+        'filename': 'payroll/preset_portrait.html',
+        'layout_type': 'portrait',
+    },
+}
+COMMON_EXCEL_HEADERS = (
+    '직원명', '강사명', '성명', '이름', '이메일', '직원구분', '강사구분',
+    '직책', '과목', '강의명', '학교명', '기관명', '은행', '지급은행',
+    '계좌번호', '예금주', '업무일환산', '기본급', '비과세', '직책수당',
+    '특근수당', '기타지급내역', '기타내역', '지급총액', '국민연금',
+    '건강보험', '장기요양', '고용보험', '고용보험료', '산재보험',
+    '산재보험료', '특별고용보험', '사업소득세', '사업주민세', '소득세',
+    '근로소득세', '기타공제내역', '기타 공제내역', '공제총액',
+    '차인지급액', '비고', '기타사항',
+)
+FORM_FIELD_PATTERNS = (
+    re.compile(r"row\.get\(\s*['\"]([^'\"]+)['\"]"),
+    re.compile(r"safe_amount\(\s*row\s*,\s*['\"]([^'\"]+)['\"]"),
+)
+VISUAL_SOURCE_TOKEN_RE = re.compile(
+    r'(<style\b[^>]*>.*?</style\s*>|<[^>]+>|{{.*?}}|{%.*?%}|{#.*?#})',
+    re.I | re.S,
+)
 MAX_BANNER_BYTES = 4 * 1024 * 1024
 MAX_TEMPLATE_BYTES = 2 * 1024 * 1024
+MAX_ARCHIVED_STATEMENT_BYTES = 6 * 1024 * 1024
 ASSET_LIMITS = {'banner': 10, 'logo': 5}
 DATA_IMAGE_RE = re.compile(r'^data:image/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=\s]+)$', re.I)
 TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+ARCHIVED_IMAGE_MARKERS = {
+    'banner1': 'https://payroll-archive.invalid/attached-banner-1',
+    'banner2': 'https://payroll-archive.invalid/attached-banner-2',
+    'logo': 'https://payroll-archive.invalid/attached-logo',
+}
 PAYROLL_IMAGE_ENCRYPTED_PREFIX = 'enc:'
 EXCEL_HEADER_ROW = 3
 EXCEL_DATA_START_ROW = EXCEL_HEADER_ROW + 1
@@ -305,6 +351,17 @@ def _owned(conn, table, row_id):
     ).fetchone()
 
 
+def _campaign_for_history_access(conn, campaign_id):
+    campaign = conn.execute(
+        'SELECT * FROM payroll_campaigns WHERE id=?',
+        (campaign_id,),
+    ).fetchone()
+    if not campaign:
+        return None
+    is_owner = str(campaign['owner_emp_no'] or '') == _owner_emp_no()
+    return campaign if is_owner or has_menu_permission('payroll_main') else None
+
+
 def _status_for(owner):
     with _status_lock:
         return _mail_statuses.setdefault(owner, {
@@ -377,6 +434,7 @@ def _asset_dict(row):
         else f'/payroll/api/assets/{item["id"]}/content'
     )
     item['source_url'] = item['source_value'] if item.get('source_type') == 'url' else ''
+    item['original_filename'] = item.get('original_filename') or ''
     item.pop('source_value', None)
     return item
 
@@ -483,6 +541,9 @@ def _hydrate_group_assets(conn, group_row):
     for field, expected_kind in selections:
         asset_id = group.get(f'{field}_asset_id')
         value = None
+        asset_name = ''
+        asset_filename = ''
+        source_type = ''
         if asset_id:
             asset = conn.execute('''
                 SELECT * FROM payroll_image_assets
@@ -490,9 +551,18 @@ def _hydrate_group_assets(conn, group_row):
             ''', (asset_id, owner, expected_kind)).fetchone()
             if asset:
                 value = _asset_plain_value(asset)
+                asset_name = str(asset['name'] or '').strip()
+                asset_filename = str(_mapping_value(asset, 'original_filename', '') or '').strip()
+                source_type = str(asset['source_type'] or '').strip()
         if field.startswith('banner') and not value:
             value = _unprotect_image_value(group.get(f'{field}_data'))
+            if value:
+                source_type = 'url' if urlparse(str(value)).scheme in ('http', 'https') else 'file-encrypted'
+                asset_name = f'광고 이미지 {field[-1]}'
         group[f'{field}_value'] = value
+        group[f'{field}_asset_name'] = asset_name
+        group[f'{field}_asset_filename'] = asset_filename
+        group[f'{field}_source_type'] = source_type
     return group
 
 
@@ -514,13 +584,153 @@ def _selected_asset_id(conn, owner, value, expected_kind, field_label):
 
 def _template_dict(row):
     item = dict(row)
+    mappings = _clean_field_mappings(item.get('field_mappings_json'))
     item['is_active'] = bool(item.get('is_active'))
     item['is_system'] = bool(item.get('is_system'))
     item['description'] = item.get('description') or item.get('subject') or ''
     item['value'] = item.get('template_key')
     item['label'] = item.get('name')
     item['match_keywords'] = item.get('match_keywords') or ''
+    item['layout_type'] = item.get('layout_type') or 'classic'
+    item['field_mappings'] = mappings
+    item['detected_fields'] = _extract_form_fields(item.get('body_html'), mappings)
+    item.pop('field_mappings_json', None)
     return item
+
+
+def _clean_field_mappings(value):
+    if isinstance(value, str):
+        try:
+            value = json.loads(value or '{}')
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError('엑셀 제목 매칭 정보가 올바르지 않습니다.') from exc
+    if value in (None, ''):
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError('엑셀 제목 매칭 정보는 항목별 연결 형식이어야 합니다.')
+    cleaned = {}
+    for raw_target, raw_source in value.items():
+        target = _clean_text(raw_target, 120)
+        source = _clean_text(raw_source, 120)
+        if not target or not source or target.startswith('__') or target == source:
+            continue
+        cleaned[target] = source
+        if len(cleaned) >= 120:
+            break
+    return cleaned
+
+
+def _extract_form_fields(source, mappings=None):
+    fields = []
+    seen = set()
+    for pattern in FORM_FIELD_PATTERNS:
+        for match in pattern.finditer(str(source or '')):
+            key = _clean_text(match.group(1), 120)
+            if not key or key.startswith('__') or key in seen:
+                continue
+            seen.add(key)
+            fields.append(key)
+    for key in (mappings or {}):
+        if key not in seen:
+            seen.add(key)
+            fields.append(key)
+    return [
+        {'field_key': key, 'excel_header': (mappings or {}).get(key, key)}
+        for key in fields
+    ]
+
+
+def _visual_text_parts(source):
+    """Split a template without touching tags, Jinja expressions, or CSS."""
+    return VISUAL_SOURCE_TOKEN_RE.split(str(source or ''))
+
+
+def _is_visual_text(part):
+    visible = re.sub(r'(?i)&nbsp;|&#160;|&#xa0;', '', str(part or '')).strip()
+    return bool(visible)
+
+
+def _annotate_visual_texts(source):
+    """Make literal labels editable while preserving the original form layout."""
+    output = []
+    text_index = 0
+    for part in _visual_text_parts(source):
+        if not part or VISUAL_SOURCE_TOKEN_RE.fullmatch(part) or not _is_visual_text(part):
+            output.append(part)
+            continue
+        leading = part[:len(part) - len(part.lstrip())]
+        trailing = part[len(part.rstrip()):]
+        visible = part[len(leading):len(part) - len(trailing) if trailing else None]
+        output.append(
+            f'{leading}<span class="pm-visual-text-target" '
+            f'data-text-index="{text_index}" contenteditable="true" '
+            f'spellcheck="false">{visible}</span>{trailing}'
+        )
+        text_index += 1
+    return ''.join(output), text_index
+
+
+def _apply_visual_text_edits(source, edits):
+    """Apply label edits from the visual form editor back to the stored template."""
+    if edits in (None, '', {}):
+        return str(source or '')
+    if isinstance(edits, str):
+        try:
+            edits = json.loads(edits)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError('명세서 글자 수정 정보가 올바르지 않습니다.') from exc
+    if not isinstance(edits, dict) or len(edits) > 500:
+        raise ValueError('명세서 글자 수정 정보가 올바르지 않습니다.')
+    cleaned = {}
+    for raw_index, raw_value in edits.items():
+        try:
+            index = int(raw_index)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('명세서 글자 수정 위치가 올바르지 않습니다.') from exc
+        value = str(raw_value or '').replace('\r', '').replace('\n', ' ').strip()
+        if index < 0 or len(value) > 1000:
+            raise ValueError('명세서 글자는 항목별 1,000자 이내로 수정해주세요.')
+        cleaned[index] = value
+
+    output = []
+    text_index = 0
+    for part in _visual_text_parts(source):
+        if not part or VISUAL_SOURCE_TOKEN_RE.fullmatch(part) or not _is_visual_text(part):
+            output.append(part)
+            continue
+        if text_index not in cleaned:
+            output.append(part)
+        else:
+            leading = part[:len(part) - len(part.lstrip())]
+            trailing = part[len(part.rstrip()):]
+            output.append(
+                f'{leading}{html.escape(cleaned[text_index], quote=False)}{trailing}'
+            )
+        text_index += 1
+    return ''.join(output)
+
+
+def _field_expression(source, field_key):
+    for expression in re.findall(r'{{.*?}}', str(source or ''), flags=re.S):
+        if any(
+                match.group(1) == field_key
+                for pattern in FORM_FIELD_PATTERNS
+                for match in pattern.finditer(expression)):
+            return re.sub(r'\s+', ' ', expression).strip()
+    return field_key
+
+
+def _form_mappings(form):
+    return _clean_field_mappings(_mapping_value(form, 'field_mappings_json', '{}'))
+
+
+def _mapped_form_row(row, form):
+    original = dict(row or {})
+    mapped = dict(original)
+    for field_key, excel_header in _form_mappings(form).items():
+        source_column = _excel_column(original.keys(), excel_header)
+        mapped[field_key] = original.get(source_column, '') if source_column is not None else ''
+    return mapped
 
 
 def _clean_match_keywords(value):
@@ -570,16 +780,63 @@ def _sample_row():
     }
 
 
-def _render_form_source(source, row=None, send_date='2026-07-25', logo_url='', ad1_url='', ad2_url=''):
+def _render_form_source(
+        source, row=None, send_date='2026-07-25', logo_url='', ad1_url='', ad2_url='',
+        amount_formatter=None):
     template = _form_environment.from_string(str(source or ''))
     return template.render(
         row=dict(row or _sample_row()),
         send_date=send_date,
-        safe_amount=safe_amount,
+        safe_amount=amount_formatter or safe_amount,
         logo_url=logo_url,
         ad1_url=ad1_url,
         ad2_url=ad2_url,
     )
+
+
+def _mapping_preview_html(source, send_date='2026-07-25', logo_url='', ad1_url='', ad2_url=''):
+    fields = _extract_form_fields(source)
+    annotated_source, _ = _annotate_visual_texts(source)
+    sample = _sample_row()
+    markers = {}
+    marker_row = dict(sample)
+    for index, field in enumerate(fields):
+        key = field['field_key']
+        marker = f'__PAYROLL_MAPPING_FIELD_{index}__'
+        markers[marker] = key
+        marker_row[key] = marker
+
+    def mapping_amount(*args):
+        key = str(args[1]) if len(args) >= 2 and hasattr(args[0], 'get') else ''
+        for marker, field_key in markers.items():
+            if field_key == key:
+                return marker
+        return safe_amount(*args)
+
+    rendered = _render_form_source(
+        annotated_source,
+        row=marker_row,
+        send_date=send_date,
+        logo_url=logo_url,
+        ad1_url=ad1_url,
+        ad2_url=ad2_url,
+        amount_formatter=mapping_amount,
+    )
+    for marker, key in markers.items():
+        sample_value = sample.get(key, key)
+        if isinstance(sample_value, (int, float)):
+            sample_value = f'{int(sample_value):,}'
+        expression = _field_expression(source, key)
+        button = (
+            f'<span class="pm-mapping-target" role="button" tabindex="0" '
+            f'data-field-key="{html.escape(key, quote=True)}" '
+            f'data-field-expression="{html.escape(expression, quote=True)}" '
+            f'title="{html.escape(key, quote=True)} 엑셀 제목 매칭">'
+            f'<span class="pm-mapping-sample">{html.escape(str(sample_value or key))}</span>'
+            f'<small class="pm-mapping-caption">{html.escape(key)}</small></span>'
+        )
+        rendered = rendered.replace(marker, button)
+    return rendered, fields
 
 
 def _safe_form_source(value):
@@ -854,18 +1111,22 @@ def _uploaded_excel_files():
     return [file_storage for file_storage in files if file_storage and file_storage.filename]
 
 
-def _inspect_rows(frame, form_names=None):
-    form_names = form_names or {}
+def _inspect_rows(frame, forms=None):
+    forms = forms or {}
+    form_names = {key: form['name'] for key, form in forms.items()}
     rows = []
     errors = []
     for _, row in frame.iterrows():
-        email = str(row.get('이메일', '')).strip().lower()
+        form_key = str(row.get(EXCEL_META_FORM, '')).strip()
+        form = forms.get(form_key)
+        rendered_row = _mapped_form_row(row, form) if form else dict(row)
+        email = str(rendered_row.get('이메일', '')).strip().lower()
         source_file = str(row.get(EXCEL_META_FILE, '')).strip()
         sheet_name = str(row.get(EXCEL_META_SHEET, '')).strip()
         excel_row = int(row.get(EXCEL_META_ROW, 0) or 0)
         location_parts = [part for part in (source_file, f'{sheet_name} 시트' if sheet_name else '') if part]
         location = f"{' / '.join(location_parts)} {excel_row}행".strip()
-        name = _recipient_name(row)
+        name = _recipient_name(rendered_row)
         issue = ''
         if name == '이름 없음':
             issue = '이름 열을 인식할 수 없습니다'
@@ -876,7 +1137,7 @@ def _inspect_rows(frame, form_names=None):
         elif not _is_valid_email(email):
             issue = '이메일 주소 형식 오류'
             errors.append(f'[{location}] {name}: 이메일 주소 형식을 확인해주세요.')
-        elif not str(row.get(EXCEL_META_FORM, '')).strip() or str(row.get(EXCEL_META_FORM, '')).strip() not in form_names:
+        elif not form_key or form_key not in form_names:
             issue = '명세서 폼 자동 판별 실패'
             detected_type = str(row.get(EXCEL_META_TYPE, '')).strip() or '비어 있음'
             errors.append(f'[{location}] {name}: 구분 "{detected_type}"에 적용할 명세서 폼을 확인해주세요.')
@@ -887,8 +1148,8 @@ def _inspect_rows(frame, form_names=None):
             'name': name,
             'email': email,
             'detected_type': str(row.get(EXCEL_META_TYPE, '')).strip() or '미지정',
-            'form_key': str(row.get(EXCEL_META_FORM, '')).strip(),
-            'form_name': form_names.get(str(row.get(EXCEL_META_FORM, '')).strip(), '판별 불가'),
+            'form_key': form_key,
+            'form_name': form_names.get(form_key, '판별 불가'),
             'status': 'error' if issue else 'ready',
             'message': issue or '발송 준비 완료',
         })
@@ -944,9 +1205,96 @@ def _sender_from_header(sender):
     return formataddr((sender_label, sender_email), charset='utf-8') if sender_label else sender_email
 
 
+def _archived_image_reference(group, field, default_url=''):
+    value = str(group.get(f'{field}_value') or '').strip()
+    parsed = urlparse(value)
+    if parsed.scheme in ('http', 'https') and parsed.netloc:
+        return value, None
+    if value:
+        filename = str(group.get(f'{field}_asset_filename') or '').strip()
+        display_name = str(group.get(f'{field}_asset_name') or '').strip()
+        fallback = '회사 로고' if field == 'logo' else f'광고 이미지 {field[-1]}'
+        return ARCHIVED_IMAGE_MARKERS[field], filename or display_name or fallback
+    return default_url or ARCHIVED_IMAGE_MARKERS[field], None
+
+
+def _archived_statement_html(form_source, row, group, send_date, base_url):
+    """발송 당시 명세서를 이미지 바이너리 없이 안전한 HTML로 고정한다."""
+    top_url, top_attachment = _archived_image_reference(group, 'banner1')
+    bottom_url, bottom_attachment = _archived_image_reference(group, 'banner2')
+    logo_url, logo_attachment = _archived_image_reference(
+        group,
+        'logo',
+        base_url + '/static/logo01.jpg',
+    )
+    rendered = _render_form_source(
+        form_source,
+        row=dict(row),
+        send_date=send_date,
+        logo_url=logo_url,
+        ad1_url=top_url,
+        ad2_url=bottom_url,
+    )
+    soup = BeautifulSoup(rendered, 'html.parser')
+    replacements = {
+        ARCHIVED_IMAGE_MARKERS['banner1']: top_attachment,
+        ARCHIVED_IMAGE_MARKERS['banner2']: bottom_attachment,
+        ARCHIVED_IMAGE_MARKERS['logo']: logo_attachment,
+    }
+    for image in list(soup.find_all('img')):
+        source = str(image.get('src') or '').strip()
+        if source not in replacements:
+            continue
+        attachment_name = replacements[source]
+        if not attachment_name:
+            image.decompose()
+            continue
+        note = soup.new_tag('span')
+        note['style'] = (
+            'display:inline-block;padding:8px 12px;border:1px solid #d1d5db;'
+            'border-radius:6px;background:#f8fafc;color:#475569;font-size:13px'
+        )
+        note.string = f'{attachment_name}첨부'
+        image.replace_with(note)
+    archived = _sanitize_html(str(soup))
+    if len(archived.encode('utf-8')) > MAX_ARCHIVED_STATEMENT_BYTES:
+        raise ValueError('발송 명세서 열람본이 저장 가능한 크기를 초과했습니다.')
+    return archived
+
+
+def _compress_statement_html(statement_html):
+    payload = str(statement_html or '').encode('utf-8')
+    if not payload:
+        return None
+    if len(payload) > MAX_ARCHIVED_STATEMENT_BYTES:
+        raise ValueError('발송 명세서 열람본이 저장 가능한 크기를 초과했습니다.')
+    return sqlite3.Binary(zlib.compress(payload, level=9))
+
+
+def _decompress_statement_html(compressed):
+    if compressed is None:
+        return ''
+    payload = bytes(compressed)
+    decoder = zlib.decompressobj()
+    restored = decoder.decompress(payload, MAX_ARCHIVED_STATEMENT_BYTES + 1)
+    if len(restored) > MAX_ARCHIVED_STATEMENT_BYTES or decoder.unconsumed_tail:
+        raise ValueError('저장된 명세서 열람본의 크기가 올바르지 않습니다.')
+    restored += decoder.flush()
+    if len(restored) > MAX_ARCHIVED_STATEMENT_BYTES:
+        raise ValueError('저장된 명세서 열람본의 크기가 올바르지 않습니다.')
+    return restored.decode('utf-8')
+
+
+def _group_mapped_row(row, group):
+    form_key = str(row.get(EXCEL_META_FORM, '')).strip()
+    definition = (group.get('form_definitions') or {}).get(form_key) or {
+        'body_html': group.get('form_source'),
+        'field_mappings_json': group.get('form_mappings_json') or '{}',
+    }
+    return _mapped_form_row(row, definition), definition
+
+
 def _build_message(row, group, sender, password, send_date, base_url):
-    target_name = _recipient_name(row)
-    target_email = str(row.get('이메일', '')).strip()
     top_url, top_image = _image_parts(group.get('banner1_value') or group.get('banner1_data'), 'payroll-banner-top')
     bottom_url, bottom_image = _image_parts(group.get('banner2_value') or group.get('banner2_data'), 'payroll-banner-bottom')
     logo_value = group.get('logo_value')
@@ -956,15 +1304,24 @@ def _build_message(row, group, sender, password, send_date, base_url):
         logo_url, logo_image = base_url + '/static/logo01.jpg', None
     top_html = _wrapped_email_image(top_url, '광고 배너 1')
     bottom_html = _wrapped_email_image(bottom_url, '광고 배너 2')
-    form_key = str(row.get(EXCEL_META_FORM, '')).strip()
-    form_source = (group.get('form_sources') or {}).get(form_key) or group.get('form_source')
+    rendered_row, form_definition = _group_mapped_row(row, group)
+    form_source = form_definition.get('body_html')
+    target_name = _recipient_name(rendered_row)
+    target_email = str(rendered_row.get('이메일', '')).strip()
     statement = _render_form_source(
         form_source,
-        row=dict(row),
+        row=rendered_row,
         send_date=send_date,
         logo_url=logo_url,
         ad1_url=top_url or TRANSPARENT_PIXEL,
         ad2_url=bottom_url or TRANSPARENT_PIXEL,
+    )
+    archived_statement = _archived_statement_html(
+        form_source,
+        rendered_row,
+        group,
+        send_date,
+        base_url,
     )
     body = _replace_variables(group.get('body_html'), target_name, send_date)
     if '{{명세서}}' in body:
@@ -988,7 +1345,7 @@ def _build_message(row, group, sender, password, send_date, base_url):
         message.attach(bottom_image)
     if logo_image:
         message.attach(logo_image)
-    return message, target_name
+    return message, target_name, archived_statement
 
 
 def _recipient_name(row):
@@ -1003,9 +1360,11 @@ def _recipient_school(row):
     return str(_row_value(row, ('학교명', '학교', '근무학교', '기관명'), '')).strip()
 
 
-def _create_campaign_recipients(conn, owner, campaign_id, frame):
+def _create_campaign_recipients(conn, owner, campaign_id, frame, forms=None):
     recipient_ids = []
     for _, row in frame.iterrows():
+        form_key = str(row.get(EXCEL_META_FORM, '')).strip()
+        recipient_row = _mapped_form_row(row, (forms or {}).get(form_key)) if (forms or {}).get(form_key) else dict(row)
         source_file = str(row.get(EXCEL_META_FILE, '')).strip()
         sheet_name = str(row.get(EXCEL_META_SHEET, '')).strip()
         source_location = ' / '.join(part for part in (source_file, sheet_name) if part)
@@ -1019,10 +1378,10 @@ def _create_campaign_recipients(conn, owner, campaign_id, frame):
             owner,
             source_location,
             int(row.get(EXCEL_META_ROW, 0) or 0),
-            _recipient_type(row),
-            _recipient_school(row),
-            _recipient_name(row),
-            str(row.get('이메일', '')).strip(),
+            _recipient_type(recipient_row),
+            _recipient_school(recipient_row),
+            _recipient_name(recipient_row),
+            str(recipient_row.get('이메일', '')).strip(),
         ))
         recipient_ids.append(cursor.lastrowid)
     return recipient_ids
@@ -1041,12 +1400,16 @@ def _campaign_recipient_start(owner, campaign_id, recipient_id):
         conn.close()
 
 
-def _campaign_recipient_finish(owner, campaign_id, recipient_id, result_status, error_message, elapsed_seconds):
+def _campaign_recipient_finish(
+        owner, campaign_id, recipient_id, result_status, error_message, elapsed_seconds,
+        statement_html=None):
     conn = _db()
     try:
+        compressed_statement = _compress_statement_html(statement_html)
         conn.execute('''
             UPDATE payroll_campaign_recipients
             SET status=?, error_message=?, elapsed_seconds=?,
+                statement_html_zlib=?,
                 started_at=COALESCE(started_at, CURRENT_TIMESTAMP),
                 finished_at=CURRENT_TIMESTAMP
             WHERE id=? AND campaign_id=? AND owner_emp_no=?
@@ -1054,6 +1417,7 @@ def _campaign_recipient_finish(owner, campaign_id, recipient_id, result_status, 
             result_status,
             str(error_message or '')[:2000],
             round(max(0.0, float(elapsed_seconds or 0)), 3),
+            compressed_statement,
             recipient_id,
             campaign_id,
             owner,
@@ -1116,43 +1480,43 @@ def payroll_worker(app, owner, campaign_id, frame, recipient_ids, send_date, int
             return
 
         try:
+            def progress_item(source_row):
+                mapped_row, _ = _group_mapped_row(source_row, group)
+                return {
+                    'type': _recipient_type(mapped_row),
+                    'name': _recipient_name(mapped_row),
+                    'email': str(mapped_row.get('이메일', '')).strip(),
+                }
+
             for position, (_, row) in enumerate(frame.iterrows()):
                 if status.get('stop_requested'):
                     break
                 recipient_id = recipient_ids[position]
                 status['recent_completed'] = [
-                    {
-                        'type': _recipient_type(frame.iloc[i]), 
-                        'name': _recipient_name(frame.iloc[i]), 
-                        'email': str(frame.iloc[i].get('이메일', '')).strip()
-                    }
+                    progress_item(frame.iloc[i])
                     for i in range(max(0, position - 3), position)
                 ]
-                status['current_recipient'] = {
-                    'type': _recipient_type(row), 
-                    'name': _recipient_name(row), 
-                    'email': str(row.get('이메일', '')).strip()
-                }
+                status['current_recipient'] = progress_item(row)
                 status['upcoming_scheduled'] = [
-                    {
-                        'type': _recipient_type(frame.iloc[i]), 
-                        'name': _recipient_name(frame.iloc[i]), 
-                        'email': str(frame.iloc[i].get('이메일', '')).strip()
-                    }
+                    progress_item(frame.iloc[i])
                     for i in range(position + 1, min(len(frame), position + 4))
                 ]
                 _campaign_recipient_start(owner, campaign_id, recipient_id)
                 started = time.perf_counter()
                 try:
-                    message, target_name = _build_message(row, group, sender, password, send_date, base_url)
+                    message, target_name, archived_statement = _build_message(
+                        row, group, sender, password, send_date, base_url
+                    )
                     smtp.send_message(message)
                     status['sent_count'] += 1
                     status['sent_names'].append(target_name)
                     _campaign_recipient_finish(
-                        owner, campaign_id, recipient_id, 'sent', '', time.perf_counter() - started
+                        owner, campaign_id, recipient_id, 'sent', '',
+                        time.perf_counter() - started,
+                        statement_html=archived_statement,
                     )
                 except Exception as exc:
-                    target_name = _recipient_name(row)
+                    target_name = progress_item(row)['name']
                     status['errors'].append(f'[{target_name}] {exc}')
                     status['failed_count'] += 1
                     _campaign_recipient_finish(
@@ -1271,6 +1635,7 @@ def bootstrap():
             history=history_page['items'],
             history_pagination={key: value for key, value in history_page.items() if key != 'items'},
             forms=forms,
+            excel_headers=list(COMMON_EXCEL_HEADERS),
         )
     finally:
         conn.close()
@@ -1399,6 +1764,10 @@ def create_asset():
     if not source_value:
         return _error('이미지 파일 또는 웹링크를 등록해주세요.')
     source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file-encrypted'
+    uploaded_filename = (
+        original_filename(data.get('original_filename'), '')
+        if source_type == 'file-encrypted' and data.get('original_filename') else ''
+    )
     stored_value = source_value if source_type == 'url' else _encrypt_password(source_value)
     conn = _db()
     try:
@@ -1411,9 +1780,10 @@ def create_asset():
             label = '광고 이미지' if kind == 'banner' else '회사 로고'
             return _error(f'{label}는 최대 {ASSET_LIMITS[kind]}개까지 등록할 수 있습니다.', 409)
         cursor = conn.execute('''
-            INSERT INTO payroll_image_assets (owner_emp_no, asset_kind, name, source_type, source_value)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (owner, kind, name, source_type, stored_value))
+            INSERT INTO payroll_image_assets (
+                owner_emp_no, asset_kind, name, original_filename, source_type, source_value
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (owner, kind, name, uploaded_filename, source_type, stored_value))
         conn.commit()
         asset = _owned(conn, 'payroll_image_assets', cursor.lastrowid)
         return _ok('이미지 보관함에 등록했습니다.', asset=_asset_dict(asset))
@@ -1443,12 +1813,17 @@ def update_asset(asset_id):
                 '광고 이미지' if current['asset_kind'] == 'banner' else '회사 로고',
             )
         source_type = 'url' if urlparse(source_value).scheme in ('http', 'https') else 'file-encrypted'
+        uploaded_filename = str(_mapping_value(current, 'original_filename', '') or '')
+        if source_type == 'url':
+            uploaded_filename = ''
+        elif data.get('original_filename'):
+            uploaded_filename = original_filename(data.get('original_filename'), '')
         stored_value = source_value if source_type == 'url' else _encrypt_password(source_value)
         conn.execute('''
             UPDATE payroll_image_assets
-            SET name=?, source_type=?, source_value=?, updated_at=CURRENT_TIMESTAMP
+            SET name=?, original_filename=?, source_type=?, source_value=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=? AND owner_emp_no=?
-        ''', (name, source_type, stored_value, asset_id, _owner_emp_no()))
+        ''', (name, uploaded_filename, source_type, stored_value, asset_id, _owner_emp_no()))
         conn.commit()
         return _ok('보관 이미지 정보를 수정했습니다.', asset=_asset_dict(_owned(conn, 'payroll_image_assets', asset_id)))
     except sqlite3.IntegrityError:
@@ -1639,6 +2014,26 @@ def test_sender(sender_id):
         conn.close()
 
 
+@payroll_bp.route('/api/templates/presets')
+@_login_required
+def template_presets():
+    template_root = os.path.join(current_app.root_path, 'templates')
+    presets = []
+    for key, preset in FORM_PRESETS.items():
+        source_path = os.path.join(template_root, *preset['filename'].split('/'))
+        with open(source_path, 'r', encoding='utf-8') as source_file:
+            source = source_file.read()
+        presets.append({
+            'key': key,
+            'name': preset['name'],
+            'description': preset['description'],
+            'layout_type': preset['layout_type'],
+            'body_html': source,
+            'detected_fields': _extract_form_fields(source),
+        })
+    return _ok(presets=presets, excel_headers=list(COMMON_EXCEL_HEADERS))
+
+
 @payroll_bp.route('/api/templates', methods=['POST'])
 @_mutating
 def create_template():
@@ -1646,10 +2041,16 @@ def create_template():
     name = _clean_text(data.get('name'), 120)
     description = _clean_text(data.get('description'), 500) or '사용자 추가 명세서 폼'
     match_keywords = _clean_match_keywords(data.get('match_keywords'))
+    layout_type = _clean_text(data.get('layout_type'), 30) or 'classic'
+    if layout_type not in FORM_PRESETS:
+        layout_type = 'classic'
     if not name:
         return _error('명세서 폼 이름을 입력해주세요.')
     try:
-        body_html = _safe_form_source(data.get('body_html'))
+        body_html = _safe_form_source(_apply_visual_text_edits(
+            data.get('body_html'), data.get('visual_text_edits')
+        ))
+        field_mappings = _clean_field_mappings(data.get('field_mappings'))
     except ValueError as exc:
         return _error(str(exc))
     conn = _db()
@@ -1658,9 +2059,13 @@ def create_template():
         cursor = conn.execute('''
             INSERT INTO payroll_mail_templates (
                 owner_emp_no, template_key, name, subject, description,
-                source_filename, match_keywords, body_html, is_system, is_active
-            ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 1)
-        ''', (_owner_emp_no(), template_key, name, description, description, match_keywords, body_html))
+                source_filename, match_keywords, field_mappings_json, layout_type,
+                body_html, is_system, is_active
+            ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 0, 1)
+        ''', (
+            _owner_emp_no(), template_key, name, description, description,
+            match_keywords, json.dumps(field_mappings, ensure_ascii=False), layout_type, body_html,
+        ))
         conn.commit()
         return _ok('명세서 HTML 폼이 저장되었습니다.', template=_template_dict(_owned(conn, 'payroll_mail_templates', cursor.lastrowid)))
     except sqlite3.IntegrityError:
@@ -1682,12 +2087,27 @@ def update_template(template_id):
         name = _clean_text(data.get('name', current['name']), 120)
         description = _clean_text(data.get('description', current['description'] or current['subject']), 500)
         match_keywords = _clean_match_keywords(data.get('match_keywords', current['match_keywords']))
-        body_html = _safe_form_source(data.get('body_html', current['body_html']))
+        field_mappings = _clean_field_mappings(
+            data.get('field_mappings', _mapping_value(current, 'field_mappings_json', '{}'))
+        )
+        layout_type = _clean_text(
+            data.get('layout_type', _mapping_value(current, 'layout_type', 'classic')), 30
+        ) or 'classic'
+        if layout_type not in FORM_PRESETS:
+            layout_type = 'classic'
+        body_html = _safe_form_source(_apply_visual_text_edits(
+            data.get('body_html', current['body_html']), data.get('visual_text_edits')
+        ))
         conn.execute('''
             UPDATE payroll_mail_templates
-            SET name=?, subject=?, description=?, match_keywords=?, body_html=?, updated_at=CURRENT_TIMESTAMP
+            SET name=?, subject=?, description=?, match_keywords=?, field_mappings_json=?,
+                layout_type=?, body_html=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=? AND owner_emp_no=?
-        ''', (name, description, description, match_keywords, body_html, template_id, _owner_emp_no()))
+        ''', (
+            name, description, description, match_keywords,
+            json.dumps(field_mappings, ensure_ascii=False), layout_type, body_html,
+            template_id, _owner_emp_no(),
+        ))
         conn.commit()
         return _ok('명세서 HTML 폼이 수정되었습니다.', template=_template_dict(_owned(conn, 'payroll_mail_templates', template_id)))
     except sqlite3.IntegrityError:
@@ -1729,7 +2149,9 @@ def preview_template():
     data = _json_data()
     conn = _db()
     try:
-        source = _safe_form_source(data.get('body_html'))
+        source = _safe_form_source(_apply_visual_text_edits(
+            data.get('body_html'), data.get('visual_text_edits')
+        ))
         owner = _owner_emp_no()
         banner1_id = _selected_asset_id(conn, owner, data.get('banner1_asset_id'), 'banner', '광고 배너 1')
         banner2_id = _selected_asset_id(conn, owner, data.get('banner2_asset_id'), 'banner', '광고 배너 2')
@@ -1741,14 +2163,41 @@ def preview_template():
                     SELECT source_type,source_value FROM payroll_image_assets WHERE id=? AND owner_emp_no=?
                 ''', (asset_id, owner)).fetchone()
                 selected[key] = _asset_plain_value(selected_row)
-        rendered = _render_form_source(
-            source,
-            send_date=_clean_text(data.get('send_date'), 20) or '2026-07-25',
-            logo_url=selected.get('logo_url') or request.host_url.rstrip('/') + '/static/logo01.jpg',
-            ad1_url=selected.get('ad1_url') or TRANSPARENT_PIXEL,
-            ad2_url=selected.get('ad2_url') or TRANSPARENT_PIXEL,
+        send_date = _clean_text(data.get('send_date'), 20) or '2026-07-25'
+        logo_url = selected.get('logo_url') or request.host_url.rstrip('/') + '/static/logo01.jpg'
+        ad1_url = selected.get('ad1_url') or TRANSPARENT_PIXEL
+        ad2_url = selected.get('ad2_url') or TRANSPARENT_PIXEL
+        field_mappings = _clean_field_mappings(data.get('field_mappings'))
+        if data.get('mapping_mode'):
+            rendered, detected_fields = _mapping_preview_html(
+                source,
+                send_date=send_date,
+                logo_url=logo_url,
+                ad1_url=ad1_url,
+                ad2_url=ad2_url,
+            )
+        else:
+            sample_row = _sample_row()
+            for field_key, excel_header in field_mappings.items():
+                sample_row[excel_header] = sample_row.get(field_key, '')
+            rendered = _render_form_source(
+                source,
+                row=_mapped_form_row(sample_row, {
+                    'field_mappings_json': json.dumps(field_mappings, ensure_ascii=False),
+                }),
+                send_date=send_date,
+                logo_url=logo_url,
+                ad1_url=ad1_url,
+                ad2_url=ad2_url,
+            )
+            detected_fields = _extract_form_fields(source, field_mappings)
+        return _ok(
+            '명세서 폼 미리보기를 만들었습니다.',
+            rendered_html=rendered,
+            edited_source=source,
+            detected_fields=detected_fields,
+            excel_headers=list(COMMON_EXCEL_HEADERS),
         )
-        return _ok('명세서 폼 미리보기를 만들었습니다.', rendered_html=rendered)
     except ValueError as exc:
         return _error(str(exc))
     finally:
@@ -1773,6 +2222,7 @@ def reset_template(template_id):
         conn.execute('''
             UPDATE payroll_mail_templates
             SET name=?, subject=?, description=?, match_keywords=?, body_html=?, source_filename=?,
+                field_mappings_json='{}', layout_type='classic',
                 is_active=1, updated_at=CURRENT_TIMESTAMP
             WHERE id=? AND owner_emp_no=?
         ''', (form['name'], form['description'], form['description'], form['match_keywords'], source, form['filename'], template_id, _owner_emp_no()))
@@ -1823,7 +2273,7 @@ def _resolve_forms(conn, group, frame):
 
 def _preflight(group, sender, frame, forms, form_errors=None):
     form_names = {key: form['name'] for key, form in forms.items()}
-    rows, errors = _inspect_rows(frame, form_names)
+    rows, errors = _inspect_rows(frame, forms)
     errors.extend(form_errors or [])
     warnings = []
     infos = []
@@ -1837,10 +2287,21 @@ def _preflight(group, sender, frame, forms, form_errors=None):
         for form_key, form in forms.items():
             matching = frame[frame[EXCEL_META_FORM] == form_key]
             sample_row = matching.iloc[0] if len(matching) else frame.iloc[0]
+            mapped_row = _mapped_form_row(sample_row, form)
+            missing_headers = [
+                excel_header
+                for excel_header in _form_mappings(form).values()
+                if _excel_column(frame.columns, excel_header) is None
+            ]
+            if missing_headers:
+                errors.append(
+                    f'{form["name"]}: 매칭한 엑셀 제목을 찾을 수 없습니다: '
+                    + ', '.join(dict.fromkeys(missing_headers))
+                )
             try:
                 _render_form_source(
                     form['body_html'],
-                    row=dict(sample_row),
+                    row=mapped_row,
                     logo_url=group.get('logo_value') or 'https://example.com/logo.jpg',
                     ad1_url=group.get('banner1_value') or TRANSPARENT_PIXEL,
                     ad2_url=group.get('banner2_value') or TRANSPARENT_PIXEL,
@@ -1944,7 +2405,7 @@ def start_send():
             group_row['subject'], ', '.join(frame.attrs.get('file_names', [])), len(frame),
         ))
         campaign_id = cursor.lastrowid
-        recipient_ids = _create_campaign_recipients(conn, owner, campaign_id, frame)
+        recipient_ids = _create_campaign_recipients(conn, owner, campaign_id, frame, forms)
         conn.commit()
         status.clear()
         status.update({
@@ -1965,9 +2426,18 @@ def start_send():
         app = current_app._get_current_object()
         base_url = request.host_url.rstrip('/').replace('http://', 'https://') if 'localhost' not in request.host_url and '127.0.0.1' not in request.host_url else request.host_url.rstrip('/')
         group_data = group
-        group_data['form_sources'] = {key: form['body_html'] for key, form in forms.items()}
+        group_data['form_definitions'] = {
+            key: {
+                'body_html': form['body_html'],
+                'field_mappings_json': _mapping_value(form, 'field_mappings_json', '{}'),
+            }
+            for key, form in forms.items()
+        }
         if group_row['form_type'] != AUTO_FORM_KEY and group_row['form_type'] in forms:
             group_data['form_source'] = forms[group_row['form_type']]['body_html']
+            group_data['form_mappings_json'] = _mapping_value(
+                forms[group_row['form_type']], 'field_mappings_json', '{}'
+            )
         threading.Thread(target=payroll_worker, args=(app, owner, campaign_id, frame, recipient_ids, send_date, interval, base_url, group_data, dict(sender_row)), daemon=True).start()
         return _ok('명세서 발송을 시작했습니다.', campaign_id=campaign_id)
     finally:
@@ -2012,7 +2482,11 @@ def history_detail(campaign_id):
             return _error('발송이력을 찾을 수 없습니다.', 404)
         campaign = _history_campaign_dict(campaign_row)
         recipient_rows = conn.execute('''
-            SELECT * FROM payroll_campaign_recipients
+            SELECT id, campaign_id, owner_emp_no, sheet_name, excel_row,
+                   recipient_type, school_name, recipient_name, email, status,
+                   error_message, started_at, finished_at, elapsed_seconds, created_at,
+                   CASE WHEN statement_html_zlib IS NOT NULL THEN 1 ELSE 0 END AS has_statement
+            FROM payroll_campaign_recipients
             WHERE campaign_id=? AND owner_emp_no=?
             ORDER BY id ASC
         ''', (campaign_id, _owner_emp_no())).fetchall()
@@ -2028,5 +2502,42 @@ def history_detail(campaign_id):
         campaign['recipient_counts'] = counts
         campaign['has_recipient_details'] = bool(recipients)
         return _ok(campaign=campaign, recipients=recipients)
+    finally:
+        conn.close()
+
+
+@payroll_bp.route('/api/history/<int:campaign_id>/recipients/<int:recipient_id>/statement')
+@_login_required
+def history_recipient_statement(campaign_id, recipient_id):
+    conn = _db()
+    try:
+        campaign = _campaign_for_history_access(conn, campaign_id)
+        if not campaign:
+            return _error('발송이력을 찾을 수 없거나 열람 권한이 없습니다.', 404)
+        recipient = conn.execute('''
+            SELECT id, campaign_id, recipient_name, email, status, statement_html_zlib
+            FROM payroll_campaign_recipients
+            WHERE id=? AND campaign_id=? AND owner_emp_no=?
+        ''', (recipient_id, campaign_id, campaign['owner_emp_no'])).fetchone()
+        if not recipient:
+            return _error('수신자 발송이력을 찾을 수 없습니다.', 404)
+        if recipient['status'] != 'sent' or recipient['statement_html_zlib'] is None:
+            return _error('이 발송 건에는 저장된 명세서 열람본이 없습니다.', 404)
+        try:
+            statement_html = _sanitize_html(
+                _decompress_statement_html(recipient['statement_html_zlib'])
+            )
+        except (ValueError, UnicodeDecodeError, zlib.error):
+            return _error('저장된 명세서 열람본을 불러오지 못했습니다.', 500)
+        response = _ok(statement={
+            'campaign_id': campaign_id,
+            'recipient_id': recipient_id,
+            'recipient_name': recipient['recipient_name'],
+            'email': recipient['email'],
+            'subject': campaign['subject'],
+            'html': statement_html,
+        })
+        response.headers['Cache-Control'] = 'no-store, private'
+        return response
     finally:
         conn.close()

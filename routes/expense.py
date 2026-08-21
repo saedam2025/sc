@@ -52,7 +52,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 MAIL_SETTINGS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mail_settings.json'))
 EXPENSE_TEMPLATE_PATH = str(
     APP_ROOT
-    / 'manuals'
+    / '-== 참고자료'
     / '지출결의서_기본양식.xlsx'
 )
 

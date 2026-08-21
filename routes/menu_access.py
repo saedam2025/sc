@@ -50,6 +50,7 @@ MENU_GROUPS = (
             ('ai_mail_main', '스마트 메일 발송', 'fa-wand-magic-sparkles', 14),
             ('excel_generator', '입금용 엑셀 생성기', 'fa-file-excel', 14),
             ('ebook_library', 'e리플렛', 'fa-book-open-reader', 14),
+            ('parent_notifications', '학부모알림전송', 'fa-bell', 7),
         ),
     },
     {
@@ -275,6 +276,14 @@ def resolve_request_menu(path, endpoint='', view_args=None):
     view_args = view_args or {}
     if path == '/':
         return 'main_home'
+    # 학부모 등록은 비회원 서비스이고, 강사 전용페이지는 자체 로그인·사번
+    # 검사를 수행하므로 관리자 메뉴 권한과 분리한다.
+    if path.startswith('/parent/register/') or path.startswith('/parent/api/') \
+            or path == '/parent/push-sw.js' \
+            or path.startswith('/parent-notifications/instructor/'):
+        return None
+    if path.startswith('/parent-notifications'):
+        return 'parent_notifications'
     if path.startswith('/admin'):
         return _admin_menu_key(path)
     if endpoint.startswith('user_mgmt.'):
@@ -312,6 +321,11 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return 'school_calendar'
     if path.startswith('/school'):
         return 'school_workspace'
+    # 발송 명세서 열람본은 라우트 내부에서 "발송자 본인 또는 스마트
+    # 명세서 메뉴 접근권한"을 확인한다. 메뉴가 나중에 제한되더라도
+    # 본인이 발송한 기록까지 일괄 차단하지 않도록 전역 검사와 분리한다.
+    if endpoint == 'payroll.history_recipient_statement':
+        return None
     if path.startswith('/payroll'):
         return 'payroll_main'
     if path.startswith('/ai-mail'):

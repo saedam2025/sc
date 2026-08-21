@@ -214,6 +214,22 @@ def read_decrypted(path: str | os.PathLike[str], max_bytes: int | None = None) -
     return b"".join(chunks)
 
 
+def encrypted_file_is_readable(path: str | os.PathLike[str]) -> bool:
+    """응답 스트리밍 전에 현재 키로 파일의 첫 청크를 열 수 있는지 확인한다."""
+    try:
+        iterator = iter_decrypted(path)
+        next(iterator, None)
+        iterator.close()
+        return True
+    except (OSError, ValueError):
+        return False
+    except Exception as exc:
+        # cryptography의 InvalidTag도 여기서 False로 바꿔 스트리밍 중 500을 막는다.
+        if exc.__class__.__name__ == 'InvalidTag':
+            return False
+        raise
+
+
 @contextmanager
 def temporary_decrypted_path(path: str | os.PathLike[str], display_name: object = "attachment"):
     """파일 경로가 필요한 외부 라이브러리용 자동 삭제 평문 임시파일."""

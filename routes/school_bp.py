@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, abort
+from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, abort, send_file
 from routes.database import get_db
 from routes.organization import classify_organization_group
 from routes.menu_access import center_director_mode_active, school_director_scope_enabled
@@ -9,8 +9,8 @@ import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
-from routes.secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
-from routes.storage import SCHOOL_UPLOADS
+from routes.secure_files import delete_file, encrypted_file_is_readable, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
+from routes.storage import APP_ROOT, SCHOOL_UPLOADS, UPLOADS_ROOT
 
 school_bp = Blueprint('school', __name__)
 
@@ -761,10 +761,17 @@ def serve_weblink_file(link_id):
     if not link or link['type'] != 'file' or not link['filepath']:
         return "파일을 찾을 수 없습니다.", 404
 
-    file_path = os.path.abspath(str(link['filepath']))
+    stored_name = os.path.basename(str(link['filepath'] or '').replace('\\', '/'))
+    file_path = os.path.join(str(UPLOADS_ROOT), stored_name) if stored_name else ''
     if not os.path.isfile(file_path):
         return "파일을 찾을 수 없습니다.", 404
-    return encrypted_response(file_path, link['filename'] or os.path.basename(file_path), as_attachment=False)
+    if not encrypted_file_is_readable(file_path):
+        safe_name = original_filename(link['filename'] or os.path.basename(file_path))
+        fallback = APP_ROOT / 'static' / safe_name
+        if fallback.is_file() and fallback.stat().st_size == plaintext_size(file_path):
+            return send_file(fallback, as_attachment=True, download_name=safe_name)
+        return "이 파일은 이전 암호화 키로 저장되어 복구할 수 없습니다. 파일을 삭제한 뒤 다시 등록해 주세요.", 409
+    return encrypted_response(file_path, link['filename'] or os.path.basename(file_path), as_attachment=True)
 
 
 @school_bp.route('/file/<stored_name>')
