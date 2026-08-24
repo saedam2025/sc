@@ -1,3 +1,11 @@
+self.addEventListener('install', event => {
+    event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', event => {
     let d={};
     try { d=event.data ? event.data.json() : {}; }
@@ -13,7 +21,8 @@ self.addEventListener('push', event => {
 });
 self.addEventListener('notificationclick', event => {
     event.notification.close();
-    const u=new URL(event.notification.data?.url||'/',self.location.origin).href;
+    const data=event.notification.data||{};
+    const u=new URL(data.url||'/',self.location.origin).href;
     event.waitUntil((async()=>{
         const ws=await self.clients.matchAll({type:'window',includeUncontrolled:true});
         for(const c of ws){ if(c.url===u && 'focus' in c) return c.focus(); }
