@@ -3,6 +3,7 @@ import os
 from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 from datetime import datetime, timezone, timedelta
 from .database import get_db
+from .points import deduct_deleted_post_points
 from .security import admin_required
 from .storage import BOARD_UPLOADS
 
@@ -298,6 +299,9 @@ def board_delete(board_en, post_id):
     user_level = session.get('user_level', 99)
     conn = get_db()
     post = conn.execute("SELECT author FROM board_posts WHERE id=?", (post_id,)).fetchone()
+    if not post:
+        conn.close()
+        return jsonify({"status": "error", "message": "게시물을 찾을 수 없습니다."}), 404
     if post['author'] != current_user and user_level > 3:
         conn.close()
         return jsonify({"status": "error", "message": "삭제 권한이 없습니다."}), 403
@@ -305,6 +309,8 @@ def board_delete(board_en, post_id):
     conn.execute("DELETE FROM board_posts WHERE id=?", (post_id,))
     conn.commit()
     conn.close()
+    if post['author'] == current_user:
+        deduct_deleted_post_points(current_user, f'generated-board:{board_en}', post_id)
     for f in files:
         delete_file(os.path.join(UPLOAD_FOLDER, f['saved_name']))
     return jsonify({"status": "success"})

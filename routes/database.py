@@ -893,7 +893,10 @@ def init_db():
         thumb_name TEXT NOT NULL,
         file_type TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        tab_id INTEGER DEFAULT 1
+        tab_id INTEGER DEFAULT 1,
+        original_name TEXT NOT NULL DEFAULT '',
+        uploaded_by TEXT NOT NULL DEFAULT '',
+        point_group TEXT NOT NULL DEFAULT ''
     )''')
 
     c.execute('''CREATE TABLE IF NOT EXISTS gallery_tabs (

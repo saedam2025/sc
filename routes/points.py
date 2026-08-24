@@ -133,6 +133,41 @@ def award_activity_points(
         conn.close()
 
 
+def deduct_deleted_post_points(user_name: str, source: str, post_id: int | str) -> int:
+    """본인이 삭제한 게시물의 포인트를 게시물별로 한 번만 차감한다."""
+    user_name = str(user_name or '').strip()
+    if not user_name:
+        return 0
+
+    conn = get_db()
+    try:
+        ensure_point_schema(conn)
+        conn.commit()
+        conn.execute('BEGIN IMMEDIATE')
+        current_balance = _balance(conn, user_name)
+        new_balance = current_balance - 5
+        conn.execute('''
+            INSERT INTO point_transactions
+                (event_key, user_name, points_delta, balance_after, activity_type,
+                 ranking_points, note)
+            VALUES (?, ?, -5, ?, 'post_delete', -5, '본인 게시물 삭제')
+        ''', (
+            f'post-delete:{source}:{post_id}:{user_name}',
+            user_name,
+            new_balance,
+        ))
+        conn.commit()
+        return new_balance
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return _balance(conn, user_name)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def award_response_activity(method: str, endpoint: str | None, user_name: str) -> int | None:
     rule = ACTIVITY_POINT_RULES.get((method.upper(), endpoint or ''))
     if not rule or not user_name:

@@ -6,6 +6,7 @@ import json
 import urllib.parse
 from .database import get_db
 from .board import init_board_db  # 💡 새로 추가: board.py에서 게시판 DB 초기화 함수 임포트
+from .points import deduct_deleted_post_points
 from .storage import APP_ROOT, UPLOADS_ROOT
 from .secure_files import delete_file, encrypted_file_is_readable, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
 
@@ -518,6 +519,8 @@ def delete_board(post_id):
     conn.execute("DELETE FROM board WHERE id=? AND author=?", (post_id, author))
     conn.commit()
     conn.close()
+    if row:
+        deduct_deleted_post_points(author, 'main-board', post_id)
     if row and row['filepath']:
         delete_file(row['filepath'])
     return jsonify({"status": "success"})

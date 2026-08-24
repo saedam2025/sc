@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify, current_app, abort, send_file
 from routes.database import get_db
+from routes.points import deduct_deleted_post_points
 from routes.organization import classify_organization_group
 from routes.menu_access import (
     SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS,
@@ -1406,6 +1407,8 @@ def delete_post(post_id):
     conn.execute('DELETE FROM school_posts WHERE id=?', (post_id,))
     conn.commit()
     conn.close()
+    if post['author'] == session.get('user_name'):
+        deduct_deleted_post_points(session.get('user_name'), 'school-post', post_id)
     _delete_references(post['filepath'])
     for row in comment_files:
         _delete_references(row['filepath'])
@@ -1442,6 +1445,7 @@ def delete_multi():
         return "공유 게시판 삭제 권한이 없습니다.", 403
 
     deleted_references = []
+    own_deleted_post_ids = []
     for post in posts_to_delete:
         if (
             is_shared_board(post['category'])
@@ -1454,11 +1458,15 @@ def delete_multi():
             ).fetchall()
             conn.execute("DELETE FROM school_post_comments WHERE post_id=?", (pid,))
             conn.execute("DELETE FROM school_posts WHERE id=?", (pid,))
+            if post['author'] == session.get('user_name'):
+                own_deleted_post_ids.append(pid)
             deleted_references.append(post['filepath'])
             for row in comment_files:
                 deleted_references.append(row['filepath'])
     conn.commit()
     conn.close()
+    for post_id in own_deleted_post_ids:
+        deduct_deleted_post_points(session.get('user_name'), 'school-post', post_id)
     for references in deleted_references:
         _delete_references(references)
     return redirect_to_school(school_id, category=category)

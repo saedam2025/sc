@@ -1,6 +1,7 @@
 from flask import Blueprint, abort, render_template, request, redirect, url_for, Response, jsonify, session
 from .database import get_db
 from .menu_access import center_director_mode_active
+from .points import deduct_deleted_post_points
 from .security import admin_required, load_credential_secret
 from .storage import GALL2_ROOT
 from cryptography.fernet import Fernet
@@ -717,7 +718,7 @@ def delete_post(post_id):
     page = request.args.get('page', 1, type=int)
     conn = get_db()
     post = conn.execute(
-        'SELECT id FROM gall2_posts WHERE id=? AND school_id IS NULL',
+        'SELECT id, author FROM gall2_posts WHERE id=? AND school_id IS NULL',
         (post_id,),
     ).fetchone()
     if not post:
@@ -726,6 +727,9 @@ def delete_post(post_id):
     delete_gallery_post(conn, post_id)
     conn.commit()
     conn.close()
+    current_user = session.get('user_name')
+    if post['author'] == current_user:
+        deduct_deleted_post_points(current_user, 'gall2-post', post_id)
     return redirect(url_for('gall2.index', page=page))
 
 @gall2_bp.route('/gall2/delete/<int:id>')
@@ -769,17 +773,21 @@ def delete_bulk():
         return jsonify({"status": "error", "message": "선택된 파일이 없습니다."})
 
     conn = get_db()
+    current_user = session.get('user_name')
+    own_deleted_post_ids = []
     for post_id in post_ids:
         try:
             post_id = int(post_id)
         except (TypeError, ValueError):
             continue
         global_post = conn.execute(
-            'SELECT id FROM gall2_posts WHERE id=? AND school_id IS NULL',
+            'SELECT id, author FROM gall2_posts WHERE id=? AND school_id IS NULL',
             (post_id,),
         ).fetchone()
         if global_post:
             delete_gallery_post(conn, post_id)
+            if global_post['author'] == current_user:
+                own_deleted_post_ids.append(post_id)
 
     for file_id in ids:
         try:
@@ -794,14 +802,22 @@ def delete_bulk():
         ''', (file_id,)).fetchone()
         if file:
             post_id = file['post_id']
+            post = conn.execute(
+                'SELECT author FROM gall2_posts WHERE id=? AND school_id IS NULL',
+                (post_id,),
+            ).fetchone()
             delete_gallery_file(file)
             conn.execute('DELETE FROM gall2 WHERE id = ?', (file_id,))
             if post_id:
                 remaining = conn.execute('SELECT COUNT(*) FROM gall2 WHERE post_id = ?', (post_id,)).fetchone()[0]
                 if remaining == 0:
                     conn.execute('DELETE FROM gall2_posts WHERE id = ?', (post_id,))
+                    if post and post['author'] == current_user:
+                        own_deleted_post_ids.append(post_id)
     conn.commit()
     conn.close()
+    for post_id in dict.fromkeys(own_deleted_post_ids):
+        deduct_deleted_post_points(current_user, 'gall2-post', post_id)
     return jsonify({"status": "success"})
 
 @gall2_bp.route('/gall2/raw/<filename>')

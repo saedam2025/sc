@@ -1,11 +1,13 @@
-from flask import Blueprint, render_template, request, redirect, url_for, Response, jsonify, abort
+from flask import Blueprint, render_template, request, redirect, url_for, Response, jsonify, abort, session
 from .database import get_db
+from .points import deduct_deleted_post_points
 from .security import admin_required, load_credential_secret
 from .storage import GALLERY_ROOT
 from cryptography.fernet import Fernet
 import base64
 import hashlib
 import os
+import uuid
 from io import BytesIO
 from PIL import Image
 from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_stream, encrypt_upload, is_encrypted_file, original_filename
@@ -26,7 +28,11 @@ def _ensure_gallery_schema(conn):
     columns = {row[1] for row in conn.execute('PRAGMA table_info(gallery)').fetchall()}
     if 'original_name' not in columns:
         conn.execute("ALTER TABLE gallery ADD COLUMN original_name TEXT NOT NULL DEFAULT ''")
-        conn.commit()
+    if 'uploaded_by' not in columns:
+        conn.execute("ALTER TABLE gallery ADD COLUMN uploaded_by TEXT NOT NULL DEFAULT ''")
+    if 'point_group' not in columns:
+        conn.execute("ALTER TABLE gallery ADD COLUMN point_group TEXT NOT NULL DEFAULT ''")
+    conn.commit()
 
 
 def generate_thumb_from_upload(file_storage, filename):
@@ -127,6 +133,8 @@ def upload():
         return redirect(request.url)
     
     title_base = request.form.get('title', '')
+    uploaded_by = session.get('user_name') or ''
+    point_group = uuid.uuid4().hex
 
     for file in files:
         if file and file.filename != '':
@@ -150,8 +158,15 @@ def upload():
                 conn = get_db()
                 try:
                     _ensure_gallery_schema(conn)
-                    conn.execute('INSERT INTO gallery (title, filename, thumb_name, file_type, tab_id, original_name) VALUES (?, ?, ?, ?, ?, ?)',
-                                 (title, filename, thumb_name, file_type, active_tab_id, display_name))
+                    conn.execute('''
+                        INSERT INTO gallery
+                            (title, filename, thumb_name, file_type, tab_id, original_name,
+                             uploaded_by, point_group)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        title, filename, thumb_name, file_type, active_tab_id, display_name,
+                        uploaded_by, point_group,
+                    ))
                     conn.commit()
                 finally:
                     conn.close()
@@ -171,6 +186,7 @@ def upload():
 def delete(id):
     active_tab_id = request.args.get('tab_id', 1, type=int)
     conn = get_db()
+    _ensure_gallery_schema(conn)
     file = conn.execute('SELECT * FROM gallery WHERE id = ?', (id,)).fetchone()
     
     if file:
@@ -186,6 +202,13 @@ def delete(id):
         conn.commit()
     
     conn.close()
+    current_user = session.get('user_name')
+    if file and file['uploaded_by'] and file['uploaded_by'] == current_user:
+        deduct_deleted_post_points(
+            current_user,
+            'legacy-gallery',
+            file['point_group'] or file['id'],
+        )
     return redirect(url_for('gallery.index', tab_id=active_tab_id))
 
 @gallery_bp.route('/gallery/raw/<filename>')
