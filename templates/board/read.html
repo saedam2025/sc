@@ -8,7 +8,11 @@
     .post-meta { display: flex; justify-content: space-between; font-size: 0.95rem; color: #64748b; }
     .meta-left span { margin-right: 15px; }
     
-    .post-content { min-height: 300px; font-size: 1.05rem; line-height: 1.7; color: #1e293b; white-space: pre-wrap; margin-bottom: 40px; }
+    .post-content { min-height: 300px; font-size: 1.05rem; line-height: 1.7; color: #1e293b; margin-bottom: 40px; }
+    .post-content-text { white-space: pre-wrap; }
+    .post-image-previews { width: 100%; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+    .post-image-preview-link { display: block; max-width: 100%; line-height: 0; }
+    .post-image-preview { display: block; width: auto; max-width: 100%; height: auto; object-fit: contain; border-radius: 8px; }
     
     .file-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 20px; margin-bottom: 30px; }
     .file-box-title { font-size: 0.9rem; font-weight: 700; color: #475569; margin-bottom: 10px; }
@@ -70,7 +74,18 @@
     </div>
     {% endif %}
 
-    <div class="post-content">{{ post.content }}</div>
+    <div class="post-content">
+        <div class="post-content-text">{{ post.content }}</div>
+        {% if image_files %}
+        <div class="post-image-previews">
+            {% for f in image_files %}
+                <a class="post-image-preview-link" href="{{ url_for('board.download_file', saved_name=f.saved_name, preview=1) }}" target="_blank" rel="noopener" title="{{ f.original_name }} 원본 보기">
+                    <img class="post-image-preview" src="{{ url_for('board.download_file', saved_name=f.saved_name, preview=1) }}" alt="{{ f.original_name }}" loading="lazy">
+                </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
 
 <div class="comment-section">
         <div class="comment-title"><i class="fa-regular fa-comments"></i> 댓글 {{ comments|length }}</div>
