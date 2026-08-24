@@ -12,7 +12,11 @@
         --blue-light: var(--primary-light, #eff6ff);
         --widget-border-color: var(--border-color, #d9e2ef);
         --hover-bg: var(--widget-hover, #f8fafc);
-        --new-widget-width: 240px; 
+        /* 상단 왼쪽 카드 끝과 하단 미니달력 구분선을 같은 열 경계로 맞춤 */
+        --dashboard-left-column-width: 311px;
+        --dashboard-right-column-width: 266px;
+        --dashboard-first-row-height: 280px;
+        --weekly-widget-inline-padding: 30px;
         --dashboard-card-shadow: 0 14px 34px rgba(0, 0, 0, 0.08);
         --dashboard-card-hover-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
         --dashboard-top-line: linear-gradient(90deg, var(--primary-color, #2563eb) 0%, #0f766e 52%, #d97706 100%);
@@ -32,8 +36,8 @@
 
     .ustra-grid {
         display: grid;
-        grid-template-columns: 0.9fr 1.5fr 1.1fr var(--new-widget-width); 
-        grid-template-rows: 280px 260px 320px; 
+        grid-template-columns: var(--dashboard-left-column-width) 1.5fr 1.1fr var(--dashboard-right-column-width); 
+        grid-template-rows: var(--dashboard-first-row-height) 260px 320px; 
         gap: 20px;
     }
 
@@ -239,6 +243,12 @@
     .holiday-day .fc-daygrid-day-number { color: #ef4444 !important; }
 
     .weather-weblink-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; margin-top: 5px; }
+    .weather-widget-card {
+        box-sizing: border-box;
+        height: var(--dashboard-first-row-height);
+        min-height: 0;
+        flex: 0 0 var(--dashboard-first-row-height);
+    }
     .weather-pill { background: var(--hover-bg); padding: 12px 6px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--widget-border-color); cursor: pointer; transition: all 0.2s ease; position: relative; }
     .weather-pill:hover { border-color: var(--blue-primary); background: var(--card-bg, #ffffff); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
     .weather-pill:hover .weblink-delete-btn { opacity: 1 !important; }
@@ -275,11 +285,18 @@
     .weekly-schedule-widget {
         position: relative;
         display: flex; gap: 30px; background: var(--dashboard-top-line) top left / 100% 4px no-repeat, var(--card-bg, #ffffff); background-origin: border-box; backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); border-radius: var(--card-radius); border: 1px solid var(--widget-border-color);
-        border-top: 4px solid transparent; padding: 24px 30px; min-height: 220px; overflow: hidden; transition: all 0.2s ease;
+        border-top: 4px solid transparent; padding: 24px var(--weekly-widget-inline-padding); min-height: 220px; overflow: hidden; transition: all 0.2s ease;
         box-shadow: var(--dashboard-card-shadow);
     }
     .weekly-schedule-widget:hover { border-color: var(--blue-primary); box-shadow: var(--dashboard-card-hover-shadow); }
-    .mini-cal-section { width: 250px; flex-shrink: 0; border-right: 1px solid var(--widget-border-color); padding-right: 30px; display: flex; flex-direction: column; }
+    .mini-cal-section {
+        width: calc(var(--dashboard-left-column-width) - (var(--weekly-widget-inline-padding) * 2) - 1px);
+        flex-shrink: 0;
+        border-right: 1px solid var(--widget-border-color);
+        padding-right: var(--weekly-widget-inline-padding);
+        display: flex;
+        flex-direction: column;
+    }
     
     #mini-calendar { font-size: 0.75rem; flex: 1; }
     #mini-calendar .fc-toolbar-title { font-size: 1rem !important; font-weight: 800; color: var(--text-main); }
@@ -590,7 +607,7 @@
         </div>
 
         <div style="grid-column: 4 / 5; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 20px;">
-            <div class="widget-card" style="flex: 0 0 auto; min-height: 200px;">
+            <div class="widget-card weather-widget-card">
                 <div class="widget-header">
                     <div class="cal-title-area">오늘의 날씨</div>
                     <div class="widget-icons"><i class="fa-solid fa-rotate-right" style="cursor:pointer;" onclick="alert('날씨 정보를 갱신합니다.')"></i></div>
