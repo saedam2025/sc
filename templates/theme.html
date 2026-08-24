@@ -566,7 +566,7 @@
         </form>
     </div>
 
-    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260810-3010"></script>
+    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260824-theme-number"></script>
     <script>
         // === 엔진 설정 ===
         // 🌟 다크모드(사이버)를 제외하고 5가지 밝은 UI 스타일만 순환 적용
@@ -990,7 +990,11 @@
         }
 
         function getThemeDisplayNumber(index) {
-            return generatedThemes[index] && generatedThemes[index].isDefault ? 0 : index;
+            const theme = generatedThemes[index];
+            if (window.SaedamThemeCatalog && typeof window.SaedamThemeCatalog.getThemeDisplayNumber === 'function') {
+                return window.SaedamThemeCatalog.getThemeDisplayNumber(theme, index);
+            }
+            return theme && theme.isDefault ? 0 : index;
         }
 
         function getThemeTotalCount() {
