@@ -9,6 +9,7 @@ from .storage import BOARD_UPLOADS
 board_bp = Blueprint('board', __name__, url_prefix='/board')
 
 UPLOAD_FOLDER = str(BOARD_UPLOADS)
+INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def init_board_db():
@@ -175,6 +176,10 @@ def board_read(board_en, post_id):
 
     post = conn.execute("SELECT * FROM board_posts WHERE id=?", (post_id,)).fetchone()
     files = conn.execute("SELECT * FROM board_files WHERE post_id=?", (post_id,)).fetchall()
+    image_files = [
+        file for file in files
+        if os.path.splitext(file['original_name'] or '')[1].lower() in INLINE_IMAGE_EXTENSIONS
+    ]
     all_comments = conn.execute("SELECT * FROM board_comments WHERE post_id=? ORDER BY created_at ASC", (post_id,)).fetchall()
     conn.close()
 
@@ -191,7 +196,10 @@ def board_read(board_en, post_id):
             if pid in replies_map: replies_map[pid].append(c)
             else: top_comments.append(c)
 
-    return render_template('board/read.html', board=config, post=post, files=files, comments=top_comments)
+    return render_template(
+        'board/read.html', board=config, post=post, files=files,
+        image_files=image_files, comments=top_comments
+    )
 
 @board_bp.route('/<board_en>/comment/<int:post_id>', methods=['POST'])
 def add_comment(board_en, post_id):
@@ -331,8 +339,12 @@ def download_file(saved_name):
     conn.close()
     if not file_info:
         abort(404)
+    show_inline = (
+        request.args.get('preview') == '1'
+        and os.path.splitext(file_info['original_name'] or '')[1].lower() in INLINE_IMAGE_EXTENSIONS
+    )
     return encrypted_response(
         os.path.join(UPLOAD_FOLDER, file_info['saved_name']),
         file_info['original_name'],
-        as_attachment=True,
+        as_attachment=not show_inline,
     )

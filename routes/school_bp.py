@@ -38,6 +38,7 @@ SCHOOL_CATEGORY_ALIASES = {
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
 FILENAME_ENCODING_PREFIX = '~e~'
+INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
 
 def is_shared_board(category):
     """모든 센터장 업무공간에서 같은 게시물을 표시하는 게시판인지 반환한다."""
@@ -946,8 +947,12 @@ def serve_school_file(stored_name):
                 if _stored_name_from_reference(reference) != safe_stored_name:
                     continue
                 display_name = _decode_filename(names[index]) if index < len(names) else safe_stored_name
+                show_inline = (
+                    request.args.get('preview') == '1'
+                    and os.path.splitext(display_name or '')[1].lower() in INLINE_IMAGE_EXTENSIONS
+                )
                 return encrypted_response(
-                    _stored_path_from_reference(reference), display_name, as_attachment=True
+                    _stored_path_from_reference(reference), display_name, as_attachment=not show_inline
                 )
     finally:
         conn.close()
