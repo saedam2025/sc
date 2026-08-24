@@ -61,6 +61,11 @@ EXPENSE_TEMPLATE_PATH = str(
     / '-== 참고자료'
     / '지출결의서_기본양식.xlsx'
 )
+CENTER_EXPENSE_TEMPLATE_PATH = str(
+    APP_ROOT
+    / '-== 참고자료'
+    / '지출결의서_센터장용_샘플양식.xlsx'
+)
 
 HEADER_ALIASES = {
     'expense_date': ['일자', '날짜', '사용일', '사용일자', '지출일', '지출일자', '거래일자', '집행일자'],
@@ -1156,8 +1161,110 @@ def _build_expense_template_workbook():
     return output
 
 
+def _build_center_expense_template_workbook():
+    """센터장용 5열 샘플 양식을 생성한다."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = '지출결의서'
+    sheet.sheet_view.showGridLines = False
+
+    navy, blue, blue_soft = '1F4E78', '5B9BD5', 'D9EAF7'
+    green_soft, yellow_soft = 'E2F0D9', 'FFF2CC'
+    slate, white, border_color = '334155', 'FFFFFF', 'D9D9D9'
+    thin = Side(style='thin', color=border_color)
+    cell_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    sheet.merge_cells('A1:E1')
+    sheet['A1'] = '지출결의서'
+    sheet['A1'].font = Font(name='맑은 고딕', size=20, bold=True, color=white)
+    sheet['A1'].fill = PatternFill('solid', fgColor=navy)
+    sheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+    sheet.merge_cells('A2:E2')
+    sheet['A2'] = '아래 입력란에 날짜·사용내역·사용출처·지출금액을 입력하고, 관련 영수증을 같은 순서로 첨부해 주세요.'
+    sheet['A2'].font = Font(name='맑은 고딕', size=10, color=navy)
+    sheet['A2'].fill = PatternFill('solid', fgColor=blue_soft)
+    sheet['A2'].alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    headers = ['날짜', '사용내역', '사용출처', '지출금액', '비고']
+    for column, value in enumerate(headers, start=1):
+        cell = sheet.cell(row=4, column=column, value=value)
+        cell.font = Font(name='맑은 고딕', size=10, bold=True, color=white)
+        cell.fill = PatternFill('solid', fgColor=blue)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = cell_border
+
+    for row in range(5, 25):
+        for column in range(1, 6):
+            cell = sheet.cell(row=row, column=column)
+            cell.font = Font(name='맑은 고딕', size=10, color=slate)
+            cell.border = cell_border
+            cell.alignment = Alignment(
+                horizontal='right' if column == 4 else ('center' if column == 1 else 'left'),
+                vertical='center',
+                wrap_text=column in {2, 3, 5},
+            )
+        sheet.cell(row=row, column=1).number_format = 'yyyy-mm-dd'
+        sheet.cell(row=row, column=4).number_format = '#,##0'
+
+    sample_values = [date(2026, 7, 15), '강사 출석부용 황파일 구입', '문구점', 5700, '']
+    for column, value in enumerate(sample_values, start=1):
+        sheet.cell(row=5, column=column, value=value)
+
+    sheet.merge_cells('A25:C25')
+    sheet['A25'] = '합계'
+    sheet['D25'] = '=SUM(D5:D24)'
+    for column in range(1, 6):
+        cell = sheet.cell(row=25, column=column)
+        cell.font = Font(name='맑은 고딕', size=10, bold=True, color='385723')
+        cell.fill = PatternFill('solid', fgColor=green_soft)
+        cell.border = cell_border
+        cell.alignment = Alignment(horizontal='right', vertical='center')
+    sheet['A25'].alignment = Alignment(horizontal='center', vertical='center')
+    sheet['D25'].number_format = '#,##0'
+
+    sheet.merge_cells('A27:E27')
+    sheet['A27'] = '※ 작성 안내: 날짜는 2026-07-29 형식, 지출금액은 숫자로 입력해 주세요. 행이 부족하면 입력 행의 서식을 복사해 추가할 수 있습니다.'
+    sheet['A27'].font = Font(name='맑은 고딕', size=9, color='9C6500')
+    sheet['A27'].fill = PatternFill('solid', fgColor=yellow_soft)
+    sheet['A27'].alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    for column, width in {'A': 14, 'B': 30, 'C': 24, 'D': 15, 'E': 24}.items():
+        sheet.column_dimensions[column].width = width
+    for row, height in {1: 34, 2: 32, 4: 25, 25: 24, 27: 32}.items():
+        sheet.row_dimensions[row].height = height
+    for row in range(5, 25):
+        sheet.row_dimensions[row].height = 22
+    sheet.print_area = 'A1:E27'
+    sheet.page_setup.orientation = 'landscape'
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.freeze_panes = 'A5'
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
+
+
 @expense_bp.route('/template')
 def expense_template():
+    channel = str(request.args.get('channel') or 'headquarters').strip().lower()
+    if channel == 'center':
+        if os.path.isfile(CENTER_EXPENSE_TEMPLATE_PATH):
+            return send_file(
+                CENTER_EXPENSE_TEMPLATE_PATH,
+                as_attachment=True,
+                download_name='지출결의서_센터장용_샘플양식.xlsx',
+            )
+        return send_file(
+            _build_center_expense_template_workbook(),
+            as_attachment=True,
+            download_name='지출결의서_센터장용_샘플양식.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
     if not os.path.isfile(EXPENSE_TEMPLATE_PATH):
         return send_file(
             _build_expense_template_workbook(),
