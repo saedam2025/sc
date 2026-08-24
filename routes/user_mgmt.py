@@ -21,6 +21,7 @@ from .organization import (
     classify_organization_group,
     normalize_department,
 )
+from .points import ensure_point_schema
 from .payroll import (
     _ensure_sender_schema,
     _payroll_sender_dict,
@@ -1237,13 +1238,23 @@ def delete_user():
 def get_user_list():
     conn = get_db()
     _ensure_hr_schema(conn)
+    ensure_point_schema(conn)
+    conn.commit()
     approved_only = request.args.get('approved_only') == '1'
-    query = "SELECT * FROM users"
+    query = '''
+        SELECT u.*, COALESCE(point_totals.balance, 0) AS point_balance
+        FROM users u
+        LEFT JOIN (
+            SELECT user_name, SUM(points_delta) AS balance
+            FROM point_transactions
+            GROUP BY user_name
+        ) point_totals ON point_totals.user_name=u.name
+    '''
     params = []
     if approved_only:
-        query += " WHERE status = ?"
+        query += " WHERE u.status = ?"
         params.append('승인')
-    query += " ORDER BY level ASC, id ASC"
+    query += " ORDER BY u.level ASC, u.id ASC"
     users = conn.execute(query, params).fetchall()
     conn.close()
     
@@ -1275,7 +1286,8 @@ def get_user_list():
             "가입신청일": u['applied_at'] if 'applied_at' in u.keys() and u['applied_at'] else '',
             "가입승인일": u['approved_at'] if 'approved_at' in u.keys() and u['approved_at'] else '',
             "입사일": u['join_date'] or '', "퇴사일": u['retire_date'] or '', 
-            "승인상태": u['status'] or '', "아이콘": icon, "profile_path": profile_path
+            "승인상태": u['status'] or '', "아이콘": icon, "profile_path": profile_path,
+            "포인트": int(u['point_balance'] or 0),
         })
     return jsonify(result)
 

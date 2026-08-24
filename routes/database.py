@@ -389,6 +389,23 @@ def init_db():
         rejection_reason TEXT DEFAULT '', rejected_at DATETIME
     )''')
 
+    c.execute('''CREATE TABLE IF NOT EXISTS point_transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_key TEXT NOT NULL UNIQUE,
+        user_name TEXT NOT NULL,
+        points_delta INTEGER NOT NULL,
+        balance_after INTEGER NOT NULL,
+        activity_type TEXT NOT NULL,
+        ranking_points INTEGER NOT NULL DEFAULT 0,
+        counterparty_name TEXT NOT NULL DEFAULT '',
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_point_transactions_user_date
+                 ON point_transactions(user_name, created_at)''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_point_transactions_ranking_date
+                 ON point_transactions(ranking_points, created_at)''')
+
     # 인사관리에서 직급명과 권한 레벨을 화면으로 관리한다.
     c.execute('''CREATE TABLE IF NOT EXISTS hr_positions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

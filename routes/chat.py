@@ -18,6 +18,7 @@ from .organization import (
     classify_messenger_organization_group,
     normalize_messenger_department,
 )
+from .points import get_point_balances
 from .socketio_ext import socketio
 from .storage import CHAT_UPLOADS, UPLOADS_ROOT
 from .secure_files import encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
@@ -1086,12 +1087,15 @@ def inject_chat_data():
     
     chat_partners = [{'name': p['partner'], 'unread': p['unread_count']} for p in partners_query if p['partner'] != current_user]
 
-    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
+    db_users = conn.execute("SELECT name, profile_icon, profile_path FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
     user_list = []
     user_icons = {}
+    user_profile_paths = {}
     for u in db_users:
         if u['name'] not in user_list: user_list.append(u['name'])
         user_icons[u['name']] = u['profile_icon'] if u['profile_icon'] else '👤'
+        if u['profile_path']:
+            user_profile_paths[u['name']] = u['profile_path']
         
     pinned_query = conn.execute("SELECT partner, pin_order FROM pinned_chats WHERE user_name=? ORDER BY pin_order ASC", (current_user,)).fetchall()
     pinned_chats = {p['partner']: p['pin_order'] for p in pinned_query}
@@ -1105,6 +1109,7 @@ def inject_chat_data():
         widget_chat_partners=chat_partners,
         chat_user_list=user_list,
         chat_user_icons=user_icons,
+        chat_user_profile_paths=user_profile_paths,
         widget_pinned_chats=pinned_chats
     )
 
@@ -1130,13 +1135,15 @@ def chat_organization():
 
     conn = get_db()
     users = conn.execute('''
-        SELECT emp_no, name, department, position, level, profile_icon
+        SELECT emp_no, name, department, position, level, profile_icon, profile_path
         FROM users
         WHERE status = '승인'
           AND LOWER(COALESCE(emp_no, '')) <> 'admin'
           AND LOWER(COALESCE(name, '')) <> 'admin'
         ORDER BY level ASC, id ASC
     ''').fetchall()
+    point_balances = get_point_balances(conn, [user['name'] or '' for user in users])
+    current_user_points = point_balances.get(str(session.get('user_name') or ''), 0)
     conn.close()
 
     return jsonify({
@@ -1153,9 +1160,12 @@ def chat_organization():
                     user['department'], user['position'], user['level']
                 ),
                 "icon": user['profile_icon'] or '👤',
+                "profile_path": user['profile_path'] or '',
+                "points": point_balances.get(user['name'] or '', 0),
             }
             for user in users
         ],
+        "current_user_points": current_user_points,
     })
 
 @chat_bp.route('/send_message', methods=['POST'])

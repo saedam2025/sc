@@ -303,15 +303,18 @@ def index():
             })
 
     # 7. 전체 회원 명단 및 프로필 아이콘 로드 (직급별, 가입순 정렬 적용)
-    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
+    db_users = conn.execute("SELECT name, profile_icon, profile_path FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
     
     user_list = []
     user_icons = {}
+    user_profile_paths = {}
     for u in db_users:
         name = u['name']
         if name not in user_list: # 순서를 유지하면서 중복 제거
             user_list.append(name)
         user_icons[name] = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
+        if u['profile_path']:
+            user_profile_paths[name] = u['profile_path']
         
     if current_user not in user_icons:
         user_icons[current_user] = '👤'
@@ -376,7 +379,8 @@ def index():
                             current_user=current_user, board_posts=board_posts, 
                             chat_partners=chat_partners,
                             received_messages=received_messages, sent_messages=sent_messages,
-                           user_list=user_list, user_icons=user_icons, my_memo=my_memo,
+                           user_list=user_list, user_icons=user_icons,
+                           user_profile_paths=user_profile_paths, my_memo=my_memo,
                            gallery_preview_items=gallery_preview_items,
                            gallery_total_count=gallery_total_count)
 
@@ -993,14 +997,17 @@ def inject_chat_data():
     chat_partners = [{'name': p['partner'], 'unread': p['unread_count']} for p in partners_query if p['partner'] != current_user]
 
     # 3. 전체 회원 명단 및 프로필 아이콘 (조직도 및 수신자 선택용)
-    db_users = conn.execute("SELECT name, profile_icon FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
+    db_users = conn.execute("SELECT name, profile_icon, profile_path FROM users WHERE status='승인' ORDER BY level ASC, id ASC").fetchall()
     user_list = []
     user_icons = {}
+    user_profile_paths = {}
     for u in db_users:
         name = u['name']
         if name not in user_list:
             user_list.append(name)
         user_icons[name] = u['profile_icon'] if 'profile_icon' in u.keys() and u['profile_icon'] else '👤'
+        if u['profile_path']:
+            user_profile_paths[name] = u['profile_path']
         
     conn.close()
 
@@ -1009,5 +1016,6 @@ def inject_chat_data():
         widget_sent_msgs=sent_messages,
         widget_chat_partners=chat_partners,
         chat_user_list=user_list,
-        chat_user_icons=user_icons
+        chat_user_icons=user_icons,
+        chat_user_profile_paths=user_profile_paths
     )
