@@ -725,7 +725,10 @@ def _form_mappings(form):
 
 
 def _mapped_form_row(row, form):
-    original = dict(row or {})
+    # pandas Series cannot be evaluated as truthy/falsy (``row or {}`` raises
+    # "The truth value of a Series is ambiguous").  Excel preflight passes a
+    # Series here, so convert the mapping directly and only special-case None.
+    original = {} if row is None else dict(row)
     mapped = dict(original)
     for field_key, excel_header in _form_mappings(form).items():
         source_column = _excel_column(original.keys(), excel_header)
