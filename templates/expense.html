@@ -315,7 +315,7 @@
             </label>
             <div class="bulk-toolbar">
                 <button class="bulk-btn bulk-email-btn" type="button" onclick="openSelectedEmailModal()"><i class="fa-solid fa-envelope"></i> 선택 이메일 전송</button>
-                {% if can_see_all %}
+                {% if can_manage_expenses %}
                 <button class="bulk-btn" type="button" onclick="deleteSelectedReports()"><i class="fa-solid fa-trash-can"></i> 선택삭제</button>
                 {% endif %}
             </div>
@@ -371,15 +371,15 @@
                         <td>
                             <div class="row-actions">
                                 <button class="icon-btn" type="button" onclick="openExpenseDetail({{ report.id }})" title="상세보기"><i class="fa-solid fa-list-ul"></i></button>
-                                {% if can_see_all and report.doc_status != '완료' %}
+                                {% if can_manage_expenses and report.doc_status != '완료' %}
                                 <button class="icon-btn pay-btn" type="button" onclick="markApproved({{ report.id }}, this)" title="결재완료"><i class="fa-solid fa-stamp"></i> 결재</button>
                                 {% endif %}
-                                {% if can_see_all and report.doc_status not in ['완료', '반려'] %}
+                                {% if can_manage_expenses and report.doc_status not in ['완료', '반려'] %}
                                 <button class="icon-btn reject-btn" type="button" onclick="markRejected({{ report.id }})" title="반려"><i class="fa-solid fa-ban"></i> 반려</button>
                                 {% endif %}
-                                {% if can_see_all and report.payment_status == '지급대기' %}
+                                {% if can_manage_expenses and report.payment_status == '지급대기' %}
                                 <button class="icon-btn pay-btn" type="button" onclick="markPaid({{ report.id }}, this)" title="지급완료"><i class="fa-solid fa-check"></i> 지급완료</button>
-                                {% elif can_see_all and report.payment_status == '지급완료' %}
+                                {% elif can_manage_expenses and report.payment_status == '지급완료' %}
                                 <button class="icon-btn waiting-btn" type="button" onclick="markWaiting({{ report.id }})" title="지급대기"><i class="fa-solid fa-rotate-left"></i></button>
                                 {% endif %}
                             </div>
