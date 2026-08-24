@@ -8,7 +8,8 @@
             {% for u in chat_user_list %}
             <div class="org-status-item" onclick="document.getElementById('orgChartModal').style.display='none'; openMsgModalWithReceiver('{{ u }}')">
                 <div class="org-avatar">
-                    {{ chat_user_icons.get(u, '👤') }}
+                    {% set profile_path = (chat_user_profile_paths | default({})).get(u) %}
+                    {% if profile_path %}<img class="chat-profile-image" src="{{ profile_path | e }}" alt="{{ u | e }} 프로필">{% else %}{{ chat_user_icons.get(u, '👤') }}{% endif %}
                     <div data-user="{{ u }}" class="org-status-dot status-offline"></div>
                 </div>
                 <div class="org-info">
@@ -41,7 +42,8 @@
                 <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
                     
                     <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
-                        {{ chat_user_icons.get(msg.sender, '👤') }}
+                        {% set sender_profile_path = (chat_user_profile_paths | default({})).get(msg.sender) %}
+                        {% if sender_profile_path %}<img class="chat-profile-image" src="{{ sender_profile_path | e }}" alt="{{ msg.sender | e }} 프로필">{% else %}{{ chat_user_icons.get(msg.sender, '👤') }}{% endif %}
                         <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
                     </div>
 
