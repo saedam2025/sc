@@ -81,6 +81,23 @@
         .chat-message-row { display:flex; align-items:flex-end; }
         .chat-message-row.me { justify-content:flex-end; }
         .chat-message-row.other { justify-content:flex-start; gap:10px; }
+        .chat-message-avatar,
+        .chat-header-avatar {
+            flex:0 0 auto;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            overflow:hidden;
+            background:transparent;
+            border:0;
+            box-shadow:none;
+        }
+        .chat-message-avatar { width:38px; height:38px; margin-top:5px; border-radius:10px; font-size:2rem; line-height:1; }
+        .chat-header-avatar { width:32px; height:32px; border-radius:9px; font-size:1.5rem; line-height:1; }
+        .chat-message-avatar img,
+        .chat-header-avatar img { width:100%; height:100%; display:block; object-fit:contain; background:transparent; border-radius:inherit; }
+        .chat-message-avatar .profile-emoji,
+        .chat-header-avatar .profile-emoji { display:inline-block; line-height:1; background:transparent; }
         .chat-bubble-wrap { position:relative; display:flex; flex-direction:column; align-items:flex-start; max-width:250px; }
         .chat-message-row.me .chat-bubble-wrap { align-items:flex-end; }
         .chat-bubble { color:#1e293b; padding:8px 12px; border-radius:12px; max-width:250px; word-break:break-word; box-shadow:0 1px 2px rgba(0,0,0,0.05); font-size: 14px; }
@@ -153,7 +170,7 @@
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; position:relative;">
         <h3 style="color: var(--text-dark); margin: 0; font-weight:800; display:flex; align-items:center; gap:8px; max-width: 75%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            <span id="chatPartnerIcon" style="font-size:1.5rem; flex-shrink: 0;">👤</span> 
+            <span id="chatPartnerIcon" class="chat-header-avatar">👤</span> 
             <span id="headerTitleText" style="overflow: hidden; text-overflow: ellipsis;" title="{{ partner }}">{{ partner }}님과의 대화</span>
         </h3>
         
@@ -263,6 +280,8 @@
     <script>
         const partnerName = {{ partner | tojson }};
         const currentUser = {{ current_user | tojson }};
+        const chatUserIcons = {{ chat_user_icons | default({}) | tojson }};
+        const chatUserProfilePaths = {{ chat_user_profile_paths | default({}) | tojson }};
         const isGroupChat = partnerName.includes(','); 
         const CHAT_MAX_FILE_BYTES = 10 * 1024 * 1024;
         let roomInfo = {
@@ -300,6 +319,16 @@
             return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
                 return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
             });
+        }
+
+        function profileAvatarContent(userName, groupAvatar = false) {
+            if (groupAvatar) return '<span class="profile-emoji" aria-hidden="true">👥</span>';
+            const name = String(userName || '');
+            const profilePath = String(chatUserProfilePaths[name] || '').trim();
+            if (profilePath.startsWith('/user/profile_img/')) {
+                return `<img src="${escapeHtml(profilePath)}" alt="${escapeHtml(name)} 프로필">`;
+            }
+            return `<span class="profile-emoji" aria-hidden="true">${escapeHtml(chatUserIcons[name] || '👤')}</span>`;
         }
 
         function reactionText(key) {
@@ -458,13 +487,13 @@
             const inviteMenu = document.getElementById('inviteMemberMenuItem');
             const muteMenu = document.getElementById('chatMuteMenuItem');
             if (roomInfo.is_group) {
-                document.getElementById('chatPartnerIcon').innerText = '👥';
+                document.getElementById('chatPartnerIcon').innerHTML = profileAvatarContent('', true);
                 title.innerText = `${roomInfo.display_name || '그룹채팅'} (${roomInfo.member_count || (roomInfo.members || []).length}명)`;
                 title.title = roomInfo.display_name || '그룹채팅';
                 groupMenu.style.display = 'block';
                 inviteMenu.style.display = roomInfo.is_admin ? 'block' : 'none';
             } else {
-                document.getElementById('chatPartnerIcon').innerText = '👤';
+                document.getElementById('chatPartnerIcon').innerHTML = profileAvatarContent(partnerName === currentUser ? currentUser : partnerName);
                 title.innerText = partnerName === currentUser ? '나와의 채팅방' : `${roomInfo.display_name || partnerName}님과의 대화`;
                 groupMenu.style.display = 'none';
                 inviteMenu.style.display = 'block';
@@ -593,7 +622,7 @@
                 const controls = roomInfo.is_admin && name !== currentUser
                     ? `<button type="button" class="chat-mini-btn" onclick="makeGroupAdmin('${encodedName}')">관리자 지정</button><button type="button" class="chat-mini-btn" style="color:#dc2626;" onclick="removeGroupMember('${encodedName}')">내보내기</button>`
                     : '';
-                return `<div class="chat-settings-member"><span>👤</span><span class="chat-settings-member-name">${escapeHtml(name)}</span>${adminBadge}${controls}</div>`;
+                return `<div class="chat-settings-member"><span class="chat-header-avatar">${profileAvatarContent(name)}</span><span class="chat-settings-member-name">${escapeHtml(name)}</span>${adminBadge}${controls}</div>`;
             }).join('');
         }
 
@@ -941,7 +970,7 @@
                 } else {
                     msgDiv.innerHTML = `
                         <div class="chat-message-row other">
-                            <div style="font-size:2.2rem;margin-top:5px;">👤</div>
+                            <div class="chat-message-avatar">${profileAvatarContent(c.sender)}</div>
                             <div style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;">
                                 <div style="font-size:0.85rem;color:#64748b;margin-bottom:3px;font-weight:bold;">${escapeHtml(c.sender)}</div>
                                 <div style="display:flex;align-items:flex-end;">

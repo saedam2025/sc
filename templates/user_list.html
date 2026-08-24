@@ -346,7 +346,13 @@
     </div>
 
     <div class="mgmt-card">
-        <h3 style="margin-bottom: 20px;"><i class="fa-solid fa-address-book" style="color: #2b8a3e;"></i> 전체 구성원 인사 명단</h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px;">
+            <h3 style="margin:0;"><i class="fa-solid fa-address-book" style="color: #2b8a3e;"></i> 전체 구성원 인사 명단</h3>
+            <label style="position:relative; width:min(320px, 42%);">
+                <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
+                <input id="memberSearchInput" class="glass-input" type="search" placeholder="이름·사번·소속·직급 검색" oninput="filterMemberList()" style="margin:0; padding-left:38px;">
+            </label>
+        </div>
         <div class="table-container">
             <table class="approve-table">
                 <thead>
@@ -355,6 +361,7 @@
                         <th style="width:90px;">사번</th>
                         <th style="width:70px;">프로필</th>
                         <th style="width:80px;">성명</th>
+                        <th style="width:85px;">포인트</th>
                         <th style="width:130px;">주민번호</th>
                         <th style="width:100px;">소속부서</th>
                         <th style="width:110px;">별도 소속</th>
@@ -643,6 +650,7 @@ async function loadAllUsers() {
                     <td class="td-center" style="color:#4a90e2;">${u.사번 || '-'}</td>
                     <td style="vertical-align: middle;">${displayProfile}</td>
                     <td class="td-center">${u.이름}</td>
+                    <td class="td-center"><strong style="color:var(--primary-color); white-space:nowrap;">P${Number(u.포인트 || 0).toLocaleString()}점</strong></td>
                     <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
                     <td class="td-center">${u.소속||'-'}</td>
                     <td class="td-center">${u.별도소속||'-'}</td>
@@ -661,7 +669,18 @@ async function loadAllUsers() {
                 </tr>`;
             }
         });
+        filterMemberList();
     } catch(e) {}
+}
+
+function filterMemberList() {
+    const input = document.getElementById('memberSearchInput');
+    const body = document.getElementById('member-list-body');
+    if (!input || !body) return;
+    const keyword = input.value.trim().toLocaleLowerCase('ko-KR');
+    body.querySelectorAll('tr').forEach(row => {
+        row.style.display = !keyword || row.textContent.toLocaleLowerCase('ko-KR').includes(keyword) ? '' : 'none';
+    });
 }
 
 async function setupAdmin() {

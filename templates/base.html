@@ -781,6 +781,17 @@
             border: 1px solid var(--card-border, var(--border-color));
         }
         .user-profile:hover { background: var(--widget-hover, #f8fafc); border-color: var(--primary-color); }
+        .user-point-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: color-mix(in srgb, var(--primary-color) 12%, #ffffff);
+            color: var(--primary-color);
+            font-size: 0.7rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
         
         .btn-logout { 
             font-size: 1.1rem; 
@@ -1025,6 +1036,7 @@
                             {{ session.get('profile_icon', '👤') }}
                         </div>
                         <span id="nav-user-name">{{ session.get('name', session.get('user_name')) }}</span>
+                        <span class="user-point-badge js-current-user-points" title="내 보유 포인트">P0점</span>
                     </div>
                     <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
                         <i class="fa-solid fa-right-from-bracket"></i>
@@ -1078,7 +1090,22 @@
             '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
         ];
 
+        window.refreshCurrentPoints = async function() {
+            try {
+                const response = await fetch('/api/points/me', {headers: {'Accept': 'application/json'}});
+                if (!response.ok) return;
+                const result = await response.json();
+                if (result.status !== 'success') return;
+                document.querySelectorAll('.js-current-user-points').forEach(element => {
+                    element.textContent = `P${Number(result.balance || 0).toLocaleString()}점`;
+                    element.title = `내 보유 포인트 · 오늘 ${Number(result.today_points || 0).toLocaleString()}점 획득`;
+                });
+            } catch (error) {}
+        };
+
         window.addEventListener('DOMContentLoaded', async () => {
+    window.refreshCurrentPoints();
+    window.setInterval(window.refreshCurrentPoints, 60000);
     try {
         const res = await fetch('/user/my_info');
         if (!res.ok) return;

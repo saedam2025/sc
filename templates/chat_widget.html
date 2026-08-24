@@ -85,6 +85,13 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         background: #f3f4f6;
         font-size: .85rem;
     }
+    .chat-profile-image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+        border-radius: inherit;
+    }
     #orgChartModal .org-status-dot,
     #unreadMsgModal .org-status-dot {
         position: absolute;
@@ -108,6 +115,19 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     #unreadMsgModal .org-name { color: var(--text-main, #0f172a); font-size: .8rem; font-weight: 700; }
     #orgChartModal .org-dept,
     #unreadMsgModal .org-dept { color: var(--text-muted, #94a3b8); font-size: .65rem; font-weight: 500; }
+    #orgChartModal .org-point-balance { color: var(--primary-color, #2563eb); font-size: .68rem; font-weight: 900; white-space: nowrap; }
+    #orgChartModal .org-point-gift-button {
+        flex: 0 0 auto;
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid color-mix(in srgb, var(--primary-color, #2563eb) 30%, #ffffff);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--primary-color, #2563eb) 8%, #ffffff);
+        color: var(--primary-color, #2563eb);
+        cursor: pointer;
+    }
+    #orgChartModal .org-point-gift-button:hover { filter: brightness(.94); transform: translateY(-1px); }
     #orgChartModal .tree-toggle-icon { transition: transform .2s ease; }
     #orgChartModal .tree-toggle-icon.expanded { transform: rotate(90deg); }
 
@@ -186,6 +206,20 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     </div>
 </div>
 
+<div id="pointGiftModal" class="modal" style="display:none; position:fixed; z-index:2060; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.35); backdrop-filter:blur(3px);">
+    <div class="modal-content" style="margin:10% auto; padding:30px; width:360px; position:relative;">
+        <span onclick="closePointGiftModal()" style="position:absolute; right:20px; top:18px; cursor:pointer; font-size:24px; color:var(--text-muted);">&times;</span>
+        <h3 style="margin:0 0 8px; color:var(--text-main);"><i class="fa-solid fa-gift" style="color:var(--blue-primary); margin-right:8px;"></i>포인트 선물</h3>
+        <p style="margin:0 0 18px; color:var(--text-muted); font-size:.82rem;">보유 포인트 안에서 구성원에게 선물할 수 있습니다.</p>
+        <div style="display:flex; justify-content:space-between; padding:12px; margin-bottom:12px; border-radius:9px; background:var(--hover-bg); border:1px solid var(--widget-border-color);">
+            <span id="pointGiftRecipient" style="font-weight:800; color:var(--text-main);"></span>
+            <span id="pointGiftBalance" style="font-weight:900; color:var(--blue-primary);"></span>
+        </div>
+        <input id="pointGiftAmount" class="modal-input" type="number" min="1" step="1" placeholder="선물할 포인트">
+        <button id="pointGiftSubmitButton" type="button" class="btn-primary" style="width:100%; padding:13px;" onclick="submitPointGift()"><i class="fa-solid fa-gift"></i> 선물하기</button>
+    </div>
+</div>
+
 <div id="msgModal" class="modal" style="display:none; position:fixed; z-index:2050; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter: blur(3px);">
     <div class="modal-content" style="margin:10% auto; padding:30px; width:400px; position:relative;">
         <span onclick="document.getElementById('msgModal').style.display='none'" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:24px; color: var(--text-muted);">&times;</span>
@@ -236,9 +270,10 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             {% for msg in received_messages %}
                 {% if (msg.is_read|string|lower) not in ['1', 'true'] %}
                 {% set r_id = msg['room_id'] if 'room_id' in msg.keys() and msg['room_id'] else '' %}
+                {% set sender_profile_path = (chat_user_profile_paths | default({})).get(msg.sender) %}
                 <div class="org-status-item unread-msg-item" onclick="document.getElementById('unreadMsgModal').style.display='none'; openChat('{{ r_id if r_id else msg.sender }}')" style="padding: 10px 12px; margin-bottom: 6px;">
                     <div class="org-avatar" style="width: 36px; height: 36px; font-size: 1.1rem; flex-shrink: 0;">
-                        {{ '👥' if r_id else user_icons.get(msg.sender, '👤') }}
+                        {% if r_id %}👥{% elif sender_profile_path %}<img class="chat-profile-image" src="{{ sender_profile_path | e }}" alt="{{ msg.sender | e }} 프로필">{% else %}{{ chat_user_icons.get(msg.sender, '👤') }}{% endif %}
                         <div class="org-status-dot" style="background: #ef4444; border: 2px solid #fff;"></div>
                     </div>
                     <div class="org-info" style="display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
@@ -263,11 +298,75 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     let chatUnreadDetails = null;
     let chatRoomsFromApi = null;
     let chatWidgetSocket = null;
+    let chatCurrentPointBalance = 0;
 
     function chatEscapeHtml(value) {
         const temp = document.createElement('span');
         temp.textContent = String(value ?? '');
         return temp.innerHTML;
+    }
+
+    function chatEscapeAttribute(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
+    function openPointGiftModal(event, button) {
+        event.stopPropagation();
+        if (chatCurrentPointBalance <= 0) {
+            alert('선물할 수 있는 보유 포인트가 없습니다.');
+            return;
+        }
+        const recipient = button.dataset.recipient || '';
+        const modal = document.getElementById('pointGiftModal');
+        const amountInput = document.getElementById('pointGiftAmount');
+        modal.dataset.recipient = recipient;
+        document.getElementById('pointGiftRecipient').textContent = `${recipient}님에게`;
+        document.getElementById('pointGiftBalance').textContent = `보유 P${chatCurrentPointBalance.toLocaleString()}점`;
+        amountInput.value = '';
+        amountInput.max = String(chatCurrentPointBalance);
+        modal.style.display = 'block';
+        amountInput.focus();
+    }
+
+    function closePointGiftModal() {
+        document.getElementById('pointGiftModal').style.display = 'none';
+    }
+
+    function openOrgChatFromElement(element) {
+        document.getElementById('orgChartModal').style.display = 'none';
+        openChat(element.dataset.user || '');
+    }
+
+    async function submitPointGift() {
+        const modal = document.getElementById('pointGiftModal');
+        const recipient = modal.dataset.recipient || '';
+        const amount = Number(document.getElementById('pointGiftAmount').value || 0);
+        if (!Number.isInteger(amount) || amount <= 0) return alert('선물할 포인트를 올바르게 입력해 주세요.');
+        if (amount > chatCurrentPointBalance) return alert(`보유 포인트 ${chatCurrentPointBalance.toLocaleString()}점을 초과할 수 없습니다.`);
+
+        const button = document.getElementById('pointGiftSubmitButton');
+        button.disabled = true;
+        try {
+            const response = await fetch('/api/points/gift', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+                body: JSON.stringify({recipient, amount})
+            });
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success') throw new Error(result.message || '포인트를 선물하지 못했습니다.');
+            chatCurrentPointBalance = Number(result.balance || 0);
+            alert(result.message);
+            closePointGiftModal();
+            await loadOrgChart();
+            if (window.refreshCurrentPoints) window.refreshCurrentPoints();
+            if (typeof loadPointRanking === 'function') loadPointRanking();
+        } catch (error) {
+            alert(error.message);
+        } finally {
+            button.disabled = false;
+        }
     }
 
     function parseChatTime(dateValue) {
@@ -281,6 +380,13 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         if (a.is_pinned && b.is_pinned) return Number(a.pin_order || 0) - Number(b.pin_order || 0);
         return parseChatTime(b.date) - parseChatTime(a.date);
     }
+    function chatAvatarMarkup(profilePath, fallbackIcon, altText) {
+        const safePath = String(profilePath || '').trim();
+        if (safePath.startsWith('/user/profile_img/')) {
+            return `<img class="chat-profile-image" src="${chatEscapeAttribute(safePath)}" alt="${chatEscapeAttribute(altText || '')} 프로필">`;
+        }
+        return chatEscapeHtml(fallbackIcon || '👤');
+    }
     // 🚀 채팅방 목록 렌더링 함수 (확장 모달과 위젯 모두 렌더링 반영)
     function renderChatList() {
         const chatListDiv = document.getElementById('list-chats');
@@ -288,6 +394,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         if(!chatListDiv) return;
         
         const userIcons = { {% for u in chat_user_list %}"{{ u }}": "{{ chat_user_icons.get(u, '👤') }}",{% endfor %} };
+        const userProfilePaths = {{ chat_user_profile_paths | default({}) | tojson }};
         
         const allMsgs = [
             {% for msg in widget_recv_msgs %}
@@ -337,7 +444,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             let pinnedRankCounter = 0;
             chatArr.forEach(c => {
                 const dateStr = c.date ? c.date.substring(5, 16) : '';
-                let avatar = userIcons[c.partner] || '👤';
+                let avatar = chatAvatarMarkup(userProfilePaths[c.partner], userIcons[c.partner] || '👤', c.partner);
                 let displayName = c.partner;
                 const pinnedRank = c.is_pinned ? ++pinnedRankCounter : 0;
                 
@@ -619,6 +726,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             if(!res.ok) throw new Error('조직도 데이터를 불러오지 못했습니다.');
             const data = await res.json();
             const users = Array.isArray(data.users) ? data.users : [];
+            chatCurrentPointBalance = Number(data.current_user_points || 0);
             
             const filteredUsers = users.filter(u => (u.name || '').toLowerCase() !== 'admin' && (u.emp_no || '').toLowerCase() !== 'admin');
             filteredUsers.sort((a, b) => (parseInt(a.level) || 999) - (parseInt(b.level) || 999));
@@ -663,20 +771,26 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                     const dept = u.department || '소속미지정';
                     const pos = u.position || '직급미지정';
                     const icon = u.icon || '👤';
+                    const pointBalance = Number(u.points || 0);
+                    const canGift = name !== chatWidgetCurrentUser;
                     
                     html += `
                     <div class="org-status-item" style="margin-top:2px; display:flex; align-items:center;">
                         <input type="checkbox" class="org-member-checkbox" value="${name}" data-group="${groupId}" onclick="event.stopPropagation(); syncGroupCheckbox('${groupId}')" style="margin-right:10px; cursor:pointer; width:16px; height:16px; accent-color:var(--blue-primary);">
-                        <div style="flex:1; display:flex; align-items:center; cursor:pointer;" onclick="document.getElementById('orgChartModal').style.display='none'; openChat('${name}')">
+                        <div data-user="${chatEscapeAttribute(name)}" style="flex:1; display:flex; align-items:center; cursor:pointer;" onclick="openOrgChatFromElement(this)">
                             <div class="org-avatar">
-                                ${icon}
+                                ${chatAvatarMarkup(u.profile_path, icon, name)}
                                 <div data-user="${name}" class="org-status-dot status-offline"></div>
                             </div>
-                            <div class="org-info" style="display: flex; align-items: baseline; gap: 8px;">
-                                <div class="org-name" style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin:0;">${name}</div>
-                                <div class="org-dept" style="font-size: 0.7rem; color: #9ca3af; font-weight: 500; margin:0;">${dept} / ${pos}</div>
+                            <div class="org-info" style="display:flex; flex-direction:column; justify-content:center; gap:2px;">
+                                <div style="display:flex; align-items:center; gap:7px; min-width:0;">
+                                    <div class="org-name" style="font-size:0.85rem; font-weight:700; color:var(--text-main); margin:0;">${chatEscapeHtml(name)}</div>
+                                    <div class="org-point-balance">P${pointBalance.toLocaleString()}</div>
+                                </div>
+                                <div class="org-dept" style="font-size:0.7rem; color:#9ca3af; font-weight:500; margin:0;">${chatEscapeHtml(dept)} / ${chatEscapeHtml(pos)}</div>
                             </div>
                         </div>
+                        ${canGift ? `<button type="button" class="org-point-gift-button" data-recipient="${chatEscapeAttribute(name)}" onclick="openPointGiftModal(event, this)" title="${chatEscapeAttribute(name)}님에게 포인트 선물"><i class="fa-solid fa-gift"></i></button>` : ''}
                     </div>
                     `;
                 });

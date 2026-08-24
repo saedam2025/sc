@@ -243,12 +243,96 @@
     .holiday-day .fc-daygrid-day-number { color: #ef4444 !important; }
 
     .weather-weblink-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 12px; margin-top: 5px; }
-    .weather-widget-card {
+    .point-ranking-card {
         box-sizing: border-box;
         height: var(--dashboard-first-row-height);
         min-height: 0;
         flex: 0 0 var(--dashboard-first-row-height);
     }
+    .point-ranking-list {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-rows: minmax(0, 7fr) minmax(48px, 3fr);
+        overflow: hidden;
+    }
+    .point-ranking-flip-stage {
+        position: relative;
+        min-height: 0;
+        perspective: 900px;
+        overflow: hidden;
+    }
+    .point-ranking-flip-card {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0 8px;
+        box-sizing: border-box;
+        opacity: 0;
+        transform: rotateX(-88deg) translateY(-8px);
+        transform-origin: center bottom;
+        backface-visibility: hidden;
+        animation: pointRankFlip 9s cubic-bezier(.22,.75,.24,1) infinite;
+        animation-delay: calc(var(--rank-index, 0) * 3s);
+    }
+    .point-ranking-flip-card.rank-top-1 { --rank-color: #eab308; --rank-glow: rgba(234,179,8,.24); }
+    .point-ranking-flip-card.rank-top-2 { --rank-color: #94a3b8; --rank-glow: rgba(148,163,184,.22); }
+    .point-ranking-flip-card.rank-top-3 { --rank-color: #b45309; --rank-glow: rgba(180,83,9,.2); }
+    .point-ranking-flip-card::after {
+        content: '';
+        position: absolute;
+        width: 112px;
+        height: 52px;
+        bottom: 7px;
+        border-radius: 50%;
+        background: radial-gradient(ellipse, var(--rank-glow), transparent 70%);
+        pointer-events: none;
+    }
+    .point-rank-crown { position: relative; top: -4px; z-index: 1; display: block; font-size: 4.47rem; line-height: .94; filter: drop-shadow(0 5px 5px var(--rank-glow)); }
+    .point-ranking-flip-card.rank-top-2 .point-rank-crown { filter: grayscale(1) brightness(1.2) drop-shadow(0 5px 5px var(--rank-glow)); }
+    .point-ranking-flip-card.rank-top-3 .point-rank-crown { filter: sepia(1) saturate(.9) brightness(.76) drop-shadow(0 5px 5px var(--rank-glow)); }
+    .point-rank-member { position: relative; z-index: 1; max-width: 100%; margin-top: 6px; display: flex; align-items: baseline; justify-content: center; gap: 6px; overflow: visible; line-height: 1.15; white-space: nowrap; }
+    .point-rank-place { flex: 0 0 auto; color: var(--rank-color); font-size: 1rem; font-weight: 900; line-height: 1.15; }
+    .point-rank-name { min-width: 0; overflow: hidden; color: var(--text-main); font-size: 1.2rem; font-weight: 600; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+    .point-rank-score { position: relative; z-index: 1; margin-top: 5px; color: var(--blue-primary); font-size: .9rem; font-weight: 900; line-height: 1.15; white-space: nowrap; }
+    .point-ranking-ticker {
+        min-height: 0;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        border-top: 1px dashed color-mix(in srgb, var(--text-muted) 65%, transparent);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+        mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    }
+    .point-ranking-ticker-track {
+        width: max-content;
+        display: flex;
+        align-items: center;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        animation: pointRankTicker 22s linear infinite;
+        will-change: transform;
+    }
+    .point-ranking-ticker-item { display: inline-flex; align-items: center; gap: 5px; padding-right: 24px; color: var(--text-sub); font-size: .82rem; font-weight: 700; }
+    .point-ranking-ticker-item::after { content: '|'; margin-left: 19px; color: var(--text-muted); font-weight: 500; }
+    .point-ranking-ticker-item strong { color: var(--text-main); font-weight: 900; }
+    .point-ranking-ticker-item .ticker-rank { color: var(--blue-primary); font-weight: 900; }
+    .point-ranking-ticker-item .ticker-score { color: var(--blue-primary); font-weight: 900; }
+    @keyframes pointRankFlip {
+        0% { opacity: 0; transform: rotateX(-88deg) translateY(-8px); }
+        6%, 27% { opacity: 1; transform: rotateX(0deg) translateY(0); }
+        34%, 100% { opacity: 0; transform: rotateX(88deg) translateY(8px); }
+    }
+    @keyframes pointRankTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    @media (prefers-reduced-motion: reduce) {
+        .point-ranking-flip-card { animation: none; opacity: 0; transform: none; }
+        .point-ranking-flip-card:first-child { opacity: 1; }
+        .point-ranking-ticker-track { animation-duration: 60s; }
+    }
+    .point-ranking-empty { margin: auto; color: var(--text-muted); font-size: 0.8rem; text-align: center; }
     .weather-pill { background: var(--hover-bg); padding: 12px 6px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid var(--widget-border-color); cursor: pointer; transition: all 0.2s ease; position: relative; }
     .weather-pill:hover { border-color: var(--blue-primary); background: var(--card-bg, #ffffff); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
     .weather-pill:hover .weblink-delete-btn { opacity: 1 !important; }
@@ -460,7 +544,10 @@
                         {% endif %}
                     </div>
                     <div>
-                        <div id="nav-user-name" style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div id="nav-user-name" style="font-size: 1.3rem; font-weight: 700; color: var(--text-main); letter-spacing: -0.5px;">{{ current_user }}</div>
+                            <span class="user-point-badge js-current-user-points" title="내 보유 포인트">P0점</span>
+                        </div>
                         <div id="nav-user-dept-pos" style="font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; font-weight: 500;">
                             {{ session.get('department', '소속미지정') }} | {{ session.get('position', '직급미지정') }}
                         </div>
@@ -607,27 +694,13 @@
         </div>
 
         <div style="grid-column: 4 / 5; grid-row: 1 / 4; display: flex; flex-direction: column; gap: 20px;">
-            <div class="widget-card weather-widget-card">
+            <div class="widget-card point-ranking-card">
                 <div class="widget-header">
-                    <div class="cal-title-area">오늘의 날씨</div>
-                    <div class="widget-icons"><i class="fa-solid fa-rotate-right" style="cursor:pointer;" onclick="alert('날씨 정보를 갱신합니다.')"></i></div>
+                    <div class="cal-title-area"><i class="fa-solid fa-ranking-star" style="color:var(--blue-primary);"></i> 오늘 사용순위</div>
+                    <div class="widget-icons"><i class="fa-solid fa-rotate-right" style="cursor:pointer;" onclick="loadPointRanking()" title="순위 새로고침"></i></div>
                 </div>
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">
-                    <i class="fa-solid fa-cloud-sun" style="font-size: 3rem; color: #60a5fa; margin-bottom: 8px;"></i>
-                    <div style="font-size: 1.6rem; font-weight: 800; color: var(--text-main); letter-spacing:-0.5px;">18°C</div>
-                    <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 2px;">수원시 맑음 (강수확률 10%)</div>
-                    
-                    <div style="margin-top: 16px; display: flex; gap: 20px; font-size: 0.8rem; border-top: 1px dashed var(--widget-border-color); padding-top: 16px; width: 100%; justify-content: center;">
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                            <span style="color:var(--text-muted); font-size:0.75rem;">미세먼지</span>
-                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
-                        </div>
-                        <div style="width: 1px; background: var(--widget-border-color);"></div>
-                        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
-                            <span style="color:var(--text-muted); font-size:0.75rem;">초미세</span>
-                            <span style="color:#10b981; font-weight:700; font-size:0.9rem;">좋음</span>
-                        </div>
-                    </div>
+                <div id="point-ranking-list" class="point-ranking-list" aria-live="polite">
+                    <div class="point-ranking-empty"><i class="fa-solid fa-spinner fa-spin"></i> 순위 집계 중...</div>
                 </div>
             </div>
 
@@ -755,6 +828,63 @@
             if (res.ok && result.status === 'success') alert(result.message);
             else alert(result.message || '처리 중 오류가 발생했습니다.');
         } catch (error) { alert('서버 통신 오류가 발생했습니다.'); }
+    }
+
+    function pointRankingEscape(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
+    function pointRankingSigned(value) {
+        const points = Number(value || 0);
+        return `${points > 0 ? '+' : ''}${points.toLocaleString()}P`;
+    }
+
+    async function loadPointRanking() {
+        const container = document.getElementById('point-ranking-list');
+        if (!container) return;
+        try {
+            const response = await fetch('/api/points/rankings', {
+                headers: {'Accept': 'application/json'},
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error('순위를 불러오지 못했습니다.');
+            const result = await response.json();
+            const rankings = Array.isArray(result.rankings) ? result.rankings : [];
+            if (rankings.length) {
+                const topRankings = rankings.slice(0, 3);
+                const tickerRankings = rankings.slice(3, 10);
+                const topHtml = topRankings.map((item, index) => {
+                    const rank = Number(item.rank || index + 1);
+                    return `
+                        <div class="point-ranking-flip-card rank-top-${Math.min(rank, 3)}" style="--rank-index:${index};" title="${pointRankingEscape(item.name)} · 보유 P${Number(item.balance || 0).toLocaleString()}점">
+                            <span class="point-rank-crown" aria-hidden="true">👑</span>
+                            <span class="point-rank-member"><span class="point-rank-place">${rank}위</span><span class="point-rank-name">${pointRankingEscape(item.name || '-')}</span></span>
+                            <span class="point-rank-score">오늘 ${pointRankingSigned(item.today_points)}</span>
+                        </div>`;
+                }).join('');
+                const tickerItems = tickerRankings.map(item => `
+                    <span class="point-ranking-ticker-item">
+                        <span class="ticker-rank">${Number(item.rank || 0)}위</span>
+                        <span aria-hidden="true">${pointRankingEscape(item.icon || '👤')}</span>
+                        <strong>${pointRankingEscape(item.name || '-')}</strong>
+                        <span class="ticker-score">${pointRankingSigned(item.today_points)}</span>
+                    </span>`).join('');
+                container.innerHTML = `
+                    <div class="point-ranking-flip-stage">${topHtml}</div>
+                    <div class="point-ranking-ticker" aria-label="오늘 사용순위 4위부터 10위">
+                        ${tickerItems ? `<div class="point-ranking-ticker-track">${tickerItems}${tickerItems}</div>` : '<div class="point-ranking-empty">4위 이하 순위가 없습니다.</div>'}
+                    </div>`;
+            } else {
+                container.innerHTML = '<div class="point-ranking-empty">집계할 사용자가 없습니다.</div>';
+            }
+            document.querySelectorAll('.js-current-user-points').forEach(element => {
+                element.textContent = `P${Number(result.balance || 0).toLocaleString()}점`;
+            });
+        } catch (error) {
+            container.innerHTML = `<div class="point-ranking-empty">${pointRankingEscape(error.message)}</div>`;
+        }
     }
 
     let notificationWidgetRequest = null;
@@ -1122,8 +1252,10 @@ let currentWeeklyStart = getMonday(new Date());
         }
 
         loadNotificationWidget();
+        loadPointRanking();
         initNotificationRealtime();
         setInterval(loadNotificationWidget, 300000);
+        setInterval(loadPointRanking, 600000);
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 scheduleNotificationRefresh(0);
