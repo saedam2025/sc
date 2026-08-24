@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
 from flask import Flask
 
 from routes.payroll import (
@@ -30,6 +31,17 @@ from routes.payroll import (
 
 
 class PayrollHistoryStatementTest(unittest.TestCase):
+    def test_excel_series_row_can_be_mapped_during_preflight(self):
+        form = {"field_mappings_json": '{"직원명":"수령인"}'}
+
+        mapped = _mapped_form_row(
+            pd.Series({"수령인": "김새담", "이메일": "kim@example.com"}),
+            form,
+        )
+
+        self.assertEqual(mapped["직원명"], "김새담")
+        self.assertEqual(mapped["이메일"], "kim@example.com")
+
     def test_excel_header_mapping_changes_render_values(self):
         form = {
             "field_mappings_json": '{"직원명":"수령인", "지급총액":"총지급액"}'
