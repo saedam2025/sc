@@ -107,6 +107,7 @@
 
     .school-profile-avatar { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--school-card-bg); border: 2px solid var(--school-border); box-shadow: 0 6px 18px rgba(15, 23, 42, 0.10); color: var(--school-blue); font-size: 1.8rem; overflow: hidden; }
     .school-profile-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+    .school-profile-avatar .school-profile-emoji { font-size: 2rem; line-height: 1; }
 
 
     .school-profile-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -713,7 +714,7 @@
         .comment-item.reply { margin-left:18px; }
     }
 
-    body > footer, .footer, #footer { margin-top: 10px !important; padding-top: 10px !important; }
+    .school-page-copyright { width: 100%; box-sizing: border-box; margin: 10px auto 0; padding: 18px 16px 22px; color: var(--text-gray, #64748b); font-size: 0.78rem; font-weight: 600; letter-spacing: 0; text-align: center; }
 
     /* 조직도 트리를 위한 CSS */
     .org-chart-box { border: 1px solid #cbd5e1 !important; border-radius: 8px; max-height: 220px; overflow-y: auto; padding: 12px; background: #f8fafc !important; }
@@ -806,8 +807,10 @@
                             data-school-email="{{ s.school_email }}"
                             data-assistant="{{ s.neulbom_assistant }}"
                             data-manager="{{ s.neulbom_manager }}"
-                            data-director-id="{{ s.center_director_id }}"
-                            data-director-name="{{ s.director_name }}">
+                            data-director-id="{{ s.center_director_id or '' }}"
+                            data-director-name="{{ s.director_name or '' }}"
+                            data-director-id-2="{{ s.center_director_id_2 or '' }}"
+                            data-director-name-2="{{ s.director_name_2 or '' }}">
                             
                             <td style="text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" name="school_ids" value="{{ s.id }}" class="school-checkbox"></td>
                             <td style="text-align:center; color:var(--text-gray, #64748b);">{{ loop.index }}</td>
@@ -822,8 +825,8 @@
 </td>
                             <td style="text-align:center; color:var(--text-gray, #64748b);">{{ s.contract_subject or '-' }}</td>
                             <td style="text-align:center; color:var(--text-gray, #64748b);">{{ s.office_phone or '-' }}</td>
-                            <td style="text-align:center;"><i class="fas fa-user-tie" style="font-size:0.8em; margin-right:4px; color:var(--text-gray, #64748b);"></i>{{ s.director_name or '미지정' }}</td>
-                            <td style="text-align:center; color:var(--text-gray, #64748b);">{{ s.director_phone or '-' }}</td>
+                            <td style="text-align:center;"><i class="fas fa-user-tie" style="font-size:0.8em; margin-right:4px; color:var(--text-gray, #64748b);"></i>{{ ([s.director_name, s.director_name_2]|select|join(' · ')) or '미지정' }}</td>
+                            <td style="text-align:center; color:var(--text-gray, #64748b);">{{ ([s.director_phone, s.director_phone_2]|select|join(' · ')) or '-' }}</td>
                             <td style="text-align:center;">
                                 {% if s.is_active == 0 %}
                                     <span class="badge" style="background:var(--school-soft); color:var(--text-gray, #94a3b8); border-color:var(--school-border);">비활성</span>
@@ -927,11 +930,19 @@
             
             const dirId = tr.data('director-id');
             const dirName = tr.data('director-name');
+            const dirId2 = tr.data('director-id-2');
+            const dirName2 = tr.data('director-name-2');
             $('#edit_selectedDirId').val(dirId || '');
             if(dirName && dirName !== 'None') {
                 $('#edit_selectedDirName').html('<i class="fas fa-check-circle"></i> 기존 지정됨: ' + escapeHtml(dirName));
             } else {
                 $('#edit_selectedDirName').html('<span style="color:#ef4444;">지정된 센터장이 없습니다.</span>');
+            }
+            $('#edit_selectedDirId2').val(dirId2 || '');
+            if(dirName2 && dirName2 !== 'None') {
+                $('#edit_selectedDirName2').html('<i class="fas fa-check-circle"></i> 기존 지정됨: ' + escapeHtml(dirName2));
+            } else {
+                $('#edit_selectedDirName2').html('<span style="color:var(--text-gray, #64748b);">두 번째 센터장 미지정</span>');
             }
             
             openModal('editModal');
@@ -985,9 +996,12 @@
                 <div class="school-profile-card">
                     <div class="school-profile-main">
                         <div class="school-profile-avatar">
-                            {% set login_profile_path = current_user_profile_path or session.get('profile_path') %}
+                            {% set login_profile_path = school_current_profile_path or current_user_profile_path or session.get('profile_path') %}
+                            {% set login_profile_icon = school_current_profile_icon or session.get('profile_icon') %}
                             {% if login_profile_path %}
                                 <img src="{{ login_profile_path }}" alt="{{ current_user or session.get('user_name') }} 프로필">
+                            {% elif login_profile_icon %}
+                                <span class="school-profile-emoji" aria-label="등록한 프로필 아이콘">{{ login_profile_icon }}</span>
                             {% else %}
                                 <i class="fa-solid fa-user-tie"></i>
                             {% endif %}
@@ -1055,8 +1069,10 @@
                         <h2><i class="fas fa-list-ul"></i> {{ active_cat.name }}</h2>
                         <div class="board-list-actions">
                             <button type="button" class="btn board-menu-btn" onclick="$('#boardDropdownMenu').slideToggle(250);"><i class="fas fa-bars"></i> 게시판 메뉴</button>
-                            {% if can_manage_current_board %}
+                            {% if can_delete_current_board %}
                             <button class="btn btn-danger" onclick="submitMultiDelete()">선택삭제</button>
+                            {% endif %}
+                            {% if can_write_current_board %}
                             <button class="btn btn-primary" onclick="openPostForm('{{ category }}')"><i class="fas fa-pen"></i> 글쓰기</button>
                             {% endif %}
                         </div>
@@ -1065,7 +1081,8 @@
                     <div id="boardDropdownMenu">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                             {% for cat in school_categories %}
-                            <a href="{{ cat.url if cat.url else url_for('school.school_detail', school_key=school.access_key, category=cat.id) }}" style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
+                            {% set category_url = cat.url if cat.url|default('') else url_for('school.school_detail', school_key=school.access_key, category=cat.id) %}
+                            <a href="{{ category_url }}"{% if cat.new_window|default(false) %} target="_blank" rel="noopener" onclick="return openSchoolCategoryWindow(event, this.href);"{% endif %} style="display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; text-decoration: none; color: var(--school-text); background: var(--school-soft); font-size: 0.85rem; font-weight: 700; transition: 0.2s;">
                                 <i class="fas {{ cat.icon }}" style="color: var(--school-blue); width: 24px; text-align: center; font-size: 1.1rem;"></i>
                                 {{ cat.name }}
                             </a>
@@ -1080,7 +1097,7 @@
                         <table class="board-table">
                             <thead>
                                 <tr>
-                                    {% if can_manage_current_board %}<th style="width:40px; text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th>{% endif %}
+                                    {% if can_delete_current_board %}<th style="width:40px; text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th>{% endif %}
                                     <th style="width:60px; text-align:center;">번호</th>
                                     <th>제목</th>
                                     <th style="width:100px; text-align:center;">작성자</th>
@@ -1091,7 +1108,7 @@
                             <tbody>
                                 {% for p in posts %}
                                 <tr onclick="viewPost({{ p.id }})">
-                                    {% if can_manage_current_board %}<td style="text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" name="post_ids" value="{{ p.id }}" class="post-checkbox"></td>{% endif %}
+                                    {% if can_delete_current_board %}<td style="text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" name="post_ids" value="{{ p.id }}" class="post-checkbox"></td>{% endif %}
                                     <td style="text-align:center;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * pagination.per_page }}</td>
                                     <td style="text-align:left; padding-left:20px;">
                                         {{ p.title }}
@@ -1105,12 +1122,12 @@
                                 </tr>
                                 {% else %}
                                 <tr class="board-empty-row">
-                                    <td colspan="{{ 6 if can_manage_current_board else 5 }}" style="text-align:center; color:var(--text-gray, #94a3b8); font-size:0.9rem;">{{ '검색 결과가 없습니다.' if pagination.search else '등록된 게시글이 없습니다.' }}</td>
+                                    <td colspan="{{ 6 if can_delete_current_board else 5 }}" style="text-align:center; color:var(--text-gray, #94a3b8); font-size:0.9rem;">{{ '검색 결과가 없습니다.' if pagination.search else '등록된 게시글이 없습니다.' }}</td>
                                 </tr>
                                 {% endfor %}
                                 {% if posts %}
                                     {% for _ in range(posts|length, pagination.per_page) %}
-                                    <tr class="board-filler-row" aria-hidden="true"><td colspan="{{ 6 if can_manage_current_board else 5 }}">&nbsp;</td></tr>
+                                    <tr class="board-filler-row" aria-hidden="true"><td colspan="{{ 6 if can_delete_current_board else 5 }}">&nbsp;</td></tr>
                                     {% endfor %}
                                 {% endif %}
                             </tbody>
@@ -1167,7 +1184,7 @@
 
                         <div class="read-footer-actions">
                             <span id="readActionBtns" style="display:none;">
-                                <button class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
+                                <button id="editPostBtn" class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
                                 <form id="singleDelForm" method="POST" style="display:inline;">
                                     <input type="hidden" name="school_id" value="{{ school.id if school else '' }}">
                                     <input type="hidden" name="category" value="{{ category }}">
@@ -1181,7 +1198,7 @@
                         <div class="comment-header">
                             <h3 style="margin:0; color:var(--school-navy); font-size:1.15em;"><i class="fa-regular fa-comments" style="color:var(--school-blue);"></i> 댓글 <span id="commentCount" style="color:var(--school-blue);">0</span></h3>
                         </div>
-                        <div class="comment-write">
+                        <div class="comment-write"{% if not can_comment_current_board %} style="display:none;"{% endif %}>
                             <textarea id="newCommentContent" class="comment-textarea" placeholder="댓글을 입력하세요."></textarea>
                             <div class="comment-file-row">
                                 <input type="file" id="newCommentFiles" class="comment-file-input" multiple>
@@ -1327,6 +1344,10 @@
     </div>
 </div>
 
+{% if view_type == 'detail' %}
+<footer class="school-page-copyright">Copyright © 2026 Saedam Youth Education &amp; Culture Center. All Rights Reserved.</footer>
+{% endif %}
+
 <div id="regModal" class="sd-modal">
     <div class="sd-modal-content" style="width:650px;">
         <h2 style="margin-top:0; border-bottom:2px solid var(--school-navy); padding-bottom:15px; color:var(--school-navy);">학교 신규 등록</h2>
@@ -1368,7 +1389,7 @@
             </div>
             
             <div class="form-group">
-                <label>센터장 담당 지정 (조직도 선택)</label>
+                <label>센터장 1 담당 지정 (필수)</label>
                 <div class="director-search">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="search" data-director-search-for="regOrgChart" placeholder="센터장 이름 검색" oninput="filterDirectorCandidates('regOrgChart', this.value)">
@@ -1376,6 +1397,17 @@
                 <div id="regOrgChart" class="org-chart-box" data-loaded="false">로딩 중...</div>
                 <input type="hidden" name="center_director_id" id="selectedDirId" required>
                 <div id="selectedDirName" style="margin-top:8px; color:var(--school-blue); font-weight:bold;"></div>
+            </div>
+            <div class="form-group">
+                <label>센터장 2 담당 지정 (선택)</label>
+                <div class="director-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" data-director-search-for="regOrgChart2" placeholder="두 번째 센터장 이름 검색" oninput="filterDirectorCandidates('regOrgChart2', this.value)">
+                </div>
+                <div id="regOrgChart2" class="org-chart-box" data-loaded="false">로딩 중...</div>
+                <input type="hidden" name="center_director_id_2" id="selectedDirId2">
+                <div id="selectedDirName2" style="margin-top:8px; color:var(--school-blue); font-weight:bold;"></div>
+                <button type="button" class="btn" style="margin-top:8px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3;" onclick="clearDirectorAssignment('selectedDirId2', 'selectedDirName2')"><i class="fa-solid fa-user-slash"></i> 센터장 2 지정 해제</button>
             </div>
             <div style="text-align:right; margin-top:25px;">
                 <button type="button" class="btn" style="background:var(--school-soft); margin-right:5px;" onclick="closeModal('regModal')">취소</button>
@@ -1427,7 +1459,7 @@
             </div>
             
             <div class="form-group">
-                <label>센터장 담당 지정 (조직도 선택)</label>
+                <label>센터장 1 담당 지정</label>
                 <div class="director-search">
                     <i class="fa-solid fa-magnifying-glass"></i>
                     <input type="search" data-director-search-for="editOrgChart" placeholder="센터장 이름 검색" oninput="filterDirectorCandidates('editOrgChart', this.value)">
@@ -1438,6 +1470,17 @@
                 <button type="button" class="btn" style="margin-top:8px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3;" onclick="clearDirectorAssignment('edit_selectedDirId', 'edit_selectedDirName')">
                     <i class="fa-solid fa-user-slash"></i> 센터장 지정 해제
                 </button>
+            </div>
+            <div class="form-group">
+                <label>센터장 2 담당 지정 (선택)</label>
+                <div class="director-search">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="search" data-director-search-for="editOrgChart2" placeholder="두 번째 센터장 이름 검색" oninput="filterDirectorCandidates('editOrgChart2', this.value)">
+                </div>
+                <div id="editOrgChart2" class="org-chart-box" data-loaded="false">로딩 중...</div>
+                <input type="hidden" name="center_director_id_2" id="edit_selectedDirId2">
+                <div id="edit_selectedDirName2" style="margin-top:8px; color:var(--school-blue); font-weight:bold;"></div>
+                <button type="button" class="btn" style="margin-top:8px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3;" onclick="clearDirectorAssignment('edit_selectedDirId2', 'edit_selectedDirName2')"><i class="fa-solid fa-user-slash"></i> 센터장 2 지정 해제</button>
             </div>
             <div style="text-align:right; margin-top:25px;">
                 <button type="button" class="btn" style="background:var(--school-soft); margin-right:5px;" onclick="closeModal('editModal')">취소</button>
@@ -1527,8 +1570,22 @@
     const POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024;
     const activeCategoryName = "{% if view_type == 'detail' %}{{ active_cat.name|e }}{% else %}게시판{% endif %}";
     const isSharedBoard = ["community", "reference"].includes("{{ category if view_type == 'detail' else '' }}");
-    const canManageCurrentBoard = {{ 'true' if can_manage_current_board|default(false) else 'false' }};
+    const canWriteCurrentBoard = {{ 'true' if can_write_current_board|default(false) else 'false' }};
+    const canDeleteCurrentBoard = {{ 'true' if can_delete_current_board|default(false) else 'false' }};
+    const canCommentCurrentBoard = {{ 'true' if can_comment_current_board|default(false) else 'false' }};
     const schoolToastStorageKey = 'schoolWorkspaceToast';
+
+    function openSchoolCategoryWindow(event, url) {
+        if (event) event.preventDefault();
+        const width = Math.max(1100, window.screen.availWidth || 1440);
+        const height = Math.max(760, window.screen.availHeight || 900);
+        const features = `popup=yes,width=${width},height=${height},left=0,top=0,scrollbars=yes,resizable=yes`;
+        const popup = window.open(url, '_blank', features);
+        if (!popup) return true;
+        try { popup.opener = null; } catch (error) {}
+        popup.focus();
+        return false;
+    }
 
     function schoolToast(message, type = 'success', timeout = 4000) {
         const region = document.getElementById('schoolToastRegion');
@@ -1562,7 +1619,11 @@
     });
     
     const schoolTasks = {{ school_tasks | tojson | safe if school_tasks else '[]' }};
-    const directorName = "{{ school.director_name if school else '' }}";
+    {% if school %}
+    const directorNames = [{{ school.director_name | tojson }}, {{ school.director_name_2 | tojson }}].filter(Boolean);
+    {% else %}
+    const directorNames = [];
+    {% endif %}
     const currentSchoolId = "{{ school.id if school else '' }}";
 
     let currentCalDate = new Date();
@@ -1718,7 +1779,7 @@
     }
 
     function openMiniTaskModal(dateStr, hasEvent) {
-        if (currentUser !== directorName) {
+        if (!directorNames.includes(currentUser)) {
             if (hasEvent) {
                 const dayTasks = schoolTasks.filter(t => {
                     return dateStr >= t.start_date && dateStr <= (t.end_date || t.start_date);
@@ -2090,13 +2151,18 @@
             $('#readFiles').html(fileHtml).show();
         } else { $('#readFiles').hide(); }
 
-        const canManagePost = isSharedBoard
-            ? canManageCurrentBoard
+        const canEditPost = isSharedBoard
+            ? canWriteCurrentBoard
             : (currentUser === data.author || userLevel <= 7);
-        if(canManagePost) {
+        const canDeletePost = isSharedBoard
+            ? canDeleteCurrentBoard
+            : (currentUser === data.author || userLevel <= 7);
+        if(canEditPost || canDeletePost) {
             $('#readActionBtns').show();
             $('#singleDelForm').attr('action', '/school/post/delete/' + id);
         } else { $('#readActionBtns').hide(); }
+        $('#editPostBtn').toggle(canEditPost);
+        $('#singleDelForm').toggle(canDeletePost);
 
         await loadComments(id);
         showView('boardReadView');
@@ -2129,8 +2195,8 @@
     }
 
     function renderCommentItem(c, isReply) {
-        const editableBtns = canManage(c.author) ? `<button type="button" class="comment-mini-btn" onclick="editComment(${c.id}, '${encodeURIComponent(c.content || '')}')">수정</button><button type="button" class="comment-mini-btn danger" onclick="deleteComment(${c.id})">삭제</button>` : '';
-        const replyBtn = !isReply ? `<button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">답글</button>` : '';
+        const editableBtns = canCommentCurrentBoard && canManage(c.author) ? `<button type="button" class="comment-mini-btn" onclick="editComment(${c.id}, '${encodeURIComponent(c.content || '')}')">수정</button><button type="button" class="comment-mini-btn danger" onclick="deleteComment(${c.id})">삭제</button>` : '';
+        const replyBtn = canCommentCurrentBoard && !isReply ? `<button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">답글</button>` : '';
         const edited = c.updated_at ? ' · 수정됨' : '';
         return `<div class="comment-item ${isReply ? 'reply' : ''}" id="comment-${c.id}"><div class="comment-top-row"><div class="comment-left-meta"><div class="comment-author"><span>${escapeHtml(c.author || '익명')}</span></div><div class="comment-date">${escapeHtml(c.created_at || '')}${edited}</div></div><div class="comment-actions">${replyBtn}${editableBtns}</div></div><div class="comment-content">${escapeHtml(c.content || '')}</div>${renderFileLinks(c.filename, c.filepath)}${!isReply ? `<div id="replyForm-${c.id}" class="reply-form" style="display:none;"><textarea id="replyContent-${c.id}" class="comment-textarea" placeholder="답글을 입력하세요."></textarea><div class="comment-file-row"><input type="file" id="replyFiles-${c.id}" class="comment-file-input" multiple><div style="display:flex; gap:7px; flex-shrink:0;"><button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">취소</button><button type="button" class="btn btn-primary" onclick="submitComment(${c.id})">답글 등록</button></div></div></div>` : ''}</div>`;
     }
@@ -2231,8 +2297,10 @@
         
         if (id === 'regModal') {
             loadDirectorAssignmentOrgChart('regOrgChart', 'selectedDirId', 'selectedDirName');
+            loadDirectorAssignmentOrgChart('regOrgChart2', 'selectedDirId2', 'selectedDirName2');
         } else if (id === 'editModal') {
             loadDirectorAssignmentOrgChart('editOrgChart', 'edit_selectedDirId', 'edit_selectedDirName');
+            loadDirectorAssignmentOrgChart('editOrgChart2', 'edit_selectedDirId2', 'edit_selectedDirName2');
         }
     }
     
@@ -2307,6 +2375,15 @@
     }
 
     function selectDirectorCandidate(candidate, inputId, displayId) {
+        const pairedInputs = {
+            selectedDirId: 'selectedDirId2', selectedDirId2: 'selectedDirId',
+            edit_selectedDirId: 'edit_selectedDirId2', edit_selectedDirId2: 'edit_selectedDirId'
+        };
+        const pairedInput = document.getElementById(pairedInputs[inputId]);
+        if(pairedInput && pairedInput.value === candidate.dataset.empNo) {
+            alert('같은 회원을 센터장 1과 센터장 2에 중복 지정할 수 없습니다.');
+            return;
+        }
         selectDirector(inputId, displayId, candidate.dataset.empNo, candidate.dataset.name);
     }
 

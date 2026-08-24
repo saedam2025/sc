@@ -893,7 +893,7 @@
     <div id="bg-effect-container" aria-hidden="true"></div>
 
     <div class="app-wrapper">
-        {% if session.get('emp_no') and not center_director_mode %}
+        {% if session.get('emp_no') and not center_director_mode and request.endpoint not in ['expense.submit_expense_center', 'expense.submit_expense_instructor'] %}
         <header class="navbar">
             <div class="nav-container">
                 <a href="/" class="logo">

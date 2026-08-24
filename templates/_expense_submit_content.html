@@ -1,0 +1,607 @@
+    <style>
+        .submit-page, .submit-page * { box-sizing: border-box; letter-spacing: 0; }
+        .submit-page {
+            --submit-primary: var(--primary-color, #0f766e);
+            --submit-primary-dark: var(--primary-dark, #115e59);
+            --submit-card: var(--card-bg, #ffffff);
+            --submit-soft: var(--widget-bg, #f8fafc);
+            --submit-input: var(--input-bg, var(--card-bg, #ffffff));
+            --submit-border: var(--card-border, var(--border-color, #dbe4ee));
+            --submit-text: var(--text-dark, #0f172a);
+            --submit-muted: var(--text-gray, #64748b);
+            width: min(1080px, calc(100% - 28px));
+            margin: 0 auto;
+            padding: 28px 0 42px;
+            color: var(--submit-text);
+        }
+        .submit-shell { background: var(--submit-card); border: 1px solid var(--submit-border); border-top: 5px solid var(--submit-primary); border-radius: 10px; box-shadow: var(--card-shadow, 0 14px 36px rgba(15, 23, 42, 0.08)); backdrop-filter: var(--card-backdrop, none); -webkit-backdrop-filter: var(--card-backdrop, none); overflow: hidden; }
+        .submit-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 22px 24px; border-bottom: 1px solid var(--submit-border); background: var(--submit-soft); }
+        .submit-shell.completed .template-download-link { display: none; }
+        .submit-title { margin: 0; font-size: 1.35rem; font-weight: 900; display: flex; align-items: center; gap: 10px; color: var(--submit-text); }
+        .submit-title i { color: var(--submit-primary); }
+        .submit-head-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .template-link { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--submit-primary) 38%, var(--submit-border)); border-radius: 7px; background: color-mix(in srgb, var(--submit-primary) 9%, var(--submit-card)); color: var(--submit-primary); text-decoration: none; font-size: 0.82rem; font-weight: 900; white-space: nowrap; }
+        .submit-body { padding: 22px 24px 24px; }
+        .submit-page .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 0.78rem; font-weight: 900; color: var(--submit-muted); }
+        .field input, .field select, .field textarea { width: 100%; border: 1px solid var(--submit-border); border-radius: 7px; background: var(--submit-input); color: var(--submit-text); font-size: 0.88rem; padding: 10px 11px; outline: none; }
+        .field input::placeholder, .field textarea::placeholder { color: color-mix(in srgb, var(--submit-muted) 78%, transparent); }
+        .field input, .field select { height: 40px; }
+        .field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
+        .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--submit-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--submit-primary) 16%, transparent); }
+        .wide { grid-column: span 2; }
+        .full { grid-column: 1 / -1; }
+        .upload-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; padding: 0 25px; }
+        .drop-zone { min-height: 148px; border: 2px dashed var(--submit-border); border-radius: 10px; background: var(--submit-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-align: center; padding: 18px; color: var(--submit-muted); transition: 0.2s; }
+        .drop-zone i { font-size: 1.9rem; color: var(--submit-primary); }
+        .drop-zone strong { color: var(--submit-text); font-size: 0.95rem; }
+        .drop-zone span { font-size: 0.78rem; font-weight: 700; }
+        .drop-zone.dragover { border-color: var(--submit-primary); background: color-mix(in srgb, var(--submit-primary) 10%, var(--submit-card)); }
+        .file-list { min-height: 28px; display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .file-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--submit-border); border-radius: 7px; background: var(--submit-card); font-size: 0.78rem; font-weight: 800; color: var(--submit-muted); }
+        .file-row span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-row button { border: none; background: transparent; color: #ef4444; cursor: pointer; }
+        .preview-panel { display: none; margin: 4px 0 18px; border: 1px solid var(--submit-border); border-radius: 8px; overflow: hidden; background: var(--submit-card); }
+        .preview-panel.visible { display: block; }
+        .preview-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px; background: var(--submit-soft); border-bottom: 1px solid var(--submit-border); }
+        .preview-title { margin: 0; color: var(--submit-text); font-size: 0.9rem; font-weight: 900; display: flex; align-items: center; gap: 7px; }
+        .preview-summary { color: var(--submit-primary); font-size: 0.88rem; font-weight: 900; white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid color-mix(in srgb, var(--submit-primary) 38%, var(--submit-border)); border-radius: 999px; background: color-mix(in srgb, var(--submit-primary) 9%, var(--submit-card)); box-shadow: 0 1px 2px color-mix(in srgb, var(--submit-primary) 12%, transparent); }
+        .preview-summary strong { color: var(--submit-text); font-size: 0.92rem; }
+        .preview-body { max-height: 360px; overflow: auto; }
+        .preview-table { width: 100%; min-width: 860px; border-collapse: collapse; table-layout: fixed; }
+        .preview-table th { background: var(--submit-soft); color: var(--submit-text); font-size: 0.76rem; font-weight: 900; padding: 9px 8px; border-bottom: 1px solid var(--submit-border); border-right: 1px solid var(--submit-border); text-align: center; }
+        .preview-table td { color: var(--submit-text); font-size: 0.78rem; padding: 9px 8px; border-bottom: 1px solid var(--submit-border); border-right: 1px solid var(--submit-border); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .preview-table th:last-child, .preview-table td:last-child { border-right: none; }
+        .preview-table td:nth-child(1), .preview-table td:nth-child(2) { text-align: center; }
+        .preview-table td:nth-child(5) { text-align: right; font-weight: 900; color: var(--submit-primary); padding-right: 2em; }
+        .preview-table td.cell-error { color: #dc2626; background: #fef2f2; font-weight: 900; }
+        .preview-error-box { margin: 0; padding: 12px 14px; border-bottom: 1px solid #fecaca; background: #fff7f7; color: #dc2626; font-size: 0.82rem; line-height: 1.55; }
+        .preview-error-title { display: block; margin-bottom: 6px; color: #b91c1c; font-weight: 900; }
+        .preview-error-list { margin: 0; padding-left: 18px; font-weight: 400; }
+        .preview-error-help { display: block; color: #7f1d1d; font-weight: 400; margin-top: 4px; }
+        .preview-message { padding: 14px; color: var(--submit-muted); font-size: 0.84rem; font-weight: 800; white-space: pre-line; }
+        .preview-message.error { color: #dc2626; background: #fef2f2; }
+        .submit-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px; }
+        .submit-btn { height: 42px; border: none; border-radius: 8px; padding: 0 18px; background: var(--submit-primary); color: #ffffff; font-weight: 900; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+        .submit-btn:hover { background: var(--submit-primary-dark); }
+        .submit-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .completion-panel { display: none; padding: 22px 0 4px; }
+        .completion-panel.visible { display: block; }
+        .completion-card { border: 1px solid color-mix(in srgb, var(--submit-primary) 42%, var(--submit-border)); border-radius: 10px; background: color-mix(in srgb, var(--submit-primary) 9%, var(--submit-card)); padding: 20px; box-shadow: 0 8px 24px color-mix(in srgb, var(--submit-primary) 10%, transparent); }
+        .completion-title { margin: 0 0 12px; color: var(--submit-primary); font-size: 1.05rem; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+        .completion-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+        .completion-item { border: 1px solid color-mix(in srgb, var(--submit-primary) 25%, var(--submit-border)); border-radius: 8px; background: color-mix(in srgb, var(--submit-primary) 3%, var(--submit-card)); padding: 12px; }
+        .completion-label { display: block; color: var(--submit-muted); font-size: 0.76rem; font-weight: 900; margin-bottom: 5px; }
+        .completion-value { color: var(--submit-text); font-size: 0.98rem; font-weight: 900; word-break: keep-all; }
+        .completion-message { color: var(--submit-muted); font-size: 0.86rem; font-weight: 800; line-height: 1.5; }
+        .completion-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+        .result-box { display: none; margin-top: 14px; border-radius: 8px; padding: 12px 14px; font-size: 0.86rem; font-weight: 900; white-space: pre-line; }
+        .result-box.success { display: block; background: color-mix(in srgb, var(--submit-primary) 9%, var(--submit-card)); color: var(--submit-primary); border: 1px solid color-mix(in srgb, var(--submit-primary) 38%, var(--submit-border)); }
+        .result-box.error { display: block; background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+        .submit-guide { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 126px; align-items: center; gap: 20px; margin-top: 16px; padding: 18px 20px; border: 1px solid var(--submit-border); border-radius: 10px; background: var(--submit-soft); color: var(--submit-text); overflow: hidden; }
+        .submit-guide-copy { min-width: 0; }
+        .submit-guide h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 0.98rem; font-weight: 900; }
+        .submit-guide h2 i { color: var(--submit-primary); }
+        .submit-guide ol { margin: 0; padding-left: 21px; color: var(--submit-muted); font-size: 0.84rem; font-weight: 400; line-height: 1.75; }
+        .submit-guide-visual { position: relative; width: 108px; height: 104px; justify-self: center; display: grid; place-items: center; color: var(--submit-primary); }
+        .submit-guide-icon-card { width: 80px; height: 88px; display: grid; place-items: center; border: 2px solid color-mix(in srgb, var(--submit-primary) 42%, var(--submit-border)); border-radius: 18px 18px 22px 22px; background: color-mix(in srgb, var(--submit-primary) 11%, var(--submit-card)); box-shadow: 0 8px 18px color-mix(in srgb, var(--submit-primary) 14%, transparent); transform: rotate(-5deg); }
+        .submit-guide-icon-card > i { font-size: 2.45rem; }
+        .submit-guide-bulb { position: absolute; right: 4px; top: 2px; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: var(--submit-card); border: 2px solid color-mix(in srgb, var(--submit-primary) 38%, var(--submit-border)); color: var(--submit-primary); box-shadow: 0 5px 12px color-mix(in srgb, var(--submit-primary) 13%, transparent); transform: rotate(8deg); }
+        .submit-guide-bulb i { font-size: 1.1rem; }
+        .submit-guide-sparkle { position: absolute; left: 4px; top: 7px; font-size: 0.95rem; color: color-mix(in srgb, var(--submit-primary) 72%, #f59e0b); animation: submit-guide-twinkle 2.4s ease-in-out infinite; }
+        @keyframes submit-guide-twinkle { 0%, 100% { transform: scale(0.82) rotate(-8deg); opacity: 0.55; } 50% { transform: scale(1.12) rotate(8deg); opacity: 1; } }
+        .submit-page.embedded { width: 100%; padding: 0; }
+        .submit-page.embedded .submit-shell { border: 0; border-radius: 0 0 12px 12px; box-shadow: none; }
+        .submit-page.embedded .submit-head { display: none; }
+        .submit-page.embedded .submit-body { padding: 16px 19px 18px; }
+        .submit-page.embedded .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .submit-page.embedded .upload-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+        .submit-page.embedded .wide { grid-column: span 1; }
+        .submit-page.embedded .field textarea { min-height: 72px; }
+        .submit-page.embedded .drop-zone { min-height: 116px; padding: 13px 10px; gap: 6px; }
+        .submit-page.embedded .drop-zone i { font-size: 1.55rem; }
+        @media (max-width: 860px) {
+            .submit-page .submit-head { flex-direction: column; align-items: flex-start; }
+            .submit-page .form-grid, .submit-page .upload-grid { grid-template-columns: 1fr; }
+            .submit-page .completion-summary { grid-template-columns: 1fr; }
+            .submit-page .wide { grid-column: span 1; }
+        }
+        @media (max-width: 640px) {
+            .submit-guide { grid-template-columns: 1fr; }
+            .submit-guide-visual { display: none; }
+        }
+    </style>
+    <main class="submit-page{{ ' embedded' if expense_submit_embedded|default(false) else '' }}">
+        <section class="submit-shell">
+            <header class="submit-head">
+                <h1 class="submit-title"><i class="fa-solid fa-receipt"></i> {{ expense_submit_page_title|default('지출결의서 전송') }}</h1>
+                <div class="submit-head-actions">
+                    {% if expense_submit_show_management|default(false) %}
+                    <a class="template-link" href="{{ url_for('expense.index') }}"><i class="fa-solid fa-list-check"></i> 지출결의관리페이지</a>
+                    {% endif %}
+                    <a class="template-link template-download-link" href="{{ url_for('expense.expense_template', channel=expense_submit_channel|default('headquarters')) }}"><i class="fa-solid fa-file-excel"></i> 엑셀양식 다운로드</a>
+                </div>
+            </header>
+            <div class="submit-body">
+                <form id="expenseSubmitForm" enctype="multipart/form-data">
+                    <input type="hidden" name="expense_submit_channel" value="{{ expense_submit_channel|default('headquarters') }}">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="expenseOrgType">학교/본사</label>
+                            <select id="expenseOrgType" name="expense_org_type" required>
+                                <option value=""{{ ' selected' if not expense_submit_default_org_type|default('') else '' }} disabled>선택하세요</option>
+                                <option value="학교"{{ ' selected' if expense_submit_default_org_type|default('') == '학교' else '' }}>학교</option>
+                                <option value="본사"{{ ' selected' if expense_submit_default_org_type|default('') == '본사' else '' }}>본사</option>
+                            </select>
+                        </div>
+                        <div id="schoolNameField" class="field wide">
+                            <label for="expenseSchoolName">학교명</label>
+                            <select id="expenseSchoolName" name="expense_school_name">
+                                <option value="">학교 선택</option>
+                                {% for school in school_list %}
+                                <option value="{{ school }}"{{ ' selected' if school == expense_submit_school_name|default('') else '' }}>{{ school }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="expenseManager">담당자 성명</label>
+                            <input id="expenseManager" name="expense_manager" required placeholder="성명" value="{{ expense_submit_manager|default('') }}">
+                        </div>
+                        <div class="field">
+                            <label for="expensePeriodDisplay">자동 문서명</label>
+                            <input id="expensePeriodDisplay" readonly placeholder="엑셀 업로드 시 자동 표시">
+                        </div>
+                        <div class="field">
+                            <label for="submitterEmail">결과 수신 이메일</label>
+                            <input id="submitterEmail" name="submitter_email" type="email" required inputmode="email" autocomplete="email" placeholder="example@email.com" value="{{ expense_submit_email|default('') }}">
+                        </div>
+                        <div class="field">
+                            <label for="paymentAccount">지급계좌번호</label>
+                            <input id="paymentAccount" name="payment_account" required placeholder="은행명 / 계좌번호 / 예금주" value="{{ expense_submit_payment_account|default('') }}">
+                        </div>
+                        <div class="field">
+                            <label for="expenseKind">결의서 내역</label>
+                            <select id="expenseKind" name="expense_kind" required>
+                                <option value="" selected disabled>선택하세요</option>
+                                <option value="교구재비">교구재비</option>
+                                <option value="업무영수증">업무영수증</option>
+                            </select>
+                        </div>
+                        <div class="field full">
+                            <label for="memo">비고</label>
+                            <textarea id="memo" name="memo" placeholder="전달할 내용을 입력하세요."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="upload-grid">
+                        <div>
+                            <div class="drop-zone" data-input="expenseExcel">
+                                <i class="fa-solid fa-file-excel"></i>
+                                <strong>지출결의 엑셀</strong>
+                                <span>파일을 마우스로 여기에 드롭다운 하세요.</span>
+                                <span>.xlsx, .xlsm, .csv / 1개만 첨부, 파일당 10MB</span>
+                            </div>
+                            <input id="expenseExcel" name="expense_excel" type="file" accept=".xlsx,.xlsm,.csv" hidden>
+                            <div id="excelList" class="file-list"></div>
+                        </div>
+                        <div>
+                            <div class="drop-zone" data-input="receiptFiles">
+                                <i class="fa-solid fa-paperclip"></i>
+                                <strong>영수증 증빙파일</strong>
+                                <span>파일을 마우스로 여기에 드롭다운 하세요.</span>
+                                <span>JPG, PNG, GIF 이미지 / 최대 20개, 총 15MB</span>
+                            </div>
+                            <input id="receiptFiles" name="receipt_files" type="file" accept=".jpg,.png,.gif" multiple hidden>
+                            <div id="receiptList" class="file-list"></div>
+                        </div>
+                    </div>
+
+                    <div id="expensePreview" class="preview-panel" aria-live="polite">
+                        <div class="preview-head">
+                            <h2 class="preview-title"><i class="fa-solid fa-table-list"></i> 업로드한 지출결의 내역 미리보기</h2>
+                            <div id="previewSummary" class="preview-summary"></div>
+                        </div>
+                        <div id="previewErrorBox"></div>
+                        <div id="previewBody" class="preview-body"></div>
+                    </div>
+
+                    <div class="submit-actions">
+                        <button id="submitBtn" class="submit-btn" type="submit"><i class="fa-solid fa-paper-plane"></i> 전송</button>
+                    </div>
+                    <div id="resultBox" class="result-box" role="alert" aria-live="assertive"></div>
+                </form>
+                <div id="completionPanel" class="completion-panel">
+                    <div class="completion-card">
+                        <h2 class="completion-title"><i class="fa-solid fa-circle-check"></i> 지출결의서 전송이 완료되었습니다.</h2>
+                        <div id="completionMessage" class="completion-message"></div>
+                        <div class="completion-summary">
+                            <div class="completion-item">
+                                <span class="completion-label">문서명</span>
+                                <span id="completionTitleText" class="completion-value">-</span>
+                            </div>
+                            <div class="completion-item">
+                                <span class="completion-label">전송자</span>
+                                <span id="completionManager" class="completion-value">-</span>
+                            </div>
+                            <div class="completion-item">
+                                <span class="completion-label">결과 수신 이메일</span>
+                                <span id="completionEmail" class="completion-value">-</span>
+                            </div>
+                            <div class="completion-item">
+                                <span class="completion-label">지출기간</span>
+                                <span id="completionPeriod" class="completion-value">-</span>
+                            </div>
+                            <div class="completion-item">
+                                <span class="completion-label">항목 / 합계</span>
+                                <span id="completionItemAmount" class="completion-value">-</span>
+                            </div>
+                            <div class="completion-item">
+                                <span class="completion-label">메일 발송</span>
+                                <span id="completionMailStatus" class="completion-value">-</span>
+                            </div>
+                        </div>
+                        <div class="completion-actions">
+                            <button class="submit-btn" type="button" onclick="startNewSubmission()"><i class="fa-solid fa-plus"></i> 지출결의 추가전송</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        {% if expense_submit_show_guide|default(false) %}
+        <section class="submit-guide" aria-labelledby="expenseSubmitGuideTitle">
+            <div class="submit-guide-copy">
+                <h2 id="expenseSubmitGuideTitle"><i class="fa-solid fa-circle-info"></i> 지출결의서 전송 사용법</h2>
+                <ol>
+                    <li>상단의 '엑셀양식 다운로드' 버튼을 눌러 기본 양식을 받은 뒤 입력된 샘플형식대로 지출내역을 작성합니다.</li>
+                    <li>작성한 지출결의서 엑셀 파일과 JPG·PNG·GIF 형식의 영수증 증빙 이미지를 반드시 각각 첨부합니다.</li>
+                    <li>기본 입력란 내용과 화면에 표시되는 지출내역 미리보기, 합계금액등을 확인합니다.</li>
+                    <li>내용을 확인한 뒤 전송 버튼을 누르면 접수 결과가 이메일로 발송되며 추후 처리결과도 이메일로 안내됩니다.</li>
+                </ol>
+            </div>
+            <div class="submit-guide-visual" aria-hidden="true">
+                <span class="submit-guide-sparkle"><i class="fa-solid fa-star"></i></span>
+                <span class="submit-guide-icon-card"><i class="fa-solid fa-book-open-reader"></i></span>
+                <span class="submit-guide-bulb"><i class="fa-solid fa-lightbulb"></i></span>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+
+    <script>
+        (() => {
+        const excelInput = document.getElementById('expenseExcel');
+        const receiptInput = document.getElementById('receiptFiles');
+        const excelList = document.getElementById('excelList');
+        const receiptList = document.getElementById('receiptList');
+        const expenseOrgType = document.getElementById('expenseOrgType');
+        const schoolNameField = document.getElementById('schoolNameField');
+        const schoolInput = document.getElementById('expenseSchoolName');
+        const submitterEmailInput = document.getElementById('submitterEmail');
+        const resultBox = document.getElementById('resultBox');
+        const submitBtn = document.getElementById('submitBtn');
+        const expensePeriodDisplay = document.getElementById('expensePeriodDisplay');
+        const submitForm = document.getElementById('expenseSubmitForm');
+        const submitShell = document.querySelector('.submit-shell');
+        const completionPanel = document.getElementById('completionPanel');
+        const completionMessage = document.getElementById('completionMessage');
+        const completionTitleText = document.getElementById('completionTitleText');
+        const completionManager = document.getElementById('completionManager');
+        const completionEmail = document.getElementById('completionEmail');
+        const completionPeriod = document.getElementById('completionPeriod');
+        const completionItemAmount = document.getElementById('completionItemAmount');
+        const completionMailStatus = document.getElementById('completionMailStatus');
+        const expenseKindInput = document.getElementById('expenseKind');
+        const previewPanel = document.getElementById('expensePreview');
+        const previewSummary = document.getElementById('previewSummary');
+        const previewErrorBox = document.getElementById('previewErrorBox');
+        const previewBody = document.getElementById('previewBody');
+        const submitChannel = document.querySelector('[name="expense_submit_channel"]').value;
+        const maxExcelFileSize = 10 * 1024 * 1024;
+        const maxReceiptTotalSize = 15 * 1024 * 1024;
+        let lastPreviewData = null;
+        const uploadRules = {
+            expenseExcel: { label: '지출결의 엑셀', maxCount: 1, maxFileSize: maxExcelFileSize, extensions: ['.xlsx', '.xlsm', '.csv'] },
+            receiptFiles: { label: '영수증 증빙파일', maxCount: 20, maxTotalSize: maxReceiptTotalSize, extensions: ['.jpg', '.png', '.gif'] }
+        };
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[char]));
+        }
+
+        function formatMoney(value) {
+            return `${Number(value || 0).toLocaleString('ko-KR')}원`;
+        }
+
+        function isValidEmail(value) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
+        }
+
+        function validateEmailInput() {
+            const email = submitterEmailInput.value.trim();
+            if (!email || !isValidEmail(email)) {
+                submitterEmailInput.setCustomValidity('이메일 주소 형식을 확인해주세요. 예: example@email.com');
+                submitterEmailInput.reportValidity();
+                submitterEmailInput.focus();
+                return false;
+            }
+            submitterEmailInput.setCustomValidity('');
+            return true;
+        }
+
+        function showFormError(messages) {
+            const text = Array.isArray(messages) ? messages.filter(Boolean).join('\n') : String(messages || '');
+            resultBox.className = 'result-box error';
+            resultBox.textContent = text;
+            resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function renderList(input, container) {
+            const files = Array.from(input.files || []);
+            container.innerHTML = files.map((file, index) => `
+                <div class="file-row">
+                    <span title="${escapeHtml(file.name)}"><i class="fa-solid fa-file"></i> ${escapeHtml(file.name)}</span>
+                    <span style="display:inline-flex; align-items:center; gap:8px;">
+                        ${(file.size / 1024 / 1024).toFixed(2)}MB
+                        <button type="button" onclick="removeSelectedFile('${input.id}', ${index})" title="첨부 삭제">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        function setInputFiles(input, files) {
+            const transfer = new DataTransfer();
+            files.forEach(file => transfer.items.add(file));
+            input.files = transfer.files;
+            resultBox.className = 'result-box';
+            resultBox.textContent = '';
+            renderList(input, input === excelInput ? excelList : receiptList);
+            if (input === excelInput) loadExpensePreview();
+        }
+
+        function validateUploadFiles(input, files) {
+            const rule = uploadRules[input.id];
+            if (!rule) return true;
+            if (files.length > rule.maxCount) {
+                alert(`${rule.label}은 최대 ${rule.maxCount}개까지 첨부할 수 있습니다.`);
+                return false;
+            }
+            const invalidType = rule.extensions ? files.find(file => {
+                const name = String(file.name || '').toLowerCase();
+                return !rule.extensions.some(extension => name.endsWith(extension));
+            }) : null;
+            if (invalidType) {
+                const allowed = rule.extensions.map(extension => extension.slice(1).toUpperCase()).join(', ');
+                alert(`${rule.label}은 ${allowed} 파일만 첨부할 수 있습니다.\n${invalidType.name}`);
+                return false;
+            }
+            const oversized = rule.maxFileSize ? files.find(file => file.size > rule.maxFileSize) : null;
+            if (oversized) {
+                alert(`${rule.label}은 파일당 10MB 이하만 첨부할 수 있습니다.\n${oversized.name}`);
+                return false;
+            }
+            const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+            if (rule.maxTotalSize && totalSize > rule.maxTotalSize) {
+                alert(`${rule.label}의 총 용량은 15MB 이하만 첨부할 수 있습니다.`);
+                return false;
+            }
+            return true;
+        }
+
+        function addFiles(input, files) {
+            const incoming = Array.from(files || []);
+            if (input === excelInput && incoming.length > 1) {
+                alert('지출결의 엑셀은 1개만 첨부할 수 있습니다.');
+                return;
+            }
+            const current = input.multiple ? Array.from(input.files || []) : [];
+            const nextFiles = input.multiple ? current.concat(incoming) : incoming.slice(0, 1);
+            if (!validateUploadFiles(input, nextFiles)) return;
+            setInputFiles(input, nextFiles);
+        }
+
+        function removeSelectedFile(inputId, index) {
+            const input = document.getElementById(inputId);
+            const files = Array.from(input.files || []).filter((_, fileIndex) => fileIndex !== index);
+            setInputFiles(input, files);
+        }
+        window.removeSelectedFile = removeSelectedFile;
+
+        function resetExpensePreview(message = '', isError = false) {
+            lastPreviewData = null;
+            previewSummary.textContent = '';
+            if (!message) {
+                previewPanel.classList.remove('visible');
+                previewErrorBox.innerHTML = '';
+                previewBody.innerHTML = '';
+                expensePeriodDisplay.value = '';
+                return;
+            }
+            previewPanel.classList.add('visible');
+            previewErrorBox.innerHTML = '';
+            previewBody.innerHTML = `<div class="preview-message${isError ? ' error' : ''}">${escapeHtml(message)}</div>`;
+        }
+
+        function renderExpensePreview(data) {
+            const items = Array.isArray(data.items) ? data.items : [];
+            lastPreviewData = data;
+            expensePeriodDisplay.value = data.title || (data.period_text ? `${data.period_text} 지출결의서` : '');
+            previewPanel.classList.add('visible');
+            const errorCount = Array.isArray(data.errors) ? data.errors.length : 0;
+            previewSummary.innerHTML = `정상 항목 <strong>${Number(data.item_count || 0).toLocaleString('ko-KR')}건</strong> / 합계 <strong>${formatMoney(data.total_amount)}</strong>${errorCount ? ` / 오류 <strong style="color:#dc2626;">${errorCount}건</strong>` : ''}`;
+            if (!items.length) {
+                previewBody.innerHTML = '<div class="preview-message">미리보기할 지출 내역이 없습니다.</div>';
+                return;
+            }
+            previewErrorBox.innerHTML = errorCount ? `
+                <div class="preview-error-box">
+                    <span class="preview-error-title">엑셀파일 입력 오류입니다!</span>
+                    <ul class="preview-error-list">
+                        ${data.errors.map(error => `<li>${escapeHtml(error)}<span class="preview-error-help">날짜는 예: 2026-02-22, 금액은 예: 128000 또는 128,000 형식으로 입력하고, 사용처와 사용내역은 빈칸 없이 입력해주세요.</span></li>`).join('')}
+                    </ul>
+                </div>
+            ` : '';
+            previewBody.innerHTML = `
+                <table class="preview-table">
+                    <thead>
+                        <tr>
+                            <th style="width:64px;">순번</th>
+                            <th style="width:112px;">일자</th>
+                            <th style="width:180px;">사용처</th>
+                            <th style="width:374px;">사용내역</th>
+                            <th style="width:130px;">금액</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map((item, index) => `
+                            <tr>
+                                <td>${escapeHtml(item.row_no || index + 1)}</td>
+                                <td class="${(item.invalid_fields || []).includes('expense_date') ? 'cell-error' : ''}" title="${escapeHtml((item.validation_errors || []).join(' / ') || item.expense_date)}">${escapeHtml(item.expense_date || '-')}</td>
+                                <td class="${(item.invalid_fields || []).includes('vendor') ? 'cell-error' : ''}" title="${escapeHtml((item.validation_errors || []).join(' / ') || item.vendor)}">${escapeHtml(item.vendor || '-')}</td>
+                                <td class="${(item.invalid_fields || []).includes('description') ? 'cell-error' : ''}" title="${escapeHtml((item.validation_errors || []).join(' / ') || item.description)}">${escapeHtml(item.description || '-')}</td>
+                                <td class="${(item.invalid_fields || []).includes('amount') ? 'cell-error' : ''}" title="${escapeHtml((item.validation_errors || []).join(' / ') || item.amount_text || item.amount)}">${(item.invalid_fields || []).includes('amount') ? escapeHtml(item.amount_text || '-') : formatMoney(item.amount)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function loadExpensePreview() {
+            const file = excelInput.files && excelInput.files[0];
+            if (!file) {
+                resetExpensePreview();
+                return;
+            }
+            resetExpensePreview('지출결의 내역을 읽는 중입니다.');
+            const formData = new FormData();
+            formData.append('expense_excel', file);
+            formData.append('expense_submit_channel', submitChannel);
+            try {
+                const response = await fetch('/expense/api/preview', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || '엑셀 미리보기를 불러오지 못했습니다.');
+                renderExpensePreview(data);
+            } catch (error) {
+                resetExpensePreview(error.message, true);
+            }
+        }
+
+        document.querySelectorAll('.drop-zone').forEach(zone => {
+            const input = document.getElementById(zone.dataset.input);
+            zone.addEventListener('click', () => input.click());
+            zone.addEventListener('dragover', event => {
+                event.preventDefault();
+                zone.classList.add('dragover');
+            });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', event => {
+                event.preventDefault();
+                zone.classList.remove('dragover');
+                addFiles(input, event.dataTransfer.files);
+            });
+            input.addEventListener('change', () => {
+                resultBox.className = 'result-box';
+                resultBox.textContent = '';
+                const files = Array.from(input.files || []);
+                if (!validateUploadFiles(input, files)) {
+                    setInputFiles(input, []);
+                    return;
+                }
+                renderList(input, input === excelInput ? excelList : receiptList);
+                if (input === excelInput) loadExpensePreview();
+            });
+        });
+
+        submitterEmailInput.addEventListener('input', () => {
+            if (isValidEmail(submitterEmailInput.value)) submitterEmailInput.setCustomValidity('');
+        });
+        submitterEmailInput.addEventListener('blur', () => {
+            if (submitterEmailInput.value.trim()) validateEmailInput();
+        });
+
+        expenseOrgType.addEventListener('change', event => {
+            const isSchool = event.target.value === '학교';
+            schoolNameField.style.visibility = isSchool ? 'visible' : 'hidden';
+            schoolInput.required = isSchool;
+            schoolInput.disabled = !isSchool;
+            if (!isSchool) schoolInput.value = '';
+        });
+        expenseOrgType.dispatchEvent(new Event('change'));
+        expenseKindInput.addEventListener('change', () => {
+            if (lastPreviewData) renderExpensePreview(lastPreviewData);
+        });
+
+        function showCompletion(data) {
+            completionMessage.textContent = data.mail_sent
+                ? '지출결의서가 정상 접수되었고 접수 확인 메일이 발송되었습니다.'
+                : `지출결의서는 접수되었으나 접수 확인 메일 발송에 실패했습니다.${data.mail_error ? ` (${data.mail_error})` : ''}`;
+            completionTitleText.textContent = data.title || '-';
+            completionManager.textContent = data.expense_manager || '-';
+            completionEmail.textContent = data.submitter_email || '-';
+            completionPeriod.textContent = data.period_text || '-';
+            completionItemAmount.textContent = `${Number(data.item_count || 0).toLocaleString('ko-KR')}건 / ${Number(data.total_amount || 0).toLocaleString('ko-KR')}원`;
+            completionMailStatus.textContent = data.mail_sent ? '발송 완료' : '발송 실패';
+            submitForm.style.display = 'none';
+            submitShell.classList.add('completed');
+            completionPanel.classList.add('visible');
+        }
+
+        function startNewSubmission() {
+            completionPanel.classList.remove('visible');
+            submitShell.classList.remove('completed');
+            submitForm.style.display = '';
+            submitForm.reset();
+            excelList.innerHTML = '';
+            receiptList.innerHTML = '';
+            resultBox.className = 'result-box';
+            resultBox.textContent = '';
+            resetExpensePreview();
+            expenseOrgType.dispatchEvent(new Event('change'));
+        }
+        window.startNewSubmission = startNewSubmission;
+
+        submitForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            resultBox.className = 'result-box';
+            resultBox.textContent = '';
+            submitBtn.disabled = true;
+
+            try {
+                const missingFiles = [];
+                if (!excelInput.files || excelInput.files.length === 0) {
+                    missingFiles.push('엑셀파일이 첨부되지 않았습니다.');
+                }
+                if (!receiptInput.files || receiptInput.files.length === 0) {
+                    missingFiles.push('영수증 증빙 이미지가 첨부되지 않았습니다.');
+                }
+                if (missingFiles.length) {
+                    showFormError(missingFiles);
+                    return;
+                }
+                if (!form.reportValidity()) return;
+                if (!validateEmailInput()) return;
+                if (!validateUploadFiles(excelInput, Array.from(excelInput.files || []))) return;
+                if (!validateUploadFiles(receiptInput, Array.from(receiptInput.files || []))) return;
+                const formData = new FormData(form);
+                const response = await fetch('/expense/submit', { method: 'POST', body: formData });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || '전송에 실패했습니다.');
+                showCompletion(data);
+            } catch (error) {
+                showFormError(error.message);
+            } finally {
+                if (document.visibilityState !== 'hidden') submitBtn.disabled = false;
+            }
+        });
+        })();
+    </script>

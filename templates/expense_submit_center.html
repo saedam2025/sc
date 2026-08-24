@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% set expense_submit_embedded = false %}
+{% set expense_submit_page_title = '센터장용 지출결의서 전송' %}
+{% set expense_submit_channel = 'center' %}
+{% set expense_submit_default_org_type = '학교' %}
+{% set expense_submit_show_management = false %}
+{% set expense_submit_show_guide = true %}
+{% include '_expense_submit_content.html' %}
+{% endblock %}

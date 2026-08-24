@@ -36,7 +36,7 @@
     .expense-actions { display: flex; gap: 8px; align-items: center; }
     
     /* 버튼 류 테마 적용 */
-    .expense-link-btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--expense-blue); background: var(--expense-soft); color: var(--expense-blue); text-decoration: none; font-size: 0.78rem; font-weight: 600; transition: 0.2s; }
+    .expense-link-btn { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--expense-blue); background: var(--expense-soft); color: var(--expense-blue); text-decoration: none; font-family: inherit; font-size: 0.78rem; font-weight: 600; transition: 0.2s; cursor: pointer; }
     .expense-link-btn:hover { background: var(--widget-hover, #ffffff); color: var(--expense-navy); border-color: var(--expense-navy); }
 
     /* 2. 대시보드 요약카드 테마 적용 */
@@ -235,7 +235,9 @@
                 <h2>지출결의 관리 시스템</h2>
             </div>
             <div class="expense-actions">
-                <a href="/expense/submit" class="expense-link-btn" target="_blank" rel="noopener"><i class="fa-solid fa-upload"></i> 지출결의서 전송</a>
+                <a href="/expense/submit" class="expense-link-btn"><i class="fa-solid fa-upload"></i> 지출결의서 전송</a>
+                <a href="/expense/submit/instructor" class="expense-link-btn" target="_blank" rel="noopener"><i class="fa-solid fa-chalkboard-user"></i> 강사용 지출결의서</a>
+                <button id="copyInstructorExpenseLink" class="expense-link-btn" type="button"><i class="fa-solid fa-link"></i> 링크복사</button>
             </div>
         </div>
 
@@ -1093,5 +1095,24 @@ document.addEventListener('keydown', function(event) {
 });
 
 document.addEventListener('DOMContentLoaded', renderExpensePagination);
+
+document.getElementById('copyInstructorExpenseLink')?.addEventListener('click', async function() {
+    const instructorUrl = new URL('/expense/submit/instructor', window.location.origin).href;
+    try {
+        await navigator.clipboard.writeText(instructorUrl);
+    } catch (error) {
+        const temporaryInput = document.createElement('input');
+        temporaryInput.value = instructorUrl;
+        temporaryInput.style.position = 'fixed';
+        temporaryInput.style.opacity = '0';
+        document.body.appendChild(temporaryInput);
+        temporaryInput.select();
+        document.execCommand('copy');
+        temporaryInput.remove();
+    }
+    const originalHtml = this.innerHTML;
+    this.innerHTML = '<i class="fa-solid fa-check"></i> 복사완료';
+    setTimeout(() => { this.innerHTML = originalHtml; }, 1500);
+});
 </script>
 {% endblock %}

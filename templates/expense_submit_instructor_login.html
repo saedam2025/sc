@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .instructor-access-page, .instructor-access-page * { box-sizing: border-box; }
+    .instructor-access-page { width: min(460px, calc(100% - 32px)); margin: 0 auto; padding: 12vh 0 50px; color: var(--text-dark); }
+    .instructor-access-card { padding: 30px; border: 1px solid var(--card-border, var(--border-color)); border-top: 5px solid var(--primary-color); border-radius: 12px; background: var(--card-bg, #fff); box-shadow: var(--card-shadow, 0 16px 40px rgba(15, 23, 42, .1)); backdrop-filter: var(--card-backdrop, none); }
+    .instructor-access-icon { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; margin-bottom: 18px; border-radius: 14px; background: var(--primary-light); color: var(--primary-color); font-size: 1.35rem; }
+    .instructor-access-card h1 { margin: 0 0 8px; font-size: 1.32rem; }
+    .instructor-access-card p { margin: 0 0 22px; color: var(--text-gray); font-size: .9rem; line-height: 1.6; }
+    .instructor-access-card label { display: block; margin-bottom: 7px; color: var(--text-gray); font-size: .82rem; font-weight: 800; }
+    .instructor-access-card input { width: 100%; height: 44px; padding: 0 13px; border: 1px solid var(--card-border, var(--border-color)); border-radius: 8px; background: var(--input-bg, #fff); color: var(--text-dark); font: inherit; outline: none; }
+    .instructor-access-card input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 16%, transparent); }
+    .instructor-access-error { margin: 9px 0 0 !important; color: #dc2626 !important; font-size: .82rem !important; font-weight: 800; }
+    .instructor-access-card button { width: 100%; height: 44px; margin-top: 16px; border: 0; border-radius: 8px; background: var(--primary-color); color: #fff; font: inherit; font-weight: 900; cursor: pointer; }
+</style>
+<main class="instructor-access-page">
+    <form class="instructor-access-card" method="post" autocomplete="off">
+        <div class="instructor-access-icon"><i class="fa-solid fa-lock"></i></div>
+        <h1>강사용 지출결의서 전송</h1>
+        <p>강사용 전송페이지 비밀번호를 입력해주세요.</p>
+        <label for="instructorExpensePassword">비밀번호</label>
+        <input id="instructorExpensePassword" name="password" type="password" inputmode="numeric" autocomplete="current-password" required autofocus>
+        {% if password_error %}<p class="instructor-access-error" role="alert">{{ password_error }}</p>{% endif %}
+        <button type="submit"><i class="fa-solid fa-arrow-right-to-bracket"></i> 확인</button>
+    </form>
+</main>
+{% endblock %}
