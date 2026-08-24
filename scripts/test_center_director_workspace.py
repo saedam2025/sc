@@ -10,6 +10,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, PROJECT_ROOT)
 
 import routes.chat as chat
+import routes.expense as expense_routes
 import routes.menu_access as menu_access
 import routes.school_bp as school_routes
 from routes.school_bp import build_school_post_list_queries, is_shared_board
@@ -148,14 +149,75 @@ def test_org_chart_function_names_are_isolated():
     assert '.dashboard-container.school-detail-spacing .school-chat-card { height: 300px; }' in school_template
 
 
+def test_center_expense_form_prefill(database):
+    connection = connect(database)
+    connection.executescript(
+        """
+        CREATE TABLE users (
+            emp_no TEXT PRIMARY KEY,
+            name TEXT,
+            email TEXT,
+            bank_account TEXT
+        );
+        CREATE TABLE schools (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            school_name TEXT,
+            center_director_id TEXT,
+            center_director_id_2 TEXT,
+            year INTEGER,
+            is_active INTEGER DEFAULT 1
+        );
+        INSERT INTO users(emp_no, name, email, bank_account) VALUES
+            ('dir-prefill', '자동입력센터장', 'director@example.com', '새담은행 123-456 자동입력센터장');
+        INSERT INTO schools(school_name, center_director_id, center_director_id_2, year, is_active) VALUES
+            ('이전학교', 'other-director-1', '', 2025, 1),
+            ('현재담당학교', 'other-director-2', 'dir-prefill', 2026, 1),
+            ('비활성학교', 'other-director-3', '', 2027, 0);
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    original_get_db = expense_routes.get_db
+    expense_routes.get_db = lambda: connect(database)
+    try:
+        app = Flask(__name__)
+        app.secret_key = 'center-expense-prefill-test'
+        with app.test_request_context('/expense/submit/center'):
+            from flask import session
+
+            session['emp_no'] = 'dir-prefill'
+            session['user_name'] = '자동입력센터장'
+            context = expense_routes._expense_submit_page_context(prefer_assigned_school=True)
+            assert context['expense_submit_school_name'] == '현재담당학교'
+            assert context['expense_submit_manager'] == '자동입력센터장'
+            assert context['expense_submit_email'] == 'director@example.com'
+            assert context['expense_submit_payment_account'] == '새담은행 123-456 자동입력센터장'
+
+            blank_context = expense_routes._expense_submit_page_context(prefer_assigned_school=False)
+            assert blank_context['expense_submit_school_name'] == ''
+            assert blank_context['expense_submit_manager'] == ''
+            assert blank_context['expense_submit_email'] == ''
+            assert blank_context['expense_submit_payment_account'] == ''
+    finally:
+        expense_routes.get_db = original_get_db
+
+
 def test_assigned_level_7_can_open_school_workspace(database):
     connection = connect(database)
     connection.executescript(
         """
         CREATE TABLE schools (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            school_name TEXT,
             center_director_id TEXT,
+            center_director_id_2 TEXT,
             is_active INTEGER DEFAULT 1
+        );
+        CREATE TABLE users (
+            emp_no TEXT PRIMARY KEY,
+            name TEXT,
+            status TEXT
         );
         CREATE TABLE menu_access_permissions (
             menu_key TEXT PRIMARY KEY,
@@ -168,15 +230,26 @@ def test_assigned_level_7_can_open_school_workspace(database):
             value TEXT,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        INSERT INTO schools(center_director_id, is_active) VALUES
-            ('dir-team-1', 1),
-            ('another-director', 1);
+        INSERT INTO users(emp_no, name, status) VALUES
+            ('primary-director', '첫번째센터장', '승인'),
+            ('dir-team-1', '두번째센터장', '승인'),
+            ('another-director', '다른학교센터장', '승인'),
+            ('free-director', '미지정센터장', '승인');
+        INSERT INTO schools(school_name, center_director_id, center_director_id_2, is_active) VALUES
+            ('공동담당학교', 'primary-director', 'dir-team-1', 1),
+            ('다른학교', 'another-director', '', 1);
         INSERT INTO admin_settings(key, value) VALUES
             ('school_director_scope_enabled', '1');
         INSERT INTO menu_access_permissions(menu_key, max_level) VALUES
-            ('school_group', 6),
+            ('school_group', 5),
             ('school_workspace', 6),
-            ('school_calendar', 6);
+            ('school_calendar', 6),
+            ('school_center_boards', 14),
+            ('school_center_shared', 8),
+            ('school_center_shared_read', 8),
+            ('school_center_shared_write', 5),
+            ('school_center_shared_delete', 5),
+            ('school_center_shared_comment', 8);
         """
     )
     connection.commit()
@@ -205,7 +278,54 @@ def test_assigned_level_7_can_open_school_workspace(database):
             connection = connect(database)
             assert school_routes.can_access_school(connection, 1) is True
             assert school_routes.can_access_school(connection, 2) is False
+            assert school_routes._validate_school_directors(
+                connection, ['primary-director', 'free-director'], school_id=1
+            ) == ''
+            duplicate_error = school_routes._validate_school_directors(
+                connection, ['free-director', 'dir-team-1'], school_id=2
+            )
+            assert '이미 공동담당학교 센터장으로 지정' in duplicate_error
+            assert '중복 지정' in school_routes._validate_school_directors(
+                connection, ['free-director', 'free-director'], school_id=1
+            )
             connection.close()
+            # 상위 학교관리 권한(레벨 5)이 더 낮아도 센터장 전용 행의
+            # 권한이 우선하므로 담당 학교의 메뉴가 사라지지 않는다.
+            assert school_routes.can_access_school_category('notice') is True
+            assert school_routes.can_access_school_category('community') is True
+            assert menu_access.shared_board_action_is_allowed('read') is True
+            assert menu_access.shared_board_action_is_allowed('comment') is True
+            assert menu_access.shared_board_action_is_allowed('write') is False
+            assert menu_access.shared_board_action_is_allowed('delete') is False
+
+            # 일반 8개 메뉴의 일괄 권한을 끄면 표시와 직접 URL이 함께 막힌다.
+            # 본부 공용 2개 메뉴는 접근/읽기/쓰기/삭제/댓글을 별도 제어한다.
+            connection = connect(database)
+            connection.execute(
+                "UPDATE menu_access_permissions SET max_level=14 WHERE menu_key='school_group'"
+            )
+            connection.execute(
+                "UPDATE menu_access_permissions SET max_level=-1 WHERE menu_key='school_center_boards'"
+            )
+            connection.commit()
+            connection.close()
+            assert school_routes.can_access_school_category('notice') is False
+            assert school_routes.can_access_school_category('expense') is False
+            assert school_routes.can_access_school_category('community') is True
+            assert school_routes.can_access_school_category('reference') is True
+            assert menu_access.shared_board_action_is_allowed('access') is True
+            assert menu_access.shared_board_action_is_allowed('read') is True
+            assert menu_access.shared_board_action_is_allowed('comment') is True
+            assert menu_access.shared_board_action_is_allowed('write') is False
+            assert menu_access.shared_board_action_is_allowed('delete') is False
+
+            with app.test_request_context('/expense/submit/center'):
+                session['user_name'] = '센터장팀장'
+                session['emp_no'] = 'dir-team-1'
+                session['user_level'] = 7
+                denied = menu_access.enforce_request_menu_access()
+                assert denied is not None
+                assert denied[1] == 403
 
             # 체크를 끄면 레벨 7의 기존 본사 권한으로 되돌아간다.
             connection = connect(database)
@@ -244,6 +364,7 @@ def main():
         test_chat_organization(os.path.join(directory, 'chat.db'))
         test_shared_boards(os.path.join(directory, 'school.db'))
         test_org_chart_function_names_are_isolated()
+        test_center_expense_form_prefill(os.path.join(directory, 'expense-prefill.db'))
         test_assigned_level_7_can_open_school_workspace(
             os.path.join(directory, 'level-7-director.db')
         )

@@ -16,7 +16,7 @@ def main():
             """
             SELECT u.emp_no, u.name, u.level, s.access_key, s.school_name
             FROM users u
-            JOIN schools s ON s.center_director_id = u.emp_no
+            JOIN schools s ON u.emp_no IN (s.center_director_id, s.center_director_id_2)
             WHERE u.level = 8
               AND u.status = '승인'
               AND COALESCE(s.is_active, 1) = 1
