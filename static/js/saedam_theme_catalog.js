@@ -8,6 +8,30 @@
     const adjectives = ['미스틱', '네온', '사이버', '오가닉', '코스믹', '딥', '퓨어', '루미너스', '크리스탈', '벨벳', '아스트랄', '스파클링', '글로우', '매직', '아우라', '일루전', '드림', '일렉트릭', '팬텀', '인피니티', '루나', '솔라', '시크릿', '로얄', '엔젤릭', '루비', '사파이어', '에메랄드', '스텔라', '다이내믹', '프리즘', '에테르', '소닉', '루시드', '비비드', '폴리곤', '매트릭스', '헥사곤', '지오메트릭', '라인'];
     const nouns = ['오션', '블랙홀', '네뷸라', '선셋', '웨이브', '포레스트', '플레어', '갤럭시', '마블', '실버', '골드', '스톰', '이클립스', '클라우드', '라군', '펄', '스타더스트', '메트릭스', '퀘이사', '스페이스', '드롭', '플로우', '오로라', '블리즈', '스카이', '크리스탈', '오아시스', '유니버스', '홀로그램', '미라지', '오디세이', '스펙트럼', '호라이즌', '에코', '포털'];
 
+    // 테마관리 화면의 고정 번호 체계:
+    // 0 기본, 1 e리플렛, 2~2001 기본 갤러리, 2002~2501 포인트 컬러,
+    // 2502~3001 딥 컬러, 3002~ 계절·기념일.
+    const themeCatalogDisplayOffsets = Object.freeze({
+        gallery: 1,
+        accent: 2001,
+        deepColor: 2501,
+        'deep-color': 2501,
+        seasonal: 3001
+    });
+
+    function getThemeDisplayNumber(theme, fallbackIndex = 0) {
+        if (!theme) return fallbackIndex;
+        if (theme.isDefault || theme.key === 'default:0') return 0;
+        if (theme.key === 'gallery:eleaflet') return 1;
+
+        const catalogIndex = Number(theme.catalogIndex);
+        const offset = themeCatalogDisplayOffsets[theme.catalog];
+        if (Number.isInteger(catalogIndex) && catalogIndex > 0 && Number.isInteger(offset)) {
+            return offset + catalogIndex;
+        }
+        return fallbackIndex;
+    }
+
     function seededRandom(seedText) {
         let seed = 2166136261;
         for (let i = 0; i < seedText.length; i++) {
@@ -638,6 +662,7 @@
         createDeepColorThemeCatalog,
         createSeasonalTheme,
         createSeasonalThemeCatalog,
+        getThemeDisplayNumber,
         shuffleThemes
     };
 })(window);
