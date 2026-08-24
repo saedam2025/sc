@@ -137,6 +137,8 @@ EXEMPT_ROUTES = [
     'document.apply2',
     'document.company_logo',
     'expense.submit_expense',
+    'expense.submit_expense_instructor',
+    'expense.preview_expense_upload',
     'expense.expense_template',
     # e리플렛 공유 뷰어와 이미지만 학부모가 로그인 없이 열람한다.
     'ebook.public_reader',
