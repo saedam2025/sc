@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, request, jsonify, session, send_file, abort
+from flask import Blueprint, render_template, request, jsonify, session, send_file, abort, redirect, url_for
 import csv
+import hmac
 import html
 from io import BytesIO, StringIO
 import json
@@ -14,10 +15,13 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.datavalidation import DataValidation
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .database import get_db
+from .menu_access import INSTRUCTOR_EXPENSE_ACCESS_SESSION
 from .storage import APP_ROOT, UPLOADS_ROOT
 from .security import is_admin_session
 from .secure_files import (
@@ -35,10 +39,12 @@ from .secure_files import (
 )
 
 expense_bp = Blueprint('expense', __name__)
+INSTRUCTOR_EXPENSE_PASSWORD = os.environ.get('EXPENSE_INSTRUCTOR_PASSWORD', '0070')
 
 EXCEL_EXTENSIONS = {'.xlsx', '.xlsm', '.csv'}
-RECEIPT_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff'}
-RECEIPT_ALLOWED_EXTENSIONS = RECEIPT_IMAGE_EXTENSIONS | {'.pdf', '.hwp', '.hwpx', '.doc', '.docx'}
+RECEIPT_IMAGE_EXTENSIONS = {'.jpg', '.png', '.gif'}
+RECEIPT_ALLOWED_EXTENSIONS = RECEIPT_IMAGE_EXTENSIONS
+RECEIPT_IMAGE_FORMATS = {'JPEG', 'PNG', 'GIF'}
 MAX_EXCEL_FILES = 1
 MAX_RECEIPT_FILES = 20
 MAX_EXCEL_FILE_SIZE = 10 * 1024 * 1024
@@ -252,14 +258,15 @@ def _build_column_map(headers):
 
 def _is_total_row(row, column_map):
     amount_idx = column_map.get('amount')
-    amount = _parse_amount(row[amount_idx]) if amount_idx is not None and amount_idx < len(row) else 0
     for idx, cell in enumerate(row):
         if idx == amount_idx:
             continue
         text = _clean_text(cell).replace(' ', '')
         if not text:
             continue
-        if amount and (text in TOTAL_ROW_LABELS or text.endswith('합계') or text.endswith('총계') or text.startswith('합계')):
+        # 비어 있는 기본 양식에서는 합계 수식 결과가 0이므로 금액의 참/거짓과
+        # 관계없이 합계 라벨만으로 집계 행을 제외해야 한다.
+        if text in TOTAL_ROW_LABELS or text.endswith('합계') or text.endswith('총계') or text.startswith('합계'):
             return True
     return False
 
@@ -365,8 +372,13 @@ def _normalize_existing_expense_totals(conn, report_id=None):
 
 def _rows_from_xlsx(path):
     workbook = load_workbook(path, data_only=True, read_only=True)
-    sheet = workbook.active
-    return [list(row) for row in sheet.iter_rows(values_only=True)]
+    try:
+        sheet = workbook.active
+        return [list(row) for row in sheet.iter_rows(values_only=True)]
+    finally:
+        # read_only 워크북은 명시적으로 닫지 않으면 Windows에서 임시파일을
+        # 계속 점유하여 복호화 파일 정리 단계가 PermissionError로 실패한다.
+        workbook.close()
 
 
 def _rows_from_csv(path):
@@ -864,6 +876,26 @@ def _validate_uploaded_files(files, max_count, allowed_extensions, label, max_fi
     return ''
 
 
+def _validate_receipt_images(files):
+    """확장자만 바꾼 파일도 차단하고 이후 저장을 위해 스트림 위치를 복원한다."""
+    for file in files:
+        try:
+            file.stream.seek(0)
+            with Image.open(file.stream) as image:
+                image_format = str(image.format or '').upper()
+                image.verify()
+            if image_format not in RECEIPT_IMAGE_FORMATS:
+                return f"영수증 증빙파일은 JPG, PNG, GIF 이미지만 첨부할 수 있습니다: {file.filename}"
+        except (UnidentifiedImageError, OSError, ValueError):
+            return f"영수증 증빙파일이 올바른 이미지가 아닙니다: {file.filename}"
+        finally:
+            try:
+                file.stream.seek(0)
+            except Exception:
+                pass
+    return ''
+
+
 def _parse_uploaded_expense_file(file):
     ext = os.path.splitext(file.filename or '')[1].lower()
     fd, path = tempfile.mkstemp(prefix='saedam-expense-parse-', suffix=ext)
@@ -927,6 +959,9 @@ def _save_receipt_files(files):
         is_image = ext in RECEIPT_IMAGE_EXTENSIONS
         save_name = _safe_upload_name(original_name)
 
+        if not is_image:
+            _delete_file_paths(','.join(item[1] for item in saved))
+            raise ValueError(f'허용되지 않은 영수증 파일 형식입니다: {original_name}')
         if is_image:
             save_root = os.path.splitext(save_name)[0]
             path = os.path.join(UPLOAD_FOLDER, f"{save_root}.jpg")
@@ -944,15 +979,8 @@ def _save_receipt_files(files):
                 saved.append((encode_filename_token(original_name), path))
                 continue
             except (UnidentifiedImageError, OSError, ValueError):
-                file.stream.seek(0)
-
-        path = os.path.join(UPLOAD_FOLDER, save_name)
-        try:
-            encrypt_upload(file, path)
-            saved.append((encode_filename_token(original_name), path))
-        except Exception:
-            _delete_file_paths(','.join(item[1] for item in saved))
-            raise
+                _delete_file_paths(','.join(item[1] for item in saved))
+                raise ValueError(f'올바른 영수증 이미지가 아닙니다: {original_name}')
     return saved
 
 
@@ -1024,10 +1052,119 @@ def _active_school_names(conn):
     return [row['school_name'] for row in rows]
 
 
+def _build_expense_template_workbook():
+    """배포본에 정적 양식이 없어도 같은 기본 엑셀 양식을 생성한다."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = '지출결의서'
+    sheet.sheet_view.showGridLines = False
+
+    teal = '0F766E'
+    teal_soft = 'F0FDFA'
+    slate = '334155'
+    border_color = 'CBD5E1'
+    white = 'FFFFFF'
+    thin = Side(style='thin', color=border_color)
+    cell_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    sheet.merge_cells('A1:G1')
+    sheet['A1'] = '지출결의서'
+    sheet['A1'].font = Font(name='맑은 고딕', size=20, bold=True, color=teal)
+    sheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+    sheet.merge_cells('A2:G2')
+    sheet['A2'] = '아래 입력란에 날짜·사용내역·사용출처·지출금액을 입력하고, 관련 영수증을 같은 순서로 첨부해 주세요.'
+    sheet['A2'].font = Font(name='맑은 고딕', size=10, color=slate)
+    sheet['A2'].alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+    headers = ['날짜', '구분', '사용내역', '사용출처', '결제수단', '지출금액', '비고']
+    for column, value in enumerate(headers, start=1):
+        cell = sheet.cell(row=4, column=column, value=value)
+        cell.font = Font(name='맑은 고딕', size=10, bold=True, color=white)
+        cell.fill = PatternFill('solid', fgColor=teal)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        cell.border = cell_border
+
+    for row in range(5, 25):
+        for column in range(1, 8):
+            cell = sheet.cell(row=row, column=column)
+            cell.font = Font(name='맑은 고딕', size=10, color=slate)
+            cell.fill = PatternFill('solid', fgColor=white)
+            cell.border = cell_border
+            cell.alignment = Alignment(
+                horizontal='right' if column == 6 else ('center' if column in {1, 2, 5} else 'left'),
+                vertical='center',
+                wrap_text=column in {3, 4, 7},
+            )
+        sheet.cell(row=row, column=1).number_format = 'yyyy-mm-dd'
+        sheet.cell(row=row, column=6).number_format = '#,##0'
+
+    category_validation = DataValidation(
+        type='list',
+        formula1='"교통비,식비,소모품비,회의비,통신비,기타"',
+        allow_blank=True,
+    )
+    payment_validation = DataValidation(
+        type='list',
+        formula1='"법인카드,개인카드,현금,계좌이체,기타"',
+        allow_blank=True,
+    )
+    sheet.add_data_validation(category_validation)
+    sheet.add_data_validation(payment_validation)
+    category_validation.add('B5:B24')
+    payment_validation.add('E5:E24')
+
+    sheet.merge_cells('A25:E25')
+    sheet['A25'] = '합계'
+    sheet['F25'] = '=SUM(F5:F24)'
+    for column in range(1, 8):
+        cell = sheet.cell(row=25, column=column)
+        cell.font = Font(name='맑은 고딕', size=10, bold=True, color=teal)
+        cell.fill = PatternFill('solid', fgColor=teal_soft)
+        cell.border = cell_border
+        cell.alignment = Alignment(horizontal='right', vertical='center')
+    sheet['A25'].alignment = Alignment(horizontal='center', vertical='center')
+    sheet['F25'].number_format = '#,##0'
+
+    sheet.merge_cells('A27:G27')
+    sheet['A27'] = '※ 작성 안내: 날짜는 2026-07-29 형식, 지출금액은 숫자로 입력해 주세요. 행이 부족하면 입력 행의 서식을 복사해 추가할 수 있습니다.'
+    sheet['A27'].font = Font(name='맑은 고딕', size=9, color=slate)
+    sheet['A27'].fill = PatternFill('solid', fgColor=teal_soft)
+    sheet['A27'].alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+    column_widths = {'A': 14, 'B': 14, 'C': 28, 'D': 24, 'E': 14, 'F': 15, 'G': 24}
+    for column, width in column_widths.items():
+        sheet.column_dimensions[column].width = width
+    sheet.row_dimensions[1].height = 34
+    sheet.row_dimensions[2].height = 32
+    sheet.row_dimensions[4].height = 25
+    for row in range(5, 25):
+        sheet.row_dimensions[row].height = 22
+    sheet.row_dimensions[25].height = 24
+    sheet.row_dimensions[27].height = 32
+
+    sheet.print_area = 'A1:G27'
+    sheet.page_setup.orientation = 'landscape'
+    sheet.page_setup.fitToWidth = 1
+    sheet.page_setup.fitToHeight = 0
+    sheet.sheet_properties.pageSetUpPr.fitToPage = True
+    sheet.freeze_panes = 'A5'
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return output
+
+
 @expense_bp.route('/template')
 def expense_template():
-    if not os.path.exists(EXPENSE_TEMPLATE_PATH):
-        return "지출결의서 기본 엑셀 양식을 찾을 수 없습니다.", 404
+    if not os.path.isfile(EXPENSE_TEMPLATE_PATH):
+        return send_file(
+            _build_expense_template_workbook(),
+            as_attachment=True,
+            download_name='지출결의서_기본양식.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
     return send_file(
         EXPENSE_TEMPLATE_PATH,
         as_attachment=True,
@@ -1037,10 +1174,20 @@ def expense_template():
 
 @expense_bp.route('/api/preview', methods=['POST'])
 def preview_expense_upload():
+    submit_channel = str(request.form.get('expense_submit_channel') or 'headquarters').strip()
+    if submit_channel == 'center' and not is_admin_session():
+        conn = get_db()
+        assigned_school = _assigned_center_school(conn)
+        conn.close()
+        if not assigned_school:
+            return jsonify({"status": "error", "message": "담당 학교의 센터장만 지출결의 엑셀을 올릴 수 있습니다."}), 403
+    if submit_channel == 'instructor' and not session.get(INSTRUCTOR_EXPENSE_ACCESS_SESSION):
+        return jsonify({"status": "error", "message": "강사용 전송페이지 비밀번호 인증이 필요합니다."}), 403
+
     excel_files = request.files.getlist('expense_excel')
     excel_files = [f for f in excel_files if f and f.filename]
     if not excel_files:
-        return jsonify({"status": "error", "message": "지출결의 엑셀을 첨부해주세요."}), 400
+        return jsonify({"status": "error", "message": "엑셀파일이 첨부되지 않았습니다."}), 400
 
     excel_error = _validate_uploaded_files(
         excel_files,
@@ -1055,12 +1202,15 @@ def preview_expense_upload():
     try:
         items, parse_errors = _parse_uploaded_expense_file_with_errors(excel_files[0])
     except Exception:
-        items, parse_errors = [], []
+        return jsonify({
+            "status": "error",
+            "message": "엑셀 파일을 열 수 없습니다. 파일이 손상되지 않았는지 확인하고 Excel에서 .xlsx 형식으로 다시 저장해주세요."
+        }), 400
 
     if not items:
         return jsonify({
             "status": "error",
-            "message": "엑셀에서 지출 항목을 읽지 못했습니다. 기본 양식의 날짜/사용내역/사용출처/지출금액 열을 확인해주세요."
+            "message": "엑셀에 입력된 지출내역이 없습니다. 기본 양식의 5행부터 날짜·사용내역·사용출처·지출금액을 입력해주세요."
         }), 400
 
     valid_items = [item for item in items if not item.get('has_error')]
@@ -1083,17 +1233,91 @@ def preview_expense_upload():
     })
 
 
+def _assigned_center_school(conn, emp_no=None):
+    emp_no = str(emp_no or session.get('emp_no') or '').strip()
+    if not emp_no:
+        return None
+    return conn.execute(
+        """
+        SELECT id, school_name
+        FROM schools
+        WHERE ? IN (center_director_id, center_director_id_2)
+          AND COALESCE(is_active, 1) = 1
+        ORDER BY year DESC, id DESC
+        LIMIT 1
+        """,
+        (emp_no,),
+    ).fetchone()
+
+
+def _expense_submit_page_context(prefer_assigned_school=False):
+    conn = get_db()
+    school_list = _active_school_names(conn)
+    school_name = ''
+    manager = ''
+    email = ''
+    payment_account = ''
+    if prefer_assigned_school and session.get('emp_no'):
+        current_user = conn.execute(
+            "SELECT name, email, bank_account FROM users WHERE emp_no = ?",
+            (session.get('emp_no'),),
+        ).fetchone()
+        assigned_school = _assigned_center_school(conn)
+        if current_user:
+            manager = current_user['name'] or ''
+            email = current_user['email'] or ''
+            payment_account = current_user['bank_account'] or ''
+        if assigned_school:
+            school_name = assigned_school['school_name'] or ''
+    conn.close()
+    return {
+        'school_list': school_list,
+        'current_month': datetime.now().strftime('%Y-%m'),
+        'expense_submit_school_name': school_name,
+        'expense_submit_manager': manager,
+        'expense_submit_email': email,
+        'expense_submit_payment_account': payment_account,
+    }
+
+
+@expense_bp.route('/submit/center')
+def submit_expense_center():
+    ensure_expense_schema()
+    return render_template(
+        'expense_submit_center.html',
+        **_expense_submit_page_context(prefer_assigned_school=True),
+    )
+
+
+@expense_bp.route('/submit/instructor', methods=['GET', 'POST'])
+def submit_expense_instructor():
+    ensure_expense_schema()
+    if request.method == 'POST':
+        password = str(request.form.get('password') or '')
+        if hmac.compare_digest(password, INSTRUCTOR_EXPENSE_PASSWORD):
+            session[INSTRUCTOR_EXPENSE_ACCESS_SESSION] = True
+            return redirect(url_for('expense.submit_expense_instructor'))
+        return render_template(
+            'expense_submit_instructor_login.html',
+            password_error='비밀번호가 올바르지 않습니다.',
+        ), 401
+
+    if not session.get(INSTRUCTOR_EXPENSE_ACCESS_SESSION):
+        return render_template('expense_submit_instructor_login.html')
+
+    return render_template(
+        'expense_submit_instructor.html',
+        **_expense_submit_page_context(),
+    )
+
+
 @expense_bp.route('/submit', methods=['GET', 'POST'])
 def submit_expense():
     ensure_expense_schema()
     if request.method == 'GET':
-        conn = get_db()
-        school_list = _active_school_names(conn)
-        conn.close()
         return render_template(
             'expense_submit.html',
-            school_list=school_list,
-            current_month=datetime.now().strftime('%Y-%m')
+            **_expense_submit_page_context(),
         )
 
     org_type = request.form.get('expense_org_type', '').strip()
@@ -1103,6 +1327,23 @@ def submit_expense():
     payment_account = request.form.get('payment_account', '').strip()
     expense_kind = request.form.get('expense_kind', '').strip()
     memo = request.form.get('memo', '').strip()
+    submit_channel = str(request.form.get('expense_submit_channel') or 'headquarters').strip()
+
+    if submit_channel not in {'headquarters', 'center', 'instructor'}:
+        return jsonify({"status": "error", "message": "올바르지 않은 지출결의 전송 경로입니다."}), 400
+    if submit_channel == 'instructor':
+        if not session.get(INSTRUCTOR_EXPENSE_ACCESS_SESSION):
+            return jsonify({"status": "error", "message": "강사용 전송페이지 비밀번호 인증이 필요합니다."}), 403
+    elif submit_channel == 'center' and not is_admin_session():
+        conn = get_db()
+        assigned_school = _assigned_center_school(conn)
+        conn.close()
+        if not assigned_school:
+            return jsonify({"status": "error", "message": "담당 학교의 센터장만 지출결의서를 전송할 수 있습니다."}), 403
+        if org_type != '학교' or school_name != str(assigned_school['school_name'] or ''):
+            return jsonify({"status": "error", "message": "센터장으로 지정된 담당 학교의 지출결의서만 전송할 수 있습니다."}), 403
+    elif submit_channel == 'headquarters' and not session.get('emp_no'):
+        return jsonify({"status": "error", "message": "인트라넷 로그인이 필요합니다."}), 401
 
     if org_type not in {'본사', '학교'}:
         return jsonify({"status": "error", "message": "본사 또는 학교를 선택해주세요."}), 400
@@ -1120,11 +1361,13 @@ def submit_expense():
         return jsonify({"status": "error", "message": "결과를 받을 이메일을 정확히 입력해주세요."}), 400
     if not expense_kind:
         return jsonify({"status": "error", "message": "결의서 내역을 선택해주세요."}), 400
+    if not payment_account:
+        return jsonify({"status": "error", "message": "지급계좌번호를 입력해주세요."}), 400
 
     excel_files = request.files.getlist('expense_excel')
     excel_files = [f for f in excel_files if f and f.filename]
     if not excel_files:
-        return jsonify({"status": "error", "message": "지출결의 엑셀을 첨부해주세요."}), 400
+        return jsonify({"status": "error", "message": "엑셀파일이 첨부되지 않았습니다."}), 400
     excel_error = _validate_uploaded_files(
         excel_files,
         MAX_EXCEL_FILES,
@@ -1137,6 +1380,8 @@ def submit_expense():
 
     receipt_files = request.files.getlist('receipt_files')
     receipt_files = [f for f in receipt_files if f and f.filename]
+    if not receipt_files:
+        return jsonify({"status": "error", "message": "영수증 증빙 이미지가 첨부되지 않았습니다."}), 400
     receipt_error = _validate_uploaded_files(
         receipt_files,
         MAX_RECEIPT_FILES,
@@ -1145,22 +1390,44 @@ def submit_expense():
         max_total_size=MAX_RECEIPT_TOTAL_SIZE
     )
     if receipt_error:
+        if '파일 형식' in receipt_error:
+            receipt_error = "영수증 증빙파일은 JPG, PNG, GIF 이미지만 첨부할 수 있습니다."
         return jsonify({"status": "error", "message": receipt_error}), 400
+    receipt_image_error = _validate_receipt_images(receipt_files)
+    if receipt_image_error:
+        return jsonify({"status": "error", "message": receipt_image_error}), 400
 
-    saved_excels = _save_regular_uploaded_files(excel_files)
-    saved_receipts = _save_receipt_files(receipt_files)
+    saved_excels = []
+    saved_receipts = []
+    try:
+        saved_excels = _save_regular_uploaded_files(excel_files)
+        saved_receipts = _save_receipt_files(receipt_files)
+    except (UnidentifiedImageError, OSError, ValueError):
+        _delete_file_paths(','.join(path for _, path in saved_excels))
+        _delete_file_paths(','.join(path for _, path in saved_receipts))
+        return jsonify({"status": "error", "message": "영수증 증빙파일을 이미지로 처리할 수 없습니다. JPG, PNG, GIF 파일인지 확인해주세요."}), 400
 
     items = []
     parse_errors = []
+    unreadable_files = []
     for stored_name, path in saved_excels:
+        display_name = decode_filename_token(stored_name)
         try:
-            display_name = decode_filename_token(stored_name)
             with temporary_decrypted_path(path, display_name) as temporary_path:
                 parsed, errors = parse_expense_file_with_errors(temporary_path)
         except Exception:
             parsed, errors = [], []
+            unreadable_files.append(display_name)
         items.extend(parsed)
         parse_errors.extend(errors)
+
+    if unreadable_files:
+        _delete_file_paths(','.join(path for _, path in saved_excels))
+        _delete_file_paths(','.join(path for _, path in saved_receipts))
+        return jsonify({
+            "status": "error",
+            "message": "엑셀 파일을 열 수 없습니다. 파일이 손상되지 않았는지 확인하고 Excel에서 .xlsx 형식으로 다시 저장해주세요."
+        }), 400
 
     if parse_errors:
         _delete_file_paths(','.join(path for _, path in saved_excels))
@@ -1174,7 +1441,7 @@ def submit_expense():
     if not items:
         _delete_file_paths(','.join(path for _, path in saved_excels))
         _delete_file_paths(','.join(path for _, path in saved_receipts))
-        return jsonify({"status": "error", "message": "엑셀에서 지출 항목을 읽지 못했습니다. 기본 양식의 날짜/사용내역/사용출처/지출금액 열을 확인해주세요."}), 400
+        return jsonify({"status": "error", "message": "엑셀에 입력된 지출내역이 없습니다. 기본 양식의 5행부터 날짜·사용내역·사용출처·지출금액을 입력해주세요."}), 400
 
     if expense_kind:
         for item in items:

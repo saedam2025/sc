@@ -7,6 +7,29 @@ from .database import get_db
 
 SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
 SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
+INSTRUCTOR_EXPENSE_ACCESS_SESSION = 'expense_instructor_access_granted'
+SCHOOL_CENTER_BOARD_MENU = 'school_center_boards'
+SCHOOL_CENTER_SHARED_MENU = 'school_center_shared'
+SCHOOL_CENTER_SHARED_ACTION_MENUS = {
+    'access': SCHOOL_CENTER_SHARED_MENU,
+    'read': 'school_center_shared_read',
+    'write': 'school_center_shared_write',
+    'delete': 'school_center_shared_delete',
+    'comment': 'school_center_shared_comment',
+}
+SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS = {
+    'community': SCHOOL_CENTER_SHARED_MENU,
+    'notice': SCHOOL_CENTER_BOARD_MENU,
+    'weekly_report': SCHOOL_CENTER_BOARD_MENU,
+    'open_class': SCHOOL_CENTER_BOARD_MENU,
+    'expense': SCHOOL_CENTER_BOARD_MENU,
+    'item_request': SCHOOL_CENTER_BOARD_MENU,
+    'work_schedule': SCHOOL_CENTER_BOARD_MENU,
+    'billing': SCHOOL_CENTER_BOARD_MENU,
+    'survey': SCHOOL_CENTER_BOARD_MENU,
+    'reference': SCHOOL_CENTER_SHARED_MENU,
+}
+SCHOOL_WORKSPACE_CATEGORY_MENUS = frozenset(SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS.values())
 
 MENU_GROUPS = (
     {
@@ -38,6 +61,12 @@ MENU_GROUPS = (
             ('school_workspace', '학교업무공간', 'fa-chalkboard-user', 14),
             ('school_tasks', '학교업무처리', 'fa-list-check', 14),
             ('school_calendar', '학교일정표', 'fa-calendar-week', 14),
+            ('school_center_boards', '[센터장] 수강안내문~만족도조사 (8개 메뉴 일괄)', 'fa-table-list', 14),
+            ('school_center_shared', '[센터장] 본부공지사항·자료실 - 접근', 'fa-door-open', 8),
+            ('school_center_shared_read', '[센터장] 본부공지사항·자료실 - 읽기', 'fa-book-open', 8),
+            ('school_center_shared_write', '[센터장] 본부공지사항·자료실 - 쓰기', 'fa-pen', 5),
+            ('school_center_shared_delete', '[센터장] 본부공지사항·자료실 - 삭제', 'fa-trash', 5),
+            ('school_center_shared_comment', '[센터장] 본부공지사항·자료실 - 댓글', 'fa-comments', 8),
         ),
     },
     {
@@ -170,7 +199,7 @@ def has_active_school_assignment(user_level=None, conn=None):
             '''
             SELECT 1
             FROM schools
-            WHERE center_director_id = ?
+            WHERE ? IN (center_director_id, center_director_id_2)
               AND COALESCE(is_active, 1) = 1
             LIMIT 1
             ''',
@@ -230,12 +259,34 @@ def menu_is_allowed(menu_key, user_level=None, max_levels=None):
     levels = max_levels or load_menu_max_levels()
     if level > int(levels.get(menu_key, item['default_max_level'])):
         return False
+    # 담당 센터장은 학교관리 주메뉴의 본사 레벨 제한과 관계없이 센터장용
+    # 메뉴 자체의 권한값을 우선 적용한다. 각 센터장 메뉴가 차단되면 위에서
+    # 이미 False가 되므로 전용 권한 설정은 그대로 유지된다.
+    if menu_key in SCHOOL_WORKSPACE_CATEGORY_MENUS \
+            and has_active_school_assignment(level):
+        return True
     parent_key = item['parent_key']
     if parent_key:
         parent = MENU_CATALOG[parent_key]
         if level > int(levels.get(parent_key, parent['default_max_level'])):
             return False
     return True
+
+
+def shared_board_action_is_allowed(action, user_level=None, max_levels=None):
+    """본부공지사항·자료실의 동작별 레벨 권한을 주메뉴/전용모드보다 우선한다."""
+    menu_key = SCHOOL_CENTER_SHARED_ACTION_MENUS.get(str(action or '').strip())
+    if not menu_key:
+        return False
+    if is_master_admin():
+        return True
+    try:
+        level = int(session.get('user_level', 99) if user_level is None else user_level)
+    except (TypeError, ValueError):
+        level = 99
+    levels = max_levels or load_menu_max_levels()
+    item = MENU_CATALOG[menu_key]
+    return level <= int(levels.get(menu_key, item['default_max_level']))
 
 
 def build_menu_access(user_level=None):
@@ -313,6 +364,11 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return 'document_admin'
     if path.startswith('/approval'):
         return 'approval_main'
+    # 강사용 전송페이지는 인트라넷 메뉴 레벨 대신 전용 비밀번호로 보호한다.
+    if path.startswith('/expense/submit/instructor'):
+        return None
+    if path.startswith('/expense/submit/center'):
+        return SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['expense']
     if path.startswith('/expense'):
         return 'expense_main'
     if path.startswith('/school/tasks'):
@@ -361,6 +417,26 @@ def enforce_request_menu_access():
     """로그인 회원의 직접 URL/API 접근도 메뉴 설정과 같게 차단한다."""
     if not session.get('emp_no'):
         return None
+    if session.get(INSTRUCTOR_EXPENSE_ACCESS_SESSION) and (request.path or '') in {
+        '/expense/submit',
+        '/expense/api/preview',
+        '/expense/template',
+    }:
+        return None
+    # 센터장 전송화면은 공용 전송/미리보기 API를 사용하므로 요청에 포함된
+    # 채널값을 확인해 센터장용 지출결의 권한으로 판정한다. 일반 본부용
+    # 전송 요청은 계속 expense_main 권한을 적용한다.
+    expense_path = request.path or ''
+    if expense_path in {'/expense/submit', '/expense/api/preview', '/expense/template'}:
+        expense_channel = (
+            request.args.get('channel', '')
+            if expense_path == '/expense/template'
+            else request.form.get('expense_submit_channel', '')
+        )
+        if expense_channel == 'center' \
+                and has_active_school_assignment() \
+                and menu_is_allowed(SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['expense']):
+            return None
     menu_key = resolve_request_menu(request.path or '', request.endpoint or '', request.view_args)
     if menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS and has_active_school_assignment():
         return None
@@ -369,6 +445,14 @@ def enforce_request_menu_access():
             return redirect('/school')
         # 전용모드는 일반 메뉴 레벨 설정보다 우선한다. 학교 화면에서 사용하는
         # 출퇴근 처리 API는 화면 내부 기능이므로 함께 허용한다.
+        if menu_key in SCHOOL_WORKSPACE_CATEGORY_MENUS:
+            if menu_is_allowed(menu_key):
+                return None
+            message = '이 센터장 업무 메뉴에 접근할 권한이 없습니다.'
+            if request.is_json or '/api/' in (request.path or '') \
+                    or request.accept_mimetypes.best == 'application/json':
+                return jsonify({'status': 'error', 'message': message}), 403
+            return message, 403
         if menu_key in {'school_workspace', 'school_calendar'} \
                 or (request.path or '').startswith('/api/attendance'):
             return None

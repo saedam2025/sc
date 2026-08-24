@@ -446,7 +446,8 @@ def delete_gallery_image_for_scope(conn, post_id, image_id, school_id):
 def require_school_gallery_access(conn, school_key):
     """본사 담당자 또는 해당 학교에 실제 지정된 센터장만 허용한다."""
     school = conn.execute('''
-        SELECT id, school_name, access_key, center_director_id, COALESCE(is_active, 1) AS is_active
+        SELECT id, school_name, access_key, center_director_id, center_director_id_2,
+               COALESCE(is_active, 1) AS is_active
         FROM schools
         WHERE access_key = ?
     ''', (school_key,)).fetchone()
@@ -466,7 +467,10 @@ def require_school_gallery_access(conn, school_key):
         )
     )
     is_assigned_director = (
-        str(school['center_director_id'] or '') == str(session.get('emp_no') or '')
+        str(session.get('emp_no') or '') in {
+            str(school['center_director_id'] or ''),
+            str(school['center_director_id_2'] or ''),
+        }
         and int(school['is_active'] or 0) == 1
     )
     if not is_headquarters and not is_assigned_director:

@@ -388,10 +388,13 @@ def _load_center_contacts(conn, positions=None):
     team_map = {str(row['emp_no']): int(row['team_no']) for row in team_rows}
     school_cols = _columns(conn, 'schools')
     location_expr = "office_location" if 'office_location' in school_cols else "''"
+    second_director_expr = "center_director_id_2" if 'center_director_id_2' in school_cols else "''"
     query = f"""
-        SELECT center_director_id, school_name, {location_expr} AS office_location
+        SELECT center_director_id, {second_director_expr} AS center_director_id_2,
+               school_name, {location_expr} AS office_location
         FROM schools
-        WHERE COALESCE(center_director_id, '') <> ''
+        WHERE (COALESCE(center_director_id, '') <> ''
+           OR COALESCE({second_director_expr}, '') <> '')
     """
     if 'is_active' in school_cols:
         query += " AND COALESCE(is_active, 1) = 1"
@@ -399,14 +402,14 @@ def _load_center_contacts(conn, positions=None):
 
     assignments = {}
     for row in conn.execute(query).fetchall():
-        emp_no = row['center_director_id']
         school_name = str(row['school_name'] or '').strip()
         office_location = str(row['office_location'] or '').strip()
         if not school_name:
             continue
-        bucket = assignments.setdefault(emp_no, {'schools': [], 'locations': []})
-        bucket['schools'].append(school_name)
-        bucket['locations'].append(f"{school_name}: {office_location if office_location else '-'}")
+        for emp_no in {row['center_director_id'], row['center_director_id_2']} - {None, ''}:
+            bucket = assignments.setdefault(emp_no, {'schools': [], 'locations': []})
+            bucket['schools'].append(school_name)
+            bucket['locations'].append(f"{school_name}: {office_location if office_location else '-'}")
 
     for contact in contacts:
         assignment = assignments.get(contact['emp_no'], {})
@@ -521,6 +524,21 @@ def _load_school_contacts(conn):
     school_phone_expr = "s.school_phone" if 'school_phone' in school_cols else "s.office_phone"
     school_email_expr = "s.school_email" if 'school_email' in school_cols else "''"
     contract_expr = "s.contract_subject" if 'contract_subject' in school_cols else "''"
+    has_second_director = 'center_director_id_2' in school_cols
+    second_director_fields = """
+            u2.name AS director_name_2,
+            u2.phone AS director_phone_2,
+            u2.email AS director_email_2
+    """ if has_second_director else """
+            NULL AS director_name_2,
+            NULL AS director_phone_2,
+            NULL AS director_email_2
+    """
+    second_director_join = """
+        LEFT JOIN users u2
+          ON s.center_director_id_2 = u2.emp_no
+         AND TRIM(COALESCE(u2.name, '')) NOT LIKE '관리자%'
+    """ if has_second_director else ""
 
     query = f"""
         SELECT
@@ -537,11 +555,13 @@ def _load_school_contacts(conn):
             {contract_expr} AS contract_subject,
             u.name AS director_name,
             u.phone AS director_phone,
-            u.email AS director_email
+            u.email AS director_email,
+            {second_director_fields}
         FROM schools s
         LEFT JOIN users u
           ON s.center_director_id = u.emp_no
          AND TRIM(COALESCE(u.name, '')) NOT LIKE '관리자%'
+        {second_director_join}
     """
     if has_is_active:
         query += " WHERE COALESCE(s.is_active, 1) = 1"
@@ -561,9 +581,9 @@ def _load_school_contacts(conn):
             'school_phone': _dash(data.get('school_phone')),
             'office_phone': _dash(data.get('office_phone')),
             'email': _dash(data.get('school_email')),
-            'director_name': _dash(data.get('director_name')),
-            'director_phone': _dash(data.get('director_phone')),
-            'director_email': _dash(data.get('director_email')),
+            'director_name': _dash(' · '.join(filter(None, [data.get('director_name'), data.get('director_name_2')]))),
+            'director_phone': _dash(' · '.join(filter(None, [data.get('director_phone'), data.get('director_phone_2')]))),
+            'director_email': _dash(' · '.join(filter(None, [data.get('director_email'), data.get('director_email_2')]))),
             'neulbom_manager': _dash(data.get('neulbom_manager')),
             'neulbom_assistant': _dash(data.get('neulbom_assistant')),
         })

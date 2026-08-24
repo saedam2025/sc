@@ -494,6 +494,37 @@ def init_db():
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
+    # 과거의 본부공지사항·자료실 일괄 권한을 최초 1회 동작별 권한으로
+    # 분리한다. 센터장은 접근·읽기·댓글까지, 본사직원은 쓰기·삭제까지
+    # 가능하도록 시작하며 이후 메뉴 권한관리에서 각 행을 독립 변경한다.
+    shared_action_migration = c.execute(
+        "SELECT value FROM admin_settings WHERE key='school_center_shared_actions_v1'"
+    ).fetchone()
+    if not shared_action_migration:
+        c.executemany('''
+            INSERT INTO menu_access_permissions (menu_key, max_level, updated_by, updated_at)
+            VALUES (?, ?, 'system-migration', CURRENT_TIMESTAMP)
+            ON CONFLICT(menu_key) DO NOTHING
+        ''', (
+            ('school_center_shared', 8),
+            ('school_center_shared_read', 8),
+            ('school_center_shared_write', 5),
+            ('school_center_shared_delete', 5),
+            ('school_center_shared_comment', 8),
+        ))
+        c.execute('''
+            UPDATE menu_access_permissions
+            SET max_level=8,
+                updated_by='system-migration',
+                updated_at=CURRENT_TIMESTAMP
+            WHERE menu_key='school_center_shared'
+              AND max_level BETWEEN 0 AND 7
+        ''')
+        c.execute('''
+            INSERT INTO admin_settings (key, value, updated_at)
+            VALUES ('school_center_shared_actions_v1', '1', CURRENT_TIMESTAMP)
+        ''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS custom_themes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -906,7 +937,8 @@ def init_db():
         school_email TEXT,
         neulbom_assistant TEXT,            
         neulbom_manager TEXT,              
-        center_director_id TEXT,           
+        center_director_id TEXT,
+        center_director_id_2 TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
@@ -980,6 +1012,7 @@ def init_db():
         "ALTER TABLE schools ADD COLUMN school_phone TEXT",
         "ALTER TABLE schools ADD COLUMN school_email TEXT",
         "ALTER TABLE schools ADD COLUMN access_key TEXT",
+        "ALTER TABLE schools ADD COLUMN center_director_id_2 TEXT",
         "ALTER TABLE gall2 ADD COLUMN post_id INTEGER",
         "ALTER TABLE usage_logs ADD COLUMN session_id TEXT",
         "ALTER TABLE usage_user_totals ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
@@ -1033,6 +1066,51 @@ def init_db():
         CREATE UNIQUE INDEX IF NOT EXISTS idx_schools_access_key
         ON schools(access_key)
         WHERE access_key IS NOT NULL
+    ''')
+    # 학교당 센터장은 최대 2명이며, 같은 회원이 두 자리 또는 다른 학교에
+    # 동시에 배정되는 것을 DB 단계에서도 차단한다.
+    c.execute('''
+        CREATE TRIGGER IF NOT EXISTS trg_school_director_unique_insert
+        BEFORE INSERT ON schools
+        WHEN (
+            TRIM(COALESCE(NEW.center_director_id, '')) <> ''
+            AND NEW.center_director_id = NEW.center_director_id_2
+        ) OR EXISTS (
+            SELECT 1 FROM schools s
+            WHERE (
+                TRIM(COALESCE(NEW.center_director_id, '')) <> ''
+                AND NEW.center_director_id IN (s.center_director_id, s.center_director_id_2)
+            ) OR (
+                TRIM(COALESCE(NEW.center_director_id_2, '')) <> ''
+                AND NEW.center_director_id_2 IN (s.center_director_id, s.center_director_id_2)
+            )
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'CENTER_DIRECTOR_ALREADY_ASSIGNED');
+        END
+    ''')
+    c.execute('''
+        CREATE TRIGGER IF NOT EXISTS trg_school_director_unique_update
+        BEFORE UPDATE OF center_director_id, center_director_id_2 ON schools
+        WHEN (
+            TRIM(COALESCE(NEW.center_director_id, '')) <> ''
+            AND NEW.center_director_id = NEW.center_director_id_2
+        ) OR EXISTS (
+            SELECT 1 FROM schools s
+            WHERE s.id <> NEW.id
+              AND (
+                (
+                    TRIM(COALESCE(NEW.center_director_id, '')) <> ''
+                    AND NEW.center_director_id IN (s.center_director_id, s.center_director_id_2)
+                ) OR (
+                    TRIM(COALESCE(NEW.center_director_id_2, '')) <> ''
+                    AND NEW.center_director_id_2 IN (s.center_director_id, s.center_director_id_2)
+                )
+              )
+        )
+        BEGIN
+            SELECT RAISE(ABORT, 'CENTER_DIRECTOR_ALREADY_ASSIGNED');
+        END
     ''')
 
     c.execute('CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at)')
