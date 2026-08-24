@@ -185,8 +185,19 @@
     .row-num { font-size: 15px; font-weight: 900; color: #64748b; text-align: center; }
     
     .disk-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 14px; }
+    .disk-root-list { max-height: 680px; overflow-y: auto; padding-right: 3px; }
     .root-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; }
     .root-card.active { border-color: var(--primary-color, #4a90e2); background: rgba(74,144,226,.11); }
+    .root-card.static { cursor: default; background: rgba(100,116,139,.045); }
+    .root-card-label { min-width: 0; display: flex; align-items: flex-start; gap: 8px; }
+    .root-card-label > i { margin-top: 2px; color: var(--primary-color, #4a90e2); }
+    .root-card-label small { display: block; margin-top: 3px; color: var(--text-gray, #64748b); font-size: 10px; font-weight: 700; }
+    .root-card-size { flex: 0 0 auto; text-align: right; }
+    .root-card-size small { display: block; margin-top: 3px; color: var(--text-gray, #64748b); font-size: 9px; }
+    .disk-personal-note { margin: 8px 0 14px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 650; line-height: 1.6; }
+    .disk-person { display: flex; align-items: center; gap: 9px; min-width: 180px; }
+    .disk-person-icon { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary-light, #eff6ff); color: var(--primary-color, #4a90e2); }
+    .disk-person small { display: block; margin-top: 2px; color: var(--text-gray, #64748b); }
     .theme-preview { min-height: 260px; border-radius: 8px; border: 1px solid var(--border-color, #e2e8f0); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--preview-bg, #f8fafc); }
     .theme-card { width: min(420px, 80%); background: var(--preview-card, rgba(255,255,255,.75)); border: 1px solid var(--preview-border, rgba(255,255,255,.9)); box-shadow: var(--preview-shadow, 0 16px 36px rgba(15,23,42,.14)); border-radius: 8px; padding: 24px; text-align: center; position: relative; z-index: 1; }
     .theme-list { max-height: 320px; overflow: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; }
@@ -436,12 +447,29 @@
         <div class="disk-layout">
             <div class="panel">
                 <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-layer-group"></i> 메뉴별 용량</h2>
+                <div class="disk-root-list">
                 {% for root in roots %}
+                {% if root.browseable %}
                 <a class="root-card {% if root.key == selected_root.key %}active{% endif %}" href="/admin/disk?root={{ root.key }}">
-                    <span><i class="fa-solid {{ root.icon }}"></i> {{ root.label }}</span>
-                    <strong>{{ root.size_text }}</strong>
+                    <span class="root-card-label">
+                        <i class="fa-solid {{ root.icon }}"></i>
+                        <span>{{ root.label }}
+                            <small>{{ root.file_count }}개 파일{% if root.db_count %} · DB {{ root.db_count }}건{% endif %}{% if root.auto_discovered %} · 신규 자동등록{% endif %}</small>
+                        </span>
+                    </span>
+                    <strong class="root-card-size">{{ root.size_text }}{% if root.db_size %}<small>DB 포함</small>{% endif %}</strong>
                 </a>
+                {% else %}
+                <div class="root-card static">
+                    <span class="root-card-label">
+                        <i class="fa-solid {{ root.icon }}"></i>
+                        <span>{{ root.label }}<small>DB 저장 {{ root.db_count }}건</small></span>
+                    </span>
+                    <strong class="root-card-size">{{ root.size_text }}<small>DB 데이터</small></strong>
+                </div>
+                {% endif %}
                 {% endfor %}
+                </div>
             </div>
             <div class="panel">
                 <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-folder-open"></i> {{ selected_root.label }} / {{ current_path }}</h2>
@@ -466,6 +494,46 @@
                         </tr>
                         {% else %}
                         <tr><td colspan="4" class="empty-note">표시할 파일이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2 class="panel-title"><i class="fa-solid fa-users"></i> 개인별 사용량</h2>
+            <p class="disk-personal-note">
+                첨부파일은 게시물 작성자·문서 기안자·메시지 발송자·기능별 소유자 기준으로 계산하고,
+                스마트 명세서 등 DB에 직접 저장된 자료도 함께 합산합니다. 소유자를 확인할 수 없는 이전 자료는 미분류/공용으로 표시됩니다.
+            </p>
+            <div class="grid-3" style="margin-bottom:14px;">
+                <div class="stat-box"><i class="fa-solid fa-user-group stat-icon"></i><div class="stat-label">집계 사용자</div><div class="stat-value">{{ personal_totals.users }}명</div></div>
+                <div class="stat-box"><i class="fa-solid fa-database stat-icon"></i><div class="stat-label">개인별 집계 합계</div><div class="stat-value">{{ personal_totals.total_text }}</div></div>
+                <div class="stat-box"><i class="fa-solid fa-box-archive stat-icon"></i><div class="stat-label">미분류/공용</div><div class="stat-value">{{ personal_totals.shared_text }}</div></div>
+            </div>
+            <div class="stats-table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>사용자</th><th>사번</th><th>소속/직급</th><th>파일 수</th><th>파일 용량</th><th>DB 데이터</th><th>합계</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for usage in personal_usage %}
+                        <tr>
+                            <td>
+                                <div class="disk-person">
+                                    <span class="disk-person-icon"><i class="fa-solid {% if usage.key == 'shared' %}fa-box-archive{% else %}fa-user{% endif %}"></i></span>
+                                    <strong>{{ usage.name }}</strong>
+                                </div>
+                            </td>
+                            <td class="mono">{{ usage.emp_no }}</td>
+                            <td>{{ usage.department or '-' }}{% if usage.position %} / {{ usage.position }}{% endif %}</td>
+                            <td>{{ usage.file_count }}개</td>
+                            <td>{{ usage.file_size_text }}</td>
+                            <td>{{ usage.db_size_text }}{% if usage.db_items %}<small class="muted"> ({{ usage.db_items }}건)</small>{% endif %}</td>
+                            <td><strong>{{ usage.total_size_text }}</strong></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="7" class="empty-note">집계할 사용자 데이터가 없습니다.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
