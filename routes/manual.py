@@ -14,6 +14,7 @@ from flask import (
     Blueprint, abort, current_app, jsonify, redirect, render_template,
     request, send_from_directory, url_for
 )
+from .storage import MANUAL_UPLOADS
 from werkzeug.utils import secure_filename
 
 from routes.database import get_db
@@ -29,7 +30,7 @@ MAX_TXT_BYTES = 2 * 1024 * 1024
 # Storage / DB helpers
 # ---------------------------------------------------------------------
 def _manual_root() -> Path:
-    path = Path(current_app.config.get("MANUAL_UPLOAD_ROOT", "/mnt/data/manuals"))
+    path = Path(current_app.config.get("MANUAL_UPLOAD_ROOT", str(MANUAL_UPLOADS)))
     path.mkdir(parents=True, exist_ok=True)
     return path
 

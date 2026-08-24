@@ -3,11 +3,28 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 from datetime import datetime
 
 from .database import BASE_DIR, GALLERY_ROOT, PROFILE_ROOT, SCHOOL_UPLOADS, get_db
 from .security import hash_password, is_admin_session
-from .storage import CHAT_UPLOADS, MEMO_UPLOADS, delete_storage_target
+from .storage import (
+    AI_MAIL_UPLOADS,
+    APP_ROOT,
+    BOARD_UPLOADS,
+    CHAT_UPLOADS,
+    CONTRACTS_ROOT,
+    DATA_ROOT,
+    DEPOSIT_UPLOADS,
+    EBOOK_UPLOADS,
+    GALL2_ROOT,
+    LEGACY_ARCHIVE_ROOT,
+    MANUAL_UPLOADS,
+    MEMO_UPLOADS,
+    UPLOADS_ROOT,
+    VERIFIED_CONTRACT_ROOT,
+    delete_storage_target,
+)
 from .menu_access import (
     MENU_CATALOG,
     MENU_GROUPS,
@@ -231,20 +248,347 @@ def _folder_size(path):
 
 
 def _storage_roots():
-    data_root = BASE_DIR
-    return [
-        {'key': 'board', 'label': '게시판', 'path': os.path.join(data_root, 'board_uploads'), 'icon': 'fa-clipboard-list'},
+    data_root = str(DATA_ROOT)
+    roots = [
+        {'key': 'approval_expense', 'label': '사내결재·지출결의', 'path': str(UPLOADS_ROOT), 'icon': 'fa-file-signature'},
+        {'key': 'board', 'label': '게시판·자료실·업무메뉴얼', 'path': str(BOARD_UPLOADS), 'icon': 'fa-clipboard-list'},
         {'key': 'messenger', 'label': '사내메신저', 'path': str(CHAT_UPLOADS), 'icon': 'fa-comments'},
         {'key': 'memo', 'label': '개인화이트보드', 'path': str(MEMO_UPLOADS), 'icon': 'fa-chalkboard'},
         {'key': 'school', 'label': '학교업무메뉴', 'path': SCHOOL_UPLOADS, 'icon': 'fa-school'},
         {'key': 'certificate', 'label': '증명발급', 'path': os.path.join(data_root, 'output_pdfs'), 'icon': 'fa-file-invoice'},
-        {'key': 'contract', 'label': '계약시스템', 'path': os.path.join(data_root, 'contracts'), 'icon': 'fa-file-contract'},
+        {'key': 'certificate_logos', 'label': '증명서 로고', 'path': os.path.join(data_root, 'certificate_logos'), 'icon': 'fa-image'},
+        {'key': 'certificate_seals', 'label': '증명서 직인', 'path': os.path.join(data_root, 'certificate_seals'), 'icon': 'fa-stamp'},
+        {'key': 'contract', 'label': '전자계약', 'path': str(CONTRACTS_ROOT), 'icon': 'fa-file-contract'},
+        {'key': 'verified_contract', 'label': '인증전자계약', 'path': str(VERIFIED_CONTRACT_ROOT), 'icon': 'fa-file-signature'},
         {'key': 'gallery', 'label': '갤러리', 'path': GALLERY_ROOT, 'icon': 'fa-images'},
-        {'key': 'gall2', 'label': '사내 갤러리', 'path': os.path.join(data_root, 'gall2'), 'icon': 'fa-photo-film'},
+        {'key': 'gall2', 'label': '사내 갤러리', 'path': str(GALL2_ROOT), 'icon': 'fa-photo-film'},
+        {'key': 'ai_mail', 'label': '스마트 메일 발송', 'path': str(AI_MAIL_UPLOADS), 'icon': 'fa-wand-magic-sparkles'},
+        {'key': 'ebook', 'label': 'e리플렛·eBook', 'path': str(EBOOK_UPLOADS), 'icon': 'fa-book-open-reader'},
+        {'key': 'manual', 'label': '신규 업무메뉴얼', 'path': str(MANUAL_UPLOADS), 'icon': 'fa-book'},
         {'key': 'profiles', 'label': '인사/프로필', 'path': PROFILE_ROOT, 'icon': 'fa-id-card'},
-        {'key': 'deposit', 'label': '입금 엑셀', 'path': os.path.join(BASE_DIR, 'uploads_deposit'), 'icon': 'fa-file-excel'},
+        {'key': 'deposit', 'label': '입금용 엑셀 생성기', 'path': str(DEPOSIT_UPLOADS), 'icon': 'fa-file-excel'},
+        {'key': 'company_stamps', 'label': '회사 직인', 'path': os.path.join(data_root, 'company_stamps'), 'icon': 'fa-stamp'},
+        {'key': 'legacy', 'label': '이전 데이터 보관', 'path': str(LEGACY_ARCHIVE_ROOT), 'icon': 'fa-box-archive'},
         {'key': 'app', 'label': '앱 루트', 'path': BASE_DIR, 'icon': 'fa-folder-tree'},
     ]
+
+    # 새 기능이 전용 데이터 폴더를 만들면 디스크관리에도 자동으로 노출한다.
+    registered_paths = {os.path.realpath(item['path']) for item in roots}
+    if os.path.isdir(data_root):
+        for name in sorted(os.listdir(data_root), key=str.lower):
+            path = os.path.join(data_root, name)
+            real_path = os.path.realpath(path)
+            if not os.path.isdir(path) or real_path in registered_paths:
+                continue
+            if _is_sensitive_storage_target(path):
+                continue
+            safe_key = re.sub(r'[^a-z0-9_-]+', '-', name.lower()).strip('-') or 'storage'
+            roots.insert(-1, {
+                'key': f'auto-{safe_key}',
+                'label': f'{name} (자동 발견)',
+                'path': path,
+                'icon': 'fa-folder-plus',
+                'auto_discovered': True,
+            })
+            registered_paths.add(real_path)
+    return roots
+
+
+def _logical_storage_usage(conn):
+    """DB 안에 직접 저장되는 메뉴 데이터와 소유자별 논리 용량을 집계한다."""
+    features = {
+        'approval_expense': {'label': '사내결재·지출결의', 'icon': 'fa-file-signature'},
+        'messenger': {'label': '사내메신저', 'icon': 'fa-comments'},
+        'memo': {'label': '개인화이트보드', 'icon': 'fa-chalkboard'},
+        'board': {'label': '게시판·자료실·업무메뉴얼', 'icon': 'fa-clipboard-list'},
+        'school': {'label': '학교업무메뉴', 'icon': 'fa-school'},
+        'ai_mail': {'label': '스마트 메일 발송', 'icon': 'fa-wand-magic-sparkles'},
+        'payroll': {'label': '스마트 명세서 발송', 'icon': 'fa-envelope-open-text'},
+        'ebook': {'label': 'e리플렛·eBook', 'icon': 'fa-book-open-reader'},
+        'manual': {'label': '신규 업무메뉴얼', 'icon': 'fa-book'},
+        'contacts': {'label': '본사연락망', 'icon': 'fa-address-book'},
+        'parent_notifications': {'label': '학부모알림전송', 'icon': 'fa-bell'},
+    }
+    usage = {
+        key: {**meta, 'key': key, 'size': 0, 'count': 0, 'owners': {}}
+        for key, meta in features.items()
+    }
+
+    def collect(feature_key, sql):
+        try:
+            rows = conn.execute(sql).fetchall()
+        except sqlite3.Error:
+            return
+        feature = usage[feature_key]
+        for row in rows:
+            owner = str(row['owner'] or '').strip() or '미분류/공용'
+            size = int(row['size_bytes'] or 0)
+            count = int(row['item_count'] or 0)
+            feature['size'] += size
+            feature['count'] += count
+            owner_row = feature['owners'].setdefault(owner, {'size': 0, 'count': 0})
+            owner_row['size'] += size
+            owner_row['count'] += count
+
+    payload = lambda column: f"LENGTH(CAST(COALESCE({column}, '') AS BLOB))"
+    queries = {
+        'approval_expense': [
+            f"SELECT drafter owner, COUNT(*) item_count, SUM({payload('doc_data')}) size_bytes FROM approvals GROUP BY drafter",
+            """SELECT r.drafter owner, COUNT(i.id) item_count,
+                      COALESCE(SUM(LENGTH(CAST(COALESCE(i.description, '') AS BLOB))
+                                 + LENGTH(CAST(COALESCE(i.vendor, '') AS BLOB))
+                                 + LENGTH(CAST(COALESCE(i.note, '') AS BLOB))), 0) size_bytes
+                   FROM expense_reports r LEFT JOIN expense_items i ON i.report_id=r.id
+                  GROUP BY r.drafter""",
+        ],
+        'messenger': [
+            f"SELECT sender owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM messages GROUP BY sender",
+        ],
+        'memo': [
+            f"SELECT COALESCE(owner_key, owner) owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM memos GROUP BY COALESCE(owner_key, owner)",
+            f"SELECT owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM whiteboard_memos GROUP BY owner",
+        ],
+        'board': [
+            f"SELECT author owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM board_posts GROUP BY author",
+        ],
+        'school': [
+            f"SELECT author owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM school_posts GROUP BY author",
+            f"SELECT author owner, COUNT(*) item_count, SUM({payload('content')}) size_bytes FROM school_post_comments GROUP BY author",
+        ],
+        'ai_mail': [
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('body_html')} + {payload('body_text')}) size_bytes FROM ai_mail_templates GROUP BY owner_emp_no",
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('body_html')} + {payload('body_text')} + {payload('preflight_json')}) size_bytes FROM ai_mail_campaigns GROUP BY owner_emp_no",
+        ],
+        'payroll': [
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('body_html')} + {payload('banner1_data')} + {payload('banner2_data')}) size_bytes FROM payroll_workgroups GROUP BY owner_emp_no",
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('body_html')} + {payload('field_mappings_json')}) size_bytes FROM payroll_mail_templates GROUP BY owner_emp_no",
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('source_value')}) size_bytes FROM payroll_image_assets GROUP BY owner_emp_no",
+            "SELECT owner_emp_no owner, COUNT(*) item_count, COALESCE(SUM(LENGTH(statement_html_zlib)), 0) size_bytes FROM payroll_campaign_recipients GROUP BY owner_emp_no",
+        ],
+        'ebook': [
+            f"SELECT created_by owner, COUNT(*) item_count, SUM({payload('content_text')}) size_bytes FROM ebooks GROUP BY created_by",
+            f"""SELECT e.created_by owner, COUNT(*) item_count, SUM({payload('p.content_html')}) size_bytes
+                    FROM ebook_pages p JOIN ebooks e ON e.id=p.ebook_id GROUP BY e.created_by""",
+        ],
+        'manual': [
+            f"""SELECT m.created_by owner, COUNT(*) item_count, SUM({payload('s.content_html')}) size_bytes
+                    FROM manual_sections s JOIN manuals m ON m.id=s.manual_id GROUP BY m.created_by""",
+        ],
+        'contacts': [
+            f"SELECT owner_emp_no owner, COUNT(*) item_count, SUM({payload('settings_json')}) size_bytes FROM saved_contact_directories GROUP BY owner_emp_no",
+        ],
+        'parent_notifications': [
+            f"SELECT created_by owner, COUNT(*) item_count, SUM({payload('title')} + {payload('body')}) size_bytes FROM parent_notifications GROUP BY created_by",
+        ],
+    }
+    for feature_key, statements in queries.items():
+        for statement in statements:
+            collect(feature_key, statement)
+    return usage
+
+
+def _personal_storage_usage(conn, logical_usage, storage_roots):
+    """파일 관계와 DB 소유자 컬럼을 이용해 개인별 저장공간을 계산한다."""
+    try:
+        user_rows = conn.execute('''
+            SELECT emp_no, name, position, department, status
+            FROM users ORDER BY name, emp_no
+        ''').fetchall()
+    except sqlite3.Error:
+        user_rows = []
+
+    people = {}
+    emp_lookup = {}
+    name_lookup = {}
+    for row in user_rows:
+        emp_no = str(row['emp_no'] or '').strip()
+        name = str(row['name'] or '').strip() or emp_no or '이름 없음'
+        key = f'emp:{emp_no.lower()}' if emp_no else f'name:{name.lower()}'
+        people[key] = {
+            'key': key,
+            'emp_no': emp_no or '-',
+            'name': name,
+            'position': str(row['position'] or '').strip(),
+            'department': str(row['department'] or '').strip(),
+            'status': str(row['status'] or '').strip(),
+            'file_bytes': 0,
+            'file_count': 0,
+            'db_bytes': 0,
+            'db_items': 0,
+        }
+        if emp_no:
+            emp_lookup[emp_no.lower()] = key
+        if name:
+            name_lookup.setdefault(name.lower(), []).append(key)
+
+    def person_for(raw_owner):
+        owner = str(raw_owner or '').strip()
+        if (
+            not owner
+            or owner == '미분류/공용'
+            or owner.lower() in {'system', '시스템', '시스템알림', '🔔시스템알림'}
+        ):
+            key = 'shared'
+        elif owner.lower() in emp_lookup:
+            key = emp_lookup[owner.lower()]
+        elif len(name_lookup.get(owner.lower(), [])) == 1:
+            key = name_lookup[owner.lower()][0]
+        else:
+            key = f'legacy:{owner.lower()}'
+        if key not in people:
+            people[key] = {
+                'key': key,
+                'emp_no': '-' if key == 'shared' else owner,
+                'name': '미분류/공용' if key == 'shared' else owner,
+                'position': '', 'department': '', 'status': '',
+                'file_bytes': 0, 'file_count': 0, 'db_bytes': 0, 'db_items': 0,
+            }
+        return people[key]
+
+    for feature in logical_usage.values():
+        for owner, stats in feature['owners'].items():
+            person = person_for(owner)
+            person['db_bytes'] += stats['size']
+            person['db_items'] += stats['count']
+
+    physical_roots = [
+        item for item in storage_roots
+        if item['key'] != 'app' and os.path.isdir(item['path'])
+    ]
+    file_index = {}
+    all_files = []
+    for root_info in physical_roots:
+        for walk_root, dirs, files in os.walk(root_info['path']):
+            dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(walk_root, d))]
+            for filename in files:
+                path = os.path.realpath(os.path.join(walk_root, filename))
+                if os.path.islink(path) or _is_sensitive_storage_target(path):
+                    continue
+                file_index.setdefault(filename.lower(), []).append(path)
+                all_files.append(path)
+
+    seen_files = set()
+
+    def resolve_reference(reference, fallback_root=None):
+        text = str(reference or '').strip().strip('"').strip("'")
+        if not text or text.startswith(('http://', 'https://', 'data:')):
+            return None
+        normalized = text.replace('\\', '/')
+        if normalized.startswith('/mnt/data/'):
+            candidate = os.path.join(BASE_DIR, normalized[len('/mnt/data/'):].replace('/', os.sep))
+            if os.path.isfile(candidate):
+                return os.path.realpath(candidate)
+        if normalized.startswith('/static/'):
+            candidate = os.path.join(str(APP_ROOT), normalized.lstrip('/').replace('/', os.sep))
+            if os.path.isfile(candidate):
+                return os.path.realpath(candidate)
+        if os.path.isfile(text):
+            return os.path.realpath(text)
+        basename = os.path.basename(normalized)
+        if fallback_root and basename:
+            candidate = os.path.join(str(fallback_root), basename)
+            if os.path.isfile(candidate):
+                return os.path.realpath(candidate)
+        matches = file_index.get(basename.lower(), []) if basename else []
+        return matches[0] if len(matches) == 1 else None
+
+    def add_file(owner, reference, fallback_root=None):
+        path = resolve_reference(reference, fallback_root)
+        if not path or path in seen_files:
+            return
+        try:
+            size = os.path.getsize(path)
+        except OSError:
+            return
+        seen_files.add(path)
+        person = person_for(owner)
+        person['file_bytes'] += size
+        person['file_count'] += 1
+
+    def add_references(owner, references, fallback_root=None):
+        for reference in references:
+            for token in str(reference or '').split(','):
+                add_file(owner, token, fallback_root)
+
+    query_specs = [
+        ("SELECT p.author owner, f.saved_name ref FROM board_files f JOIN board_posts p ON p.id=f.post_id", str(BOARD_UPLOADS)),
+        ("SELECT sender owner, filepath ref FROM messages WHERE TRIM(COALESCE(filepath,''))<>''", str(CHAT_UPLOADS)),
+        ("SELECT COALESCE(owner_key, owner) owner, filepath ref FROM memos WHERE TRIM(COALESCE(filepath,''))<>''", str(MEMO_UPLOADS)),
+        ("SELECT drafter owner, filepath ref FROM approvals WHERE TRIM(COALESCE(filepath,''))<>''", str(UPLOADS_ROOT)),
+        ("SELECT drafter owner, source_filepath ref FROM expense_reports WHERE TRIM(COALESCE(source_filepath,''))<>''", str(UPLOADS_ROOT)),
+        ("SELECT drafter owner, receipt_filepath ref FROM expense_reports WHERE TRIM(COALESCE(receipt_filepath,''))<>''", str(UPLOADS_ROOT)),
+        ("SELECT author owner, filepath ref FROM school_posts WHERE TRIM(COALESCE(filepath,''))<>''", SCHOOL_UPLOADS),
+        ("SELECT author owner, filepath ref FROM school_post_comments WHERE TRIM(COALESCE(filepath,''))<>''", SCHOOL_UPLOADS),
+        ("SELECT emp_no owner, profile_path ref FROM users WHERE TRIM(COALESCE(profile_path,''))<>''", PROFILE_ROOT),
+        ("""SELECT c.owner_emp_no owner, a.filepath ref
+                FROM ai_mail_campaign_attachments a JOIN ai_mail_campaigns c ON c.id=a.campaign_id""", str(AI_MAIL_UPLOADS)),
+        ("""SELECT t.owner_emp_no owner, a.filepath ref
+                FROM ai_mail_template_assets a JOIN ai_mail_templates t ON t.id=a.template_id""", str(AI_MAIL_UPLOADS)),
+        ("SELECT created_by owner, cover_path ref FROM ebooks WHERE TRIM(COALESCE(cover_path,''))<>''", str(EBOOK_UPLOADS)),
+        ("""SELECT e.created_by owner, p.image_path ref
+                FROM ebook_pages p JOIN ebooks e ON e.id=p.ebook_id
+               WHERE TRIM(COALESCE(p.image_path,''))<>''""", str(EBOOK_UPLOADS)),
+        ("SELECT created_by owner, filepath ref FROM ebook_media WHERE TRIM(COALESCE(filepath,''))<>''", str(EBOOK_UPLOADS)),
+    ]
+    for sql, fallback_root in query_specs:
+        try:
+            rows = conn.execute(sql).fetchall()
+        except sqlite3.Error:
+            continue
+        for row in rows:
+            add_references(row['owner'], [row['ref']], fallback_root)
+
+    try:
+        gallery_rows = conn.execute('SELECT filename, thumb_name FROM gallery').fetchall()
+    except sqlite3.Error:
+        gallery_rows = []
+    for row in gallery_rows:
+        add_file('', row['filename'], os.path.join(GALLERY_ROOT, 'uploads'))
+        add_file('', row['thumb_name'], os.path.join(GALLERY_ROOT, 'thumbnails'))
+
+    try:
+        gall2_rows = conn.execute('''
+            SELECT p.author owner, g.filename, g.thumb_name
+            FROM gall2 g LEFT JOIN gall2_posts p ON p.id=g.post_id
+        ''').fetchall()
+    except sqlite3.Error:
+        gall2_rows = []
+    for row in gall2_rows:
+        add_file(row['owner'], row['filename'], os.path.join(str(GALL2_ROOT), 'uploads'))
+        add_file(row['owner'], row['thumb_name'], os.path.join(str(GALL2_ROOT), 'thumbnails'))
+
+    try:
+        contract_rows = conn.execute('SELECT created_by owner, signature_filename, pdf_filename FROM verified_contracts').fetchall()
+    except sqlite3.Error:
+        contract_rows = []
+    for row in contract_rows:
+        add_file(row['owner'], row['signature_filename'], os.path.join(str(VERIFIED_CONTRACT_ROOT), 'signatures'))
+        add_file(row['owner'], row['pdf_filename'], os.path.join(str(VERIFIED_CONTRACT_ROOT), 'completed'))
+
+    try:
+        manual_rows = conn.execute('''
+            SELECT m.created_by owner, i.manual_id, i.filename
+            FROM manual_images i JOIN manuals m ON m.id=i.manual_id
+        ''').fetchall()
+    except sqlite3.Error:
+        manual_rows = []
+    for row in manual_rows:
+        add_file(row['owner'], row['filename'], os.path.join(str(MANUAL_UPLOADS), str(row['manual_id'])))
+
+    # 관계가 없는 과거 파일도 총량에서 사라지지 않도록 공용 사용량에 포함한다.
+    for path in all_files:
+        if path not in seen_files:
+            add_file('', path)
+
+    rows = []
+    for person in people.values():
+        person['total_bytes'] = person['file_bytes'] + person['db_bytes']
+        person['file_size_text'] = _format_size(person['file_bytes'])
+        person['db_size_text'] = _format_size(person['db_bytes'])
+        person['total_size_text'] = _format_size(person['total_bytes'])
+        rows.append(person)
+    rows.sort(key=lambda row: (-row['total_bytes'], row['name'], row['emp_no']))
+    return rows
 
 
 def _is_sensitive_storage_target(path):
@@ -517,12 +861,53 @@ def disk():
     if _is_sensitive_storage_target(target):
         abort(403)
 
+    storage_roots = _storage_roots()
+    conn = get_db()
+    try:
+        logical_usage = _logical_storage_usage(conn)
+        personal_usage = _personal_storage_usage(conn, logical_usage, storage_roots)
+    finally:
+        conn.close()
+
     roots = []
-    for item in _storage_roots():
+    for item in storage_roots:
         size, count = _folder_size(item['path'])
+        logical = logical_usage.get(item['key'], {})
+        db_size = int(logical.get('size') or 0)
+        db_count = int(logical.get('count') or 0)
         row = dict(item)
-        row.update(size=size, size_text=_format_size(size), count=count, exists=os.path.exists(item['path']))
+        row.update(
+            size=size + db_size,
+            physical_size=size,
+            db_size=db_size,
+            size_text=_format_size(size + db_size),
+            count=count + db_count,
+            file_count=count,
+            db_count=db_count,
+            exists=os.path.exists(item['path']),
+            browseable=True,
+        )
         roots.append(row)
+
+    physical_keys = {item['key'] for item in roots}
+    for key, logical in logical_usage.items():
+        if key in physical_keys:
+            continue
+        roots.insert(-1, {
+            'key': key,
+            'label': logical['label'],
+            'icon': logical['icon'],
+            'path': None,
+            'size': logical['size'],
+            'physical_size': 0,
+            'db_size': logical['size'],
+            'size_text': _format_size(logical['size']),
+            'count': logical['count'],
+            'file_count': 0,
+            'db_count': logical['count'],
+            'exists': True,
+            'browseable': False,
+        })
 
     files = []
     parent_path = None
@@ -555,6 +940,13 @@ def disk():
         'free': _format_size(free),
         'percent': round((used / total) * 100, 1) if total else 0,
     }
+    personal_totals = {
+        'users': sum(1 for row in personal_usage if row['key'].startswith('emp:')),
+        'total': sum(row['total_bytes'] for row in personal_usage),
+        'total_text': _format_size(sum(row['total_bytes'] for row in personal_usage)),
+        'shared': next((row['total_bytes'] for row in personal_usage if row['key'] == 'shared'), 0),
+        'shared_text': _format_size(next((row['total_bytes'] for row in personal_usage if row['key'] == 'shared'), 0)),
+    }
     return _render(
         'disk',
         roots=roots,
@@ -564,6 +956,8 @@ def disk():
         target_exists=os.path.exists(target),
         files=files,
         disk_stats=disk_stats,
+        personal_usage=personal_usage,
+        personal_totals=personal_totals,
     )
 
 
