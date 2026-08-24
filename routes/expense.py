@@ -21,7 +21,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .database import get_db
-from .menu_access import INSTRUCTOR_EXPENSE_ACCESS_SESSION
+from .menu_access import INSTRUCTOR_EXPENSE_ACCESS_SESSION, menu_is_allowed
 from .storage import APP_ROOT, UPLOADS_ROOT
 from .security import is_admin_session
 from .secure_files import (
@@ -493,7 +493,13 @@ def _payment_status_for_doc(doc_status):
 
 
 def _can_manage_expenses():
-    return is_admin_session()
+    """지출결의 관리 권한은 메뉴권한관리의 설정을 따른다."""
+    return menu_is_allowed('expense_main')
+
+
+def _can_view_all_expenses():
+    """지출결의 관리 메뉴에 접근할 수 있는 회원은 전체 내역을 조회한다."""
+    return _can_manage_expenses()
 
 
 def _html_text(value):
@@ -1813,8 +1819,8 @@ def _query_reports(conn, filters, can_see_all, current_user):
 def index():
     ensure_expense_schema()
     current_user = session.get('user_name', '')
-    user_level = session.get('user_level', 99)
-    can_see_all = is_admin_session()
+    can_see_all = _can_view_all_expenses()
+    can_manage_expenses = _can_manage_expenses()
 
     filters = {
         'q': request.args.get('q', '').strip(),
@@ -1872,7 +1878,8 @@ def index():
         managers=[r['expense_manager'] for r in managers],
         schools=[r['expense_school_name'] for r in schools],
         years=[r['report_year'] for r in years],
-        can_see_all=can_see_all
+        can_see_all=can_see_all,
+        can_manage_expenses=can_manage_expenses
     )
 
 
@@ -1886,7 +1893,7 @@ def report_detail(report_id):
     if not report:
         conn.close()
         return jsonify({"status": "error", "message": "지출결의 내역을 찾을 수 없습니다."}), 404
-    if not _can_manage_expenses() and report['drafter'] != session.get('user_name'):
+    if not _can_view_all_expenses() and report['drafter'] != session.get('user_name'):
         conn.close()
         return jsonify({"status": "error", "message": "조회 권한이 없습니다."}), 403
     items = conn.execute("SELECT * FROM expense_items WHERE report_id=? ORDER BY row_no ASC, id ASC", (report_id,)).fetchall()
@@ -1915,7 +1922,7 @@ def report_attachment(report_id, kind, file_index):
     conn.close()
     if not report:
         abort(404)
-    if not _can_manage_expenses() and report['drafter'] != session.get('user_name'):
+    if not _can_view_all_expenses() and report['drafter'] != session.get('user_name'):
         abort(403)
     prefix = 'source' if kind == 'source' else 'receipt'
     files = _attachment_details(report[f'{prefix}_filename'], report[f'{prefix}_filepath'])
@@ -1955,7 +1962,7 @@ def email_selected_reports():
         }), 400
 
     current_user = session.get('user_name', '')
-    can_manage_all = _can_manage_expenses()
+    can_view_all = _can_view_all_expenses()
     report_entries = []
     conn = get_db()
     try:
@@ -1969,7 +1976,7 @@ def email_selected_reports():
                     "status": "error",
                     "message": f"선택한 지출결의서 #{report_id}을(를) 찾을 수 없습니다."
                 }), 404
-            if not can_manage_all and report['drafter'] != current_user:
+            if not can_view_all and report['drafter'] != current_user:
                 return jsonify({
                     "status": "error",
                     "message": "본인이 작성한 지출결의서만 이메일로 전송할 수 있습니다."
