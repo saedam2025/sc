@@ -35,6 +35,7 @@ from routes.parent_notifications import (
     ensure_parent_notification_schema,
     parent_notification_bp,
 )
+from routes.points import points_bp, award_response_activity
 
 # [수정] gall2.py가 routes 폴더 안에 있다면 아래와 같이 수정해야 합니다.
 from routes.gall2 import gall2_bp
@@ -206,6 +207,18 @@ def push_notification_changes(response):
             emit_notification_refresh(request.endpoint or path)
     except Exception as e:
         print(f"업무 알림 WebSocket 전송 오류: {e}")
+    return response
+
+
+@app.after_request
+def award_user_activity_points(response):
+    """성공한 로그인·게시물 등록·메신저 사용에 정해진 포인트를 적립한다."""
+    if response.status_code < 400:
+        user_name = str(session.get('user_name') or '').strip()
+        try:
+            award_response_activity(request.method, request.endpoint, user_name)
+        except Exception:
+            app.logger.exception('사용자 활동 포인트 적립 실패')
     return response
 
 
@@ -762,6 +775,7 @@ app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(ebook_bp, url_prefix='/ebook')
 app.register_blueprint(manual_bp, url_prefix='/manual')
 app.register_blueprint(parent_notification_bp)
+app.register_blueprint(points_bp)
 
 # 🚀 새로 분리한 메신저 블루프린트 등록 추가
 
