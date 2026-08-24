@@ -382,9 +382,9 @@
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">
                                 상태 변경:
                             </span>
-                            <button type="button" onclick="changeStatus('접수')" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
-                            <button type="button" onclick="changeStatus('처리중')" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
-                            <button type="button" onclick="changeStatus('완료')" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
+                            <button type="button" onclick="changeStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
+                            <button type="button" onclick="changeStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
                         </div>
                     </div>
 
@@ -472,16 +472,16 @@
                 </div>
             </div>
 
-            <div id="taskReadView" style="display: none; padding: 40px 30px;">
+            <div id="taskReadView" data-post-id="" style="display: none; padding: 40px 30px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid var(--saedam-blue); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
                     <h2 id="rTitle" style="margin:0; color:var(--text-dark); font-size: 1.6em; flex: 1;">제목이 로딩중입니다...</h2>
                     
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <div style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">상태 변경:</span>
-                            <button type="button" onclick="changeSingleStatus('접수')" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
-                            <button type="button" onclick="changeSingleStatus('처리중')" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
-                            <button type="button" onclick="changeSingleStatus('완료')" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
+                            <button type="button" onclick="changeSingleStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeSingleStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
+                            <button type="button" onclick="changeSingleStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
                         </div>
                         <button class="btn-action" style="background:rgba(0,0,0,0.03); color:var(--text-gray); border: 1px solid var(--border-color); font-size: 0.9em; padding: 8px 16px; height: 100%;" onclick="showView('taskListView')">
                             <i class="fa-solid fa-list"></i> 목록으로
@@ -513,6 +513,7 @@
     const itemsPerPage = 10;
     let filteredRows = [];
     let currentReadPostId = null;
+    let statusUpdatePending = false;
 
     document.addEventListener('DOMContentLoaded', function () {
         initSchoolFilter();
@@ -537,7 +538,10 @@
     function showView(viewId) {
         document.getElementById('taskListView').style.display = (viewId === 'taskListView') ? 'block' : 'none';
         document.getElementById('taskReadView').style.display = (viewId === 'taskReadView') ? 'block' : 'none';
-        if (viewId === 'taskListView') currentReadPostId = null;
+        if (viewId === 'taskListView') {
+            currentReadPostId = null;
+            document.getElementById('taskReadView').dataset.postId = '';
+        }
     }
 
     function initSchoolFilter() {
@@ -670,60 +674,94 @@
         container.appendChild(nextBtn);
     }
 
-    async function changeStatus(newStatus) {
+    async function changeStatus(newStatus, button) {
+        if (statusUpdatePending) return;
         const checkedItems = document.querySelectorAll('.chk-item:checked');
         const postIds = Array.from(checkedItems).map(cb => parseInt(cb.value, 10)).filter(id => !Number.isNaN(id));
         if (postIds.length === 0) { alert('상태를 변경할 게시물을 체크박스로 선택해주세요.'); return; }
         if (!confirm(`선택한 ${postIds.length}건의 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
-        await executeStatusUpdate(postIds, newStatus, false);
+        await executeStatusUpdate(postIds, newStatus, false, button);
     }
 
-    async function changeSingleStatus(newStatus) {
-        if (!currentReadPostId) return;
+    async function changeSingleStatus(newStatus, button) {
+        if (statusUpdatePending) return;
+        const storedPostId = document.getElementById('taskReadView').dataset.postId;
+        const postId = Number(storedPostId || currentReadPostId);
+        if (!Number.isInteger(postId) || postId <= 0) {
+            alert('게시물 정보를 확인할 수 없습니다. 목록으로 돌아가 게시물을 다시 선택해주세요.');
+            return;
+        }
         if (!confirm(`현재 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
-        await executeStatusUpdate([currentReadPostId], newStatus, true);
+        await executeStatusUpdate([postId], newStatus, true, button);
     }
 
-    async function executeStatusUpdate(postIds, newStatus, isSingle) {
+    async function executeStatusUpdate(postIds, newStatus, isSingle, button) {
+        const originalButtonHtml = button ? button.innerHTML : '';
+        statusUpdatePending = true;
+        document.querySelectorAll('.btn-action').forEach(actionButton => {
+            if (actionButton.closest('#taskReadView') || actionButton.closest('.task-toolbar')) {
+                actionButton.disabled = true;
+            }
+        });
+        if (button) button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 변경중';
+
         try {
             const res = await fetch('/school/tasks/api/update_status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ post_ids: postIds, status: newStatus })
             });
-            let data = await res.json();
-            if (data.status === 'success') {
-                if (isSingle) {
-                    postIds.forEach(id => {
-                        const row = document.querySelector(`.chk-item[value="${id}"]`)?.closest('tr');
-                        if (row) {
-                            row.dataset.status = newStatus;
-                            const badge = row.querySelector('.badge[class*="status-"]');
-                            if (badge) {
-                                badge.textContent = newStatus;
-                                badge.className = `badge status-${newStatus}`;
-                            }
-                            const processorCell = row.querySelector('.task-processor');
-                            if (processorCell) processorCell.textContent = data.processor || '-';
-                        }
-                    });
-                    applyFilters(); 
-                    await openTaskDetail(postIds[0]); 
-                } else {
-                    location.reload();
-                }
-            } else {
-                alert(data.message || '업데이트에 실패했습니다.');
+
+            if (res.redirected || res.headers.get('content-type')?.includes('text/html')) {
+                throw new Error('로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
             }
-        } catch (e) { alert('서버와 통신하는 중 오류가 발생했습니다.'); }
+
+            const data = await res.json();
+            if (!res.ok || data.status !== 'success') {
+                throw new Error(data.message || '업데이트에 실패했습니다.');
+            }
+
+            postIds.forEach(id => {
+                const row = document.querySelector(`.chk-item[value="${id}"]`)?.closest('tr');
+                if (row) {
+                    row.dataset.status = newStatus;
+                    const badge = row.querySelector('.badge[class*="status-"]');
+                    if (badge) {
+                        badge.textContent = newStatus;
+                        badge.className = `badge status-${newStatus}`;
+                    }
+                    const processorCell = row.querySelector('.task-processor');
+                    if (processorCell) processorCell.textContent = data.processor || '-';
+                }
+            });
+
+            if (isSingle) {
+                const statusBadge = document.getElementById('rStatus');
+                statusBadge.textContent = newStatus;
+                statusBadge.className = 'badge status-' + newStatus;
+                document.getElementById('rProcessor').textContent = data.processor || '미지정';
+            }
+
+            applyFilters();
+        } catch (e) {
+            alert(e.message || '서버와 통신하는 중 오류가 발생했습니다.');
+        } finally {
+            statusUpdatePending = false;
+            document.querySelectorAll('.btn-action').forEach(actionButton => {
+                actionButton.disabled = false;
+            });
+            if (button) button.innerHTML = originalButtonHtml;
+        }
     }
 
     async function openTaskDetail(postId) {
         try {
-            currentReadPostId = postId;
             const res = await fetch(`/school/tasks/api/detail/${postId}`);
             let post = await res.json();
             if (!res.ok || post.error) { alert(post.message || '게시물을 불러올 수 없습니다.'); return; }
+
+            currentReadPostId = Number(post.id || postId);
+            document.getElementById('taskReadView').dataset.postId = String(currentReadPostId);
 
             document.getElementById('rCategory').textContent = post.category || '';
             document.getElementById('rTitle').textContent = post.title || '';
