@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from routes.database import get_db
 
 school_task_bp = Blueprint('school_task', __name__)
+VALID_STATUSES = {'접수', '처리중', '완료'}
 
 
 @school_task_bp.before_request
@@ -109,10 +110,11 @@ def update_status():
     """
     2. 체크박스 선택 후 상태 변경
     """
+    conn = None
     try:
-        data = request.get_json()
-        post_ids = data.get('post_ids', [])
-        new_status = data.get('status')
+        data = request.get_json(silent=True) or {}
+        raw_post_ids = data.get('post_ids', [])
+        new_status = str(data.get('status') or '').strip()
         current_user = str(
             session.get('user_name')
             or session.get('name')
@@ -120,18 +122,34 @@ def update_status():
             or '관리자'
         ).strip()
 
-        if not post_ids or not new_status:
-            return jsonify({'status': 'fail', 'message': '잘못된 요청입니다.'}), 400
+        if not isinstance(raw_post_ids, list) or new_status not in VALID_STATUSES:
+            return jsonify({'status': 'fail', 'message': '유효하지 않은 상태 변경 요청입니다.'}), 400
+
+        post_ids = []
+        for raw_id in raw_post_ids:
+            try:
+                post_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            if post_id > 0 and post_id not in post_ids:
+                post_ids.append(post_id)
+
+        if not post_ids:
+            return jsonify({'status': 'fail', 'message': '변경할 게시물을 선택해주세요.'}), 400
 
         conn = get_db()
-        for pid in post_ids:
-            conn.execute('''
-                UPDATE school_posts 
-                SET status = ?, processor = ? 
-                WHERE id = ?
-            ''', (new_status, current_user, pid))
+        placeholders = ','.join('?' for _ in post_ids)
+        cursor = conn.execute(f'''
+            UPDATE school_posts
+            SET status = ?, processor = ?
+            WHERE id IN ({placeholders})
+        ''', (new_status, current_user, *post_ids))
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({'status': 'fail', 'message': '변경할 게시물을 찾을 수 없습니다.'}), 404
+
         conn.commit()
-        conn.close()
 
         return jsonify({
             'status': 'success',
@@ -141,6 +159,9 @@ def update_status():
     except Exception as e:
         print(f"상태 업데이트 중 에러 발생: {e}")
         return jsonify({'status': 'error', 'message': '상태 변경 중 오류가 발생했습니다.'}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @school_task_bp.route('/api/detail/<int:post_id>', methods=['GET'])

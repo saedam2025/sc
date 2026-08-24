@@ -951,6 +951,8 @@ def init_db():
         author TEXT,
         filename TEXT,                     
         filepath TEXT,                     
+        status TEXT DEFAULT '접수',
+        processor TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE CASCADE
     )''')
@@ -1013,6 +1015,8 @@ def init_db():
         "ALTER TABLE schools ADD COLUMN school_email TEXT",
         "ALTER TABLE schools ADD COLUMN access_key TEXT",
         "ALTER TABLE schools ADD COLUMN center_director_id_2 TEXT",
+        "ALTER TABLE school_posts ADD COLUMN status TEXT DEFAULT '접수'",
+        "ALTER TABLE school_posts ADD COLUMN processor TEXT",
         "ALTER TABLE gall2 ADD COLUMN post_id INTEGER",
         "ALTER TABLE usage_logs ADD COLUMN session_id TEXT",
         "ALTER TABLE usage_user_totals ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
