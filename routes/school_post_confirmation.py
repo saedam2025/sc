@@ -68,16 +68,46 @@ def get_confirmation_map(conn, post_ids):
 
     placeholders = ','.join('?' for _ in normalized_ids)
     rows = conn.execute(f'''
-        SELECT post_id, user_emp_no, user_name, school_name, confirmed_at
-        FROM school_post_confirmations
-        WHERE post_id IN ({placeholders})
-        ORDER BY confirmed_at ASC, user_name ASC
+        WITH assignment_rows AS (
+            SELECT TRIM(center_director_id) AS emp_no, school_name
+            FROM schools
+            WHERE COALESCE(is_active, 1) = 1
+              AND TRIM(COALESCE(center_director_id, '')) != ''
+            UNION
+            SELECT TRIM(center_director_id_2) AS emp_no, school_name
+            FROM schools
+            WHERE COALESCE(is_active, 1) = 1
+              AND TRIM(COALESCE(center_director_id_2, '')) != ''
+        ),
+        assignments AS (
+            SELECT emp_no, GROUP_CONCAT(school_name, ', ') AS assigned_school_names
+            FROM assignment_rows
+            GROUP BY emp_no
+        ),
+        user_positions AS (
+            SELECT emp_no, MAX(position) AS user_position
+            FROM users
+            GROUP BY emp_no
+        )
+        SELECT c.post_id, c.user_emp_no, c.user_name, c.school_name,
+               c.confirmed_at, a.assigned_school_names, u.user_position
+        FROM school_post_confirmations c
+        LEFT JOIN assignments a ON a.emp_no = c.user_emp_no
+        LEFT JOIN user_positions u ON u.emp_no = c.user_emp_no
+        WHERE c.post_id IN ({placeholders})
+        ORDER BY c.confirmed_at ASC, c.user_name ASC
     ''', normalized_ids).fetchall()
     for row in rows:
         item = dict(row)
-        school_name = str(item.get('school_name') or '').strip()
+        assigned_school_names = str(item.pop('assigned_school_names', '') or '').strip()
+        user_position = str(item.pop('user_position', '') or '').strip()
+        stored_label = str(item.get('school_name') or '').strip()
+        organization_label = assigned_school_names or user_position or stored_label
         user_name = str(item.get('user_name') or '').strip()
-        item['display_name'] = f'{user_name} ({school_name})' if school_name else user_name
+        item['organization_label'] = organization_label
+        item['display_name'] = (
+            f'{user_name} ({organization_label})' if organization_label else user_name
+        )
         result.setdefault(int(item['post_id']), []).append(item)
     return result
 

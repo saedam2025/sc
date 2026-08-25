@@ -1356,7 +1356,9 @@ def confirm_shared_post(post_id):
 
     emp_no = str(session.get('emp_no') or '').strip()
     user_name = str(session.get('user_name') or '').strip()
-    organization_name = str(session.get('department') or '').strip()
+    organization_name = str(
+        session.get('position') or session.get('department') or ''
+    ).strip()
     if not emp_no or not user_name:
         conn.close()
         return jsonify({'ok': False, 'message': '로그인한 조직원만 확인할 수 있습니다.'}), 403
