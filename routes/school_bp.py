@@ -15,36 +15,42 @@ import math
 import json
 import secrets
 import sqlite3
+import urllib.parse
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
 from routes.secure_files import delete_file, encrypted_file_is_readable, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename, plaintext_size
 from routes.storage import APP_ROOT, SCHOOL_UPLOADS, UPLOADS_ROOT
+from routes.school_post_confirmation import (
+    ensure_confirmation_schema,
+    ensure_view_count_schema,
+    get_confirmation_map,
+    get_confirmation_summary,
+    increment_view_count,
+    is_shared_board,
+)
 
 school_bp = Blueprint('school', __name__)
 
-SHARED_BOARD_CATEGORIES = {'community', '본부공지사항', 'reference', '자료실'}
 SCHOOL_CATEGORY_ALIASES = {
     '본부공지사항': 'community',
     '수강안내문': 'notice',
     '주간업무보고': 'weekly_report',
     '공개수업': 'open_class',
+    '강사정보현황': 'open_class',
     '지출결의서': 'expense',
     '물품요청': 'item_request',
     '근무표': 'work_schedule',
     '청구관련': 'billing',
     '만족도조사': 'survey',
+    '공개수업&만족도조사': 'survey',
     '자료실': 'reference',
 }
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
+WEBLINK_FILE_MAX_SIZE = 5 * 1024 * 1024
 FILENAME_ENCODING_PREFIX = '~e~'
 INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
-
-def is_shared_board(category):
-    """모든 센터장 업무공간에서 같은 게시물을 표시하는 게시판인지 반환한다."""
-    return str(category or '').strip() in SHARED_BOARD_CATEGORIES
-
 
 def can_access_school_category(category, max_levels=None):
     category_id = SCHOOL_CATEGORY_ALIASES.get(str(category or '').strip(), str(category or '').strip())
@@ -54,12 +60,25 @@ def can_access_school_category(category, max_levels=None):
 
 def build_school_post_list_queries(school_id, category, category_name, search_query=''):
     """공유 게시판은 학교 조건 없이, 개별 게시판은 해당 학교 조건으로 조회한다."""
+    normalized_category = SCHOOL_CATEGORY_ALIASES.get(
+        str(category or '').strip(), str(category or '').strip()
+    )
+    category_values = []
+    for value in (normalized_category, category, category_name):
+        value = str(value or '').strip()
+        if value and value not in category_values:
+            category_values.append(value)
+    for alias, category_id in SCHOOL_CATEGORY_ALIASES.items():
+        if category_id == normalized_category and alias not in category_values:
+            category_values.append(alias)
+
+    category_placeholders = ','.join('?' for _ in category_values)
     if is_shared_board(category):
-        query_params = [category, category_name]
-        where_clause = "(category = ? OR category = ?)"
+        query_params = list(category_values)
+        where_clause = f"category IN ({category_placeholders})"
     else:
-        query_params = [school_id, category, category_name]
-        where_clause = "school_id = ? AND (category = ? OR category = ?)"
+        query_params = [school_id, *category_values]
+        where_clause = f"school_id = ? AND category IN ({category_placeholders})"
 
     if search_query:
         where_clause += " AND (title LIKE ? OR author LIKE ? OR content LIKE ?)"
@@ -297,6 +316,8 @@ def get_stored_file_size(reference):
     return plaintext_size(_stored_path_from_reference(reference))
 
 def init_school_comment_table(conn):
+    ensure_confirmation_schema(conn)
+    ensure_view_count_schema(conn)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS school_post_comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -349,8 +370,10 @@ def init_school_comment_table(conn):
         )
     """)
 
+    # 센터장 업무공간의 Web / File Link는 메인 화면 링크와 데이터 및
+    # 사용자별 정렬 상태를 완전히 분리해서 관리한다.
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS weblinks (
+        CREATE TABLE IF NOT EXISTS center_weblinks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT,
             url TEXT,
@@ -360,18 +383,18 @@ def init_school_comment_table(conn):
         )
     """)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS user_weblink_order (
+        CREATE TABLE IF NOT EXISTS center_user_weblink_order (
             user_name TEXT PRIMARY KEY,
             order_json TEXT
         )
     """)
-    columns_w = [row[1] for row in conn.execute("PRAGMA table_info(weblinks)").fetchall()]
+    columns_w = [row[1] for row in conn.execute("PRAGMA table_info(center_weblinks)").fetchall()]
     if 'type' not in columns_w:
-        conn.execute("ALTER TABLE weblinks ADD COLUMN type TEXT DEFAULT 'url'")
+        conn.execute("ALTER TABLE center_weblinks ADD COLUMN type TEXT DEFAULT 'url'")
     if 'filename' not in columns_w:
-        conn.execute("ALTER TABLE weblinks ADD COLUMN filename TEXT")
+        conn.execute("ALTER TABLE center_weblinks ADD COLUMN filename TEXT")
     if 'filepath' not in columns_w:
-        conn.execute("ALTER TABLE weblinks ADD COLUMN filepath TEXT")
+        conn.execute("ALTER TABLE center_weblinks ADD COLUMN filepath TEXT")
     conn.commit()
 
 def save_uploaded_files(files):
@@ -591,7 +614,7 @@ def school_detail(school_key):
         {'id': 'community', 'name': '본부공지사항', 'icon': 'fa-bullhorn', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['community']},
         {'id': 'notice', 'name': '수강안내문', 'icon': 'fa-circle-info', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['notice']},
         {'id': 'weekly_report', 'name': '주간업무보고', 'icon': 'fa-list-check', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['weekly_report']},
-        {'id': 'open_class', 'name': '공개수업', 'icon': 'fa-chalkboard-user', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['open_class']},
+        {'id': 'open_class', 'name': '강사정보현황', 'icon': 'fa-chalkboard-user', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['open_class']},
         {
             'id': 'expense',
             'name': '지출결의서',
@@ -603,7 +626,7 @@ def school_detail(school_key):
         {'id': 'item_request', 'name': '물품요청', 'icon': 'fa-box', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['item_request']},
         {'id': 'work_schedule', 'name': '근무표', 'icon': 'fa-calendar-days', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['work_schedule']},
         {'id': 'billing', 'name': '청구관련', 'icon': 'fa-receipt', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['billing']},
-        {'id': 'survey', 'name': '만족도조사', 'icon': 'fa-chart-simple', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['survey']},
+        {'id': 'survey', 'name': '공개수업&만족도조사', 'icon': 'fa-chart-simple', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['survey']},
         {'id': 'reference', 'name': '자료실', 'icon': 'fa-file-zipper', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['reference']}
     ]
 
@@ -703,7 +726,15 @@ def school_detail(school_key):
     offset = (page - 1) * per_page
 
     query_params.extend([per_page, offset])
-    posts = conn.execute(data_query, query_params).fetchall()
+    posts = [dict(row) for row in conn.execute(data_query, query_params).fetchall()]
+    is_shared_current_board = is_shared_board(search_category)
+    if is_shared_current_board:
+        confirmation_map = get_confirmation_map(conn, [post['id'] for post in posts])
+        for post in posts:
+            confirmations = confirmation_map.get(post['id'], [])
+            post['confirmation_count'] = len(confirmations)
+            post['confirmations'] = confirmations
+            post['confirmation_names'] = [item['display_name'] for item in confirmations]
     
     current_user_name = session.get('user_name')
     current_user_profile_row = conn.execute('''
@@ -830,9 +861,38 @@ def school_detail(school_key):
     except Exception as e:
         print(f"학교 업무공간 주간 업무 요약 로드 에러: {e}")
 
-    weblinks_db = conn.execute("SELECT * FROM weblinks").fetchall()
-    weblinks = [dict(row) for row in weblinks_db]
-    order_row = conn.execute("SELECT order_json FROM user_weblink_order WHERE user_name = ?", (current_user_name,)).fetchone()
+    current_user_level = _center_weblink_user_level(conn, current_user_name)
+    if current_user_level is None:
+        current_user_level = get_session_user_level()
+    can_register_center_weblinks = 1 <= current_user_level <= 8
+    weblinks_db = conn.execute("""
+        SELECT link.*,
+               (
+                   SELECT MIN(u.level)
+                   FROM users u
+                   WHERE u.name = link.created_by
+               ) AS creator_level
+        FROM center_weblinks link
+    """).fetchall()
+    weblinks = []
+    for row in weblinks_db:
+        link = dict(row)
+        try:
+            creator_level = int(link.get('creator_level'))
+        except (TypeError, ValueError):
+            creator_level = None
+        link['can_delete'] = (
+            str(link.get('created_by') or '') == str(current_user_name or '')
+            or (
+                creator_level is not None
+                and current_user_level < creator_level
+            )
+        )
+        weblinks.append(link)
+    order_row = conn.execute(
+        "SELECT order_json FROM center_user_weblink_order WHERE user_name = ?",
+        (current_user_name,),
+    ).fetchone()
     if order_row and order_row['order_json']:
         try:
             order_list = json.loads(order_row['order_json'])
@@ -893,17 +953,19 @@ def school_detail(school_key):
                              can_write_current_board=can_write_current_board,
                              can_delete_current_board=can_delete_current_board,
                              can_comment_current_board=can_comment_current_board,
+                             is_shared_current_board=is_shared_current_board,
                              weblinks=weblinks,
+                              can_register_center_weblinks=can_register_center_weblinks,
                               gallery_preview_items=gallery_preview_items,
                               school_current_profile_path=(current_user_profile.get('profile_path') or session.get('profile_path') or ''),
                               school_current_profile_icon=(current_user_profile.get('profile_icon') or session.get('profile_icon') or '👤'),
                               view_type='detail')
 
-@school_bp.route('/weblink-file/<int:link_id>')
-def serve_weblink_file(link_id):
+@school_bp.route('/center-weblink-file/<int:link_id>')
+def serve_center_weblink_file(link_id):
     conn = get_db()
     link = conn.execute(
-        "SELECT type, filename, filepath FROM weblinks WHERE id=?",
+        "SELECT type, filename, filepath FROM center_weblinks WHERE id=?",
         (link_id,)
     ).fetchone()
     conn.close()
@@ -922,6 +984,163 @@ def serve_weblink_file(link_id):
             return send_file(fallback, as_attachment=True, download_name=safe_name)
         return "이 파일은 이전 암호화 키로 저장되어 복구할 수 없습니다. 파일을 삭제한 뒤 다시 등록해 주세요.", 409
     return encrypted_response(file_path, link['filename'] or os.path.basename(file_path), as_attachment=True)
+
+
+def _center_weblink_user_level(conn, user_name):
+    if not user_name:
+        return None
+    row = conn.execute(
+        "SELECT MIN(level) AS level FROM users WHERE name = ?",
+        (user_name,),
+    ).fetchone()
+    try:
+        return int(row['level']) if row and row['level'] is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+@school_bp.route('/center-weblinks', methods=['POST'])
+def save_center_weblink():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    conn = get_db()
+    user_level = _center_weblink_user_level(conn, current_user)
+    if user_level is None:
+        user_level = get_session_user_level()
+    if not 1 <= user_level <= 8:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '센터장 링크 등록 권한이 없습니다.'}), 403
+
+    title = str(request.form.get('title') or '').strip()
+    link_type = str(request.form.get('type') or 'url').strip().lower()
+    if not title:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '표시될 이름을 입력하세요.'}), 400
+    if link_type not in {'url', 'file'}:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '지원하지 않는 링크 형식입니다.'}), 400
+
+    created_path = None
+    try:
+        if link_type == 'file':
+            file = request.files.get('file')
+            if not file or not file.filename:
+                conn.close()
+                return jsonify({'status': 'error', 'message': '업로드할 파일을 선택하세요.'}), 400
+            if get_uploaded_file_size(file) > WEBLINK_FILE_MAX_SIZE:
+                conn.close()
+                return jsonify({
+                    'status': 'error',
+                    'message': '첨부파일은 5MB 이하만 등록할 수 있습니다.',
+                }), 413
+            filename = original_filename(file.filename)
+            stored_name = encrypted_storage_name(filename)
+            created_path = os.path.join(str(UPLOADS_ROOT), stored_name)
+            encrypt_upload(file, created_path)
+            cursor = conn.execute("""
+                INSERT INTO center_weblinks
+                    (title, type, url, favicon_url, created_by, filename, filepath)
+                VALUES (?, 'file', '', 'FILE', ?, ?, ?)
+            """, (title, current_user, filename, stored_name))
+            file_url = url_for('school.serve_center_weblink_file', link_id=cursor.lastrowid)
+            conn.execute(
+                "UPDATE center_weblinks SET url = ? WHERE id = ?",
+                (file_url, cursor.lastrowid),
+            )
+        else:
+            url = str(request.form.get('url') or '').strip()
+            if not url:
+                conn.close()
+                return jsonify({'status': 'error', 'message': 'URL 주소를 입력하세요.'}), 400
+            if not url.startswith(('http://', 'https://')):
+                url = 'http://' + url
+            parsed_uri = urllib.parse.urlparse(url)
+            if not parsed_uri.netloc:
+                conn.close()
+                return jsonify({'status': 'error', 'message': '올바른 URL 주소를 입력하세요.'}), 400
+            domain = f'{parsed_uri.scheme}://{parsed_uri.netloc}'
+            if parsed_uri.netloc in {'works.saedam.org', 'www.saedam.org', 'saedam.org'}:
+                favicon_url = 'https://www.saedam.org/img_sub/favicon.ico'
+            else:
+                favicon_url = f'https://www.google.com/s2/favicons?domain={domain}&sz=64'
+            conn.execute("""
+                INSERT INTO center_weblinks
+                    (title, type, url, favicon_url, created_by)
+                VALUES (?, 'url', ?, ?, ?)
+            """, (title, url, favicon_url, current_user))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        delete_file(created_path)
+        raise
+    finally:
+        conn.close()
+
+    return jsonify({'status': 'success'})
+
+
+@school_bp.route('/center-weblinks/order', methods=['POST'])
+def update_center_weblink_order():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    data = request.get_json(silent=True) or {}
+    order_list = data.get('order', [])
+    if not isinstance(order_list, list):
+        return jsonify({'status': 'error', 'message': '잘못된 정렬 정보입니다.'}), 400
+
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO center_user_weblink_order (user_name, order_json)
+        VALUES (?, ?)
+        ON CONFLICT(user_name) DO UPDATE SET order_json = excluded.order_json
+    """, (current_user, json.dumps(order_list)))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success'})
+
+
+@school_bp.route('/center-weblinks/<int:link_id>', methods=['DELETE'])
+def delete_center_weblink(link_id):
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    conn = get_db()
+    link = conn.execute(
+        'SELECT * FROM center_weblinks WHERE id = ?',
+        (link_id,),
+    ).fetchone()
+    if not link:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '존재하지 않는 센터장 링크입니다.'}), 404
+
+    current_level = _center_weblink_user_level(conn, current_user)
+    if current_level is None:
+        current_level = get_session_user_level()
+    creator_level = _center_weblink_user_level(conn, link['created_by'])
+    can_delete = (
+        str(link['created_by'] or '') == str(current_user)
+        or (creator_level is not None and current_level < creator_level)
+    )
+    if not can_delete:
+        conn.close()
+        return jsonify({
+            'status': 'error',
+            'message': '본인 또는 작성자보다 높은 권한의 회원만 삭제할 수 있습니다.',
+        }), 403
+
+    file_to_delete = None
+    if link['type'] == 'file' and link['filepath']:
+        stored_name = os.path.basename(str(link['filepath']).replace('\\', '/'))
+        file_to_delete = os.path.join(str(UPLOADS_ROOT), stored_name) if stored_name else None
+    conn.execute('DELETE FROM center_weblinks WHERE id = ?', (link_id,))
+    conn.commit()
+    conn.close()
+    delete_file(file_to_delete)
+    return jsonify({'status': 'success'})
 
 
 @school_bp.route('/file/<stored_name>')
@@ -1031,13 +1250,34 @@ def get_post_api(post_id):
         conn.close()
         return jsonify({'message': '담당 학교 게시글만 볼 수 있습니다.'}), 403
 
+    current_view_count = increment_view_count(conn, post_id)
     comment_count = conn.execute(
         "SELECT COUNT(*) FROM school_post_comments WHERE post_id=?",
         (post_id,)
     ).fetchone()[0]
+    data = dict(post)
+    data['view_count'] = current_view_count
+    data['is_shared'] = is_shared_board(post['category'])
+    if data['is_shared']:
+        data.update(get_confirmation_summary(conn, post_id))
+        data['can_confirm'] = bool(
+            str(session.get('emp_no') or '').strip()
+            and str(session.get('user_name') or '').strip()
+        )
+        data['confirmed_by_me'] = any(
+            item['user_emp_no'] == str(session.get('emp_no') or '')
+            for item in data['confirmations']
+        )
+    else:
+        data.update({
+            'confirmation_count': 0,
+            'confirmations': [],
+            'confirmation_names': [],
+            'can_confirm': False,
+            'confirmed_by_me': False,
+        })
     conn.close()
 
-    data = dict(post)
     if data.get('filepath'):
         data['filepath'] = _secure_reference_csv(data['filepath'])
     data['comment_count'] = comment_count
@@ -1045,6 +1285,47 @@ def get_post_api(post_id):
     data['attachment_sizes'] = [get_stored_file_size(path) for path in attachment_paths]
     data['attachment_total_size'] = sum(data['attachment_sizes'])
     return jsonify(data)
+
+
+@school_bp.route('/post/<int:post_id>/confirm', methods=['POST'])
+def confirm_shared_post(post_id):
+    conn = get_db()
+    init_school_comment_table(conn)
+    post = conn.execute(
+        "SELECT id, school_id, category FROM school_posts WHERE id=?",
+        (post_id,)
+    ).fetchone()
+    if not post:
+        conn.close()
+        return jsonify({'ok': False, 'message': '게시물을 찾을 수 없습니다.'}), 404
+    if not is_shared_board(post['category']):
+        conn.close()
+        return jsonify({'ok': False, 'message': '확인 기록은 본부공지사항과 자료실에서만 사용합니다.'}), 400
+    if not can_access_post(conn, post['school_id'], post['category']):
+        conn.close()
+        return jsonify({'ok': False, 'message': '게시물을 확인할 권한이 없습니다.'}), 403
+
+    emp_no = str(session.get('emp_no') or '').strip()
+    user_name = str(session.get('user_name') or '').strip()
+    organization_name = str(session.get('department') or '').strip()
+    if not emp_no or not user_name:
+        conn.close()
+        return jsonify({'ok': False, 'message': '로그인한 조직원만 확인할 수 있습니다.'}), 403
+
+    cursor = conn.execute('''
+        INSERT OR IGNORE INTO school_post_confirmations
+            (post_id, user_emp_no, user_name, school_name)
+        VALUES (?, ?, ?, ?)
+    ''', (post_id, emp_no, user_name, organization_name))
+    conn.commit()
+    summary = get_confirmation_summary(conn, post_id)
+    conn.close()
+    return jsonify({
+        'ok': True,
+        'already_confirmed': cursor.rowcount == 0,
+        'confirmed_by_me': True,
+        **summary,
+    })
 
 @school_bp.route('/post/add', methods=['POST'])
 def add_post():
@@ -1371,6 +1652,7 @@ def delete_post_comment(comment_id):
 def delete_post(post_id):
     category = request.form.get('category')
     conn = get_db()
+    ensure_confirmation_schema(conn)
     post = conn.execute(
         """
         SELECT school_id, author, filepath, category
@@ -1404,6 +1686,7 @@ def delete_post(post_id):
         'SELECT filepath FROM school_post_comments WHERE post_id=?', (post_id,)
     ).fetchall()
     conn.execute('DELETE FROM school_post_comments WHERE post_id=?', (post_id,))
+    conn.execute('DELETE FROM school_post_confirmations WHERE post_id=?', (post_id,))
     conn.execute('DELETE FROM school_posts WHERE id=?', (post_id,))
     conn.commit()
     conn.close()
@@ -1420,6 +1703,7 @@ def delete_multi():
     category = request.form.get('category')
     post_ids = request.form.getlist('post_ids')
     conn = get_db()
+    ensure_confirmation_schema(conn)
     if not can_access_school(conn, school_id):
         conn.close()
         return "담당 학교 게시글만 삭제할 수 있습니다.", 403
@@ -1457,6 +1741,7 @@ def delete_multi():
                 'SELECT filepath FROM school_post_comments WHERE post_id=?', (pid,)
             ).fetchall()
             conn.execute("DELETE FROM school_post_comments WHERE post_id=?", (pid,))
+            conn.execute("DELETE FROM school_post_confirmations WHERE post_id=?", (pid,))
             conn.execute("DELETE FROM school_posts WHERE id=?", (pid,))
             if post['author'] == session.get('user_name'):
                 own_deleted_post_ids.append(pid)

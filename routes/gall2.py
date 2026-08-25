@@ -81,6 +81,7 @@ def ensure_gall2_schema():
             tab_id INTEGER NOT NULL DEFAULT 1,
             upload_token TEXT UNIQUE,
             school_id INTEGER,
+            view_count INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -91,12 +92,28 @@ def ensure_gall2_schema():
     }
     if 'school_id' not in post_columns:
         conn.execute('ALTER TABLE gall2_posts ADD COLUMN school_id INTEGER')
+    if 'view_count' not in post_columns:
+        conn.execute('ALTER TABLE gall2_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0')
     # 초기 센터별 시범 데이터가 있다면 공용 학교갤러리로 합친다.
     conn.execute(
         'UPDATE gall2_posts SET school_id=? WHERE school_id IS NOT NULL AND school_id<>?',
         (SCHOOL_GALLERY_SCOPE_ID, SCHOOL_GALLERY_SCOPE_ID),
     )
     conn.execute('CREATE INDEX IF NOT EXISTS idx_gall2_posts_school_id ON gall2_posts(school_id, created_at)')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS gall2_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER NOT NULL,
+            author TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(post_id) REFERENCES gall2_posts(id) ON DELETE CASCADE
+        )
+    ''')
+    conn.execute('''
+        CREATE INDEX IF NOT EXISTS idx_gall2_comments_post
+        ON gall2_comments(post_id, created_at, id)
+    ''')
     try:
         conn.execute("ALTER TABLE gall2 ADD COLUMN post_id INTEGER")
     except Exception:
@@ -166,6 +183,11 @@ def load_gallery_page(conn, page, school_id=None):
         SELECT p.*,
                COUNT(g.id) AS photo_count,
                (
+                   SELECT COUNT(*)
+                   FROM gall2_comments c
+                   WHERE c.post_id = p.id
+               ) AS comment_count,
+               (
                    SELECT thumb_name
                    FROM gall2
                    WHERE post_id = p.id
@@ -221,6 +243,7 @@ def delete_gallery_post(conn, post_id):
     files = conn.execute('SELECT * FROM gall2 WHERE post_id = ?', (post_id,)).fetchall()
     for file in files:
         delete_gallery_file(file)
+    conn.execute('DELETE FROM gall2_comments WHERE post_id = ?', (post_id,))
     conn.execute('DELETE FROM gall2 WHERE post_id = ?', (post_id,))
     conn.execute('DELETE FROM gall2_posts WHERE id = ?', (post_id,))
 
@@ -444,8 +467,67 @@ def delete_gallery_image_for_scope(conn, post_id, image_id, school_id):
     return True
 
 
+def current_gallery_user_level(conn):
+    """세션보다 DB의 현재 회원 레벨을 우선해 반환한다."""
+    user_name = str(session.get('user_name') or '').strip()
+    emp_no = str(session.get('emp_no') or '').strip()
+    if not user_name:
+        return None
+    row = conn.execute('''
+        SELECT level
+        FROM users
+        WHERE (? <> '' AND CAST(emp_no AS TEXT) = ?)
+           OR name = ?
+        ORDER BY CASE WHEN ? <> '' AND CAST(emp_no AS TEXT) = ? THEN 0 ELSE 1 END,
+                 level ASC
+        LIMIT 1
+    ''', (emp_no, emp_no, user_name, emp_no, emp_no)).fetchone()
+    try:
+        if row and row['level'] is not None:
+            return int(row['level'])
+        return int(session.get('user_level', 99))
+    except (TypeError, ValueError):
+        return None
+
+
+def school_gallery_post_for_permission(conn, post_id):
+    return conn.execute('''
+        SELECT p.*,
+               (
+                   SELECT MIN(u.level)
+                   FROM users u
+                   WHERE u.name = p.author
+               ) AS author_level
+        FROM gall2_posts p
+        WHERE p.id = ? AND p.school_id = ?
+    ''', (post_id, SCHOOL_GALLERY_SCOPE_ID)).fetchone()
+
+
+def can_manage_school_gallery_post(conn, post):
+    """작성자 본인 또는 작성자와 같거나 높은 권한(숫자는 작거나 같음)."""
+    if not post:
+        return False
+    current_name = str(session.get('user_name') or '')
+    author = str(post['author'] or '')
+    if current_name and current_name == author:
+        return True
+    if current_name == 'admin':
+        return True
+    current_level = current_gallery_user_level(conn)
+    try:
+        author_level = int(post['author_level'])
+    except (KeyError, TypeError, ValueError, IndexError):
+        author_level = None
+    return (
+        current_level is not None
+        and author_level is not None
+        and 1 <= current_level <= 8
+        and current_level <= author_level
+    )
+
+
 def require_school_gallery_access(conn, school_key):
-    """본사 담당자 또는 해당 학교에 실제 지정된 센터장만 허용한다."""
+    """레벨 8까지의 본사 담당자 또는 실제 지정 센터장만 허용한다."""
     school = conn.execute('''
         SELECT id, school_name, access_key, center_director_id, center_director_id_2,
                COALESCE(is_active, 1) AS is_active
@@ -455,10 +537,9 @@ def require_school_gallery_access(conn, school_key):
     if not school:
         abort(404)
 
-    try:
-        user_level = int(session.get('user_level', 99))
-    except (TypeError, ValueError):
-        user_level = 99
+    user_level = current_gallery_user_level(conn)
+    if user_level is None or not 1 <= user_level <= 8:
+        abort(403)
     is_headquarters = (
         session.get('user_name') == 'admin'
         or (
@@ -472,6 +553,7 @@ def require_school_gallery_access(conn, school_key):
             str(school['center_director_id'] or ''),
             str(school['center_director_id_2'] or ''),
         }
+        and 1 <= user_level <= 8
         and int(school['is_active'] or 0) == 1
     )
     if not is_headquarters and not is_assigned_director:
@@ -487,6 +569,14 @@ def school_gallery(school_key):
     try:
         school = require_school_gallery_access(conn, school_key)
         posts, pagination = load_gallery_page(conn, page, school_id=SCHOOL_GALLERY_SCOPE_ID)
+        for post in posts:
+            author_level_row = conn.execute(
+                'SELECT MIN(level) FROM users WHERE name = ?',
+                (post.get('author') or '',),
+            ).fetchone()
+            permission_post = dict(post)
+            permission_post['author_level'] = author_level_row[0] if author_level_row else None
+            post['can_manage'] = can_manage_school_gallery_post(conn, permission_post)
         school_info = dict(school)
     finally:
         conn.close()
@@ -495,6 +585,8 @@ def school_gallery(school_key):
         pagination=pagination, school_gallery=school_info,
         gallery_title='학교갤러리',
         gallery_help='센터장 공유 학교갤러리 업로드 안내',
+        can_write_gallery=True,
+        can_manage_any=any(post.get('can_manage') for post in posts),
     )
 
 
@@ -525,7 +617,12 @@ def school_gallery_update_post(school_key, post_id):
         return jsonify({'status': 'error', 'message': '제목을 입력해 주세요.'}), 400
     conn = get_db()
     try:
-        school = require_school_gallery_access(conn, school_key)
+        require_school_gallery_access(conn, school_key)
+        post = school_gallery_post_for_permission(conn, post_id)
+        if not post:
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+        if not can_manage_school_gallery_post(conn, post):
+            return jsonify({'status': 'error', 'message': '게시물을 수정할 권한이 없습니다.'}), 403
         cursor = conn.execute('''
             UPDATE gall2_posts
             SET title=?, content=?, updated_at=CURRENT_TIMESTAMP
@@ -545,8 +642,11 @@ def school_gallery_add_images(school_key, post_id):
     conn = get_db()
     try:
         require_school_gallery_access(conn, school_key)
-        if not gallery_post_for_scope(conn, post_id, SCHOOL_GALLERY_SCOPE_ID):
+        post = school_gallery_post_for_permission(conn, post_id)
+        if not post:
             return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+        if not can_manage_school_gallery_post(conn, post):
+            return jsonify({'status': 'error', 'message': '게시물을 수정할 권한이 없습니다.'}), 403
         try:
             added = append_gallery_files(conn, post_id, request.files.getlist('file'))
         except ValueError as exc:
@@ -565,6 +665,11 @@ def school_gallery_delete_image(school_key, post_id, image_id):
     conn = get_db()
     try:
         require_school_gallery_access(conn, school_key)
+        post = school_gallery_post_for_permission(conn, post_id)
+        if not post:
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+        if not can_manage_school_gallery_post(conn, post):
+            return jsonify({'status': 'error', 'message': '사진을 삭제할 권한이 없습니다.'}), 403
         if not delete_gallery_image_for_scope(conn, post_id, image_id, SCHOOL_GALLERY_SCOPE_ID):
             return jsonify({'status': 'error', 'message': '사진을 찾을 수 없습니다.'}), 404
         return jsonify({'status': 'success'})
@@ -578,13 +683,12 @@ def school_gallery_delete_post(school_key, post_id):
     page = request.args.get('page', 1, type=int) or 1
     conn = get_db()
     try:
-        school = require_school_gallery_access(conn, school_key)
-        post = conn.execute(
-            'SELECT id FROM gall2_posts WHERE id=? AND school_id=?',
-            (post_id, SCHOOL_GALLERY_SCOPE_ID),
-        ).fetchone()
+        require_school_gallery_access(conn, school_key)
+        post = school_gallery_post_for_permission(conn, post_id)
         if not post:
             abort(404)
+        if not can_manage_school_gallery_post(conn, post):
+            return jsonify({'status': 'error', 'message': '게시물을 삭제할 권한이 없습니다.'}), 403
         delete_gallery_post(conn, post_id)
         conn.commit()
     finally:
@@ -603,20 +707,101 @@ def school_gallery_delete_bulk(school_key):
         post_ids = [post_ids]
     conn = get_db()
     try:
-        school = require_school_gallery_access(conn, school_key)
+        require_school_gallery_access(conn, school_key)
+        permitted_posts = []
         for raw_post_id in post_ids:
             try:
                 post_id = int(raw_post_id)
             except (TypeError, ValueError):
                 continue
-            owned = conn.execute(
-                'SELECT id FROM gall2_posts WHERE id=? AND school_id=?',
-                (post_id, SCHOOL_GALLERY_SCOPE_ID),
-            ).fetchone()
-            if owned:
-                delete_gallery_post(conn, post_id)
+            post = school_gallery_post_for_permission(conn, post_id)
+            if not post:
+                continue
+            if not can_manage_school_gallery_post(conn, post):
+                return jsonify({
+                    'status': 'error',
+                    'message': '선택한 게시물 중 삭제 권한이 없는 게시물이 있습니다.',
+                }), 403
+            permitted_posts.append(post_id)
+        for post_id in permitted_posts:
+            delete_gallery_post(conn, post_id)
         conn.commit()
         return jsonify({'status': 'success'})
+    finally:
+        conn.close()
+
+
+@gall2_bp.route('/school/<string:school_key>/gallery/post/<int:post_id>/view', methods=['POST'])
+def school_gallery_record_view(school_key, post_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        require_school_gallery_access(conn, school_key)
+        post = conn.execute(
+            'SELECT id, view_count FROM gall2_posts WHERE id=? AND school_id=?',
+            (post_id, SCHOOL_GALLERY_SCOPE_ID),
+        ).fetchone()
+        if not post:
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+
+        viewed_ids = session.get('school_gallery_viewed_post_ids', [])
+        viewed_ids = [int(value) for value in viewed_ids if str(value).isdigit()]
+        if post_id not in viewed_ids:
+            conn.execute(
+                'UPDATE gall2_posts SET view_count=COALESCE(view_count, 0)+1 WHERE id=?',
+                (post_id,),
+            )
+            conn.commit()
+            viewed_ids.append(post_id)
+            session['school_gallery_viewed_post_ids'] = viewed_ids[-100:]
+        row = conn.execute(
+            'SELECT COALESCE(view_count, 0) AS view_count FROM gall2_posts WHERE id=?',
+            (post_id,),
+        ).fetchone()
+        return jsonify({'status': 'success', 'view_count': int(row['view_count'] or 0)})
+    finally:
+        conn.close()
+
+
+@gall2_bp.route('/school/<string:school_key>/gallery/post/<int:post_id>/comments', methods=['GET', 'POST'])
+def school_gallery_comments(school_key, post_id):
+    ensure_gall2_schema()
+    conn = get_db()
+    try:
+        require_school_gallery_access(conn, school_key)
+        post = conn.execute(
+            'SELECT id FROM gall2_posts WHERE id=? AND school_id=?',
+            (post_id, SCHOOL_GALLERY_SCOPE_ID),
+        ).fetchone()
+        if not post:
+            return jsonify({'status': 'error', 'message': '게시물을 찾을 수 없습니다.'}), 404
+
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or request.form
+            content = str(data.get('content') or '').strip()
+            if not content:
+                return jsonify({'status': 'error', 'message': '댓글 내용을 입력해 주세요.'}), 400
+            if len(content) > 1000:
+                return jsonify({'status': 'error', 'message': '댓글은 1,000자 이하로 입력해 주세요.'}), 400
+            author = str(session.get('user_name') or '').strip()
+            cursor = conn.execute(
+                'INSERT INTO gall2_comments(post_id, author, content) VALUES (?, ?, ?)',
+                (post_id, author, content),
+            )
+            conn.commit()
+            comment = conn.execute(
+                'SELECT id, author, content, created_at FROM gall2_comments WHERE id=?',
+                (cursor.lastrowid,),
+            ).fetchone()
+            return jsonify({'status': 'success', 'comment': dict(comment)})
+
+        comments = conn.execute('''
+            SELECT id, author, content, created_at
+            FROM gall2_comments
+            WHERE post_id=?
+            ORDER BY created_at ASC, id ASC
+        ''', (post_id,)).fetchall()
+        return jsonify({'status': 'success', 'comments': [dict(row) for row in comments]})
     finally:
         conn.close()
 

@@ -133,6 +133,17 @@ def can_view_approval(doc, current_user):
     return bool(current_user and current_user in allowed)
 
 
+def belongs_to_completed_box(doc, current_user):
+    """완료 문서 중 기안·결재·수신으로 직접 참여한 문서인지 확인한다."""
+    direct_participants = {
+        str(doc['drafter'] or '').strip(),
+        str(doc['approver_1'] or '').strip(),
+        str(doc['approver_2'] or '').strip(),
+    }
+    direct_participants.update(_approval_names(doc['receivers']))
+    return bool(current_user and current_user in direct_participants)
+
+
 def normalize_user_level(value, default=14):
     try:
         return int(value)
@@ -223,29 +234,20 @@ def index():
     completed_rows = conn.execute('''
         SELECT * FROM approvals
         WHERE status = '완료'
-          AND drafter = ?
-        ORDER BY updated_at DESC
-    ''', (current_user,)).fetchall()
-    completed_docs = rows_to_dicts(completed_rows)
-
-    reference_rows = conn.execute('''
-        SELECT * FROM approvals
-        WHERE status = '완료'
         ORDER BY updated_at DESC
     ''').fetchall()
+    completed_docs = [
+        dict(row) for row in completed_rows
+        if belongs_to_completed_box(row, current_user)
+    ]
     reference_docs = [
-        dict(row) for row in reference_rows
+        dict(row) for row in completed_rows
         if current_user in _approval_names(row['cc_receivers'])
     ]
 
-    archive_rows = conn.execute('''
-        SELECT * FROM approvals
-        WHERE status = '완료'
-        ORDER BY updated_at DESC
-    ''').fetchall()
     archive_docs = [
         dict(row)
-        for row in archive_rows
+        for row in completed_rows
         if can_view_approval(row, current_user)
     ]
 

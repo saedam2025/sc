@@ -61,7 +61,7 @@ MENU_GROUPS = (
             ('school_workspace', '학교업무공간', 'fa-chalkboard-user', 14),
             ('school_tasks', '학교업무처리', 'fa-list-check', 14),
             ('school_calendar', '학교일정표', 'fa-calendar-week', 14),
-            ('school_center_boards', '[센터장] 수강안내문~만족도조사 (8개 메뉴 일괄)', 'fa-table-list', 14),
+            ('school_center_boards', '[센터장] 수강안내문~공개수업&만족도조사 (8개 메뉴 일괄)', 'fa-table-list', 14),
             ('school_center_shared', '[센터장] 본부공지사항·자료실 - 접근', 'fa-door-open', 8),
             ('school_center_shared_read', '[센터장] 본부공지사항·자료실 - 읽기', 'fa-book-open', 8),
             ('school_center_shared_write', '[센터장] 본부공지사항·자료실 - 쓰기', 'fa-pen', 5),

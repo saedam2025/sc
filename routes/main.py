@@ -13,6 +13,7 @@ from .secure_files import delete_file, encrypted_file_is_readable, encrypted_res
 main_bp = Blueprint('main', __name__)
 
 UPLOAD_FOLDER = str(UPLOADS_ROOT)
+WEBLINK_FILE_MAX_SIZE = 5 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -29,6 +30,23 @@ def _bundled_weblink_fallback(filename, encrypted_path):
     if candidate.is_file() and candidate.stat().st_size == plaintext_size(encrypted_path):
         return candidate
     return None
+
+
+def _uploaded_weblink_file_size(file):
+    """업로드 스트림을 소비하지 않고 실제 파일 크기를 계산한다."""
+    if not file or not getattr(file, 'stream', None):
+        return 0
+    stream = file.stream
+    try:
+        current_position = stream.tell()
+    except (AttributeError, OSError):
+        current_position = 0
+    try:
+        stream.seek(0, os.SEEK_END)
+        size = stream.tell()
+    finally:
+        stream.seek(current_position)
+    return max(0, int(size))
 
 # === 실시간 접속자 상태 관리를 위한 전역 변수 ===
 active_users = {}
@@ -852,23 +870,28 @@ def save_weblink():
     created_path = None
     if link_type == 'file':
         file = request.files.get('file')
-        if file and file.filename:
-            try:
-                filename = original_filename(file.filename)
-                stored_name = encrypted_storage_name(filename)
-                file_path = os.path.join(UPLOAD_FOLDER, stored_name)
-                encrypt_upload(file, file_path)
-                created_path = file_path
-                # 파일을 위한 특수 플래그로 favicon_url 설정
-                cursor = conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, '', ?, ?, ?, ?)",
-                                      (title, 'file', 'FILE', current_user, filename, stored_name))
-                url = url_for('main.serve_weblink_file', link_id=cursor.lastrowid)
-                conn.execute("UPDATE weblinks SET url=? WHERE id=?", (url, cursor.lastrowid))
-            except Exception:
-                conn.rollback()
-                delete_file(created_path)
-                conn.close()
-                raise
+        if not file or not file.filename:
+            conn.close()
+            return jsonify({"status": "error", "message": "업로드할 파일을 선택하세요."}), 400
+        if _uploaded_weblink_file_size(file) > WEBLINK_FILE_MAX_SIZE:
+            conn.close()
+            return jsonify({"status": "error", "message": "첨부파일은 5MB 이하만 등록할 수 있습니다."}), 413
+        try:
+            filename = original_filename(file.filename)
+            stored_name = encrypted_storage_name(filename)
+            file_path = os.path.join(UPLOAD_FOLDER, stored_name)
+            encrypt_upload(file, file_path)
+            created_path = file_path
+            # 파일을 위한 특수 플래그로 favicon_url 설정
+            cursor = conn.execute("INSERT INTO weblinks (title, type, url, favicon_url, created_by, filename, filepath) VALUES (?, ?, '', ?, ?, ?, ?)",
+                                  (title, 'file', 'FILE', current_user, filename, stored_name))
+            url = url_for('main.serve_weblink_file', link_id=cursor.lastrowid)
+            conn.execute("UPDATE weblinks SET url=? WHERE id=?", (url, cursor.lastrowid))
+        except Exception:
+            conn.rollback()
+            delete_file(created_path)
+            conn.close()
+            raise
     else:
         url = request.form.get('url')
         if not url.startswith('http://') and not url.startswith('https://'):

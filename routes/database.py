@@ -930,6 +930,7 @@ def init_db():
         tab_id INTEGER NOT NULL DEFAULT 1,
         upload_token TEXT UNIQUE,
         school_id INTEGER,
+        view_count INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (tab_id) REFERENCES gall2_tabs (id)
@@ -940,9 +941,23 @@ def init_db():
     }
     if 'school_id' not in gall2_post_columns:
         c.execute('ALTER TABLE gall2_posts ADD COLUMN school_id INTEGER')
+    if 'view_count' not in gall2_post_columns:
+        c.execute('ALTER TABLE gall2_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0')
     # 학교갤러리는 센터별이 아니라 모든 센터장이 공유하는 단일 범위(0)다.
     c.execute('UPDATE gall2_posts SET school_id=0 WHERE school_id IS NOT NULL AND school_id<>0')
     c.execute('CREATE INDEX IF NOT EXISTS idx_gall2_posts_school_id ON gall2_posts(school_id, created_at)')
+    c.execute('''CREATE TABLE IF NOT EXISTS gall2_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        author TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (post_id) REFERENCES gall2_posts (id) ON DELETE CASCADE
+    )''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_gall2_comments_post
+        ON gall2_comments(post_id, created_at, id)
+    ''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS schools (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -973,9 +988,25 @@ def init_db():
         filepath TEXT,                     
         status TEXT DEFAULT '접수',
         processor TEXT,
+        view_count INTEGER NOT NULL DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE CASCADE
     )''')
+
+    c.execute('''CREATE TABLE IF NOT EXISTS school_post_confirmations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL,
+        user_emp_no TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        school_name TEXT DEFAULT '',
+        confirmed_at TEXT DEFAULT (datetime('now', 'localtime')),
+        UNIQUE(post_id, user_emp_no),
+        FOREIGN KEY (post_id) REFERENCES school_posts (id) ON DELETE CASCADE
+    )''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_school_post_confirmations_post
+        ON school_post_confirmations(post_id, confirmed_at)
+    ''')
 
     # 🚀 [수정] 데이터베이스의 하위 호환성을 완벽히 보장하여 기존 db 파일을 마이그레이션할 때 
     # `is_read` 컬럼이 누락되어 카운트가 비정상 차감되거나 작동하지 않는 현상을 완전히 차단하기 위해 alter 구문에 is_read를 강제 주입했습니다.
@@ -1037,6 +1068,7 @@ def init_db():
         "ALTER TABLE schools ADD COLUMN center_director_id_2 TEXT",
         "ALTER TABLE school_posts ADD COLUMN status TEXT DEFAULT '접수'",
         "ALTER TABLE school_posts ADD COLUMN processor TEXT",
+        "ALTER TABLE school_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE gall2 ADD COLUMN post_id INTEGER",
         "ALTER TABLE usage_logs ADD COLUMN session_id TEXT",
         "ALTER TABLE usage_user_totals ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",
@@ -1167,6 +1199,7 @@ def init_db():
             AND path NOT LIKE '%/download/%'
             AND path NOT LIKE '%/file/%'
             AND path NOT LIKE '%/weblink-file/%'
+            AND path NOT LIKE '%/center-weblink-file/%'
             AND path NOT LIKE '/get_%'
             AND path NOT LIKE '/check_%'
             AND path <> '/user/my_info'

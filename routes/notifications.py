@@ -44,8 +44,15 @@ def widget_notifications():
         draft = conn.execute("SELECT COUNT(*) FROM approvals WHERE drafter = ?", (current_user,)).fetchone()
         approval_draft_count = draft[0] if draft else 0
         
-        # 학교업무 접수
-        task = conn.execute("SELECT COUNT(*) FROM school_posts WHERE status = '접수' OR status IS NULL OR status = ''").fetchone()
+        # 학교업무 접수 (본부 공지/자료실은 처리 대상이 아닌 공유 게시판)
+        task = conn.execute("""
+            SELECT COUNT(*)
+            FROM school_posts
+            WHERE (status = '접수' OR status IS NULL OR status = '')
+              AND TRIM(COALESCE(category, '')) NOT IN (
+                  'community', '본부공지사항', 'reference', '자료실'
+              )
+        """).fetchone()
         school_task_wait_count = task[0] if task else 0
         
         # 지출결의 대기
