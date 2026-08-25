@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block body_class %}{% if view_type == 'detail' %}school-detail-page{% endif %}{% endblock %}
+
 {% block content %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -28,10 +30,12 @@
 
     /* 전체 배경 및 폰트 설정 */
     .dashboard-container { padding: 20px 0; background-color: transparent; color: var(--school-text); letter-spacing: -0.02em; position: relative; z-index: 2; }
-    /* 상세 업무공간도 다른 메뉴 화면과 같은 상단 여백을 유지한다. */
-    .dashboard-container.school-detail-spacing { padding-top: 20px; }
-    .dashboard-container.school-detail-spacing .school-container { padding-top: 25px; }
-    .dashboard-container.school-detail-spacing .school-workspace-shell { padding-top: 13px; }
+    /* 센터장 전용 업무공간 상세 화면의 타이틀바 위 여백은 기존의 70%로 줄인다. */
+    .school-detail-page .main-content { padding-top: 14px; }
+    .school-detail-page .content-container { padding-top: 21px; }
+    .dashboard-container.school-detail-spacing { padding-top: 14px; padding-bottom: 10px; }
+    .dashboard-container.school-detail-spacing .school-container { padding-top: 17.5px; padding-bottom: 12.5px; }
+    .dashboard-container.school-detail-spacing .school-workspace-shell { padding-top: 13px; padding-bottom: 12px; }
 
     /* 메인 컨테이너 */
     .school-container { 
@@ -292,6 +296,10 @@
         height: min(82.5vh, 1012px);
         padding-bottom: 0;
     }
+    .board-write-modal-panel.instructor-status-write-wide {
+        --board-modal-padding: clamp(24px, 2vw, 34px);
+        max-width: min(1364px, calc(100vw - 36px));
+    }
     .board-write-modal-panel #postForm { margin: 0 calc(-1 * var(--board-modal-padding)); }
     .board-editor-section { padding: 0 var(--board-modal-padding) 8px; }
     .board-attachment-section {
@@ -371,16 +379,17 @@
 
     /* FHD 업무환경: 3단 구성은 유지하고 과한 여백과 큰 장식 요소만 줄인다. */
     @media (min-width: 1101px) and (max-width: 2000px) and (max-height: 1200px) {
-        .dashboard-container.school-detail-spacing { padding-top: 10px; }
+        .dashboard-container.school-detail-spacing { padding-top: 7px; }
         .dashboard-container.school-detail-spacing .school-container {
             min-height: 0;
             padding: 14px;
-            padding-top: 14px;
+            padding-top: 9.8px;
+            padding-bottom: 7px;
         }
         .dashboard-container.school-detail-spacing .school-workspace-shell {
             grid-template-columns: 278px minmax(420px, 1fr) 282px;
             gap: 15px;
-            padding: 12px 0 16px;
+            padding: 12px 0 8px;
         }
         .dashboard-container.school-detail-spacing .school-left-rail,
         .dashboard-container.school-detail-spacing .school-main-rail,
@@ -491,6 +500,7 @@
     table.board-table th { background: rgba(0,0,0,0.03); color: var(--school-navy); font-size: 0.75rem; font-weight: 700; padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.05); text-align: center; }
     table.board-table td { font-size: 0.8rem; color: var(--school-text); padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.05); vertical-align: middle; cursor: pointer; transition: 0.2s; }
     .board-table tbody tr:hover td { background: rgba(0,0,0,0.02); }
+    .board-list-attachment-size { margin-left:4px; color:var(--text-gray, #64748b); font-size:0.72rem; font-weight:500; white-space:nowrap; }
 
     .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; display: inline-block; text-align: center; margin: 0; background: #ffffff; border: 1px solid #cbd5e1;}
     .status-접수 { color: #d97706; border-color: #f59e0b; }
@@ -706,6 +716,7 @@
     .post-file-remove:hover { background:#fef2f2; }
     .read-file-delete { border:0; background:transparent; color:#dc2626; cursor:pointer; font-size:0.78rem; font-weight:800; padding:3px 6px; border-radius:6px; }
     .read-file-delete:hover { background:#fef2f2; }
+    .read-file-size { color:var(--text-gray, #64748b); font-size:0.78em; white-space:nowrap; }
     .board-write-modal-panel .tox-tinymce { border-color:var(--school-border) !important; border-radius:8px !important; }
     .board-write-modal-panel .tox .tox-toolbar__primary,
     .board-write-modal-panel .tox .tox-toolbar-overlord,
@@ -723,6 +734,7 @@
         .board-modal-shell { align-items: flex-start; padding: 6px; }
         .board-modal-panel { height: calc(100dvh - 12px); padding: 18px 14px 24px; border-radius: 8px; }
         .board-write-modal-panel { --board-modal-padding: 14px; padding: 18px var(--board-modal-padding) 0; }
+        .board-write-modal-panel.instructor-status-write-wide { --board-modal-padding: 14px; max-width: 100%; }
         .board-modal-close { top: 10px; right: 10px; width: 34px; height: 34px; }
         .read-header { padding:22px 20px 14px; }
         .board-modal-panel .read-header { padding-right: 48px; }
@@ -735,7 +747,8 @@
         .comment-item.reply { margin-left:18px; }
     }
 
-    .school-page-copyright { width: 100%; box-sizing: border-box; margin: 2px auto 0; padding: 6px 16px 12px; color: var(--text-gray, #64748b); font-size: 11px; line-height: 1.5; font-weight: 400; letter-spacing: 0.01em; text-align: center; opacity: 0.9; }
+    /* 마지막 콘텐츠와 저작권 문구 사이의 여백은 기존의 50%로 줄인다. */
+    .school-page-copyright { width: 100%; box-sizing: border-box; margin: 1px auto 0; padding: 3px 16px 12px; color: var(--text-gray, #64748b); font-size: 11px; line-height: 1.5; font-weight: 400; letter-spacing: 0.01em; text-align: center; opacity: 0.9; }
 
     /* 조직도 트리를 위한 CSS */
     .org-chart-box { border: 1px solid #cbd5e1 !important; border-radius: 8px; max-height: 220px; overflow-y: auto; padding: 12px; background: #f8fafc !important; }
@@ -1134,7 +1147,7 @@
                                     <td style="text-align:center;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * pagination.per_page }}</td>
                                     <td style="text-align:left; padding-left:20px;">
                                         {{ p.title }}
-                                        {% if p.filename %}<i class="fas fa-paperclip" style="color:var(--text-gray, #94a3b8); margin-left:5px;"></i>{% endif %}
+                                        {% if p.filename %}<i class="fas fa-paperclip" style="color:var(--text-gray, #94a3b8); margin-left:5px;"></i><span class="board-list-attachment-size" title="첨부 {{ p.attachment_count }}개 총용량">{{ p.attachment_total_size_label }}</span>{% endif %}
                                     </td>
                                     <td style="text-align:center;">{{ p.author }}</td>
                                     <td style="text-align:center;">
@@ -1282,7 +1295,13 @@
                                 <div id="postFileDropzone" class="post-file-dropzone">
                                     <input type="file" name="file" multiple id="fileInput" onchange="handlePostFileSelect(this.files)" style="display: none;">
                                     <label for="fileInput" class="post-file-pick-btn"><i class="fa-solid fa-cloud-arrow-up post-file-upload-icon"></i><span>이곳을 클릭해 파일을 선택하세요.</span></label>
-                                    <div class="post-file-help">파일을 드래그해서도 첨부할 수 있습니다. (최대 10개, 총 15MB 이하)</div>
+                                    <div class="post-file-help">
+                                        {% if category == 'reference' %}
+                                        파일을 드래그해서도 첨부할 수 있습니다. (최대 10개, 파일당 100MB 이하 · 대용량 업로드 진행률 표시)
+                                        {% else %}
+                                        파일을 드래그해서도 첨부할 수 있습니다. (최대 10개, 총 15MB 이하)
+                                        {% endif %}
+                                    </div>
                                     <div id="fileLabel" style="margin-top:12px; color:var(--school-blue); font-weight: 600;"></div>
                                     <div id="existingFileTitle" class="existing-file-title" style="display:none;">기존 첨부파일</div>
                                     <div id="existingFileList" class="existing-file-list"></div>
@@ -1337,7 +1356,9 @@
 
             <aside class="school-side-rail">
                 <div class="school-chat-card">
-                    {% include 'chat_widget.html' %}
+                    {% with hide_chat_title_icon = true %}
+                        {% include 'chat_widget.html' %}
+                    {% endwith %}
                 </div>
 
                 <div class="widget-card gallery-widget company-gallery-card">
@@ -1612,6 +1633,10 @@
     let existingPostFiles = [];
     const POST_MAX_FILES = 10;
     const POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024;
+    const REFERENCE_POST_MAX_FILE_SIZE = 100 * 1024 * 1024;
+    const REFERENCE_POST_MAX_TOTAL_SIZE = POST_MAX_FILES * REFERENCE_POST_MAX_FILE_SIZE;
+    const activePostCategory = "{{ category if view_type == 'detail' else '' }}";
+    const isReferencePostBoard = activePostCategory === 'reference';
     const activeCategoryName = "{% if view_type == 'detail' %}{{ active_cat.name|e }}{% else %}게시판{% endif %}";
     const isSharedBoard = ["community", "reference"].includes("{{ category if view_type == 'detail' else '' }}");
     const canWriteCurrentBoard = {{ 'true' if can_write_current_board|default(false) else 'false' }};
@@ -2111,8 +2136,49 @@
         if(btn.prop('disabled')) { e.preventDefault(); return false; }
         const editor = getPostEditor();
         if(editor && editor.initialized) editor.save();
+        if(isReferencePostBoard && selectedPostFiles.length > 0) {
+            e.preventDefault();
+            submitReferencePostWithProgress(this, btn);
+            return false;
+        }
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 처리중...');
     });
+
+    function submitReferencePostWithProgress(form, btn) {
+        const originalButtonHtml = btn.html();
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        xhr.timeout = 0;
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> 업로드 준비중...');
+
+        xhr.upload.addEventListener('progress', event => {
+            if(!event.lengthComputable) return;
+            const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+            btn.html(`<i class="fas fa-spinner fa-spin"></i> 업로드 ${percent}%`);
+        });
+        xhr.upload.addEventListener('load', () => {
+            btn.html('<i class="fas fa-lock fa-spin"></i> 서버 암호화 저장중...');
+        });
+        xhr.onload = () => {
+            if(xhr.status >= 200 && xhr.status < 400) {
+                window.location.href = xhr.responseURL || window.location.href;
+                return;
+            }
+            const message = String(xhr.responseText || '자료실 파일 업로드에 실패했습니다.')
+                .replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            schoolToast(message.slice(0, 240) || '자료실 파일 업로드에 실패했습니다.', 'error');
+            btn.prop('disabled', false).html(originalButtonHtml);
+        };
+        xhr.onerror = () => {
+            schoolToast('네트워크가 불안정하여 업로드하지 못했습니다. 연결을 확인한 뒤 다시 시도해주세요.', 'error');
+            btn.prop('disabled', false).html(originalButtonHtml);
+        };
+        xhr.onabort = () => {
+            schoolToast('파일 업로드가 취소되었습니다.', 'warning');
+            btn.prop('disabled', false).html(originalButtonHtml);
+        };
+        xhr.send(new FormData(form));
+    }
 
     function escapeHtml(str) {
         return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -2170,9 +2236,8 @@
 
     function showBoardList() { showView('boardListView'); }
 
-    document.addEventListener('click', function(event) {
-        if(event.target.classList.contains('board-modal-shell')) showBoardList();
-    });
+    // 글보기·글쓰기 모달은 배경 클릭이나 드래그 후 클릭으로 닫지 않는다.
+    // 닫기, 취소, 목록으로 같은 명시적 버튼에서만 화면을 전환한다.
     document.addEventListener('keydown', function(event) {
         if(event.key === 'Escape' && document.body.classList.contains('board-modal-open')) showBoardList();
     });
@@ -2253,12 +2318,14 @@
         if(data.filename) {
             const names = String(data.filename || '').split(',');
             const paths = String(data.filepath || '').split(',');
+            const sizes = Array.isArray(data.attachment_sizes) ? data.attachment_sizes : [];
             const links = [];
             names.forEach((n, i) => {
                 const originalPath = String(paths[i] || '').trim();
                 const originalName = getOriginalFileName(n, originalPath);
                 const fileUrl = makeFileUrl(originalPath);
-                links.push(`<span style="display:inline-flex; align-items:center; gap:3px;"><a href="${escapeHtml(fileUrl)}" target="_blank" class="read-file-link" download="${escapeHtml(originalName)}">${escapeHtml(originalName)}</a></span>`);
+                const sizeLabel = formatPostFileSize(sizes[i] || 0);
+                links.push(`<span style="display:inline-flex; align-items:center; gap:4px;"><a href="${escapeHtml(fileUrl)}" target="_blank" class="read-file-link" download="${escapeHtml(originalName)}">${escapeHtml(originalName)}</a><span class="read-file-size">(${sizeLabel})</span></span>`);
                 if(isSharedBoard && isPreviewablePostImage(originalName)) {
                     const previewUrl = makeImagePreviewUrl(originalPath);
                     imagePreviews.push(`<a class="read-image-preview-link" href="${escapeHtml(previewUrl)}" target="_blank" rel="noopener" title="${escapeHtml(originalName)} 원본 보기"><img class="read-image-preview" src="${escapeHtml(previewUrl)}" alt="${escapeHtml(originalName)}" loading="lazy" onerror="this.closest('.read-image-preview-link').style.display='none'"></a>`);
@@ -2380,23 +2447,97 @@
         }
     }
 
+    const instructorStatusColumns = [
+        ['순번', '6%'],
+        ['과목', '11%'],
+        ['이름', '9%'],
+        ['전화번호', '12%'],
+        ['e-메일', '14%'],
+        ['주민번호 (-제외/숫자만기재)', '16%'],
+        ['은행명', '8%'],
+        ['계좌번호 (-제외/숫자만기재)', '17%'],
+        ['비고', '7%']
+    ];
+
+    function buildInstructorStatusTable(heading, rowNumbers, headerBackground, extraTopSpace = false) {
+        const cellStyle = 'border:1px solid #94a3b8;padding:6px 7px;height:30px;vertical-align:middle;word-break:break-all;';
+        const headingSpacer = extraTopSpace ? '<p style="height:1.5em;margin:0;">&nbsp;</p>' : '';
+        const colgroup = instructorStatusColumns
+            .map(([, width]) => `<col style="width:${width};">`)
+            .join('');
+        const headers = instructorStatusColumns
+            .map(([label]) => `<th style="${cellStyle}background:${headerBackground};text-align:center;font-weight:700;">${label}</th>`)
+            .join('');
+        const rows = rowNumbers.map(number => `
+            <tr>
+                <td style="${cellStyle}text-align:center;">${number}</td>
+                ${instructorStatusColumns.slice(1).map(() => `<td style="${cellStyle}">&nbsp;</td>`).join('')}
+            </tr>
+        `).join('');
+        return `
+            ${headingSpacer}
+            <h2 style="margin:18px 0 10px;font-size:20px;line-height:1.4;">${heading}</h2>
+            <table border="1" style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 28px;">
+                <colgroup>${colgroup}</colgroup>
+                <thead><tr>${headers}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
+    function getInstructorStatusTemplate() {
+        const beneficiaryRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22, 23, 24];
+        const customizedRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        const noteCellStyle = 'border:1px solid #94a3b8;padding:8px 10px;vertical-align:middle;';
+
+        return [
+            buildInstructorStatusTable('수익자(선택형) 강사 현황', beneficiaryRows, '#dbeafe', true),
+            buildInstructorStatusTable('맞춤형 강사 현황', customizedRows, '#dcfce7'),
+            `
+                <h2 style="margin:18px 0 10px;font-size:20px;line-height:1.4;">기타 강사전달사항</h2>
+                <table border="1" style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 20px;">
+                    <tbody>
+                        <tr>
+                            <th style="${noteCellStyle}width:16%;background:#f1f5f9;text-align:center;font-weight:700;">내용</th>
+                            <td style="${noteCellStyle}height:90px;">&nbsp;</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="margin:24px 0 8px;padding:14px 16px;border:1px solid #cbd5e1;background:#f8fafc;line-height:1.7;">
+                    <p style="margin:0;"><strong>안내:</strong> 1) 엑셀에서 내용 복사하여 위의 표에 붙여넣기가 가능합니다.</p>
+                    <p style="margin:0 0 0 3.1em;">2) 위 형식이 필요없을 시 글과 표를 다 삭제하고 작성하세요.</p>
+                    <p style="margin:0 0 0 3.1em;">3) 필요 시 파일첨부가 가능합니다.</p>
+                </div>
+            `
+        ].join('');
+    }
+
+    function setInstructorStatusWriteWidth(enabled) {
+        const panel = document.querySelector('#boardWriteView .board-write-modal-panel');
+        if(panel) panel.classList.toggle('instructor-status-write-wide', Boolean(enabled));
+    }
+
     function openPostForm(cat) {
+        const isInstructorStatus = cat === 'open_class';
+        setInstructorStatusWriteWidth(isInstructorStatus);
         showView('boardWriteView');
         $('#postForm').attr('action', "{{ url_for('school.add_post') }}");
         $('#postFormTitle').html(`<i class="fas fa-pen-nib" style="color:var(--school-blue);"></i> ${escapeHtml(activeCategoryName)} 게시글 작성`);
         $('#postCategory').val(cat);
-        $('#postTitle').val('');
+        $('#postTitle').val(isInstructorStatus ? '(      )월 강사현황보고' : '');
         $('#btnCancelWrite').show();
         $('#btnCancelEdit').hide();
         $('#btnSubmitPost').html('<i class="fas fa-save"></i> 저장하기').prop('disabled', false);
         resetPostFiles();
-        setPostEditorContent('');
+        setPostEditorContent(isInstructorStatus ? getInstructorStatusTemplate() : '');
     }
 
     function openEditFromRead() {
         const data = currentPostData;
+        setInstructorStatusWriteWidth(false);
         showView('boardWriteView');
         $('#postForm').attr('action', '/school/post/edit/' + data.id);
+        $('#postCategory').val(activePostCategory);
         $('#postFormTitle').html(`<i class="fas fa-edit" style="color:var(--school-blue);"></i> ${escapeHtml(activeCategoryName)} 게시글 수정`);
         $('#btnCancelWrite').hide();
         $('#btnCancelEdit').show();
@@ -2552,10 +2693,24 @@
             syncPostFileInput();
             return false;
         }
+        if(isReferencePostBoard) {
+            const oversizedFile = merged.find(file => file.size > REFERENCE_POST_MAX_FILE_SIZE);
+            if(oversizedFile) {
+                schoolToast(`${oversizedFile.name}: 자료실 첨부파일은 파일당 100MB 이하만 등록할 수 있습니다.`, 'warning');
+                syncPostFileInput();
+                return false;
+            }
+        }
         const totalSize = existingPostFiles.reduce((sum, file) => sum + file.size, 0)
             + merged.reduce((sum, file) => sum + file.size, 0);
-        if(totalSize > POST_MAX_TOTAL_SIZE) {
-            schoolToast('첨부파일의 총용량은 기존 파일을 포함해 최대 15MB까지 등록할 수 있습니다.', 'warning');
+        const totalLimit = isReferencePostBoard ? REFERENCE_POST_MAX_TOTAL_SIZE : POST_MAX_TOTAL_SIZE;
+        if(totalSize > totalLimit) {
+            schoolToast(
+                isReferencePostBoard
+                    ? '자료실 첨부파일은 최대 10개, 파일당 100MB 이하로 등록할 수 있습니다.'
+                    : '첨부파일의 총용량은 기존 파일을 포함해 최대 15MB까지 등록할 수 있습니다.',
+                'warning'
+            );
             syncPostFileInput();
             return false;
         }
@@ -2579,7 +2734,9 @@
             + selectedPostFiles.reduce((sum, file) => sum + file.size, 0);
         labelEl.innerHTML = totalCount === 0
             ? ''
-            : `<i class="fas fa-check-circle"></i> 총 ${totalCount}개 · ${formatPostFileSize(totalSize)} / 15MB`;
+            : isReferencePostBoard
+                ? `<i class="fas fa-check-circle"></i> 총 ${totalCount}개 · ${formatPostFileSize(totalSize)} · 파일당 100MB 이하`
+                : `<i class="fas fa-check-circle"></i> 총 ${totalCount}개 · ${formatPostFileSize(totalSize)} / 15MB`;
     }
 
     function syncPostFileInput() {

@@ -141,7 +141,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
 <div class="widget-card chat-widget" style="display: flex; flex-direction: column; height: 100%;">
     <div class="widget-header" style="margin-bottom: 12px; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px solid var(--widget-border-color);">
         <div class="cal-title-area" style="font-size: 1rem; color: #1e293b;">
-            <i class="fa-regular fa-comment-dots" style="color:var(--blue-primary);"></i> 사내메신저
+            {% if not hide_chat_title_icon %}<i class="fa-regular fa-comment-dots" style="color:var(--blue-primary);"></i>{% endif %} 사내메신저
         </div>
         <div style="display: flex; align-items: center; gap: 12px;">
 <div class="pill-tabs" style="margin: 0; display: flex; gap: 2px; flex-shrink: 1; background: transparent; border: none; padding: 0;">
