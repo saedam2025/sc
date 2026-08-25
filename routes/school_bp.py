@@ -48,6 +48,8 @@ SCHOOL_CATEGORY_ALIASES = {
 }
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
+REFERENCE_POST_MAX_FILE_SIZE = 100 * 1024 * 1024
+REFERENCE_POST_MAX_TOTAL_SIZE = POST_MAX_FILES * REFERENCE_POST_MAX_FILE_SIZE
 WEBLINK_FILE_MAX_SIZE = 5 * 1024 * 1024
 FILENAME_ENCODING_PREFIX = '~e~'
 INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
@@ -314,6 +316,40 @@ def get_stored_file_size(reference):
     if not reference:
         return 0
     return plaintext_size(_stored_path_from_reference(reference))
+
+
+def format_school_file_size(size):
+    """게시판 목록에서 사용할 짧은 파일 용량 문자열을 만든다."""
+    size = max(0, int(size or 0))
+    if size >= 1024 * 1024 * 1024:
+        return f'{size / (1024 * 1024 * 1024):.1f}GB'
+    if size >= 1024 * 1024:
+        return f'{size / (1024 * 1024):.1f}MB'
+    if size >= 1024:
+        return f'{math.ceil(size / 1024)}KB'
+    return f'{size}B'
+
+
+def validate_post_attachment_sizes(category, uploaded_sizes, existing_sizes=()):
+    """게시판별 첨부 제한을 실제 바이트 기준으로 검사한다."""
+    uploaded_sizes = [max(0, int(size or 0)) for size in uploaded_sizes]
+    existing_sizes = [max(0, int(size or 0)) for size in existing_sizes]
+    if len(uploaded_sizes) + len(existing_sizes) > POST_MAX_FILES:
+        return f"게시물 첨부파일은 최대 {POST_MAX_FILES}개까지 등록할 수 있습니다."
+
+    category_id = SCHOOL_CATEGORY_ALIASES.get(
+        str(category or '').strip(), str(category or '').strip()
+    )
+    if category_id == 'reference':
+        if any(size > REFERENCE_POST_MAX_FILE_SIZE for size in uploaded_sizes):
+            return "자료실 첨부파일은 파일당 100MB 이하만 등록할 수 있습니다."
+        if sum(existing_sizes) + sum(uploaded_sizes) > REFERENCE_POST_MAX_TOTAL_SIZE:
+            return "자료실 첨부파일은 최대 10개, 파일당 100MB 이하로 등록할 수 있습니다."
+        return ''
+
+    if sum(existing_sizes) + sum(uploaded_sizes) > POST_MAX_TOTAL_SIZE:
+        return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다."
+    return ''
 
 def init_school_comment_table(conn):
     ensure_confirmation_schema(conn)
@@ -727,6 +763,19 @@ def school_detail(school_key):
 
     query_params.extend([per_page, offset])
     posts = [dict(row) for row in conn.execute(data_query, query_params).fetchall()]
+    for post in posts:
+        attachment_paths = [
+            path.strip()
+            for path in str(post.get('filepath') or '').split(',')
+            if path.strip()
+        ]
+        attachment_sizes = [get_stored_file_size(path) for path in attachment_paths]
+        post['attachment_count'] = len(attachment_paths)
+        post['attachment_sizes'] = attachment_sizes
+        post['attachment_total_size'] = sum(attachment_sizes)
+        post['attachment_total_size_label'] = format_school_file_size(
+            post['attachment_total_size']
+        )
     is_shared_current_board = is_shared_board(search_category)
     if is_shared_current_board:
         confirmation_map = get_confirmation_map(conn, [post['id'] for post in posts])
@@ -1347,12 +1396,12 @@ def add_post():
     
     files = request.files.getlist('file')
     files = [f for f in files if f and f.filename != '']
-    if len(files) > POST_MAX_FILES:
+    attachment_error = validate_post_attachment_sizes(
+        category, [get_uploaded_file_size(file) for file in files]
+    )
+    if attachment_error:
         conn.close()
-        return f"게시물 첨부파일은 최대 {POST_MAX_FILES}개까지 등록할 수 있습니다.", 400
-    if sum(get_uploaded_file_size(file) for file in files) > POST_MAX_TOTAL_SIZE:
-        conn.close()
-        return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다.", 400
+        return attachment_error, 400
     filename_str, filepath_str = save_uploaded_files(files)
         
     try:
@@ -1430,15 +1479,14 @@ def edit_post(post_id):
     existing_filepaths = [pair[1] for pair in existing_pairs]
 
     files = [f for f in request.files.getlist('file') if f and f.filename != '']
-    if len(existing_filenames) + len(files) > POST_MAX_FILES:
+    attachment_error = validate_post_attachment_sizes(
+        post['category'],
+        [get_uploaded_file_size(file) for file in files],
+        [get_stored_file_size(path) for path in existing_filepaths],
+    )
+    if attachment_error:
         conn.close()
-        return f"게시물 첨부파일은 최대 {POST_MAX_FILES}개까지 등록할 수 있습니다.", 400
-
-    existing_total_size = sum(get_stored_file_size(path) for path in existing_filepaths)
-    uploaded_total_size = sum(get_uploaded_file_size(file) for file in files)
-    if existing_total_size + uploaded_total_size > POST_MAX_TOTAL_SIZE:
-        conn.close()
-        return "게시물 첨부파일의 총용량은 최대 15MB까지 등록할 수 있습니다.", 400
+        return attachment_error, 400
 
     removed_references = [
         old_pair[1] or old_pair[0]
