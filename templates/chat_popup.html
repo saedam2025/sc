@@ -32,7 +32,7 @@
             color: var(--text-dark);
         }
 
-        .chat-input-area { width: 100%; border: none !important; background: transparent !important; padding: 10px 5px !important; font-size: 1.05rem; outline: none !important; box-shadow: none !important; font-family: inherit; color: var(--text-dark); }
+        .chat-input-area { width: 100%; min-height:45px; max-height:110px; border: none !important; background: transparent !important; padding: 10px 5px !important; font-size: 1.05rem; line-height:1.45; outline: none !important; box-shadow: none !important; font-family: inherit; color: var(--text-dark); resize:none; overflow-y:auto; box-sizing:border-box; }
         .chat-input-area::placeholder { color: #94a3b8; }
 
         .btn-primary { background: var(--primary-color); color: white; border: none; padding: 0 20px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: background 0.2s; height: 45px; }
@@ -240,7 +240,7 @@
 
         <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
             <div id="chatFileName" style="font-size:0.8rem; color:var(--primary-color); display:none; padding:2px 5px 0; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
-            <input type="text" id="chatInput" class="chat-input-area" placeholder="메시지를 입력하세요" onkeypress="if(event.key==='Enter') sendChatReply()" autocomplete="off">
+            <textarea id="chatInput" class="chat-input-area" rows="1" placeholder="메시지를 입력하세요" autocomplete="off" aria-label="메시지 입력"></textarea>
         </div>
         
         <button class="btn-primary" onclick="sendChatReply()"><i class="fa-solid fa-paper-plane" style="font-size: 1.1rem;"></i></button>
@@ -1058,6 +1058,7 @@
                 const res = await fetch('/send_message', { method: 'POST', body: formData });
                 if(res.ok) { 
                     input.value = ''; fileInput.value = '';
+                    resizeChatInput(input);
                     showChatFileName(fileInput);
                     document.getElementById('chatEmojiPicker').style.display = 'none';
                     cancelReply();
@@ -1070,14 +1071,28 @@
             } catch (e) { alert("메시지 전송 중 오류가 발생했습니다."); }
         }
 
+        function handleChatInputKeydown(event) {
+            if (event.key !== 'Enter' || event.isComposing) return;
+            if (event.shiftKey) return;
+            event.preventDefault();
+            sendChatReply();
+        }
+
         function sendTypingState(isTyping) {
             if (!chatSocket || !chatSocket.connected) return;
             chatSocket.emit('typing', { partner: partnerName, is_typing: !!isTyping });
             if (!isTyping) lastTypingSentAt = 0;
         }
 
+        function resizeChatInput(input) {
+            input.style.height = 'auto';
+            input.style.height = `${Math.min(input.scrollHeight, 110)}px`;
+        }
+
         function handleChatInput() {
-            if (!document.getElementById('chatInput').value) {
+            const input = document.getElementById('chatInput');
+            resizeChatInput(input);
+            if (!input.value) {
                 clearTimeout(typingStopTimer);
                 sendTypingState(false);
                 return;
@@ -1140,6 +1155,8 @@
             initHeader();
             initializeChatFileDrop();
             document.getElementById('chatInput').addEventListener('input', handleChatInput);
+            document.getElementById('chatInput').addEventListener('keydown', handleChatInputKeydown);
+            resizeChatInput(document.getElementById('chatInput'));
             await loadChatMessages({ reset: true });
             initializeChatSocket();
             document.getElementById('chatInput').focus();

@@ -337,7 +337,7 @@
     .weather-pill:hover { border-color: var(--blue-primary); background: var(--card-bg, #ffffff); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); transform: translateY(-2px); }
     .weather-pill:hover .weblink-delete-btn { opacity: 1 !important; }
     .weblink-delete-btn:hover { background: #dc2626 !important; transform: scale(1.1); }
-    .weather-pill-value { font-size: 0.75rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 5em; width: 100%; margin-top: 4px; }
+    .weather-pill-value { font-size: 0.675rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 5em; width: 100%; margin-top: 4px; }
 
     .unread-badge { background: #ef4444; color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 700; margin-left: 4px; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2); }
     
@@ -808,6 +808,7 @@
             </div>
             <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소">
             <input type="file" id="weblinkFile" class="modal-input" style="display: none; padding:10px;">
+            <div id="weblinkFileHelp" style="display:none; margin:-7px 0 12px; color:var(--text-muted); font-size:0.78rem;">첨부파일은 5MB 이하만 등록할 수 있습니다.</div>
             <button type="button" class="btn-primary" onclick="saveWebLink()" style="width:100%; padding:14px;">등록하기</button>
         </form>
     </div>
@@ -1514,16 +1515,26 @@ let currentWeeklyStart = getMonday(new Date());
         const t = document.querySelector('input[name="weblinkType"]:checked').value;
         if (t === 'url') { document.getElementById('weblinkUrl').style.display = 'block'; document.getElementById('weblinkFile').style.display = 'none'; } 
         else { document.getElementById('weblinkUrl').style.display = 'none'; document.getElementById('weblinkFile').style.display = 'block'; }
+        document.getElementById('weblinkFileHelp').style.display = t === 'file' ? 'block' : 'none';
     }
 
     async function saveWebLink() {
         const title = document.getElementById('weblinkTitle').value; const type = document.querySelector('input[name="weblinkType"]:checked').value;
         let fd = new FormData(); fd.append('title', title); fd.append('type', type);
         if (type === 'url') fd.append('url', document.getElementById('weblinkUrl').value);
-        else fd.append('file', document.getElementById('weblinkFile').files[0]);
+        else {
+            const file = document.getElementById('weblinkFile').files[0];
+            if (!file) return alert('업로드할 파일을 선택하세요.');
+            if (file.size > 5 * 1024 * 1024) return alert('첨부파일은 5MB 이하만 등록할 수 있습니다.');
+            fd.append('file', file);
+        }
         try {
             const res = await fetch('/save_weblink', { method: 'POST', body: fd });
             if (res.ok) location.reload();
+            else {
+                const data = await res.json().catch(() => ({}));
+                alert(data.message || '링크 등록에 실패했습니다.');
+            }
         } catch (error) {}
     }
 

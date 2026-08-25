@@ -215,8 +215,8 @@
     .task-table th {
         background: rgba(0,0,0,0.02);
         color: var(--text-gray);
-        font-weight: 700;
-        font-size: 0.85rem;
+        font-weight: 400;
+        font-size: 0.765rem;
         padding: 16px 15px;
         border-bottom: 1px solid var(--border-color);
         text-transform: uppercase;
@@ -226,9 +226,13 @@
     .task-table td {
         padding: 16px 15px;
         border-bottom: 1px solid var(--border-light);
-        font-size: 0.95rem;
+        font-size: 0.855rem;
+        font-weight: 400;
         color: var(--text-dark);
     }
+    .task-table td :not(i), .task-table th :not(i) { font-weight: 400 !important; }
+    .task-table i.fa-solid, .task-table i.fas { font-weight: 900 !important; }
+    .task-table i.fa-regular, .task-table i.far { font-weight: 400 !important; }
 
     .task-row:hover {
         background-color: rgba(0,0,0,0.02);
@@ -249,16 +253,38 @@
         border-radius: 0;
         border: none;
         background: transparent !important;
-        font-size: 0.9rem;
-        font-weight: 600;
+        font-size: 0.81rem;
+        font-weight: 400;
         white-space: nowrap;
     }
 
-    .badge-school { color: var(--text-dark); font-weight: 700; }
+    .badge-school { color: var(--text-dark); font-weight: 400; }
     .badge-cat { color: var(--saedam-blue); }
     .status-접수 { color: #d97706; }
     .status-처리중 { color: #2563eb; }
     .status-완료 { color: #16a34a; }
+    .confirmation-count { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:55px; padding:4px 9px; border:0; background:transparent; color:#0f766e; font-size:0.675rem; font-weight:400; cursor:help; }
+    .confirmation-tooltip { display:none; position:absolute; z-index:120; left:50%; bottom:calc(100% + 7px); transform:translateX(-50%); width:max-content; min-width:110px; max-width:230px; padding:7px 9px; border:1px solid #99f6e4; border-radius:8px; background:#134e4a; color:#fff; box-shadow:0 7px 18px rgba(15,23,42,.2); text-align:left; font-size:.67rem; font-weight:500; line-height:1.35; white-space:normal; pointer-events:none; }
+    .confirmation-tooltip strong { display:block; margin-bottom:4px; color:#ccfbf1; font-size:.68rem; }
+    .confirmation-tooltip span { display:block; padding:1px 0; }
+    .confirmation-count:hover .confirmation-tooltip, .confirmation-count:focus .confirmation-tooltip { display:block; }
+    .shared-confirmation-detail { display:none; align-items:flex-start; gap:8px; padding:9px 12px; border:1px solid #99f6e4; border-radius:9px; background:#f0fdfa; color:#115e59; font-size:.75rem; line-height:1.45; }
+    .shared-confirmation-detail strong { flex:0 0 auto; }
+    .shared-confirmation-detail span { color:#475569; }
+    #rTitle.shared-board-title { font-size:1.44em !important; }
+
+    .bulk-move-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        background: rgba(0,0,0,0.02);
+    }
+    .bulk-move-controls .move-label { color: var(--text-gray); font-size: .82rem; font-weight: 400; }
+    .btn-action.move { background: var(--saedam-blue); color: #fff; }
 
     #emptyState {
         display: none;
@@ -334,14 +360,14 @@
         <aside class="category-sidebar">
             <ul class="category-list">
                 <li>
-                    <button type="button" class="category-btn active" onclick="filterCategory('all', this)">
+                    <button type="button" class="category-btn active" data-category-name="all" onclick="filterCategory('all', this)">
                         <i class="fa-solid fa-list"></i> 전체
                     </button>
                 </li>
 
                 {% for cat in categories %}
                 <li>
-                    <button type="button" class="category-btn" onclick="filterCategory('{{ cat.name }}', this)">
+                    <button type="button" class="category-btn" data-category-name="{{ cat.name }}" onclick="filterCategory('{{ cat.name }}', this)">
                         <i class="fa-solid {{ cat.icon }}"></i> {{ cat.name }}
                     </button>
                 </li>
@@ -378,7 +404,7 @@
                             </button>
                         </div>
 
-                        <div style="margin-left: auto; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <div id="bulkStatusControls" style="margin-left: auto; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 16px; border-radius: 12px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">
                                 상태 변경:
                             </span>
@@ -388,7 +414,20 @@
                         </div>
                     </div>
 
-                    <div style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.02); padding: 12px 20px; border-radius: 10px; border: 1px dashed var(--border-color);">
+                    <div id="bulkMoveControls" class="bulk-move-controls">
+                        <span class="move-label"><i class="fa-solid fa-arrow-right-arrow-left"></i> 선택 자료 이동:</span>
+                        <select id="moveTargetCategory" class="glass-input" style="width:170px; padding:8px 12px;">
+                            <option value="">옮길 게시판 선택</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" data-category-name="{{ cat.name }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="btnMovePosts" type="button" class="btn-action move" onclick="moveSelectedPosts(this)">
+                            <i class="fa-solid fa-share"></i> 이동
+                        </button>
+                    </div>
+
+                    <div id="statusSummary" style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.02); padding: 12px 20px; border-radius: 10px; border: 1px dashed var(--border-color);">
                         <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-gray); display: flex; align-items: center; gap: 8px;">
                             <i class="fa-solid fa-chart-pie" style="color: var(--saedam-blue);"></i> 현재 조건 상태 요약
                         </div>
@@ -406,7 +445,7 @@
                     <table class="task-table">
                         <thead>
                             <tr>
-                                <th style="width: 40px; text-align: center;">
+                                <th class="task-select-cell" style="width: 40px; text-align: center;">
                                     <input type="checkbox" id="checkAll" class="chk-box" onclick="toggleAll()">
                                 </th>
                                 <th style="width: 50px;">No.</th>
@@ -415,8 +454,8 @@
                                 <th>게시물 제목</th>
                                 <th style="width: 80px;">작성자</th>
                                 <th style="width: 100px;">등록일자</th>
-                                <th style="width: 80px; text-align: center;">상태</th>
-                                <th style="width: 80px; text-align: center;">처리자</th>
+                                <th id="taskStatusHeader" style="width: 80px; text-align: center;">상태 / 확인</th>
+                                <th id="taskProcessorHeader" class="task-processor-cell" style="width: 80px; text-align: center;">처리자</th>
                             </tr>
                         </thead>
 
@@ -425,11 +464,13 @@
                             <tr class="task-row"
                                 data-category="{{ task.cat_name }}"
                                 data-school="{{ task.school_name }}"
+                                data-original-school="{{ task.original_school_name }}"
                                 data-status="{{ task.status }}"
+                                data-shared="{{ 'true' if task.is_shared else 'false' }}"
                                 onclick="openTaskDetail({{ task.id }})">
 
-                                <td style="text-align: center;" onclick="event.stopPropagation()">
-                                    <input type="checkbox" class="chk-box chk-item" value="{{ task.id }}">
+                                <td class="task-select-cell" style="text-align: center;" onclick="event.stopPropagation()">
+                                    <input type="checkbox" class="chk-box chk-item {% if not task.is_shared %}status-change-item{% endif %}" value="{{ task.id }}">
                                 </td>
 
                                 <td style="color:var(--text-gray);">{{ task.id }}</td>
@@ -442,22 +483,36 @@
                                     <span class="badge badge-cat">{{ task.cat_name }}</span>
                                 </td>
 
-                                <td style="font-weight: 600; color: var(--text-dark);">
+                                <td style="font-weight: 400; color: var(--text-dark);">
                                     {{ task.title }}
                                 </td>
 
                                 <td>{{ task.author }}</td>
 
-                                <td style="color:var(--text-gray); font-size: 0.85rem;">
+                                <td style="color:var(--text-gray); font-size: 0.765rem;">
                                     {{ task.date }}
                                 </td>
 
                                 <td style="text-align: center;">
+                                    {% if task.is_shared %}
+                                    <span class="confirmation-count" tabindex="0" aria-label="확인자 {{ task.confirmation_count or 0 }}명" title="{{ task.confirmation_names|join(', ') if task.confirmation_names else '아직 확인한 조직원이 없습니다.' }}">
+                                        <i class="fa-regular fa-circle-check"></i> {{ task.confirmation_count or 0 }}명
+                                        <span class="confirmation-tooltip" role="tooltip">
+                                            <strong>확인자 {{ task.confirmation_count or 0 }}명</strong>
+                                            {% for confirmation in task.confirmations %}
+                                            <span>{{ confirmation.display_name }}</span>
+                                            {% else %}
+                                            <span>아직 확인한 조직원이 없습니다.</span>
+                                            {% endfor %}
+                                        </span>
+                                    </span>
+                                    {% else %}
                                     <span class="badge status-{{ task.status }}">{{ task.status }}</span>
+                                    {% endif %}
                                 </td>
 
-                                <td class="task-processor" style="text-align: center; font-size: 0.85rem; font-weight: 600; color: var(--text-gray);">
-                                    {{ task.processor }}
+                                <td class="task-processor task-processor-cell" style="text-align: center; font-size: 0.765rem; font-weight: 400; color: var(--text-gray);">
+                                    {{ '-' if task.is_shared else task.processor }}
                                 </td>
                             </tr>
                             {% endfor %}
@@ -477,7 +532,7 @@
                     <h2 id="rTitle" style="margin:0; color:var(--text-dark); font-size: 1.6em; flex: 1;">제목이 로딩중입니다...</h2>
                     
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <div style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div id="singleStatusControls" style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">상태 변경:</span>
                             <button type="button" onclick="changeSingleStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
                             <button type="button" onclick="changeSingleStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
@@ -494,8 +549,10 @@
                     <span class="badge" id="rStatus">상태</span>
                     <span><i class="fa-solid fa-school"></i> <span id="rSchool" style="font-weight: 600; color: var(--text-dark);">학교명</span></span>
                     <span><i class="fa-solid fa-user"></i> 작성: <span id="rAuthor">작성자</span></span>
-                    <span><i class="fa-solid fa-user-check"></i> 처리: <span id="rProcessor">처리자</span></span>
+                    <span id="rProcessorMeta"><i class="fa-solid fa-user-check"></i> 처리: <span id="rProcessor">처리자</span></span>
                     <span><i class="fa-solid fa-calendar"></i> <span id="rDate">날짜</span></span>
+                    <span><i class="fa-regular fa-eye"></i> 조회 <span id="rViewCount">0</span></span>
+                    <span id="sharedConfirmationDetail" class="shared-confirmation-detail"><strong><i class="fa-regular fa-circle-check"></i> 확인 <span id="rConfirmationCount">0</span>명</strong><span id="rConfirmationNames">아직 확인한 조직원이 없습니다.</span></span>
                 </div>
 
                 <div id="rBody" style="min-height:300px; padding:10px; line-height:1.8; font-size:1.05em; color:var(--text-dark); white-space: normal;">내용이 로딩중입니다...</div>
@@ -518,6 +575,16 @@
     document.addEventListener('DOMContentLoaded', function () {
         initSchoolFilter();
         bindFilterEvents();
+        const savedCategory = sessionStorage.getItem('schoolTaskCategoryAfterMove');
+        if (savedCategory) {
+            sessionStorage.removeItem('schoolTaskCategoryAfterMove');
+            const savedButton = Array.from(document.querySelectorAll('.category-btn'))
+                .find(button => button.dataset.categoryName === savedCategory);
+            if (savedButton) {
+                filterCategory(savedCategory, savedButton);
+                return;
+            }
+        }
         applyFilters();
     });
 
@@ -586,7 +653,30 @@
         applyFilters();
     }
 
+    function updateSharedBoardMode() {
+        const sharedMode = ['본부공지사항', '자료실'].includes(currentCategory);
+        const bulkControls = document.getElementById('bulkStatusControls');
+        const statusSummary = document.getElementById('statusSummary');
+        const statusFilter = document.getElementById('statusFilter');
+        bulkControls.style.display = sharedMode ? 'none' : 'flex';
+        statusSummary.style.display = sharedMode ? 'none' : 'flex';
+        statusFilter.style.display = sharedMode ? 'none' : '';
+        if(sharedMode) statusFilter.value = 'all';
+        document.getElementById('taskStatusHeader').textContent = sharedMode ? '확인' : '상태 / 확인';
+        document.getElementById('taskProcessorHeader').textContent = '처리자';
+        document.querySelectorAll('.task-processor-cell').forEach(cell => {
+            cell.style.display = sharedMode ? 'none' : '';
+        });
+        document.getElementById('checkAll').checked = false;
+        const targetSelect = document.getElementById('moveTargetCategory');
+        Array.from(targetSelect.options).forEach(option => {
+            option.disabled = Boolean(option.dataset.categoryName && option.dataset.categoryName === currentCategory);
+        });
+        if (targetSelect.selectedOptions[0]?.disabled) targetSelect.value = '';
+    }
+
     function applyFilters() {
+        updateSharedBoardMode();
         const school = document.getElementById('schoolFilter').value;
         const status = document.getElementById('statusFilter').value;
         const search = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -598,6 +688,7 @@
             const rowCategory = row.dataset.category || '';
             const rowSchool = row.dataset.school || '';
             const rowStatus = row.dataset.status || '';
+            const rowShared = row.dataset.shared === 'true';
             const rowText = row.innerText.toLowerCase();
             const matchCategory = currentCategory === 'all' || rowCategory === currentCategory;
             const matchSchool = school === 'all' || rowSchool === school;
@@ -605,11 +696,11 @@
 
             if (matchCategory && matchSchool && matchSearch) {
                 cTotal++;
-                if (rowStatus === '접수') cWait++;
-                else if (rowStatus === '처리중') cProcess++;
-                else if (rowStatus === '완료') cDone++;
+                if (!rowShared && rowStatus === '접수') cWait++;
+                else if (!rowShared && rowStatus === '처리중') cProcess++;
+                else if (!rowShared && rowStatus === '완료') cDone++;
             }
-            const matchStatus = status === 'all' || rowStatus === status;
+            const matchStatus = status === 'all' || (!rowShared && rowStatus === status);
             if (matchCategory && matchSchool && matchStatus && matchSearch) {
                 filteredRows.push(row);
             } else {
@@ -676,11 +767,54 @@
 
     async function changeStatus(newStatus, button) {
         if (statusUpdatePending) return;
-        const checkedItems = document.querySelectorAll('.chk-item:checked');
+        const checkedItems = document.querySelectorAll('.status-change-item:checked');
         const postIds = Array.from(checkedItems).map(cb => parseInt(cb.value, 10)).filter(id => !Number.isNaN(id));
         if (postIds.length === 0) { alert('상태를 변경할 게시물을 체크박스로 선택해주세요.'); return; }
         if (!confirm(`선택한 ${postIds.length}건의 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
         await executeStatusUpdate(postIds, newStatus, false, button);
+    }
+
+    async function moveSelectedPosts(button) {
+        const checkedItems = document.querySelectorAll('.chk-item:checked');
+        const postIds = Array.from(checkedItems)
+            .map(checkbox => Number(checkbox.value))
+            .filter(id => Number.isInteger(id) && id > 0);
+        const targetSelect = document.getElementById('moveTargetCategory');
+        const targetCategory = targetSelect.value;
+        const targetName = targetSelect.selectedOptions[0]?.dataset.categoryName || '';
+        if (postIds.length === 0) {
+            alert('이동할 게시물을 체크박스로 선택해주세요.');
+            return;
+        }
+        if (!targetCategory || !targetName) {
+            alert('옮길 게시판을 선택해주세요.');
+            targetSelect.focus();
+            return;
+        }
+        if (!confirm(`선택한 ${postIds.length}건을 [${targetName}] 게시판으로 이동하시겠습니까?\n게시물 분류도 [${targetName}]으로 일괄 변경됩니다.`)) return;
+
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 이동중';
+        try {
+            const response = await fetch('/school/tasks/api/move_posts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ post_ids: postIds, target_category: targetCategory })
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') {
+                throw new Error(data.message || '게시물 이동에 실패했습니다.');
+            }
+            sessionStorage.setItem('schoolTaskCategoryAfterMove', data.target_name || targetName);
+            alert(`${data.moved_ids.length}건을 [${data.target_name || targetName}] 게시판으로 이동했습니다.`);
+            window.location.reload();
+        } catch (error) {
+            alert(error.message || '게시물 이동 중 오류가 발생했습니다.');
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+        }
     }
 
     async function changeSingleStatus(newStatus, button) {
@@ -764,9 +898,12 @@
             document.getElementById('taskReadView').dataset.postId = String(currentReadPostId);
 
             document.getElementById('rCategory').textContent = post.category || '';
-            document.getElementById('rTitle').textContent = post.title || '';
+            const readTitle = document.getElementById('rTitle');
+            readTitle.classList.toggle('shared-board-title', Boolean(post.is_shared));
+            readTitle.textContent = post.is_shared ? `제목: ${post.title || ''}` : (post.title || '');
             document.getElementById('rAuthor').textContent = post.author || '';
             document.getElementById('rDate').textContent = post.created_at || '';
+            document.getElementById('rViewCount').textContent = Number(post.view_count || 0);
             document.getElementById('rSchool').textContent = post.school_name || '';
             document.getElementById('rProcessor').textContent = post.processor || '';
             document.getElementById('rBody').innerHTML = post.content || '';
@@ -775,6 +912,21 @@
             const statusText = post.status || '접수';
             statusBadge.textContent = statusText;
             statusBadge.className = 'badge status-' + statusText;
+            const shared = Boolean(post.is_shared);
+            document.getElementById('singleStatusControls').style.display = shared ? 'none' : 'flex';
+            statusBadge.style.display = shared ? 'none' : 'inline-block';
+            document.getElementById('rProcessorMeta').style.display = shared ? 'none' : 'inline';
+            const confirmationDetail = document.getElementById('sharedConfirmationDetail');
+            if(shared) {
+                const names = (Array.isArray(post.confirmations) ? post.confirmations : [])
+                    .map(item => item.display_name || item.user_name || '')
+                    .filter(Boolean);
+                document.getElementById('rConfirmationCount').textContent = Number(post.confirmation_count || 0);
+                document.getElementById('rConfirmationNames').textContent = names.length ? names.join(', ') : '아직 확인한 조직원이 없습니다.';
+                confirmationDetail.style.display = 'inline-flex';
+            } else {
+                confirmationDetail.style.display = 'none';
+            }
 
             renderFiles(post);
             showView('taskReadView');

@@ -646,6 +646,64 @@
         font-size: 0.85rem;
     }
 
+    .gallery-comments {
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-color);
+    }
+    .gallery-comments-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        color: var(--text-dark);
+        font-size: 0.82rem;
+        font-weight: 800;
+    }
+    .gallery-comment-list {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        max-height: 150px;
+        overflow-y: auto;
+        margin-bottom: 9px;
+    }
+    .gallery-comment-item {
+        padding: 8px 9px;
+        border: 1px solid var(--border-color);
+        border-radius: 7px;
+        background: var(--widget-bg, #f8fafc);
+    }
+    .gallery-comment-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 4px;
+        color: var(--text-gray, #64748b);
+        font-size: 0.68rem;
+    }
+    .gallery-comment-content {
+        color: var(--text-dark);
+        font-size: 0.78rem;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .gallery-comment-empty {
+        padding: 12px 4px;
+        color: var(--text-gray, #94a3b8);
+        font-size: 0.76rem;
+        text-align: center;
+    }
+    .gallery-comment-form { display: flex; gap: 7px; align-items: flex-end; }
+    .gallery-comment-form textarea {
+        min-height: 52px;
+        max-height: 100px;
+        resize: vertical;
+        padding: 8px 9px;
+        font-size: 0.76rem;
+    }
+
     .post-modal-actions {
         display: flex;
         flex-wrap: wrap;
@@ -979,13 +1037,13 @@
                 </div>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items: center;">
-                <button id="btnSelectAllPosts" class="btn-gallery" type="button">
+                <button id="btnSelectAllPosts" class="btn-gallery" type="button" {% if school_gallery and not can_manage_any|default(false) %}style="display:none;"{% endif %}>
                     <i class="fas fa-check-double"></i> 전체 선택
                 </button>
-                <button id="btnDeleteSelectedPosts" class="btn-gallery danger" type="button" disabled>
+                <button id="btnDeleteSelectedPosts" class="btn-gallery danger" type="button" disabled {% if school_gallery and not can_manage_any|default(false) %}style="display:none;"{% endif %}>
                     🗑️ 선택 삭제
                 </button>
-                <button id="btnToggleUpload" class="btn-gallery primary" type="button">
+                <button id="btnToggleUpload" class="btn-gallery primary" type="button" {% if school_gallery and not can_write_gallery|default(false) %}style="display:none;"{% endif %}>
                     📝 게시물 작성
                 </button>
             </div>
@@ -1018,7 +1076,9 @@
         <div class="post-grid">
             {% for post in posts %}
             <article class="post-card" onclick="openGalleryPost({{ post.id }})">
+                {% if not school_gallery or post.can_manage|default(false) %}
                 <input type="checkbox" class="post-select-check" value="{{ post.id }}" aria-label="게시물 선택" onclick="event.stopPropagation();">
+                {% endif %}
                 {% if post.cover_thumb %}
                 <img class="post-thumb" src="{{ url_for('gall2.school_gallery_serve_thumb', school_key=school_gallery.access_key, filename=post.cover_thumb) if school_gallery else url_for('gall2.serve_thumb', filename=post.cover_thumb) }}" alt="{{ post.title }}" loading="lazy">
                 {% else %}
@@ -1030,6 +1090,8 @@
                         <span><i class="far fa-user"></i> {{ post.author or '관리자' }}</span>
                         <span><i class="far fa-calendar"></i> {{ post.created_at[:10] if post.created_at else '' }}</span>
                         <span><i class="far fa-image"></i> {{ post.photo_count or 0 }}장</span>
+                        <span data-gallery-view-post="{{ post.id }}"><i class="far fa-eye"></i> {{ post.view_count or 0 }}</span>
+                        {% if school_gallery %}<span data-gallery-comment-post="{{ post.id }}"><i class="far fa-comment"></i> {{ post.comment_count or 0 }}</span>{% endif %}
                     </div>
                 </div>
             </article>
@@ -1076,11 +1138,23 @@
                     <div class="post-detail-byline">
                         <span id="modalAuthor"></span>
                         <span id="modalDate"></span>
+                        <span id="modalViews"></span>
                     </div>
                     <button type="button" id="modalCount" class="photo-count-button"></button>
                 </div>
                 <div id="photoInfoPanel" class="photo-info-panel"></div>
                 <div id="modalContent" class="post-detail-content"></div>
+                <section id="galleryCommentSection" class="gallery-comments" {% if not school_gallery %}hidden{% endif %}>
+                    <div class="gallery-comments-header">
+                        <span><i class="far fa-comments"></i> 댓글</span>
+                        <span id="galleryCommentCount">0</span>
+                    </div>
+                    <div id="galleryCommentList" class="gallery-comment-list"></div>
+                    <form id="galleryCommentForm" class="gallery-comment-form">
+                        <textarea id="galleryCommentInput" class="gallery-textarea" maxlength="1000" placeholder="댓글을 입력하세요."></textarea>
+                        <button id="btnGalleryComment" type="submit" class="btn-gallery primary">등록</button>
+                    </form>
+                </section>
                 <div id="postEditForm" class="post-edit-form">
                     <input id="modalEditTitle" class="gallery-input" type="text" maxlength="120" style="margin-bottom:10px;">
                     <textarea id="modalEditContent" class="gallery-textarea"></textarea>
@@ -1129,6 +1203,9 @@
     const galleryDeleteUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/delete{% else %}/gall2/post/__post_id__/delete{% endif %}";
     const galleryAddImagesUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/images/add{% else %}/gall2/post/__post_id__/images/add{% endif %}";
     const galleryDeleteImageUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/image/__image_id__/delete{% else %}/gall2/post/__post_id__/image/__image_id__/delete{% endif %}";
+    const isSchoolGallery = {{ 'true' if school_gallery else 'false' }};
+    const galleryViewUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/view{% endif %}";
+    const galleryCommentsUrlTemplate = "{% if school_gallery %}/school/{{ school_gallery.access_key }}/gallery/post/__post_id__/comments{% endif %}";
     const currentPage = {{ pagination.page if pagination else 1 }};
     let activePost = null;
     let activeImageIndex = 0;
@@ -1352,6 +1429,56 @@
         });
     }
 
+    async function recordGalleryView(postId) {
+        if (!isSchoolGallery || !postId) return;
+        try {
+            const response = await fetch(galleryViewUrlTemplate.replace('__post_id__', postId), { method: 'POST' });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') return;
+            const post = galleryPosts.find(item => Number(item.id) === Number(postId));
+            if (post) post.view_count = Number(data.view_count || 0);
+            const cardView = document.querySelector(`[data-gallery-view-post="${postId}"]`);
+            if (cardView) cardView.innerHTML = `<i class="far fa-eye"></i> ${Number(data.view_count || 0)}`;
+            if (activePost && Number(activePost.id) === Number(postId)) {
+                document.getElementById('modalViews').textContent = `조회 ${Number(data.view_count || 0)}`;
+            }
+        } catch (error) {
+            console.warn('학교갤러리 조회수 반영 실패:', error);
+        }
+    }
+
+    function renderGalleryComments(comments) {
+        const list = document.getElementById('galleryCommentList');
+        const safeComments = Array.isArray(comments) ? comments : [];
+        document.getElementById('galleryCommentCount').textContent = `${safeComments.length}개`;
+        list.innerHTML = safeComments.map(comment => `
+            <div class="gallery-comment-item">
+                <div class="gallery-comment-meta">
+                    <strong>${escapeHtml(comment.author || '회원')}</strong>
+                    <span>${escapeHtml((comment.created_at || '').slice(0, 16))}</span>
+                </div>
+                <div class="gallery-comment-content">${escapeHtml(comment.content || '')}</div>
+            </div>
+        `).join('') || '<div class="gallery-comment-empty">첫 댓글을 남겨보세요.</div>';
+        list.scrollTop = list.scrollHeight;
+    }
+
+    async function loadGalleryComments(postId) {
+        if (!isSchoolGallery || !postId) return;
+        const list = document.getElementById('galleryCommentList');
+        list.innerHTML = '<div class="gallery-comment-empty">댓글을 불러오는 중입니다.</div>';
+        try {
+            const response = await fetch(galleryCommentsUrlTemplate.replace('__post_id__', postId));
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') throw new Error(data.message || '댓글을 불러오지 못했습니다.');
+            if (!activePost || Number(activePost.id) !== Number(postId)) return;
+            activePost.comment_count = data.comments.length;
+            renderGalleryComments(data.comments);
+        } catch (error) {
+            list.innerHTML = `<div class="gallery-comment-empty">${escapeHtml(error.message || '댓글을 불러오지 못했습니다.')}</div>`;
+        }
+    }
+
     function openGalleryPost(postId) {
         activePost = galleryPosts.find(post => Number(post.id) === Number(postId));
         if (!activePost) return;
@@ -1360,6 +1487,7 @@
         document.getElementById('modalSideTitle').textContent = activePost.title || '게시물';
         document.getElementById('modalAuthor').textContent = `작성자: ${activePost.author || '관리자'}`;
         document.getElementById('modalDate').textContent = `작성일: ${(activePost.created_at || '').slice(0, 10)}`;
+        document.getElementById('modalViews').textContent = `조회 ${Number(activePost.view_count || 0)}`;
         document.getElementById('modalCount').innerHTML = `<i class="far fa-image"></i> ${(activePost.images || []).length}장`;
         renderPhotoInfoPanel();
         document.getElementById('modalContent').textContent = activePost.content || '등록된 내용이 없습니다.';
@@ -1368,6 +1496,9 @@
         resetEditPhotoFiles();
         document.getElementById('postEditForm').style.display = 'none';
         renderEditPhotoManager();
+        const canManagePost = !isSchoolGallery || Boolean(activePost.can_manage);
+        document.getElementById('btnModalEdit').style.display = canManagePost ? 'inline-flex' : 'none';
+        document.getElementById('btnModalDelete').style.display = canManagePost ? 'inline-flex' : 'none';
 
         const thumbs = document.getElementById('modalThumbs');
         thumbs.innerHTML = '';
@@ -1391,6 +1522,10 @@
 
         document.getElementById('postModal').style.display = 'flex';
         fitModalToCurrentImage();
+        if (isSchoolGallery) {
+            recordGalleryView(activePost.id);
+            loadGalleryComments(activePost.id);
+        }
     }
 
     function closePostModal() {
@@ -1698,6 +1833,37 @@
         form.action = `${galleryDeleteUrlTemplate.replace('__post_id__', activePost.id)}?page=${currentPage}`;
         document.body.appendChild(form);
         form.submit();
+    });
+
+    document.getElementById('galleryCommentForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        if (!isSchoolGallery || !activePost) return;
+        const input = document.getElementById('galleryCommentInput');
+        const content = input.value.trim();
+        if (!content) {
+            alert('댓글 내용을 입력해 주세요.');
+            input.focus();
+            return;
+        }
+        const button = document.getElementById('btnGalleryComment');
+        button.disabled = true;
+        try {
+            const response = await fetch(galleryCommentsUrlTemplate.replace('__post_id__', activePost.id), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== 'success') throw new Error(data.message || '댓글 등록에 실패했습니다.');
+            input.value = '';
+            await loadGalleryComments(activePost.id);
+            const cardComment = document.querySelector(`[data-gallery-comment-post="${activePost.id}"]`);
+            if (cardComment) cardComment.innerHTML = `<i class="far fa-comment"></i> ${Number(activePost.comment_count || 0)}`;
+        } catch (error) {
+            alert(error.message || '댓글 등록에 실패했습니다.');
+        } finally {
+            button.disabled = false;
+        }
     });
 
     document.getElementById('modalCount').addEventListener('click', function() {

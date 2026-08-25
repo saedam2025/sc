@@ -226,7 +226,7 @@
     .school-link-item:hover .school-link-delete { opacity: 1; }
     /* 아이콘 사이즈 반으로 축소 (26px -> 16px) */
     .school-link-icon-img { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; margin-bottom: 2px; font-size: 14px; }
-    .school-link-title { max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+    .school-link-title { max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 90%; font-weight: 400; }
     .school-link-delete { position:absolute; top:-6px; right:-6px; z-index:2; width:20px; height:20px; border:0; border-radius:50%; background:#ef4444; color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.7rem; cursor:pointer; opacity:0; transition:0.16s; box-shadow:0 2px 5px rgba(0,0,0,0.18); }
     .school-link-empty { flex: 1 1 auto; text-align:center; color:var(--text-gray, #94a3b8); font-size:0.82rem; padding:18px 0; }
     .school-link-ghost { opacity: 0.45; }
@@ -480,6 +480,9 @@
         .board-search-form { padding: 0 14px 18px; }
         table.board-table { min-width: 640px; }
         #boardReadView, #boardWriteView { padding: 18px; }
+        .read-footer-actions { align-items:stretch; flex-direction:column; }
+        .read-confirm-area { align-items:flex-start; flex-direction:column; }
+        .read-confirm-names { max-width:calc(100vw - 90px); }
         .school-link-card { padding: 14px 16px 12px; }
         .school-link-item { flex-basis: 54px; width: 54px; }
     }
@@ -493,6 +496,11 @@
     .status-접수 { color: #d97706; border-color: #f59e0b; }
     .status-처리중 { color: #0284c7; border-color: #0ea5e9; }
     .status-완료 { color: #15803d; border-color: #22c55e; }
+    .confirmation-count { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:55px; padding:4px 9px; border:0; background:transparent; color:#0f766e; font-size:0.75rem; font-weight:800; cursor:help; }
+    .confirmation-tooltip { display:none; position:absolute; z-index:120; left:50%; bottom:calc(100% + 7px); transform:translateX(-50%); width:max-content; min-width:110px; max-width:230px; padding:7px 9px; border:1px solid #99f6e4; border-radius:8px; background:#134e4a; color:#ffffff; box-shadow:0 7px 18px rgba(15,23,42,0.2); text-align:left; font-size:0.67rem; font-weight:500; line-height:1.35; white-space:normal; pointer-events:none; }
+    .confirmation-tooltip strong { display:block; margin-bottom:4px; color:#ccfbf1; font-size:0.68rem; }
+    .confirmation-tooltip span { display:block; padding:1px 0; }
+    .confirmation-count:hover .confirmation-tooltip, .confirmation-count:focus .confirmation-tooltip, .confirmation-count:focus-within .confirmation-tooltip { display:block; }
 
     .glass-input { width: 100%; padding: 10px 14px; border: 1px solid var(--school-border); border-radius: 8px; box-sizing: border-box; font-size: 0.85rem; color: var(--school-text); transition: 0.2s; background: var(--input-bg, #ffffff); }
     .glass-input:focus { outline: none; border-color: var(--school-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
@@ -624,7 +632,7 @@
     .read-card { background:transparent; border:1px solid var(--school-border); border-radius:18px; overflow:hidden; box-shadow:none; }
     .read-header { padding:26px 30px 18px; background:transparent; border-bottom:0; }
     .read-topline { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
-    .read-title { margin:0; color:var(--school-text); font-size:1.7rem; line-height:1.38; letter-spacing:-0.035em; font-weight:800; }
+    .read-title { margin:0; color:var(--school-text); font-size:1.53rem; line-height:1.38; letter-spacing:-0.035em; font-weight:800; }
     .read-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; margin-top:14px; color:var(--text-gray, #6b7280); font-size:0.88rem; }
     .read-meta-item { display:inline-flex; align-items:center; gap:6px; }
     .read-body-wrap { margin:0; background:transparent; border:0; border-radius:0; padding:10px 30px 30px; }
@@ -638,7 +646,16 @@
     .read-file-prefix { font-weight:700; color:var(--school-text); }
     .read-file-link { display:inline; padding:0; border:0; background:transparent; color:var(--school-blue); text-decoration:none; font-weight:600; }
     .read-file-link:hover { text-decoration:underline; text-underline-offset:3px; }
-    .read-footer-actions { text-align:right; padding:0 30px 26px; border-top:0; background:transparent; }
+    .read-footer-actions { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; text-align:right; padding:0 30px 26px; border-top:0; background:transparent; }
+    .read-confirm-area { display:flex; align-items:center; gap:10px; min-width:0; text-align:left; }
+    .read-confirm-btn { flex:0 0 auto; border:1px solid #14b8a6; border-radius:8px; background:#0f766e; color:#ffffff; padding:8px 13px; font-family:inherit; font-size:0.82rem; font-weight:800; cursor:pointer; }
+    .read-confirm-btn:hover { background:#115e59; }
+    .read-confirm-btn:disabled { border-color:#99f6e4; background:#ccfbf1; color:#0f766e; cursor:default; }
+    .read-confirm-summary { min-width:0; color:var(--text-gray, #64748b); font-size:0.72rem; line-height:1.45; }
+    .read-confirm-summary strong { color:#0f766e; }
+    .read-confirm-names { display:block; max-width:440px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .read-footer-actions #readActionBtns { margin-left:auto; }
+    .read-outside-actions { display:flex; justify-content:flex-end; padding-top:12px; }
     
     .read-back-btn, .post-action-btn, .comment-mini-btn { border:0; background:var(--input-bg, #ffffff); color:var(--text-gray, #6b7280); border-radius:7px; padding:6px 9px; cursor:pointer; font-size:0.82rem; font-weight:700; transition:all .15s ease; border: 1px solid var(--school-border); }
     .read-back-btn:hover, .post-action-btn:hover, .comment-mini-btn:hover { background:var(--widget-hover, #f3f4f6); color:var(--school-text); }
@@ -1106,13 +1123,13 @@
                                     <th style="width:60px; text-align:center;">번호</th>
                                     <th>제목</th>
                                     <th style="width:100px; text-align:center;">작성자</th>
-                                    <th style="width:80px; text-align:center;">상태</th>
+                                    <th style="width:90px; text-align:center;">{{ '확인' if is_shared_current_board else '상태' }}</th>
                                     <th style="width:120px; text-align:center;">작성일</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for p in posts %}
-                                <tr onclick="viewPost({{ p.id }})">
+                                <tr data-post-id="{{ p.id }}" onclick="viewPost({{ p.id }})">
                                     {% if can_delete_current_board %}<td style="text-align:center;" onclick="event.stopPropagation();"><input type="checkbox" name="post_ids" value="{{ p.id }}" class="post-checkbox"></td>{% endif %}
                                     <td style="text-align:center;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * pagination.per_page }}</td>
                                     <td style="text-align:left; padding-left:20px;">
@@ -1121,7 +1138,21 @@
                                     </td>
                                     <td style="text-align:center;">{{ p.author }}</td>
                                     <td style="text-align:center;">
+                                        {% if is_shared_current_board %}
+                                        <span class="confirmation-count" id="confirmation-count-{{ p.id }}" tabindex="0" aria-label="확인자 {{ p.confirmation_count or 0 }}명" title="{{ p.confirmation_names|join(', ') if p.confirmation_names else '아직 확인한 조직원이 없습니다.' }}">
+                                            <i class="fa-regular fa-circle-check"></i> {{ p.confirmation_count or 0 }}명
+                                            <span class="confirmation-tooltip" role="tooltip">
+                                                <strong>확인자 {{ p.confirmation_count or 0 }}명</strong>
+                                                {% for confirmation in p.confirmations %}
+                                                <span>{{ confirmation.display_name }}</span>
+                                                {% else %}
+                                                <span>아직 확인한 조직원이 없습니다.</span>
+                                                {% endfor %}
+                                            </span>
+                                        </span>
+                                        {% else %}
                                         <span class="badge status-{{ p.status or '접수' }}">{{ p.status or '접수' }}</span>
+                                        {% endif %}
                                     </td>
                                     <td style="text-align:center;">{{ p.created_at[:10] }}</td>
                                 </tr>
@@ -1177,7 +1208,6 @@
                         <div class="read-header">
                             <div class="read-topline">
                                 <h2 id="readTitle" class="read-title" style="color:var(--school-navy);"></h2>
-                                <button class="read-back-btn" style="flex-shrink:0;" onclick="showBoardList()"><i class="fas fa-list"></i> 목록으로</button>
                             </div>
                             <div id="readMeta" class="read-meta"></div>
                         </div>
@@ -1189,6 +1219,10 @@
                         <div id="readFiles" class="read-file-box"></div>
 
                         <div class="read-footer-actions">
+                            <div id="readConfirmArea" class="read-confirm-area" style="display:none;">
+                                <button type="button" id="confirmPostBtn" class="read-confirm-btn" onclick="confirmCurrentPost()"><i class="fa-regular fa-circle-check"></i> 확인</button>
+                                <div id="readConfirmSummary" class="read-confirm-summary"></div>
+                            </div>
                             <span id="readActionBtns" style="display:none;">
                                 <button id="editPostBtn" class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
                                 <form id="singleDelForm" method="POST" style="display:inline;">
@@ -1198,6 +1232,9 @@
                                 </form>
                             </span>
                         </div>
+                    </div>
+                    <div class="read-outside-actions">
+                        <button class="read-back-btn" onclick="showBoardList()"><i class="fas fa-list"></i> 목록으로</button>
                     </div>
 
                     <div id="commentBox" class="comment-box">
@@ -1265,7 +1302,7 @@
                 </div>
 
                 <div class="school-link-card">
-                    {% set can_manage_weblinks = 1 <= (current_user_level|default(99)|int) <= 5 %}
+                    {% set can_manage_weblinks = can_register_center_weblinks|default(false) %}
                     <div class="school-link-header">
                         <span><i class="fas fa-link" style="color: var(--school-blue); margin-right: 5px;"></i> Web / File Link</span>
                         {% if can_manage_weblinks %}
@@ -1276,9 +1313,9 @@
                     </div>
                     <div id="school-weblink-container" class="school-link-grid">
                         {% for link in weblinks %}
-                        {% set weblink_target = url_for('school.serve_weblink_file', link_id=link.id) if link.type == 'file' else link.url %}
+                        {% set weblink_target = url_for('school.serve_center_weblink_file', link_id=link.id) if link.type == 'file' else link.url %}
                         <div class="school-link-item" data-id="{{ link.id }}" onclick="window.open('{{ weblink_target }}', '_blank')" title="{{ link.title }}">
-                            {% if can_manage_weblinks %}
+                            {% if link.can_delete %}
                             <button type="button" class="school-link-delete" onclick="event.stopPropagation(); deleteWebLink({{ link.id }});" title="삭제"><i class="fa-solid fa-xmark"></i></button>
                             {% endif %}
 
@@ -1560,6 +1597,7 @@
             </div>
             <input type="url" id="weblinkUrl" class="modal-input" placeholder="URL 주소">
             <input type="file" id="weblinkFile" class="modal-input" style="display:none; padding:10px;">
+            <div id="weblinkFileHelp" style="display:none; margin:-7px 0 12px; color:var(--text-gray, #64748b); font-size:0.78rem;">첨부파일은 5MB 이하만 등록할 수 있습니다.</div>
             <button type="button" class="btn btn-primary" onclick="saveWebLink()" style="width:100%; padding:14px; border-radius:8px;">등록하기</button>
         </form>
     </div>
@@ -1725,7 +1763,7 @@
                 weblinkEl.querySelectorAll('.school-link-item').forEach(function(item) {
                     newOrder.push(item.getAttribute('data-id'));
                 });
-                fetch('/update_weblink_order', {
+                fetch('{{ url_for("school.update_center_weblink_order") }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ order: newOrder })
@@ -1740,6 +1778,7 @@
         const isUrl = checked.value === 'url';
         document.getElementById('weblinkUrl').style.display = isUrl ? 'block' : 'none';
         document.getElementById('weblinkFile').style.display = isUrl ? 'none' : 'block';
+        document.getElementById('weblinkFileHelp').style.display = isUrl ? 'none' : 'block';
     }
 
     async function saveWebLink() {
@@ -1758,13 +1797,17 @@
         } else {
             const file = document.getElementById('weblinkFile').files[0];
             if (!file) return schoolToast('업로드할 파일을 선택하세요.', 'warning');
+            if (file.size > 5 * 1024 * 1024) return schoolToast('첨부파일은 5MB 이하만 등록할 수 있습니다.', 'warning');
             formData.append('file', file);
         }
 
         try {
-            const res = await fetch('/save_weblink', { method: 'POST', body: formData });
+            const res = await fetch('{{ url_for("school.save_center_weblink") }}', { method: 'POST', body: formData });
             if (res.ok) schoolToastAfterReload('학교 링크를 등록했습니다.');
-            else schoolToast('링크 등록에 실패했습니다.', 'error');
+            else {
+                const data = await res.json().catch(() => ({}));
+                schoolToast(data.message || '링크 등록에 실패했습니다.', 'error');
+            }
         } catch (error) {
             schoolToast('서버 통신 오류가 발생했습니다.', 'error');
         }
@@ -1773,7 +1816,7 @@
     async function deleteWebLink(id) {
         if (!confirm('삭제하시겠습니까?')) return;
         try {
-            const res = await fetch(`/delete_weblink/${id}`, { method: 'DELETE' });
+            const res = await fetch(`{{ url_for("school.delete_center_weblink", link_id=0) }}`.replace(/0$/, String(id)), { method: 'DELETE' });
             if (res.ok) schoolToastAfterReload('학교 링크를 삭제했습니다.');
             else {
                 const data = await res.json().catch(() => ({}));
@@ -2134,15 +2177,73 @@
         if(event.key === 'Escape' && document.body.classList.contains('board-modal-open')) showBoardList();
     });
 
+    function renderConfirmationTooltip(data) {
+        const confirmations = Array.isArray(data.confirmations) ? data.confirmations : [];
+        const rows = confirmations.length
+            ? confirmations.map(item => `<span>${escapeHtml(item.display_name || item.user_name || '')}</span>`).join('')
+            : '<span>아직 확인한 조직원이 없습니다.</span>';
+        return `<i class="fa-regular fa-circle-check"></i> ${Number(data.confirmation_count || 0)}명<span class="confirmation-tooltip" role="tooltip"><strong>확인자 ${Number(data.confirmation_count || 0)}명</strong>${rows}</span>`;
+    }
+
+    function updateReadConfirmation(data) {
+        const area = document.getElementById('readConfirmArea');
+        const button = document.getElementById('confirmPostBtn');
+        const summary = document.getElementById('readConfirmSummary');
+        if(!data.is_shared) {
+            area.style.display = 'none';
+            return;
+        }
+
+        const names = (Array.isArray(data.confirmations) ? data.confirmations : [])
+            .map(item => item.display_name || item.user_name || '')
+            .filter(Boolean);
+        summary.innerHTML = `<strong>확인 ${Number(data.confirmation_count || 0)}명</strong><span class="read-confirm-names">${names.length ? names.map(escapeHtml).join(', ') : '아직 확인한 조직원이 없습니다.'}</span>`;
+        button.style.display = data.can_confirm ? 'inline-flex' : 'none';
+        button.disabled = Boolean(data.confirmed_by_me);
+        button.innerHTML = data.confirmed_by_me
+            ? '<i class="fa-solid fa-check"></i> 확인 완료'
+            : '<i class="fa-regular fa-circle-check"></i> 확인';
+        area.style.display = 'flex';
+
+        const listChip = document.getElementById(`confirmation-count-${data.id}`);
+        if(listChip) {
+            listChip.innerHTML = renderConfirmationTooltip(data);
+            listChip.setAttribute('aria-label', `확인자 ${Number(data.confirmation_count || 0)}명`);
+            listChip.setAttribute('title', names.length ? names.join(', ') : '아직 확인한 조직원이 없습니다.');
+        }
+    }
+
+    async function confirmCurrentPost() {
+        if(!currentPostData || !currentPostData.id) return schoolToast('게시글 정보가 없습니다.', 'warning');
+        const button = document.getElementById('confirmPostBtn');
+        if(button.disabled) return;
+        button.disabled = true;
+        try {
+            const response = await fetch(`/school/post/${currentPostData.id}/confirm`, { method: 'POST' });
+            const result = await response.json().catch(() => ({}));
+            if(!response.ok || result.ok === false) throw new Error(result.message || '확인 기록을 저장하지 못했습니다.');
+            currentPostData = { ...currentPostData, ...result, can_confirm: true, is_shared: true };
+            updateReadConfirmation(currentPostData);
+            schoolToast(result.already_confirmed ? '이미 확인한 게시물입니다.' : '게시물 확인이 기록되었습니다.', 'success');
+        } catch(error) {
+            button.disabled = false;
+            schoolToast(error.message || '확인 기록을 저장하지 못했습니다.', 'error');
+        }
+    }
+
     async function viewPost(id) {
         const data = await $.get('/school/post/api/' + id);
         currentPostData = data;
         const statusText = data.status || '접수';
-        $('#readTitle').text(data.title);
+        const statusMeta = data.is_shared
+            ? `<span class="read-meta-item" style="color:#0f766e;"><i class="fa-regular fa-circle-check"></i> 확인 <strong>${Number(data.confirmation_count || 0)}명</strong></span>`
+            : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusText}</span>`;
+        $('#readTitle').text(`제목: ${data.title || ''}`);
         $('#readMeta').html(`
-            <span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusText}</span>
+            ${statusMeta}
             <span class="read-meta-item"><i class="fas fa-user-circle"></i> <strong style="color:var(--school-text);">${escapeHtml(data.author || '')}</strong></span>
             <span class="read-meta-item"><i class="fas fa-clock"></i> ${escapeHtml(data.created_at || '')}</span>
+            <span class="read-meta-item"><i class="fa-regular fa-eye"></i> 조회 ${Number(data.view_count || 0)}</span>
             <span class="read-meta-item"><i class="fa-regular fa-comments"></i> 댓글 <span id="viewCommentCount">${data.comment_count || 0}</span></span>
         `);
         $('#readContent').html(data.content);
@@ -2181,6 +2282,7 @@
         } else { $('#readActionBtns').hide(); }
         $('#editPostBtn').toggle(canEditPost);
         $('#singleDelForm').toggle(canDeletePost);
+        updateReadConfirmation(data);
 
         await loadComments(id);
         showView('boardReadView');
