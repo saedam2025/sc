@@ -9,7 +9,13 @@
     .meta-left span { margin-right: 15px; }
     
     .post-content { min-height: 300px; font-size: 1.05rem; line-height: 1.7; color: #1e293b; margin-bottom: 40px; }
-    .post-content-text { white-space: pre-wrap; }
+    .post-content-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .post-content-text p, .post-content-text div, .post-content-text li,
+    .post-content-text blockquote, .post-content-text td, .post-content-text th { white-space: normal; }
+    .post-content-text img { display: block; max-width: 100%; height: auto; margin: 10px 0; border-radius: 6px; }
+    .post-content-text table { width: 100%; max-width: 100%; margin: 12px 0; border-collapse: collapse; table-layout: fixed; }
+    .post-content-text td, .post-content-text th { border: 1px solid #cbd5e1; padding: 6px 8px; vertical-align: top; word-break: break-word; }
+    .post-content-text a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
     .post-image-previews { width: 100%; margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
     .post-image-preview-link { display: block; max-width: 100%; line-height: 0; }
     .post-image-preview { display: block; width: auto; max-width: 100%; height: auto; object-fit: contain; border-radius: 8px; }
@@ -75,7 +81,7 @@
     {% endif %}
 
     <div class="post-content">
-        <div class="post-content-text">{{ post.content }}</div>
+        <div class="post-content-text">{{ post.content|safe }}</div>
         {% if image_files %}
         <div class="post-image-previews">
             {% for f in image_files %}

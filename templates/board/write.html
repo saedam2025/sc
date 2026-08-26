@@ -1,5 +1,8 @@
 {% extends 'base.html' %}
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/generated_board_editor.css', v='20260826-1') }}">
+<script src="https://cdn.jsdelivr.net/npm/tinymce@8/tinymce.min.js"></script>
+<script src="{{ url_for('static', filename='js/generated_board_editor.js', v='20260826-1') }}"></script>
 <style>
     /* CSS 기존 유지 */
     .write-box { max-width: 1000px; margin: 0 auto; background: #fff; padding: 40px; border: none solid #e2e8f0; border-radius: 12px; }
@@ -29,7 +32,10 @@
     </div>
     
     <input type="text" id="title" class="w-input" placeholder="제목을 입력하세요">
-    <textarea id="content" class="w-input" style="height: 400px; resize: none;" placeholder="내용을 입력하세요"></textarea>
+    <div class="generated-board-editor-wrap">
+        <label class="generated-board-editor-label" for="content">내용</label>
+        <textarea id="content" placeholder="내용을 입력하세요"></textarea>
+    </div>
     
     <div id="dropZone" class="drop-zone">
         <i class="fa-solid fa-cloud-arrow-up" style="font-size: 2rem; margin-bottom: 10px;"></i>
@@ -94,12 +100,12 @@
     }
 
     async function submitPost() {
-        const title = document.getElementById('title').value;
-        const content = document.getElementById('content').value;
+        const title = document.getElementById('title').value.trim();
+        const content = window.GeneratedBoardEditor.getContent('content');
         const isNoticeCheckbox = document.getElementById('isNotice');
         const isNotice = isNoticeCheckbox && isNoticeCheckbox.checked ? 1 : 0; // 공지 여부 가져오기
         
-        if (!title || !content) return alert('제목과 내용을 입력하세요.');
+        if (!title || !window.GeneratedBoardEditor.hasContent(content)) return alert('제목과 내용을 입력하세요.');
 
         const formData = new FormData();
         formData.append('title', title);
@@ -114,5 +120,7 @@
             else alert(result.message);
         } catch (e) { alert('게시글 등록 중 오류가 발생했습니다.'); }
     }
+
+    window.GeneratedBoardEditor.init('content');
 </script>
 {% endblock %}
