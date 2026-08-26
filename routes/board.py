@@ -1,5 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, session, current_app, redirect, url_for, abort
 import os
+import re
+from bs4 import BeautifulSoup, Comment
 from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
 from datetime import datetime, timezone, timedelta
 from .database import get_db
@@ -12,6 +14,108 @@ board_bp = Blueprint('board', __name__, url_prefix='/board')
 UPLOAD_FOLDER = str(BOARD_UPLOADS)
 INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+RICH_TEXT_ALLOWED_TAGS = {
+    'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'strike',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td',
+    'div', 'span', 'a', 'img', 'blockquote', 'code', 'pre', 'hr',
+}
+RICH_TEXT_DROP_TAGS = {
+    'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta',
+    'form', 'input', 'button', 'textarea', 'select', 'option', 'svg', 'math',
+}
+RICH_TEXT_ALLOWED_STYLES = {
+    'color', 'background-color', 'font-size', 'font-family', 'font-weight',
+    'font-style', 'line-height', 'text-align', 'text-decoration',
+    'width', 'height', 'min-width', 'max-width', 'min-height', 'max-height',
+    'vertical-align', 'white-space', 'word-break',
+    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border', 'border-width', 'border-style', 'border-color',
+    'border-collapse', 'table-layout', 'list-style-type',
+}
+
+
+def _clean_rich_text_style(value):
+    cleaned = []
+    for declaration in str(value or '').split(';'):
+        if ':' not in declaration:
+            continue
+        property_name, property_value = declaration.split(':', 1)
+        property_name = property_name.strip().lower()
+        property_value = property_value.strip()
+        lowered = property_value.lower().replace(' ', '')
+        if property_name not in RICH_TEXT_ALLOWED_STYLES:
+            continue
+        if any(token in lowered for token in (
+            'url(', 'expression(', 'javascript:', 'vbscript:', '@import',
+            'behavior:', '-moz-binding', '<', '>',
+        )):
+            continue
+        cleaned.append(f'{property_name}:{property_value}')
+    return ';'.join(cleaned)
+
+
+def sanitize_board_content(value):
+    """생성형 게시판 에디터 본문에 필요한 안전한 HTML만 보존한다."""
+    raw = str(value or '')
+    if len(raw.encode('utf-8')) > 2 * 1024 * 1024:
+        raise ValueError('게시글 내용은 2MB 이하로 작성해주세요.')
+
+    soup = BeautifulSoup(raw, 'html.parser')
+    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
+        comment.extract()
+
+    for tag in list(soup.find_all(True)):
+        if not tag.name:
+            continue
+        name = tag.name.lower()
+        if name in RICH_TEXT_DROP_TAGS:
+            tag.decompose()
+            continue
+        if name not in RICH_TEXT_ALLOWED_TAGS:
+            tag.unwrap()
+            continue
+
+        attributes = {}
+        style = _clean_rich_text_style(tag.attrs.get('style', ''))
+        if style:
+            attributes['style'] = style
+        if name in {'td', 'th'}:
+            for attribute in ('colspan', 'rowspan', 'scope'):
+                value = str(tag.attrs.get(attribute, '')).strip()
+                if value:
+                    attributes[attribute] = value
+        elif name == 'a':
+            href = str(tag.attrs.get('href', '')).strip()
+            if re.match(r'^(?:https?://|mailto:|/)', href, flags=re.I):
+                attributes.update({'href': href, 'target': '_blank', 'rel': 'noopener noreferrer'})
+            title = str(tag.attrs.get('title', '')).strip()
+            if title:
+                attributes['title'] = title[:300]
+        elif name == 'img':
+            src = str(tag.attrs.get('src', '')).strip()
+            if not re.match(r'^(?:https?://|/)', src, flags=re.I):
+                tag.decompose()
+                continue
+            attributes['src'] = src
+            for attribute in ('alt', 'title'):
+                text = str(tag.attrs.get(attribute, '')).strip()
+                if text:
+                    attributes[attribute] = text[:300]
+            for attribute in ('width', 'height'):
+                size = str(tag.attrs.get(attribute, '')).strip()
+                if re.match(r'^\d{1,4}$', size):
+                    attributes[attribute] = size
+        tag.attrs = attributes
+
+    return str(soup).strip()
+
+
+def board_content_has_value(value):
+    soup = BeautifulSoup(str(value or ''), 'html.parser')
+    return bool(soup.get_text(strip=True) or soup.find(['img', 'table', 'hr']))
 
 def init_board_db():
     conn = get_db()
@@ -128,8 +232,13 @@ def board_write(board_en):
     if request.method == 'GET':
         return render_template('board/write.html', board=config)
 
-    title = request.form.get('title')
-    content = request.form.get('content')
+    title = str(request.form.get('title') or '').strip()
+    try:
+        content = sanitize_board_content(request.form.get('content'))
+    except ValueError as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+    if not title or not board_content_has_value(content):
+        return jsonify({"status": "error", "message": "제목과 내용을 입력하세요."}), 400
     is_notice = request.form.get('is_notice', 0, type=int)
     author = session.get('user_name', '익명')
     files = request.files.getlist('files[]') 
@@ -176,6 +285,11 @@ def board_read(board_en, post_id):
     conn.commit()
 
     post = conn.execute("SELECT * FROM board_posts WHERE id=?", (post_id,)).fetchone()
+    if not post or post['board_en'] != board_en:
+        conn.close()
+        abort(404)
+    post = dict(post)
+    post['content'] = sanitize_board_content(post.get('content'))
     files = conn.execute("SELECT * FROM board_files WHERE post_id=?", (post_id,)).fetchall()
     image_files = [
         file for file in files
@@ -247,6 +361,11 @@ def board_edit(board_en, post_id):
     user_level = session.get('user_level', 99)
     conn = get_db()
     post = conn.execute("SELECT * FROM board_posts WHERE id=?", (post_id,)).fetchone()
+    if not post or post['board_en'] != board_en:
+        conn.close()
+        abort(404)
+    post = dict(post)
+    post['content'] = sanitize_board_content(post.get('content'))
     if post['author'] != current_user and user_level > 3:
         conn.close()
         return "수정 권한이 없습니다.", 403
@@ -255,8 +374,15 @@ def board_edit(board_en, post_id):
         files = conn.execute("SELECT * FROM board_files WHERE post_id=?", (post_id,)).fetchall()
         conn.close()
         return render_template('board/edit.html', board=config, post=post, files=files)
-    title = request.form.get('title')
-    content = request.form.get('content')
+    title = str(request.form.get('title') or '').strip()
+    try:
+        content = sanitize_board_content(request.form.get('content'))
+    except ValueError as error:
+        conn.close()
+        return jsonify({"status": "error", "message": str(error)}), 400
+    if not title or not board_content_has_value(content):
+        conn.close()
+        return jsonify({"status": "error", "message": "제목과 내용을 모두 입력하세요."}), 400
     is_notice = request.form.get('is_notice', 0, type=int)
     removed_paths = []
     created_paths = []
