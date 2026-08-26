@@ -1,0 +1,47 @@
+.generated-board-editor-label {
+    display: block;
+    margin: 0 0 8px;
+    color: #475569;
+    font-size: .9rem;
+    font-weight: 800;
+}
+
+.generated-board-editor-wrap {
+    margin-bottom: 20px;
+}
+
+.generated-board-editor-wrap .tox-tinymce {
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+}
+
+.generated-board-editor-wrap .tox .tox-toolbar__primary,
+.generated-board-editor-wrap .tox .tox-toolbar-overlord,
+.generated-board-editor-wrap .tox .tox-toolbar__overflow {
+    background: #f8fafc !important;
+}
+
+.generated-board-editor-wrap .tox .tox-menubar,
+.generated-board-editor-wrap .tox .tox-statusbar {
+    display: none !important;
+}
+
+.generated-board-editor-wrap .tox .tox-toolbar__group {
+    padding: 0 3px !important;
+}
+
+.generated-board-editor-wrap .tox .tox-tbtn {
+    width: 30px !important;
+    height: 30px !important;
+    margin: 1px !important;
+}
+
+.generated-board-editor-wrap .tox .tox-tbtn--select {
+    width: auto !important;
+    max-width: 135px !important;
+}
+
+@media (max-width: 720px) {
+    .write-box { padding: 22px 16px !important; }
+    .generated-board-editor-wrap .tox .tox-toolbar__group { padding: 0 1px !important; }
+}
