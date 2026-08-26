@@ -460,6 +460,75 @@ def send_membership_result_email(
         print(f"가입 처리 결과 메일 발송 실패: {exc}")
         return False
 
+
+def send_account_recovery_email(target_email, member_name, emp_no, temporary_password):
+    """사번과 새 임시 비밀번호를 가입 이메일로 안내한다."""
+    target_email = _normalize_email(target_email)
+    if not _is_valid_email(target_email):
+        return False
+
+    sender_email = os.environ.get('MAIL_USERNAME') or "lunch9797@gmail.com"
+    sender_password = os.environ.get('MAIL_PASSWORD') or "txnbofpijgysjpfq"
+    if not sender_email or not sender_password:
+        return False
+
+    safe_name = str(member_name or '회원').strip() or '회원'
+    safe_emp_no = str(emp_no or '').strip()
+    safe_password = str(temporary_password or '')
+    subject = '[새담 인트라넷] 사번 및 임시 비밀번호 안내'
+    password_warning = '로그인 후 개인 프로필 수정에서 비밀번호를 반드시 변경해주세요.'
+    identity_lines = [
+        f'{safe_name}님의 로그인 정보입니다.',
+        f'사번: {safe_emp_no}',
+        f'임시 비밀번호: {safe_password}',
+    ]
+    detail_lines = [*identity_lines, password_warning, f'인트라넷 주소: {INTRANET_DIRECT_URL}']
+    plain_content = '\n'.join(detail_lines)
+    safe_identity = '<br>'.join(escape(line) for line in identity_lines)
+    intranet_link = f'<a href="{INTRANET_DIRECT_URL}" target="_blank" style="color:#2563eb;">{escape(INTRANET_DIRECT_URL)}</a>'
+    message = MIMEMultipart('alternative')
+    message['From'] = f"새담 인트라넷 <{sender_email}>"
+    message['To'] = target_email
+    message['Subject'] = subject
+    message.attach(MIMEText(plain_content, 'plain', 'utf-8'))
+    message.attach(MIMEText(f'''
+        <style>
+            @keyframes recoveryPasswordWarningBlink {{
+                0%, 100% {{ opacity:1; text-shadow:0 0 0 rgba(220,38,38,0); }}
+                50% {{ opacity:.28; text-shadow:0 0 9px rgba(220,38,38,.8); }}
+            }}
+            .recovery-password-warning {{
+                color:#dc2626 !important;
+                font-weight:900 !important;
+                animation:recoveryPasswordWarningBlink 1s ease-in-out infinite;
+            }}
+        </style>
+        <table width="100%" cellpadding="0" cellspacing="0" style="font-family:sans-serif;max-width:640px;margin:0 auto;border:1px solid #e5e7eb;border-radius:14px;background:#ffffff;border-collapse:separate;overflow:hidden;">
+            <tr><td style="height:7px;background:#2563eb;font-size:0;">&nbsp;</td></tr>
+            <tr>
+                <td style="padding:32px 20px 32px 32px;vertical-align:middle;">
+                    <h2 style="margin:0 0 18px;color:#2563eb;font-size:22px;">사번 및 임시 비밀번호 안내</h2>
+                    <p style="margin:0;color:#374151;font-size:15px;line-height:1.9;">{safe_identity}</p>
+                    <p class="recovery-password-warning" style="margin:16px 0 12px;color:#dc2626;font-size:15px;line-height:1.7;font-weight:900;animation:recoveryPasswordWarningBlink 1s ease-in-out infinite;">{escape(password_warning)}</p>
+                    <p style="margin:0;color:#374151;font-size:14px;line-height:1.8;">인트라넷 주소: {intranet_link}</p>
+                </td>
+                <td width="155" style="padding:28px 28px 28px 8px;text-align:center;vertical-align:middle;background:#f8fbff;border-left:1px solid #eef2f7;">
+                    <img src="https://www.saedam.org/img/logo01.gif" width="115" alt="새담청소년교육문화원" style="display:block;width:115px;max-width:100%;height:auto;margin:0 auto;border:0;">
+                </td>
+            </tr>
+        </table>
+    ''', 'html', 'utf-8'))
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=20) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, target_email, message.as_string())
+        return True
+    except Exception as exc:
+        print(f"로그인 정보 메일 발송 실패: {exc}")
+        return False
+
 @user_mgmt_bp.route('/')
 @admin_required
 def index():
@@ -1213,6 +1282,74 @@ def update_user():
                 pass
         delete_file(upload_path)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@user_mgmt_bp.route('/bulk_update', methods=['POST'])
+@admin_required
+def bulk_update_users():
+    """선택한 승인 회원의 조직 정보를 한 번에 변경한다."""
+    conn = None
+    try:
+        data = request.get_json(silent=True) or {}
+        raw_user_ids = data.get('user_ids')
+        field = str(data.get('field') or '').strip()
+        value = str(data.get('value') or '').strip()
+
+        if not isinstance(raw_user_ids, list) or not raw_user_ids:
+            return jsonify({'status': 'error', 'message': '수정할 회원을 선택해주세요.'}), 400
+
+        user_ids = []
+        for raw_user_id in raw_user_ids:
+            try:
+                user_id = int(raw_user_id)
+            except (TypeError, ValueError):
+                return jsonify({'status': 'error', 'message': '회원 선택 정보가 올바르지 않습니다.'}), 400
+            if user_id > 0 and user_id not in user_ids:
+                user_ids.append(user_id)
+
+        if not user_ids or len(user_ids) > 500:
+            return jsonify({'status': 'error', 'message': '한 번에 수정할 회원은 1명 이상 500명 이하로 선택해주세요.'}), 400
+
+        allowed_fields = {
+            'department': 'department',
+            'custom_department': 'custom_department',
+            'custom_team': 'custom_team',
+        }
+        column = allowed_fields.get(field)
+        if not column:
+            return jsonify({'status': 'error', 'message': '일괄수정 항목이 올바르지 않습니다.'}), 400
+        if field == 'department' and value not in DEPARTMENT_OPTIONS:
+            return jsonify({'status': 'error', 'message': '소속부서를 선택해주세요.'}), 400
+        if field != 'department' and len(value) > 100:
+            return jsonify({'status': 'error', 'message': '별도 소속과 별도 팀은 100자 이내로 입력해주세요.'}), 400
+
+        conn = get_db()
+        _ensure_hr_schema(conn)
+        placeholders = ','.join('?' for _ in user_ids)
+        approved_rows = conn.execute(
+            f"SELECT id FROM users WHERE status='승인' AND id IN ({placeholders})",
+            user_ids,
+        ).fetchall()
+        if len(approved_rows) != len(user_ids):
+            return jsonify({'status': 'error', 'message': '승인된 회원만 일괄수정할 수 있습니다.'}), 400
+
+        cursor = conn.execute(
+            f"UPDATE users SET {column}=? WHERE status='승인' AND id IN ({placeholders})",
+            [value, *user_ids],
+        )
+        conn.commit()
+        return jsonify({
+            'status': 'success',
+            'message': f'{cursor.rowcount}명의 정보를 일괄수정했습니다.',
+            'updated_count': cursor.rowcount,
+        })
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 @user_mgmt_bp.route('/delete', methods=['POST'])
 @admin_required

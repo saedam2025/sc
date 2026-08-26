@@ -41,6 +41,7 @@ memo_bp = Blueprint("memo", __name__)
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MEMO_USER_QUOTA_BYTES = 30 * 1024 * 1024
 
 POSTIT_SHAPES = {
     "square",
@@ -381,6 +382,53 @@ def _delete_physical_file(filepath: str) -> None:
             pass
 
 
+def _text_size(value: Any) -> int:
+    return len(str(value or "").encode("utf-8"))
+
+
+def _format_megabytes(size_bytes: int) -> str:
+    value = max(0, int(size_bytes or 0)) / (1024 * 1024)
+    return f"{value:.1f}".rstrip("0").rstrip(".")
+
+
+def _memo_usage_bytes(conn: sqlite3.Connection) -> int:
+    """현재 회원의 메모 본문과 실제 첨부파일 사용량을 합산한다."""
+    where, params = _owned_where()
+    rows = conn.execute(
+        f"SELECT content, filepath FROM memos WHERE {where}",
+        params,
+    ).fetchall()
+
+    content_bytes = sum(_text_size(row["content"]) for row in rows)
+    file_bytes = 0
+    seen_paths: set[Path] = set()
+    for row in rows:
+        path = _resolve_file_path(str(row["filepath"] or ""))
+        if not path:
+            continue
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved in seen_paths:
+            continue
+        seen_paths.add(resolved)
+        file_bytes += plaintext_size(resolved)
+    return content_bytes + file_bytes
+
+
+def _quota_exceeded(usage_bytes: int, additional_bytes: int = 0) -> bool:
+    return max(0, usage_bytes) + max(0, additional_bytes) > MEMO_USER_QUOTA_BYTES
+
+
+def _quota_error(usage_bytes: int):
+    used = _format_megabytes(usage_bytes)
+    return _json_error(
+        f"개인화이트보드 사용 가능 용량 30MB를 초과합니다. 현재 {used}MB 사용 중입니다.",
+        413,
+    )
+
+
 @memo_bp.route("/")
 def memo_board():
     conn = get_db()
@@ -393,7 +441,14 @@ def memo_board():
             params,
         ).fetchall()
         memos = [_serialize_memo(row) for row in rows]
-        response = make_response(render_template("memo.html", memos=memos))
+        usage_bytes = _memo_usage_bytes(conn)
+        response = make_response(render_template(
+            "memo.html",
+            memos=memos,
+            memo_quota_mb=MEMO_USER_QUOTA_BYTES // (1024 * 1024),
+            memo_usage_mb=_format_megabytes(usage_bytes),
+            memo_usage_bytes=usage_bytes,
+        ))
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
@@ -471,11 +526,6 @@ def upload_file():
         return _json_error(str(exc))
     reminder_minutes = _parse_reminder_minutes(request.form.get("reminder_minutes"))
 
-    encrypt_upload(uploaded, save_path)
-    if plaintext_size(save_path) > MAX_UPLOAD_BYTES:
-        save_path.unlink(missing_ok=True)
-        return _json_error("5MB 이하의 파일만 보드에 붙일 수 있습니다.")
-
     memo_type = "image" if extension in IMAGE_EXTENSIONS else "file"
     password_hash = generate_password_hash(password) if password else None
     is_locked = 1 if password_hash else 0
@@ -483,6 +533,19 @@ def upload_file():
     conn = get_db()
     try:
         ensure_memo_schema(conn)
+        usage_bytes = _memo_usage_bytes(conn)
+        if _quota_exceeded(usage_bytes, size + _text_size(original_name)):
+            return _quota_error(usage_bytes)
+
+        encrypt_upload(uploaded, save_path)
+        stored_plain_size = plaintext_size(save_path)
+        if stored_plain_size > MAX_UPLOAD_BYTES:
+            save_path.unlink(missing_ok=True)
+            return _json_error("5MB 이하의 파일만 보드에 붙일 수 있습니다.")
+        if _quota_exceeded(usage_bytes, stored_plain_size + _text_size(original_name)):
+            save_path.unlink(missing_ok=True)
+            return _quota_error(usage_bytes)
+
         next_z = _next_z_index(conn)
         cursor = conn.execute(
             """
@@ -535,6 +598,9 @@ def add_timer():
     conn = get_db()
     try:
         ensure_memo_schema(conn)
+        usage_bytes = _memo_usage_bytes(conn)
+        if _quota_exceeded(usage_bytes, _text_size(content)):
+            return _quota_error(usage_bytes)
         next_z = _next_z_index(conn)
         cursor = conn.execute(
             """
@@ -577,6 +643,7 @@ def update_memo():
         }
         assignments: list[str] = []
         values: list[Any] = []
+        content_growth = 0
 
         for field, converter in allowed_fields.items():
             if field not in data:
@@ -597,11 +664,20 @@ def update_memo():
                 value = max(80, min(value, 5000))
             elif field == "content":
                 value = value[:20000]
+                content_growth = max(
+                    0,
+                    _text_size(value) - _text_size(memo["content"]),
+                )
             assignments.append(f"{field}=?")
             values.append(value)
 
         if not assignments:
             return jsonify({"ok": True})
+
+        if content_growth:
+            usage_bytes = _memo_usage_bytes(conn)
+            if _quota_exceeded(usage_bytes, content_growth):
+                return _quota_error(usage_bytes)
 
         assignments.append("updated_at=datetime('now','localtime')")
         values.append(memo_id)

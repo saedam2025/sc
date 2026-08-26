@@ -29,6 +29,15 @@ from routes.school_post_confirmation import (
     increment_view_count,
     is_shared_board,
 )
+from routes.school_team_review import (
+    TEAM_REVIEW_CATEGORY,
+    TEAM_REVIEW_STATUS,
+    build_team_review_post_queries,
+    ensure_team_review_schema,
+    get_team_leader,
+    post_matches_team,
+    post_requires_team_review,
+)
 
 school_bp = Blueprint('school', __name__)
 
@@ -45,6 +54,7 @@ SCHOOL_CATEGORY_ALIASES = {
     '만족도조사': 'survey',
     '공개수업&만족도조사': 'survey',
     '자료실': 'reference',
+    '센터장 기타자료': 'director_resources',
 }
 POST_MAX_FILES = 10
 POST_MAX_TOTAL_SIZE = 15 * 1024 * 1024
@@ -142,8 +152,8 @@ def can_access_school(conn, school_id):
     return False
 
 
-def can_access_post(conn, school_id, category):
-    """본부공지사항·자료실은 전역 공개하고, 그 외 글은 담당 학교에만 공개한다."""
+def can_access_post(conn, school_id, category, post=None):
+    """공유 글, 담당 학교 글과 팀장에게 허용된 같은 별도 팀 글을 판정한다."""
     if not can_access_school_category(category):
         return False
     if is_shared_board(category):
@@ -181,6 +191,14 @@ def can_access_post(conn, school_id, category):
             (session.get('emp_no'),)
         ).fetchone()
         return active_assignment is not None
+    # 센터장(팀장)은 별도 팀이 일치하는 센터장 게시물을 [팀장전용]에서
+    # 열람할 수 있다. post를 전달한 읽기 경로에만 적용해 수정·삭제 권한은
+    # 기존의 담당 학교 권한을 유지한다.
+    leader = get_team_leader(conn, session.get('emp_no'))
+    if post is not None and leader and post_matches_team(
+        conn, post, str(leader['custom_team'] or '').strip()
+    ):
+        return True
     return can_access_school(conn, school_id)
 
 
@@ -645,7 +663,11 @@ def school_detail(school_key):
     page = max(1, request.args.get('page', 1, type=int) or 1)
     search_query = request.args.get('search', '').strip()
 
-# 커뮤니티를 본부공지사항으로 변경하고 맨 앞으로 이동
+    conn = get_db()
+    ensure_team_review_schema(conn)
+    team_leader = get_team_leader(conn, session.get('emp_no'))
+
+ # 커뮤니티를 본부공지사항으로 변경하고 맨 앞으로 이동
     all_school_categories = [
         {'id': 'community', 'name': '본부공지사항', 'icon': 'fa-bullhorn', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['community']},
         {'id': 'notice', 'name': '수강안내문', 'icon': 'fa-circle-info', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['notice']},
@@ -663,8 +685,17 @@ def school_detail(school_key):
         {'id': 'work_schedule', 'name': '근무표', 'icon': 'fa-calendar-days', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['work_schedule']},
         {'id': 'billing', 'name': '청구관련', 'icon': 'fa-receipt', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['billing']},
         {'id': 'survey', 'name': '공개수업&만족도조사', 'icon': 'fa-chart-simple', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['survey']},
-        {'id': 'reference', 'name': '자료실', 'icon': 'fa-file-zipper', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['reference']}
+        {'id': 'reference', 'name': '자료실', 'icon': 'fa-file-zipper', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['reference']},
+        {'id': 'director_resources', 'name': '센터장 기타자료', 'icon': 'fa-folder-open', 'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['director_resources']}
     ]
+    # 실제 승인된 레벨 7 센터장(팀장)만 마지막 메뉴를 볼 수 있다.
+    if team_leader:
+        all_school_categories.append({
+            'id': TEAM_REVIEW_CATEGORY,
+            'name': '[팀장전용]',
+            'icon': 'fa-user-check',
+            'permission_key': SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS[TEAM_REVIEW_CATEGORY],
+        })
 
     menu_max_levels = load_menu_max_levels()
     school_categories = [
@@ -672,6 +703,7 @@ def school_detail(school_key):
         if menu_is_allowed(cat['permission_key'], max_levels=menu_max_levels)
     ]
     if not school_categories:
+        conn.close()
         return "접근할 수 있는 센터장 업무 메뉴가 없습니다.", 403
 
     all_cat_name_to_id = {cat['name']: cat['id'] for cat in all_school_categories}
@@ -680,11 +712,13 @@ def school_detail(school_key):
         None,
     )
     if requested_category is None and default_board_category is None:
+        conn.close()
         return "접근할 수 있는 센터장 게시판 메뉴가 없습니다.", 403
 
     category = requested_category or default_board_category
     normalized_requested_category = all_cat_name_to_id.get(category, category)
     if not any(cat['id'] == normalized_requested_category for cat in school_categories):
+        conn.close()
         return "이 센터장 업무 메뉴에 접근할 권한이 없습니다.", 403
 
     cat_id_to_name = {cat['id']: cat['name'] for cat in school_categories}
@@ -697,22 +731,22 @@ def school_detail(school_key):
          search_category = category
          current_category_name = cat_id_to_name.get(category, category)
 
-    can_write_current_board = (
+    is_team_review_board = search_category == TEAM_REVIEW_CATEGORY
+    can_write_current_board = not is_team_review_board and (
         not is_shared_board(search_category)
         or can_manage_shared_board('write')
     )
-    can_delete_current_board = (
+    can_delete_current_board = not is_team_review_board and (
         not is_shared_board(search_category)
         or can_manage_shared_board('delete')
     )
-    can_comment_current_board = (
+    can_comment_current_board = not is_team_review_board and (
         not is_shared_board(search_category)
         or can_manage_shared_board('comment')
     )
     
     per_page = 7
     
-    conn = get_db()
     init_school_comment_table(conn)
     
     school = conn.execute('''
@@ -748,11 +782,21 @@ def school_detail(school_key):
             category=default_board_category,
         ))
 
-    count_query, data_query, query_params = build_school_post_list_queries(
-        school_id, search_category, current_category_name, search_query
-    )
-    
-    total_posts = conn.execute(count_query, query_params).fetchone()[0]
+    if is_team_review_board:
+        team_name = str(team_leader['custom_team'] or '').strip()
+        if team_name:
+            count_query, data_query, query_params = build_team_review_post_queries(
+                team_name, search_query
+            )
+            total_posts = conn.execute(count_query, query_params).fetchone()[0]
+        else:
+            total_posts, query_params = 0, []
+            data_query = 'SELECT p.*, \'\' AS school_name FROM school_posts AS p WHERE 1=0 LIMIT ? OFFSET ?'
+    else:
+        count_query, data_query, query_params = build_school_post_list_queries(
+            school_id, search_category, current_category_name, search_query
+        )
+        total_posts = conn.execute(count_query, query_params).fetchone()[0]
     total_pages = math.ceil(total_posts / per_page)
 
     # 삭제나 잘못된 직접 URL로 현재 페이지가 범위를 벗어나도
@@ -764,6 +808,14 @@ def school_detail(school_key):
     query_params.extend([per_page, offset])
     posts = [dict(row) for row in conn.execute(data_query, query_params).fetchall()]
     for post in posts:
+        post['team_review_required'] = bool(
+            team_leader
+            and str(team_leader['custom_team'] or '').strip()
+            and str(post.get('status') or '접수') == '접수'
+            and post_requires_team_review(conn, post)
+            and post_matches_team(conn, post, str(team_leader['custom_team'] or '').strip())
+        )
+        post['can_team_review'] = post['team_review_required']
         attachment_paths = [
             path.strip()
             for path in str(post.get('filepath') or '').split(',')
@@ -1001,8 +1053,9 @@ def school_detail(school_key):
                              weekly_task_groups=weekly_task_groups,
                              can_write_current_board=can_write_current_board,
                              can_delete_current_board=can_delete_current_board,
-                             can_comment_current_board=can_comment_current_board,
-                             is_shared_current_board=is_shared_current_board,
+                              can_comment_current_board=can_comment_current_board,
+                              is_shared_current_board=is_shared_current_board,
+                              is_team_review_board=is_team_review_board,
                              weblinks=weblinks,
                               can_register_center_weblinks=can_register_center_weblinks,
                               gallery_preview_items=gallery_preview_items,
@@ -1198,17 +1251,17 @@ def serve_school_file(stored_name):
     conn = get_db()
     try:
         rows = conn.execute('''
-            SELECT p.school_id, p.category, p.filename, p.filepath
+            SELECT p.school_id, p.category, p.author, p.author_emp_no, p.filename, p.filepath
             FROM school_posts p
             WHERE COALESCE(p.filepath, '') LIKE ?
             UNION ALL
-            SELECT p.school_id, p.category, c.filename, c.filepath
+            SELECT p.school_id, p.category, p.author, p.author_emp_no, c.filename, c.filepath
             FROM school_post_comments c
             JOIN school_posts p ON p.id=c.post_id
             WHERE COALESCE(c.filepath, '') LIKE ?
         ''', (f'%{safe_stored_name}%', f'%{safe_stored_name}%')).fetchall()
         for row in rows:
-            if not can_access_post(conn, row['school_id'], row['category']):
+            if not can_access_post(conn, row['school_id'], row['category'], post=row):
                 continue
             names = str(row['filename'] or '').split(',')
             paths = str(row['filepath'] or '').split(',')
@@ -1289,13 +1342,14 @@ def employee_search():
 @school_bp.route('/post/api/<int:post_id>')
 def get_post_api(post_id):
     conn = get_db()
+    ensure_team_review_schema(conn)
     init_school_comment_table(conn)
     post = conn.execute("SELECT * FROM school_posts WHERE id=?", (post_id,)).fetchone()
     if not post:
         conn.close()
         return jsonify({}), 404
 
-    if not can_access_post(conn, post['school_id'], post['category']):
+    if not can_access_post(conn, post['school_id'], post['category'], post=post):
         conn.close()
         return jsonify({'message': '담당 학교 게시글만 볼 수 있습니다.'}), 403
 
@@ -1307,6 +1361,15 @@ def get_post_api(post_id):
     data = dict(post)
     data['view_count'] = current_view_count
     data['is_shared'] = is_shared_board(post['category'])
+    team_leader = get_team_leader(conn, session.get('emp_no'))
+    team_name = str(team_leader['custom_team'] or '').strip() if team_leader else ''
+    data['team_review_required'] = bool(
+        team_name
+        and str(data.get('status') or '접수') == '접수'
+        and post_requires_team_review(conn, data)
+        and post_matches_team(conn, data, team_name)
+    )
+    data['can_team_review'] = data['team_review_required']
     if data['is_shared']:
         data.update(get_confirmation_summary(conn, post_id))
         data['can_confirm'] = bool(
@@ -1378,6 +1441,78 @@ def confirm_shared_post(post_id):
         **summary,
     })
 
+
+@school_bp.route('/post/team-review', methods=['POST'])
+def confirm_team_review_posts():
+    """같은 별도 팀의 접수 게시물을 팀장확인으로 일괄 전환한다."""
+    data = request.get_json(silent=True) or {}
+    raw_post_ids = data.get('post_ids')
+    if not isinstance(raw_post_ids, list):
+        raw_post_ids = [data.get('post_id')]
+    post_ids = []
+    for raw_post_id in raw_post_ids:
+        try:
+            post_id = int(raw_post_id)
+        except (TypeError, ValueError):
+            continue
+        if post_id > 0 and post_id not in post_ids:
+            post_ids.append(post_id)
+    if not post_ids:
+        return jsonify({'ok': False, 'message': '확인할 게시물을 선택해주세요.'}), 400
+
+    conn = get_db()
+    try:
+        ensure_team_review_schema(conn)
+        team_leader = get_team_leader(conn, session.get('emp_no'))
+        if not team_leader:
+            return jsonify({'ok': False, 'message': '센터장(팀장) 레벨 7만 팀장확인을 할 수 있습니다.'}), 403
+        team_name = str(team_leader['custom_team'] or '').strip()
+        if not team_name:
+            return jsonify({'ok': False, 'message': '회원 구성원 정보에 별도 팀을 먼저 입력해주세요.'}), 400
+
+        placeholders = ','.join('?' for _ in post_ids)
+        posts = conn.execute(
+            f'SELECT * FROM school_posts WHERE id IN ({placeholders})', post_ids
+        ).fetchall()
+        posts_by_id = {int(post['id']): post for post in posts}
+        if len(posts_by_id) != len(post_ids):
+            return jsonify({'ok': False, 'message': '선택한 게시물 중 찾을 수 없는 항목이 있습니다.'}), 404
+        invalid_ids = [
+            post_id for post_id in post_ids
+            if not post_requires_team_review(conn, posts_by_id[post_id])
+            or not post_matches_team(conn, posts_by_id[post_id], team_name)
+            or str(posts_by_id[post_id]['status'] or '접수') != '접수'
+        ]
+        if invalid_ids:
+            return jsonify({
+                'ok': False,
+                'message': '같은 별도 팀의 근무표·청구관련 접수 상태 게시물만 팀장확인할 수 있습니다.',
+            }), 403
+
+        conn.execute(f'''
+            UPDATE school_posts
+            SET status=?, processor=?, team_reviewer=?, team_reviewed_at=datetime('now', 'localtime')
+            WHERE id IN ({placeholders})
+        ''', (
+            TEAM_REVIEW_STATUS,
+            str(team_leader['name'] or session.get('user_name') or ''),
+            str(team_leader['name'] or session.get('user_name') or ''),
+            *post_ids,
+        ))
+        conn.commit()
+        return jsonify({
+            'ok': True,
+            'updated_ids': post_ids,
+            'status': TEAM_REVIEW_STATUS,
+            'reviewer': str(team_leader['name'] or ''),
+        })
+    except Exception as error:
+        conn.rollback()
+        current_app.logger.exception('팀장확인 처리 실패: %s', error)
+        return jsonify({'ok': False, 'message': '팀장확인 처리 중 오류가 발생했습니다.'}), 500
+    finally:
+        conn.close()
+
 @school_bp.route('/post/add', methods=['POST'])
 def add_post():
     school_id = request.form.get('school_id')
@@ -1386,12 +1521,16 @@ def add_post():
     content = request.form.get('content')
     author = session.get('user_name')
 
+    if category == TEAM_REVIEW_CATEGORY:
+        return "[팀장전용]은 게시물을 조회하고 확인하는 메뉴입니다.", 400
+
     if not can_access_school_category(category):
         return "이 센터장 업무 메뉴에 접근할 권한이 없습니다.", 403
     if is_shared_board(category) and not can_manage_shared_board('write'):
         return "공유 게시판 글쓰기 권한이 없습니다.", 403
 
     conn = get_db()
+    ensure_team_review_schema(conn)
     if not can_access_school(conn, school_id):
         conn.close()
         return "담당 학교 게시판에만 글을 등록할 수 있습니다.", 403
@@ -1409,9 +1548,9 @@ def add_post():
     try:
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO school_posts (school_id, category, title, content, author, filename, filepath)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (school_id, category, title, content, author, filename_str, filepath_str))
+            INSERT INTO school_posts (school_id, category, title, content, author, author_emp_no, filename, filepath)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (school_id, category, title, content, author, session.get('emp_no') or '', filename_str, filepath_str))
         new_post_id = cursor.lastrowid
         conn.commit()
     except Exception:
@@ -1531,13 +1670,13 @@ def get_post_comments(post_id):
     conn = get_db()
     init_school_comment_table(conn)
     post = conn.execute(
-        "SELECT school_id, category FROM school_posts WHERE id = ?",
+        "SELECT school_id, category, author, author_emp_no FROM school_posts WHERE id = ?",
         (post_id,)
     ).fetchone()
     if not post:
         conn.close()
         return jsonify({'message': '게시글을 찾을 수 없습니다.'}), 404
-    if not can_access_post(conn, post['school_id'], post['category']):
+    if not can_access_post(conn, post['school_id'], post['category'], post=post):
         conn.close()
         return jsonify({'message': '담당 학교 댓글만 볼 수 있습니다.'}), 403
 

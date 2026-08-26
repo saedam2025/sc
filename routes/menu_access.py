@@ -7,6 +7,7 @@ from .database import get_db
 
 SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
 SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
+SCHOOL_DIRECTOR_MODE_EXTRA_MENUS = {'memo_main'}
 INSTRUCTOR_EXPENSE_ACCESS_SESSION = 'expense_instructor_access_granted'
 SCHOOL_CENTER_BOARD_MENU = 'school_center_boards'
 SCHOOL_CENTER_SHARED_MENU = 'school_center_shared'
@@ -28,6 +29,8 @@ SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS = {
     'billing': SCHOOL_CENTER_BOARD_MENU,
     'survey': SCHOOL_CENTER_BOARD_MENU,
     'reference': SCHOOL_CENTER_SHARED_MENU,
+    'director_resources': SCHOOL_CENTER_BOARD_MENU,
+    'team_review': SCHOOL_CENTER_BOARD_MENU,
 }
 SCHOOL_WORKSPACE_CATEGORY_MENUS = frozenset(SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS.values())
 
@@ -61,7 +64,7 @@ MENU_GROUPS = (
             ('school_workspace', '학교업무공간', 'fa-chalkboard-user', 14),
             ('school_tasks', '학교업무처리', 'fa-list-check', 14),
             ('school_calendar', '학교일정표', 'fa-calendar-week', 14),
-            ('school_center_boards', '[센터장] 수강안내문~공개수업&만족도조사 (8개 메뉴 일괄)', 'fa-table-list', 14),
+            ('school_center_boards', '[센터장] 일반 게시판 (9개 메뉴 일괄)', 'fa-table-list', 14),
             ('school_center_shared', '[센터장] 본부공지사항·자료실 - 접근', 'fa-door-open', 8),
             ('school_center_shared_read', '[센터장] 본부공지사항·자료실 - 읽기', 'fa-book-open', 8),
             ('school_center_shared_write', '[센터장] 본부공지사항·자료실 - 쓰기', 'fa-pen', 5),
@@ -444,7 +447,11 @@ def enforce_request_menu_access():
         if request.path == '/':
             return redirect('/school')
         # 전용모드는 일반 메뉴 레벨 설정보다 우선한다. 학교 화면에서 사용하는
-        # 출퇴근 처리 API는 화면 내부 기능이므로 함께 허용한다.
+        # 출퇴근 처리 API와 프로필 카드의 개인화이트보드는 화면 내부 기능이므로
+        # 상단 메뉴를 표시하지 않고 직접 접근만 허용한다.
+        if menu_key in SCHOOL_DIRECTOR_MODE_EXTRA_MENUS \
+                and has_active_school_assignment():
+            return None
         if menu_key in SCHOOL_WORKSPACE_CATEGORY_MENUS:
             if menu_is_allowed(menu_key):
                 return None
@@ -457,7 +464,7 @@ def enforce_request_menu_access():
                 or (request.path or '').startswith('/api/attendance'):
             return None
         if menu_key:
-            message = '센터장은 담당 센터 업무공간과 학교일정표만 이용할 수 있습니다.'
+            message = '센터장은 담당 센터 업무공간, 학교일정표와 개인화이트보드만 이용할 수 있습니다.'
             if request.is_json or '/api/' in (request.path or '') \
                     or request.accept_mimetypes.best == 'application/json':
                 return jsonify({'status': 'error', 'message': message}), 403

@@ -8,9 +8,15 @@ from routes.school_post_confirmation import (
     increment_view_count,
     is_shared_board,
 )
+from routes.school_team_review import (
+    TEAM_REVIEW_STATUS,
+    category_requires_team_review,
+    ensure_team_review_schema,
+    post_requires_team_review,
+)
 
 school_task_bp = Blueprint('school_task', __name__)
-VALID_STATUSES = {'접수', '처리중', '완료'}
+VALID_STATUSES = {'접수', TEAM_REVIEW_STATUS, '처리중', '완료'}
 SCHOOL_TASK_CATEGORIES = (
     {'id': 'community', 'name': '본부공지사항', 'icon': 'fa-bullhorn'},
     {'id': 'notice', 'name': '수강안내문', 'icon': 'fa-circle-info'},
@@ -22,6 +28,7 @@ SCHOOL_TASK_CATEGORIES = (
     {'id': 'billing', 'name': '청구관련', 'icon': 'fa-receipt'},
     {'id': 'survey', 'name': '공개수업&만족도조사', 'icon': 'fa-chart-simple'},
     {'id': 'reference', 'name': '자료실', 'icon': 'fa-file-zipper'},
+    {'id': 'director_resources', 'name': '센터장 기타자료', 'icon': 'fa-folder-open'},
 )
 CATEGORY_BY_ID = {item['id']: item for item in SCHOOL_TASK_CATEGORIES}
 
@@ -71,6 +78,8 @@ def get_mapped_category(raw_cat):
         return '공개수업&만족도조사'
     elif raw_lower in ['reference', 'archive', '자료실', '자료']: 
         return '자료실'
+    elif raw_lower in ['directorresources', 'directormisc', '센터장기타자료', '기타자료']:
+        return '센터장 기타자료'
     
     # 만약 위 목록에 없는 완전히 엉뚱한 값이면 원본을 보여주어 데이터가 숨겨지지 않도록 방어
     return str(raw_cat).strip()
@@ -87,6 +96,7 @@ def task_list():
     
     try:
         ensure_confirmation_schema(conn)
+        ensure_team_review_schema(conn)
         rows = conn.execute('''
             SELECT p.*, s.school_name 
             FROM school_posts p
@@ -115,6 +125,7 @@ def task_list():
                 'author': r_dict.get('author', ''),
                 'date': str(r_dict.get('created_at', ''))[:10] if r_dict.get('created_at') else '',
                 'status': r_dict.get('status') or '접수',
+                'status_display': r_dict.get('status') or '접수',
                 'processor': r_dict.get('processor') or '-',
                 'is_shared': shared,
                 'confirmation_count': len(confirmations),
@@ -170,9 +181,10 @@ def update_status():
 
         conn = get_db()
         ensure_confirmation_schema(conn)
+        ensure_team_review_schema(conn)
         placeholders = ','.join('?' for _ in post_ids)
         selected_posts = conn.execute(f'''
-            SELECT id, category
+            SELECT *
             FROM school_posts
             WHERE id IN ({placeholders})
         ''', post_ids).fetchall()
@@ -183,11 +195,47 @@ def update_status():
                 'status': 'fail',
                 'message': '본부공지사항과 자료실은 처리 상태를 변경하지 않고 확인 현황으로 관리합니다.'
             }), 400
-        cursor = conn.execute(f'''
-            UPDATE school_posts
-            SET status = ?, processor = ?
-            WHERE id IN ({placeholders})
-        ''', (new_status, current_user, *post_ids))
+        if new_status == TEAM_REVIEW_STATUS:
+            invalid_review_ids = [
+                row['id'] for row in selected_posts
+                if not post_requires_team_review(conn, row)
+            ]
+            if invalid_review_ids:
+                conn.rollback()
+                return jsonify({
+                    'status': 'fail',
+                    'message': '팀장확인은 근무표와 청구관련 게시물에만 지정할 수 있습니다.',
+                }), 400
+        team_review_pending = [
+            row['id'] for row in selected_posts
+            if str(row['status'] or '접수') == '접수'
+            and post_requires_team_review(conn, row)
+        ]
+        if team_review_pending and new_status in {'처리중', '완료'}:
+            conn.rollback()
+            return jsonify({
+                'status': 'fail',
+                'message': '팀장확인이 필요한 근무표·청구관련 게시물은 확인 후 처리중 또는 완료로 변경할 수 있습니다.',
+            }), 400
+        if new_status == TEAM_REVIEW_STATUS:
+            cursor = conn.execute(f'''
+                UPDATE school_posts
+                SET status=?, processor=?, team_reviewer=?,
+                    team_reviewed_at=datetime('now', 'localtime')
+                WHERE id IN ({placeholders})
+            ''', (new_status, current_user, current_user, *post_ids))
+        elif new_status == '접수':
+            cursor = conn.execute(f'''
+                UPDATE school_posts
+                SET status=?, processor=?, team_reviewer='', team_reviewed_at=NULL
+                WHERE id IN ({placeholders})
+            ''', (new_status, current_user, *post_ids))
+        else:
+            cursor = conn.execute(f'''
+                UPDATE school_posts
+                SET status=?, processor=?
+                WHERE id IN ({placeholders})
+            ''', (new_status, current_user, *post_ids))
 
         if cursor.rowcount == 0:
             conn.rollback()
@@ -225,6 +273,7 @@ def move_posts():
 
         conn = get_db()
         ensure_confirmation_schema(conn)
+        ensure_team_review_schema(conn)
         placeholders = ','.join('?' for _ in post_ids)
         selected_posts = conn.execute(f'''
             SELECT p.id, p.category, p.school_id, s.id AS valid_school_id
@@ -275,6 +324,21 @@ def move_posts():
             WHERE id IN ({moved_placeholders})
         ''', (target_category, *moved_ids))
 
+        target_requires_review = category_requires_team_review(target_category)
+        workflow_reset_ids = [
+            int(row['id'])
+            for row in selected_posts
+            if int(row['id']) in moved_ids
+            and category_requires_team_review(row['category']) != target_requires_review
+        ]
+        if workflow_reset_ids:
+            reset_placeholders = ','.join('?' for _ in workflow_reset_ids)
+            conn.execute(f'''
+                UPDATE school_posts
+                SET status='접수', processor='', team_reviewer='', team_reviewed_at=NULL
+                WHERE id IN ({reset_placeholders})
+            ''', workflow_reset_ids)
+
         if confirmation_reset_ids:
             confirmation_placeholders = ','.join('?' for _ in confirmation_reset_ids)
             conn.execute(f'''
@@ -289,6 +353,7 @@ def move_posts():
             'target_category': target_category,
             'target_name': target['name'],
             'confirmation_reset_ids': confirmation_reset_ids,
+            'workflow_reset_ids': workflow_reset_ids,
         })
     except Exception as e:
         if conn is not None:
@@ -309,6 +374,7 @@ def task_detail(post_id):
         conn = get_db()
         ensure_confirmation_schema(conn)
         ensure_view_count_schema(conn)
+        ensure_team_review_schema(conn)
         row = conn.execute('''
             SELECT p.*, s.school_name 
             FROM school_posts p
@@ -343,6 +409,7 @@ def task_detail(post_id):
             'school_name': '전체 센터' if shared else (r_dict.get('school_name') or '알 수 없음'),
             'processor': r_dict.get('processor') or '미지정',
             'status': r_dict.get('status') or '접수',
+            'status_display': r_dict.get('status') or '접수',
             'view_count': r_dict.get('view_count', 0),
             'content': r_dict.get('content', ''),
             'filename': r_dict.get('filename', ''),
