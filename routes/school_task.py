@@ -33,6 +33,12 @@ SCHOOL_TASK_CATEGORIES = (
 CATEGORY_BY_ID = {item['id']: item for item in SCHOOL_TASK_CATEGORIES}
 
 
+def get_status_display(status):
+    """업무 처리 상태의 저장값은 유지하고 화면용 명칭만 반환한다."""
+    normalized = str(status or '접수').strip() or '접수'
+    return '본사접수' if normalized == '접수' else normalized
+
+
 @school_task_bp.before_request
 def headquarters_only():
     """전 학교 통합 업무 목록은 본사 계정만 이용한다."""
@@ -116,6 +122,7 @@ def task_list():
             
             shared = is_shared_board(raw_cat)
             confirmations = confirmation_map.get(r_dict.get('id'), []) if shared else []
+            status = r_dict.get('status') or '접수'
             tasks.append({
                 'id': r_dict.get('id'),
                 'school_name': '전체 센터' if shared else (r_dict.get('school_name') or '알 수 없음'),
@@ -124,8 +131,8 @@ def task_list():
                 'title': r_dict.get('title', ''),
                 'author': r_dict.get('author', ''),
                 'date': str(r_dict.get('created_at', ''))[:10] if r_dict.get('created_at') else '',
-                'status': r_dict.get('status') or '접수',
-                'status_display': r_dict.get('status') or '접수',
+                'status': status,
+                'status_display': get_status_display(status),
                 'processor': r_dict.get('processor') or '-',
                 'is_shared': shared,
                 'confirmation_count': len(confirmations),
@@ -399,6 +406,7 @@ def task_detail(post_id):
         }
         conn.close()
 
+        status = r_dict.get('status') or '접수'
         post = {
             'id': r_dict.get('id'),
             'category': cat_name,
@@ -408,8 +416,8 @@ def task_detail(post_id):
             'created_at': str(r_dict.get('created_at', ''))[:16] if r_dict.get('created_at') else '',
             'school_name': '전체 센터' if shared else (r_dict.get('school_name') or '알 수 없음'),
             'processor': r_dict.get('processor') or '미지정',
-            'status': r_dict.get('status') or '접수',
-            'status_display': r_dict.get('status') or '접수',
+            'status': status,
+            'status_display': get_status_display(status),
             'view_count': r_dict.get('view_count', 0),
             'content': r_dict.get('content', ''),
             'filename': r_dict.get('filename', ''),
