@@ -529,7 +529,6 @@
         #boardReadView, #boardWriteView { padding: 18px; }
         .read-footer-actions { align-items:stretch; flex-direction:column; }
         .read-confirm-area { align-items:flex-start; flex-direction:column; }
-        .read-confirm-names { max-width:calc(100vw - 90px); }
         .school-link-card { padding: 14px 16px 12px; }
         .school-link-item { flex-basis: 54px; width: 54px; }
     }
@@ -710,9 +709,7 @@
     .read-confirm-btn { flex:0 0 auto; border:1px solid #14b8a6; border-radius:8px; background:#0f766e; color:#ffffff; padding:8px 13px; font-family:inherit; font-size:0.82rem; font-weight:800; cursor:pointer; }
     .read-confirm-btn:hover { background:#115e59; }
     .read-confirm-btn:disabled { border-color:#99f6e4; background:#ccfbf1; color:#0f766e; cursor:default; }
-    .read-confirm-summary { min-width:0; color:var(--text-gray, #64748b); font-size:0.72rem; line-height:1.45; }
-    .read-confirm-summary strong { color:#0f766e; }
-    .read-confirm-names { display:block; max-width:440px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .read-confirm-summary.confirmation-count { min-width:55px; color:#0f766e; font-size:0.75rem; line-height:normal; }
     .read-footer-actions #readActionBtns { margin-left:auto; }
     .read-outside-actions { display:flex; justify-content:flex-end; padding-top:12px; }
     
@@ -1433,7 +1430,7 @@
                         <div class="read-footer-actions">
                             <div id="readConfirmArea" class="read-confirm-area" style="display:none;">
                                 <button type="button" id="confirmPostBtn" class="read-confirm-btn" onclick="confirmCurrentPost()"><i class="fa-regular fa-circle-check"></i> 확인</button>
-                                <div id="readConfirmSummary" class="read-confirm-summary"></div>
+                                <div id="readConfirmSummary" class="read-confirm-summary confirmation-count" tabindex="0" aria-label="확인자 0명"></div>
                             </div>
                             <span id="readActionBtns" style="display:none;">
                                 <button id="editPostBtn" class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
@@ -2462,7 +2459,11 @@
         const names = (Array.isArray(data.confirmations) ? data.confirmations : [])
             .map(item => item.display_name || item.user_name || '')
             .filter(Boolean);
-        summary.innerHTML = `<strong>확인 ${Number(data.confirmation_count || 0)}명</strong><span class="read-confirm-names">${names.length ? names.map(escapeHtml).join(', ') : '아직 확인한 조직원이 없습니다.'}</span>`;
+        const confirmationCount = Number(data.confirmation_count || 0);
+        const confirmationTitle = names.length ? names.join(', ') : '아직 확인한 조직원이 없습니다.';
+        summary.innerHTML = renderConfirmationTooltip(data);
+        summary.setAttribute('aria-label', `확인자 ${confirmationCount}명`);
+        summary.setAttribute('title', confirmationTitle);
         button.style.display = data.can_confirm ? 'inline-flex' : 'none';
         button.disabled = Boolean(data.confirmed_by_me);
         button.innerHTML = data.confirmed_by_me
@@ -2473,8 +2474,14 @@
         const listChip = document.getElementById(`confirmation-count-${data.id}`);
         if(listChip) {
             listChip.innerHTML = renderConfirmationTooltip(data);
-            listChip.setAttribute('aria-label', `확인자 ${Number(data.confirmation_count || 0)}명`);
-            listChip.setAttribute('title', names.length ? names.join(', ') : '아직 확인한 조직원이 없습니다.');
+            listChip.setAttribute('aria-label', `확인자 ${confirmationCount}명`);
+            listChip.setAttribute('title', confirmationTitle);
+        }
+        const readMetaChip = document.getElementById('readMetaConfirmation');
+        if(readMetaChip) {
+            readMetaChip.innerHTML = renderConfirmationTooltip(data);
+            readMetaChip.setAttribute('aria-label', `확인자 ${confirmationCount}명`);
+            readMetaChip.setAttribute('title', confirmationTitle);
         }
     }
 
@@ -2550,7 +2557,7 @@
         const statusText = data.status || '접수';
         const statusLabel = statusText === '접수' ? '본사접수' : statusText;
         const statusMeta = data.is_shared
-            ? `<span class="read-meta-item" style="color:#0f766e;"><i class="fa-regular fa-circle-check"></i> 확인 <strong>${Number(data.confirmation_count || 0)}명</strong></span>`
+            ? `<span id="readMetaConfirmation" class="confirmation-count" tabindex="0" aria-label="확인자 ${Number(data.confirmation_count || 0)}명">${renderConfirmationTooltip(data)}</span>`
             : data.can_team_review
                 ? `<button type="button" class="team-review-status-btn" onclick="confirmTeamReview(${Number(data.id)}, this)">팀장확인</button>`
             : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusLabel}</span>`;
