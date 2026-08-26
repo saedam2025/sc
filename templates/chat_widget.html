@@ -838,6 +838,9 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             ? 'fa-solid fa-spinner fa-spin'
             : (enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen');
         b.style.color = enabled ? 'var(--blue-primary)' : '#94a3b8';
+        // 터치 기기에서는 :hover가 탭 후에도 남을 수 있으므로 아이콘은
+        // 버튼의 실제 구독 상태 색상을 항상 상속한다.
+        if (icon) icon.style.color = 'inherit';
         b.disabled = busy;
         b.setAttribute('aria-pressed', String(enabled));
         b.title = busy ? '휴대폰 푸시 알림 설정 중' : (enabled ? '휴대폰 푸시 알림 켜짐 · 눌러서 끄기' : '휴대폰 푸시 알림 꺼짐 · 눌러서 켜기');

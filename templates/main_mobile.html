@@ -76,6 +76,16 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         justify-content: center;
         cursor: pointer;
         font-size: 1rem;
+        transition: color .2s ease, background-color .2s ease, border-color .2s ease;
+    }
+    .mobile-icon-button[aria-pressed="true"] {
+        color: #fff;
+        background: rgba(255,255,255,.2);
+    }
+    .mobile-icon-button[aria-pressed="false"] {
+        color: #94a3b8;
+        border-color: rgba(203,213,225,.42);
+        background: rgba(15,23,42,.18);
     }
     .mobile-icon-button:disabled { opacity: .65; }
     .mobile-profile-row { gap: 14px; margin-top: 24px; position: relative; z-index: 1; }
@@ -194,8 +204,8 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                 <span>INTRANET</span>
             </div>
             <div class="mobile-top-actions">
-                <button id="mobilePushButton" class="mobile-icon-button" type="button" onclick="toggleMobilePush()" title="메시지 푸시 알림">
-                    <i id="mobilePushIcon" class="fa-solid fa-mobile-screen-button"></i>
+                <button id="mobilePushButton" class="mobile-icon-button" type="button" aria-pressed="false" onclick="toggleMobilePush()" title="메시지 푸시 알림">
+                    <i id="mobilePushIcon" class="fa-solid fa-mobile-screen"></i>
                 </button>
                 <a class="mobile-icon-button" href="{{ url_for('logout') }}" title="로그아웃"><i class="fa-solid fa-right-from-bracket"></i></a>
             </div>
@@ -393,12 +403,14 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         icon.className = busy ? 'fa-solid fa-spinner fa-spin' : (enabled ? 'fa-solid fa-mobile-screen-button' : 'fa-solid fa-mobile-screen');
         button.title = busy ? '푸시 알림 설정 중' : (enabled ? '메시지 푸시 알림 켜짐' : '메시지 푸시 알림 꺼짐');
         button.setAttribute('aria-pressed', String(enabled));
+        button.setAttribute('aria-label', button.title);
     }
 
     async function toggleMobilePush() {
         if (!window.SaedamChatPush) return alert('푸시 알림 모듈을 불러오지 못했습니다.');
         try {
             const enabled = await window.SaedamChatPush.toggle();
+            updateMobilePushButton();
             alert(enabled ? '메시지 푸시 알림을 켰습니다.' : '이 기기의 메시지 푸시 알림을 껐습니다.');
         } catch (error) {
             alert((error && error.message) || '푸시 알림 설정에 실패했습니다.');
