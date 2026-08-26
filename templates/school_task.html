@@ -261,6 +261,7 @@
     .badge-school { color: var(--text-dark); font-weight: 400; }
     .badge-cat { color: var(--saedam-blue); }
     .status-접수 { color: #d97706; }
+    .status-팀장확인 { color: #7c3aed; }
     .status-처리중 { color: #2563eb; }
     .status-완료 { color: #16a34a; }
     .confirmation-count { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:55px; padding:4px 9px; border:0; background:transparent; color:#0f766e; font-size:0.675rem; font-weight:400; cursor:help; }
@@ -390,6 +391,7 @@
                             <select class="glass-input" id="statusFilter" style="width: 130px;">
                                 <option value="all">상태 전체</option>
                                 <option value="접수">접수</option>
+                                <option value="팀장확인">팀장확인</option>
                                 <option value="처리중">처리중</option>
                                 <option value="완료">완료</option>
                             </select>
@@ -409,6 +411,7 @@
                                 상태 변경:
                             </span>
                             <button type="button" onclick="changeStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeStatus('팀장확인', this)" class="btn-action" style="padding: 6px 12px; background:#7c3aed; color:#fff;"><i class="fa-solid fa-user-check"></i> 팀장확인</button>
                             <button type="button" onclick="changeStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
                             <button type="button" onclick="changeStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
                         </div>
@@ -435,6 +438,7 @@
                         <div style="display: flex; gap: 24px; font-size: 0.9rem; font-weight: 600;">
                             <span style="color: var(--text-gray); display: flex; align-items: center; gap: 6px;">전체 <span id="count-all" style="color: var(--text-dark); font-size: 1rem;">0</span></span>
                             <span style="color: #d97706; display: flex; align-items: center; gap: 6px;">접수 <span id="count-wait" style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
+                            <span style="color: #7c3aed; display: flex; align-items: center; gap: 6px;">팀장확인 <span id="count-team-reviewed" style="background: #f3e8ff; color: #7c3aed; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                             <span style="color: #2563eb; display: flex; align-items: center; gap: 6px;">처리중 <span id="count-process" style="background: #dbeafe; color: #2563eb; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                             <span style="color: #16a34a; display: flex; align-items: center; gap: 6px;">완료 <span id="count-done" style="background: #dcfce3; color: #16a34a; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                         </div>
@@ -465,7 +469,7 @@
                                 data-category="{{ task.cat_name }}"
                                 data-school="{{ task.school_name }}"
                                 data-original-school="{{ task.original_school_name }}"
-                                data-status="{{ task.status }}"
+                                data-status="{{ task.status_display }}"
                                 data-shared="{{ 'true' if task.is_shared else 'false' }}"
                                 onclick="openTaskDetail({{ task.id }})">
 
@@ -507,7 +511,7 @@
                                         </span>
                                     </span>
                                     {% else %}
-                                    <span class="badge status-{{ task.status }}">{{ task.status }}</span>
+                                    <span class="badge status-{{ task.status_display }}">{{ task.status_display }}</span>
                                     {% endif %}
                                 </td>
 
@@ -535,6 +539,7 @@
                         <div id="singleStatusControls" style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">상태 변경:</span>
                             <button type="button" onclick="changeSingleStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeSingleStatus('팀장확인', this)" class="btn-action" style="padding: 6px 12px; background:#7c3aed; color:#fff;"><i class="fa-solid fa-user-check"></i> 팀장확인</button>
                             <button type="button" onclick="changeSingleStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
                             <button type="button" onclick="changeSingleStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
                         </div>
@@ -682,7 +687,7 @@
         const search = document.getElementById('searchInput').value.toLowerCase().trim();
         const allRows = document.querySelectorAll('.task-row');
         filteredRows = []; 
-        let cWait = 0, cProcess = 0, cDone = 0, cTotal = 0;
+        let cWait = 0, cTeamReviewed = 0, cProcess = 0, cDone = 0, cTotal = 0;
 
         allRows.forEach(row => {
             const rowCategory = row.dataset.category || '';
@@ -697,6 +702,7 @@
             if (matchCategory && matchSchool && matchSearch) {
                 cTotal++;
                 if (!rowShared && rowStatus === '접수') cWait++;
+                else if (!rowShared && rowStatus === '팀장확인') cTeamReviewed++;
                 else if (!rowShared && rowStatus === '처리중') cProcess++;
                 else if (!rowShared && rowStatus === '완료') cDone++;
             }
@@ -712,6 +718,7 @@
         
         document.getElementById('count-all').innerText = cTotal;
         document.getElementById('count-wait').innerText = cWait;
+        document.getElementById('count-team-reviewed').innerText = cTeamReviewed;
         document.getElementById('count-process').innerText = cProcess;
         document.getElementById('count-done').innerText = cDone;
 
@@ -909,7 +916,7 @@
             document.getElementById('rBody').innerHTML = post.content || '';
 
             const statusBadge = document.getElementById('rStatus');
-            const statusText = post.status || '접수';
+            const statusText = post.status_display || post.status || '접수';
             statusBadge.textContent = statusText;
             statusBadge.className = 'badge status-' + statusText;
             const shared = Boolean(post.is_shared);

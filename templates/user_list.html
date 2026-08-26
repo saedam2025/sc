@@ -39,7 +39,7 @@
 
     .mgmt-card { background: white; padding: 30px; border-radius: 20px; border: 1px solid #e9ecef; box-shadow: 0 10px 25px rgba(0,0,0,0.02); margin-bottom: 30px; width: 100%; box-sizing: border-box;}
     
-    /* 데이터가 구겨지지 않게 유지하되, 통장 아이콘화로 공간을 확보하여 100% 비율 사용 */
+    /* 데이터가 구겨지지 않게 유지하되, 민감정보 아이콘화로 공간을 확보하여 100% 비율 사용 */
     .table-container { overflow-x: auto; width: 100%; border: 1px solid #e9ecef; border-radius: 12px; }
     .table-container::-webkit-scrollbar { height: 10px; }
     .table-container::-webkit-scrollbar-thumb { background-color: #ced4da; border-radius: 5px; }
@@ -55,9 +55,29 @@
     .td-wrap { white-space: normal; word-break: keep-all; line-height: 1.4; min-width: 200px; font-size: 0.9em; }
     .td-nowrap { white-space: nowrap; letter-spacing: -0.5px; font-size: 0.9em; }
 
-    /* 아이콘 호버 애니메이션 */
-    .copy-icon { transition: transform 0.2s ease; }
-    .copy-icon:hover { transform: scale(1.2); color: #0ca678 !important; }
+    /* 민감정보 복사 아이콘 */
+    .sensitive-copy-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--copy-icon-color, #475569);
+        cursor: pointer;
+        font-size: 1.25em;
+        transition: transform 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+    }
+    .sensitive-copy-button:hover,
+    .sensitive-copy-button:focus-visible {
+        transform: scale(1.12);
+        color: var(--copy-icon-hover-color, #0ca678);
+        background: rgba(15, 118, 110, 0.09);
+        outline: none;
+    }
 
     /* 모달 UI 가로 배치 전면 개편 */
     .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); }
@@ -107,6 +127,17 @@
     .position-list th { background: var(--widget-bg, #f8fafc); color: var(--text-gray, #475569); }
     .position-list tbody tr:last-child td { border-bottom: 0; }
     .position-list input { min-width: 90px; }
+    .member-tools { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+    .member-bulk-tools { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--card-border, #e2e8f0); border-radius:12px; background:var(--widget-bg, #f8fafc); }
+    .member-bulk-tools .glass-input { width:auto; min-width:145px; padding:9px 12px; }
+    .member-bulk-count { min-width:72px; color:var(--primary-color); font-size:.88rem; }
+    .member-bulk-help { color:var(--text-gray, #64748b); font-size:.76rem; }
+    .member-select { width:17px; height:17px; margin:0; accent-color:var(--primary-color); cursor:pointer; }
+    .sort-header { display:inline-flex; align-items:center; justify-content:center; gap:5px; width:100%; padding:0; border:0; background:transparent; color:inherit; font:inherit; font-weight:inherit; white-space:nowrap; cursor:pointer; }
+    .sort-header:hover, .sort-header:focus-visible { color:var(--primary-color); }
+    .sort-indicator { min-width:10px; color:#94a3b8; font-size:.72rem; }
+    .sort-header.active .sort-indicator { color:var(--primary-color); }
+    .member-empty-row { padding:30px 12px !important; text-align:center; color:var(--text-gray, #64748b) !important; }
     @media (max-width: 650px) { .position-create-row { grid-template-columns: 1fr; } }
 
     /* 공통 테마 호환 */
@@ -346,34 +377,55 @@
     </div>
 
     <div class="mgmt-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:14px;">
             <h3 style="margin:0;"><i class="fa-solid fa-address-book" style="color: #2b8a3e;"></i> 전체 구성원 인사 명단</h3>
             <label style="position:relative; width:min(320px, 42%);">
                 <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#94a3b8;"></i>
-                <input id="memberSearchInput" class="glass-input" type="search" placeholder="이름·사번·소속·직급 검색" oninput="filterMemberList()" style="margin:0; padding-left:38px;">
+                <input id="memberSearchInput" name="member_directory_search" class="glass-input" type="search" placeholder="이름·사번·소속·직급 검색" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore readonly onfocus="this.removeAttribute('readonly')" oninput="filterMemberList()" style="margin:0; padding-left:38px;">
             </label>
+        </div>
+        <div class="member-tools">
+            <div class="member-bulk-tools" aria-label="선택 회원 일괄수정">
+                <strong id="memberBulkCount" class="member-bulk-count">0명 선택</strong>
+                <select id="memberBulkField" class="glass-input" aria-label="일괄수정 항목" onchange="changeBulkField()">
+                    <option value="department">소속부서</option>
+                    <option value="custom_department">별도 소속</option>
+                    <option value="custom_team">별도 팀</option>
+                </select>
+                <select id="memberBulkDepartment" class="glass-input" aria-label="변경할 소속부서">
+                    <option value="">변경할 소속부서</option>
+                    <option value="본부">본부</option>
+                    <option value="북부지점">북부지점</option>
+                    <option value="파견">파견</option>
+                    <option value="기타">기타</option>
+                </select>
+                <input id="memberBulkText" class="glass-input" type="text" maxlength="100" placeholder="변경할 값을 입력" autocomplete="off" data-lpignore="true" data-1p-ignore style="display:none;">
+                <button id="memberBulkApplyBtn" type="button" class="action-btn btn-approve" onclick="applyBulkMemberUpdate()" disabled><i class="fa-solid fa-pen-to-square"></i> 선택 회원 적용</button>
+                <span id="memberBulkHelp" class="member-bulk-help">왼쪽 체크박스로 회원을 선택하세요.</span>
+            </div>
         </div>
         <div class="table-container">
             <table class="approve-table">
                 <thead>
                     <tr>
-                        <th style="width:40px;">No.</th>
-                        <th style="width:90px;">사번</th>
-                        <th style="width:70px;">프로필</th>
-                        <th style="width:80px;">성명</th>
-                        <th style="width:85px;">포인트</th>
-                        <th style="width:130px;">주민번호</th>
-                        <th style="width:100px;">소속부서</th>
-                        <th style="width:110px;">별도 소속</th>
-                        <th style="width:100px;">별도 팀</th>
-                        <th style="width:80px;">직급</th>
-                        <th style="width:50px;">레벨</th>
-                        <th style="width:120px;">연락처</th>
-                        <th style="width:auto;">주소</th>
-                        <th style="width:70px;">급여통장</th>
-                        <th style="width:100px;">가입승인일</th>
-                        <th style="width:90px;">입사일</th>
-                        <th style="width:90px;">퇴사일</th>
+                        <th style="width:42px;"><input id="memberSelectAll" class="member-select" type="checkbox" aria-label="검색된 회원 전체 선택" onchange="toggleAllMembers(this.checked)"></th>
+                        <th style="width:40px;"><button type="button" class="sort-header" data-member-sort="__no" onclick="sortMemberList('__no')">No.<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:90px;"><button type="button" class="sort-header" data-member-sort="사번" onclick="sortMemberList('사번')">사번<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:70px;"><button type="button" class="sort-header" data-member-sort="프로필" onclick="sortMemberList('프로필')">프로필<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:80px;"><button type="button" class="sort-header" data-member-sort="이름" onclick="sortMemberList('이름')">성명<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:85px;"><button type="button" class="sort-header" data-member-sort="포인트" onclick="sortMemberList('포인트')">포인트<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:130px;"><button type="button" class="sort-header" data-member-sort="주민번호" onclick="sortMemberList('주민번호')">주민번호<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:100px;"><button type="button" class="sort-header" data-member-sort="소속" onclick="sortMemberList('소속')">소속부서<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:110px;"><button type="button" class="sort-header" data-member-sort="별도소속" onclick="sortMemberList('별도소속')">별도 소속<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:100px;"><button type="button" class="sort-header" data-member-sort="별도팀" onclick="sortMemberList('별도팀')">별도 팀<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:80px;"><button type="button" class="sort-header" data-member-sort="직급" onclick="sortMemberList('직급')">직급<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:50px;"><button type="button" class="sort-header" data-member-sort="레벨" onclick="sortMemberList('레벨')">레벨<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:120px;"><button type="button" class="sort-header" data-member-sort="전화번호" onclick="sortMemberList('전화번호')">연락처<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:auto;"><button type="button" class="sort-header" data-member-sort="주소" onclick="sortMemberList('주소')">주소<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:70px;"><button type="button" class="sort-header" data-member-sort="계좌" onclick="sortMemberList('계좌')">급여통장<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:100px;"><button type="button" class="sort-header" data-member-sort="가입승인일" onclick="sortMemberList('가입승인일')">가입승인일<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:90px;"><button type="button" class="sort-header" data-member-sort="입사일" onclick="sortMemberList('입사일')">입사일<span class="sort-indicator">↕</span></button></th>
+                        <th style="width:90px;"><button type="button" class="sort-header" data-member-sort="퇴사일" onclick="sortMemberList('퇴사일')">퇴사일<span class="sort-indicator">↕</span></button></th>
                         <th style="width:80px;">관리</th>
                     </tr>
                 </thead>
@@ -468,29 +520,48 @@ const userMgmtAvatarEmojis = [
     '🍎','🍓','🍉','🍕','🍔','☕','🍺','🌻','🍀','🌵'
 ];
 let currentUserData = [];
+const selectedMemberIds = new Set();
+const memberCollator = new Intl.Collator('ko-KR', {numeric:true, sensitivity:'base'});
+let memberSortState = {key:'__no', direction:'asc'};
 
-function copyToClipboard(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-            alert('계좌번호가 복사되었습니다:\n' + text);
-        });
-    } else {
-        let textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('계좌번호가 복사되었습니다:\n' + text);
-        } catch (err) {
-            alert('복사 실패');
+async function copyToClipboard(text, label = '내용') {
+    const copyValue = String(text || '').trim();
+    if (!copyValue) return;
+
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(copyValue);
+        } else {
+            const textArea = document.createElement('textarea');
+            textArea.value = copyValue;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const copied = document.execCommand('copy');
+            textArea.remove();
+            if (!copied) throw new Error('clipboard copy failed');
         }
-        textArea.remove();
+        alert(`${label}가 복사되었습니다:\n${copyValue}`);
+    } catch (error) {
+        alert(`${label} 복사에 실패했습니다.`);
     }
+}
+
+function sensitiveInfoDisplay(value, iconClass, label, color) {
+    const copyValue = String(value || '').trim();
+    if (!copyValue) return '<span style="color:#adb5bd;">-</span>';
+
+    const escapedValue = escapeMgmt(copyValue);
+    const escapedLabel = escapeMgmt(label);
+    const escapedColor = escapeMgmt(color);
+    return `<button type="button" class="sensitive-copy-button" style="--copy-icon-color:${escapedColor};" data-copy-value="${escapedValue}" data-copy-label="${escapedLabel}" title="${escapedValue} (클릭하여 복사)" aria-label="${escapedLabel} 복사" onclick="copySensitiveFromElement(this)"><i class="${iconClass}" aria-hidden="true"></i></button>`;
+}
+
+function copySensitiveFromElement(element) {
+    copyToClipboard(element.dataset.copyValue || '', element.dataset.copyLabel || '내용');
 }
 
 function previewImage(input, previewId) {
@@ -619,20 +690,21 @@ async function loadAllUsers() {
                 ? `<img src="${u.profile_path}" style="width:45px; height:45px; border-radius:50%; object-fit:contain; background-color:#fff; border:1px solid #dee2e6; margin:0 auto; display:block;">` 
                 : `<span style="font-size:1.8rem; display:block; text-align:center;">${u.아이콘 || '👤'}</span>`;
 
-            const bankDisplay = u.계좌 
-                ? `<i class="fa-solid fa-money-check-dollar copy-icon" style="color: #2b8a3e; cursor: pointer; font-size: 1.4em;" title="${u.계좌} (클릭하여 복사)" onclick="copyToClipboard('${u.계좌}')"></i>` 
-                : `<span style="color:#adb5bd;">-</span>`;
+            const rrnDisplay = sensitiveInfoDisplay(u.주민번호, 'fa-solid fa-id-card', '주민번호', '#7950f2');
+            const phoneDisplay = sensitiveInfoDisplay(u.전화번호, 'fa-solid fa-phone', '연락처', '#1971c2');
+            const addressDisplay = sensitiveInfoDisplay(u.주소, 'fa-solid fa-location-dot', '주소', '#e67700');
+            const bankDisplay = sensitiveInfoDisplay(u.계좌, 'fa-solid fa-money-check-dollar', '계좌번호', '#2b8a3e');
 
             if(u.승인상태 === '대기') {
                 pBody.innerHTML += `<tr>
                     <td class="td-center">${pCount++}</td>
                     <td style="vertical-align: middle;">${displayProfile}</td>
                     <td class="td-center">${u.이름}</td>
-                    <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
+                    <td class="td-center">${rrnDisplay}</td>
                     <td class="td-center">${u.소속||'-'}</td>
                     <td class="td-center">${u.직급}</td>
-                    <td class="td-center td-nowrap">${u.전화번호||'-'}</td>
-                    <td class="td-left td-wrap">${u.주소||'-'}</td>
+                    <td class="td-center">${phoneDisplay}</td>
+                    <td class="td-center">${addressDisplay}</td>
                     <td class="td-center">${bankDisplay}</td>
                     <td class="td-center td-nowrap" style="color:#666;">${formatMgmtDate(u.가입신청일)}</td>
                     <td class="td-center"><span class="status-badge status-pending">대기</span></td>
@@ -645,20 +717,22 @@ async function loadAllUsers() {
                     </td>
                 </tr>`;
             } else if(u.승인상태 === '승인') {
-                mBody.innerHTML += `<tr>
-                    <td class="td-center">${mCount++}</td>
+                const memberNumber = mCount++;
+                mBody.innerHTML += `<tr data-user-id="${Number(u.id)}" data-original-order="${memberNumber}">
+                    <td class="td-center"><input class="member-select member-row-select" type="checkbox" value="${Number(u.id)}" aria-label="${escapeMgmt(u.이름 || u.사번 || '회원')} 선택" ${selectedMemberIds.has(Number(u.id)) ? 'checked' : ''} onchange="setMemberSelected(${Number(u.id)}, this.checked)"></td>
+                    <td class="td-center">${memberNumber}</td>
                     <td class="td-center" style="color:#4a90e2;">${u.사번 || '-'}</td>
                     <td style="vertical-align: middle;">${displayProfile}</td>
                     <td class="td-center">${u.이름}</td>
                     <td class="td-center"><strong style="color:var(--primary-color); white-space:nowrap;">P${Number(u.포인트 || 0).toLocaleString()}점</strong></td>
-                    <td class="td-center td-nowrap">${u.주민번호||'-'}</td>
+                    <td class="td-center">${rrnDisplay}</td>
                     <td class="td-center">${u.소속||'-'}</td>
                     <td class="td-center">${u.별도소속||'-'}</td>
                     <td class="td-center">${u.별도팀||'-'}</td>
                     <td class="td-center">${u.직급}</td>
                     <td class="td-center">${u.레벨}</td>
-                    <td class="td-center td-nowrap">${u.전화번호||'-'}</td>
-                    <td class="td-left td-wrap">${u.주소||'-'}</td>
+                    <td class="td-center">${phoneDisplay}</td>
+                    <td class="td-center">${addressDisplay}</td>
                     <td class="td-center">${bankDisplay}</td>
                     <td class="td-center td-nowrap" style="color:#2b8a3e;">${formatMgmtDate(u.가입승인일)}</td>
                     <td class="td-center td-nowrap" style="color:#666;">${u.입사일||'-'}</td>
@@ -669,8 +743,14 @@ async function loadAllUsers() {
                 </tr>`;
             }
         });
+        const approvedIds = new Set(currentUserData.filter(u => u.승인상태 === '승인').map(u => Number(u.id)));
+        [...selectedMemberIds].forEach(id => { if (!approvedIds.has(id)) selectedMemberIds.delete(id); });
+        applyCurrentMemberSort();
         filterMemberList();
-    } catch(e) {}
+    } catch(e) {
+        console.error(e);
+        mBody.innerHTML = '<tr><td colspan="19" class="member-empty-row">회원 명단을 불러오지 못했습니다.</td></tr>';
+    }
 }
 
 function filterMemberList() {
@@ -681,6 +761,154 @@ function filterMemberList() {
     body.querySelectorAll('tr').forEach(row => {
         row.style.display = !keyword || row.textContent.toLocaleLowerCase('ko-KR').includes(keyword) ? '' : 'none';
     });
+    updateMemberSelectionUi();
+}
+
+const MEMBER_SORT_COLUMNS = {
+    '__no': 1, '사번': 2, '프로필': 3, '이름': 4, '포인트': 5,
+    '주민번호': 6, '소속': 7, '별도소속': 8, '별도팀': 9, '직급': 10,
+    '레벨': 11, '전화번호': 12, '주소': 13, '계좌': 14,
+    '가입승인일': 15, '입사일': 16, '퇴사일': 17
+};
+
+function memberCellSortValue(row, key) {
+    if (key === '__no') return Number(row.dataset.originalOrder || 0);
+    const cell = row.cells[MEMBER_SORT_COLUMNS[key]];
+    if (!cell) return '';
+    if (key === '프로필') return `${cell.querySelector('img') ? '사진' : '아이콘'} ${cell.textContent.trim()}`;
+    if (['주민번호', '전화번호', '주소', '계좌'].includes(key)) {
+        return cell.querySelector('[data-copy-value]')?.dataset.copyValue || '';
+    }
+    if (key === '포인트' || key === '레벨') return Number(cell.textContent.replace(/[^0-9.-]/g, '') || 0);
+    return cell.textContent.trim();
+}
+
+function applyCurrentMemberSort() {
+    const body = document.getElementById('member-list-body');
+    if (!body) return;
+    const {key, direction} = memberSortState;
+    const numericKeys = new Set(['__no', '포인트', '레벨']);
+    const rows = [...body.querySelectorAll('tr[data-user-id]')];
+    rows.sort((left, right) => {
+        const leftValue = memberCellSortValue(left, key);
+        const rightValue = memberCellSortValue(right, key);
+        const leftBlank = leftValue === null || leftValue === undefined || String(leftValue).trim() === '';
+        const rightBlank = rightValue === null || rightValue === undefined || String(rightValue).trim() === '';
+        if (leftBlank !== rightBlank) return leftBlank ? 1 : -1;
+        let compared = numericKeys.has(key)
+            ? Number(leftValue || 0) - Number(rightValue || 0)
+            : memberCollator.compare(String(leftValue || ''), String(rightValue || ''));
+        if (compared === 0) compared = Number(left.dataset.originalOrder || 0) - Number(right.dataset.originalOrder || 0);
+        return direction === 'asc' ? compared : -compared;
+    });
+    rows.forEach(row => body.appendChild(row));
+    updateSortIndicators();
+}
+
+function sortMemberList(key) {
+    memberSortState = memberSortState.key === key
+        ? {key, direction:memberSortState.direction === 'asc' ? 'desc' : 'asc'}
+        : {key, direction:'asc'};
+    applyCurrentMemberSort();
+}
+
+function updateSortIndicators() {
+    document.querySelectorAll('[data-member-sort]').forEach(button => {
+        const active = button.dataset.memberSort === memberSortState.key;
+        button.classList.toggle('active', active);
+        const indicator = button.querySelector('.sort-indicator');
+        if (indicator) indicator.textContent = active ? (memberSortState.direction === 'asc' ? '▲' : '▼') : '↕';
+        const heading = button.closest('th');
+        if (heading) heading.setAttribute('aria-sort', active ? (memberSortState.direction === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+}
+
+function visibleMemberRows() {
+    return [...document.querySelectorAll('#member-list-body tr[data-user-id]')]
+        .filter(row => row.style.display !== 'none');
+}
+
+function setMemberSelected(userId, checked) {
+    if (checked) selectedMemberIds.add(Number(userId));
+    else selectedMemberIds.delete(Number(userId));
+    updateMemberSelectionUi();
+}
+
+function toggleAllMembers(checked) {
+    visibleMemberRows().forEach(row => {
+        const userId = Number(row.dataset.userId);
+        const checkbox = row.querySelector('.member-row-select');
+        if (checkbox) checkbox.checked = checked;
+        if (checked) selectedMemberIds.add(userId);
+        else selectedMemberIds.delete(userId);
+    });
+    updateMemberSelectionUi();
+}
+
+function updateMemberSelectionUi() {
+    const rows = visibleMemberRows();
+    const selectedVisibleCount = rows.filter(row => selectedMemberIds.has(Number(row.dataset.userId))).length;
+    const count = document.getElementById('memberBulkCount');
+    const applyButton = document.getElementById('memberBulkApplyBtn');
+    const selectAll = document.getElementById('memberSelectAll');
+    if (count) count.textContent = `${selectedMemberIds.size}명 선택`;
+    if (applyButton) applyButton.disabled = selectedMemberIds.size === 0;
+    if (selectAll) {
+        selectAll.checked = rows.length > 0 && selectedVisibleCount === rows.length;
+        selectAll.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < rows.length;
+    }
+}
+
+function changeBulkField() {
+    const field = document.getElementById('memberBulkField').value;
+    const department = document.getElementById('memberBulkDepartment');
+    const textInput = document.getElementById('memberBulkText');
+    const help = document.getElementById('memberBulkHelp');
+    const isDepartment = field === 'department';
+    department.style.display = isDepartment ? '' : 'none';
+    textInput.style.display = isDepartment ? 'none' : '';
+    textInput.placeholder = field === 'custom_department' ? '변경할 별도 소속' : '변경할 별도 팀';
+    help.textContent = isDepartment ? '왼쪽 체크박스로 회원을 선택하세요.' : '빈 값으로 적용하면 기존 값이 삭제됩니다.';
+}
+
+async function applyBulkMemberUpdate() {
+    if (!selectedMemberIds.size) return alert('수정할 회원을 선택해주세요.');
+    const fieldElement = document.getElementById('memberBulkField');
+    const field = fieldElement.value;
+    const fieldLabel = fieldElement.options[fieldElement.selectedIndex].text;
+    const value = field === 'department'
+        ? document.getElementById('memberBulkDepartment').value
+        : document.getElementById('memberBulkText').value.trim();
+    if (field === 'department' && !value) return alert('변경할 소속부서를 선택해주세요.');
+    const valueLabel = value || '빈 값(기존 값 삭제)';
+    if (!confirm(`선택한 ${selectedMemberIds.size}명의 ${fieldLabel}을(를) '${valueLabel}'(으)로 변경하시겠습니까?`)) return;
+
+    const button = document.getElementById('memberBulkApplyBtn');
+    button.disabled = true;
+    try {
+        const response = await fetch('/user/bulk_update', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({user_ids:[...selectedMemberIds], field, value})
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || '일괄수정에 실패했습니다.');
+        alert(result.message);
+        selectedMemberIds.clear();
+        document.getElementById('memberBulkText').value = '';
+        await loadAllUsers();
+    } catch (error) {
+        alert(error.message || '일괄수정 중 오류가 발생했습니다.');
+        updateMemberSelectionUi();
+    }
+}
+
+function clearMemberSearch() {
+    const input = document.getElementById('memberSearchInput');
+    if (!input) return;
+    input.value = '';
+    input.defaultValue = '';
+    filterMemberList();
 }
 
 async function setupAdmin() {
@@ -1369,6 +1597,8 @@ function closeModal() {
     }
 }
 
+window.addEventListener('pageshow', clearMemberSearch);
+
 window.onload = async () => {
     {% if mode == 'invite' %}
     renderIcons('icon-container-invite', 'profile_icon');
@@ -1376,6 +1606,7 @@ window.onload = async () => {
     return;
     {% elif mode == 'admin_setup' %}
     {% else %}
+    clearMemberSearch();
     try { await loadPositionSettings(); } catch (error) { console.error(error); }
     loadAllUsers();
     {% endif %}

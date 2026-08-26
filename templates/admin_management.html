@@ -298,7 +298,7 @@
                     <div class="menu-permission-row child">
                         <div class="menu-permission-label">
                             <i class="fa-solid {{ child[2] }}"></i>
-                            <div><strong>{{ child[1] }}</strong><small>{% if child[0].startswith('school_center_shared') %}센터 공용게시판 독립 권한 · 센터장 전용모드보다 우선{% elif child[0] == 'school_center_boards' %}센터장 8개 게시판 일괄 권한 · 학교관리 주메뉴보다 우선{% else %}서브메뉴 권한 · 주메뉴 권한과 함께 적용{% endif %}</small></div>
+                            <div><strong>{{ child[1] }}</strong><small>{% if child[0].startswith('school_center_shared') %}센터 공용게시판 독립 권한 · 센터장 전용모드보다 우선{% elif child[0] == 'school_center_boards' %}센터장 9개 게시판 일괄 권한 · 학교관리 주메뉴보다 우선{% else %}서브메뉴 권한 · 주메뉴 권한과 함께 적용{% endif %}</small></div>
                         </div>
                         <select name="{{ child[0] }}" data-permission-select required aria-label="{{ child[1] }} 서브메뉴 권한">
                             <option value="-1" {% if menu_max_levels[child[0]] == -1 %}selected{% endif %}>차단 (최고관리자 제외)</option>
@@ -312,7 +312,7 @@
                     <div class="menu-special-policy">
                         <div>
                             <strong><i class="fa-solid fa-school-lock"></i> 레벨 7·8 센터장 전용모드</strong>
-                            <span>사용 시 센터장(팀장·레벨 7)과 센터장(레벨 8)은 자신이 센터장으로 등록된 활성 학교 업무공간과 학교일정표만 이용할 수 있습니다. 센터장용 메뉴와 본부공지사항·자료실의 5개 동작 권한은 이 전용모드 및 학교관리 주메뉴 레벨보다 우선합니다.</span>
+                            <span>사용 시 센터장(팀장·레벨 7)과 센터장(레벨 8)은 자신이 센터장으로 등록된 활성 학교 업무공간과 학교일정표, 개인화이트보드를 이용할 수 있습니다. 개인화이트보드는 상단 메뉴에 표시하지 않고 센터장 전용 업무공간의 아이콘으로 접속합니다. 센터장용 메뉴와 본부공지사항·자료실의 5개 동작 권한은 이 전용모드 및 학교관리 주메뉴 레벨보다 우선합니다.</span>
                         </div>
                         <label class="menu-special-toggle">
                             <input type="checkbox" name="school_director_scope_enabled" value="1" {% if school_director_scope %}checked{% endif %}>

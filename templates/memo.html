@@ -94,10 +94,12 @@
         margin-top: 5px;
         color: var(--memo-muted);
         font-size: 0.78rem;
-        font-weight: 600;
+        font-weight: 400;
         line-height: 1.4;
         letter-spacing: -0.015em;
     }
+
+    .memo-storage-usage { margin-left:5px; font-weight:400; white-space:nowrap; }
 
     .toolbar-actions {
         position: relative;
@@ -1646,7 +1648,7 @@
             <span class="toolbar-brand-icon"><i class="fa-solid fa-chalkboard"></i></span>
             <div>
                 <div class="toolbar-title">개인 화이트보드</div>
-                <div class="toolbar-subtitle">메모와 자료를 자유롭게 붙여 업무를 한눈에 정리하세요.</div>
+                <div class="toolbar-subtitle">메모와 자료를 자유롭게 붙여 업무를 한눈에 정리하세요.<span class="memo-storage-usage">(사용가능용량 {{ memo_quota_mb }}MB 중 {{ memo_usage_mb }}MB사용)</span></div>
             </div>
         </div>
 
@@ -1949,6 +1951,8 @@
 </div>
 
 <script>
+    const memoQuotaBytes = {{ memo_quota_mb * 1024 * 1024 }};
+    const memoUsageBytes = {{ memo_usage_bytes }};
     let highestZ = 100;
     let draggedElement = null;
     let offsetX = 0;
@@ -2425,6 +2429,12 @@
 
         if (file.size > 5 * 1024 * 1024) {
             alert('5MB 이하의 파일만 보드에 붙일 수 있습니다.');
+            input.value = '';
+            return;
+        }
+
+        if (memoUsageBytes + file.size > memoQuotaBytes) {
+            alert(`개인화이트보드 사용 가능 용량 30MB를 초과합니다. 현재 ${(memoUsageBytes / 1024 / 1024).toFixed(1)}MB 사용 중입니다.`);
             input.value = '';
             return;
         }
