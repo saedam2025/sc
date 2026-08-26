@@ -1088,6 +1088,12 @@
         transform: scale(1.08);
     }
 
+    .meditation-layer.is-active .meditation-scene.is-artwork {
+        object-fit: contain;
+        transform: scale(1);
+        background: #070b14;
+    }
+
     .meditation-shade {
         position: absolute;
         inset: 0;
@@ -1106,6 +1112,31 @@
         color: #ffffff;
         text-align: center;
         text-shadow: 0 2px 12px rgba(2, 6, 23, 0.55);
+        opacity: 1;
+        transition: opacity 2s ease, transform 2s ease;
+        pointer-events: none;
+    }
+
+    .meditation-center.is-intro-hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    .meditation-caption {
+        position: absolute;
+        z-index: 3;
+        left: 50%;
+        bottom: 82px;
+        width: min(760px, calc(100% - 36px));
+        padding: 10px 16px;
+        border-radius: 12px;
+        color: #ffffff;
+        background: rgba(2, 6, 23, 0.34);
+        text-align: center;
+        text-shadow: 0 2px 10px rgba(2, 6, 23, 0.86);
+        backdrop-filter: blur(5px);
+        transform: translateX(-50%);
+        pointer-events: none;
     }
 
     .breathing-orb {
@@ -1142,9 +1173,18 @@
 
     .meditation-scene-name {
         min-height: 20px;
+        font-size: 1rem;
+        font-weight: 900;
+        opacity: 0.98;
+    }
+
+    .meditation-scene-description {
+        max-width: 680px;
+        min-height: 20px;
         font-size: 0.78rem;
-        font-weight: 800;
-        opacity: 0.92;
+        font-weight: 700;
+        line-height: 1.55;
+        opacity: 0.9;
     }
 
     .meditation-controls {
@@ -1185,7 +1225,7 @@
         left: 18px;
         bottom: 18px;
         z-index: 3;
-        min-width: 310px;
+        min-width: 250px;
         display: flex;
         align-items: center;
         gap: 9px;
@@ -1197,28 +1237,29 @@
         box-shadow: 0 8px 20px rgba(2, 6, 23, 0.30);
     }
 
-    .meditation-sound-label {
+    .meditation-mute-btn {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 6px;
         flex: 0 0 auto;
+        min-height: 32px;
+        padding: 5px 10px;
+        border: 1px solid #94a3b8;
+        border-radius: 8px;
+        color: #ffffff;
+        background: #1e293b;
+        cursor: pointer;
+        font: inherit;
         font-size: 0.76rem;
         font-weight: 850;
         white-space: nowrap;
     }
 
-    .meditation-sound-select {
-        min-width: 112px;
-        height: 32px;
-        padding: 0 28px 0 9px;
-        border: 1px solid #94a3b8;
-        border-radius: 8px;
-        color: #0f172a;
-        background: #ffffff;
-        font: inherit;
-        font-size: 0.76rem;
-        font-weight: 800;
-        cursor: pointer;
+    .meditation-mute-btn:hover,
+    .meditation-mute-btn.is-muted {
+        color: #cbd5e1;
+        background: #334155;
     }
 
     .meditation-volume-wrap {
@@ -1240,10 +1281,46 @@
         cursor: pointer;
     }
 
-    .meditation-volume:disabled {
-        cursor: not-allowed;
-        opacity: 0.42;
+    .meditation-auto-sound {
+        min-width: 0;
+        max-width: 150px;
+        overflow: hidden;
+        color: #dbeafe;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: .68rem;
+        font-weight: 750;
     }
+
+    .meditation-genre-panel {
+        position: absolute;
+        z-index: 5;
+        left: 50%;
+        bottom: 68px;
+        width: min(760px, calc(100% - 36px));
+        max-height: min(68vh, 620px);
+        padding: 18px;
+        overflow-y: auto;
+        border: 1px solid rgba(255,255,255,.75);
+        border-radius: 16px;
+        color: #f8fafc;
+        background: rgba(15,23,42,.94);
+        box-shadow: 0 24px 70px rgba(2,6,23,.48);
+        backdrop-filter: blur(16px);
+        transform: translateX(-50%);
+    }
+
+    .meditation-genre-panel[hidden] { display: none; }
+    .meditation-genre-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .meditation-genre-head strong { font-size:1rem; }
+    .meditation-genre-close { width:32px; height:32px; border:0; border-radius:8px; color:#fff; background:#334155; cursor:pointer; }
+    .meditation-genre-group + .meditation-genre-group { margin-top:15px; padding-top:14px; border-top:1px solid rgba(255,255,255,.14); }
+    .meditation-genre-title { margin-bottom:8px; color:#bae6fd; font-size:.78rem; font-weight:900; }
+    .meditation-genre-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:7px; }
+    .meditation-genre-option { min-height:38px; padding:7px 8px; border:1px solid rgba(255,255,255,.2); border-radius:9px; color:#fff; background:rgba(255,255,255,.07); cursor:pointer; font:inherit; font-size:.73rem; font-weight:800; }
+    .meditation-genre-option:hover, .meditation-genre-option.is-active { border-color:#67e8f9; color:#cffafe; background:rgba(8,145,178,.25); }
+    .meditation-genre-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.62rem; font-weight:700; }
+    .meditation-genre-option.is-active small { color:#a5f3fc; }
 
     .meditation-sound-status {
         position: absolute;
@@ -1287,6 +1364,13 @@
             left: 10px;
             bottom: 114px;
         }
+
+        .meditation-genre-panel { bottom:112px; width:calc(100% - 20px); max-height:62vh; padding:14px; }
+        .meditation-genre-grid { grid-template-columns:repeat(2, minmax(0,1fr)); }
+        .meditation-auto-sound { max-width:110px; }
+        .meditation-caption { bottom:122px; width:calc(100% - 20px); padding:8px 11px; }
+        .meditation-scene-name { font-size:.9rem; }
+        .meditation-scene-description { font-size:.7rem; }
     }
 
     /* =====================================================
@@ -1836,27 +1920,39 @@
                     <div class="breathing-orb"><i class="fa-solid fa-wind"></i></div>
                     <div class="meditation-title">잠시 쉬어가세요</div>
                     <div class="meditation-guide">천천히 숨을 들이마시고, 길게 내쉬어 보세요.</div>
+                </div>
+                <div class="meditation-caption">
                     <div id="meditationSceneName" class="meditation-scene-name"></div>
+                    <div id="meditationSceneDescription" class="meditation-scene-description"></div>
                 </div>
                 <div id="meditationSoundStatus" class="meditation-sound-status" aria-live="polite"></div>
                 <div class="meditation-sound-panel">
-                    <label class="meditation-sound-label" for="meditationSoundSelect">
-                        <i class="fa-solid fa-music"></i> 배경음
-                    </label>
-                    <select id="meditationSoundSelect" class="meditation-sound-select" onchange="changeMeditationSound(this.value)">
-                        <option value="" selected>무음</option>
-                        <option value="ocean">잔잔한 파도</option>
-                        <option value="rain">부드러운 빗소리</option>
-                        <option value="forest">숲속 바람</option>
-                        <option value="stream">계곡물 소리</option>
-                    </select>
+                    <button type="button" id="meditationMuteBtn" class="meditation-mute-btn" onclick="toggleMeditationMute()" aria-pressed="false"><i class="fa-solid fa-volume-high"></i> 무음</button>
                     <div class="meditation-volume-wrap">
                         <i class="fa-solid fa-volume-low"></i>
-                        <input id="meditationVolume" class="meditation-volume" type="range" min="0" max="100" value="38" disabled oninput="changeMeditationVolume(this.value)" aria-label="명상 배경음 음량">
+                        <input id="meditationVolume" class="meditation-volume" type="range" min="0" max="100" value="38" oninput="changeMeditationVolume(this.value)" aria-label="명상 배경음 음량">
+                    </div>
+                    <span id="meditationAutoSound" class="meditation-auto-sound">장면 맞춤 배경음</span>
+                </div>
+                <div id="meditationGenrePanel" class="meditation-genre-panel" hidden>
+                    <div class="meditation-genre-head"><strong><i class="fa-solid fa-layer-group"></i> 감상 장르 선택</strong><button type="button" class="meditation-genre-close" onclick="toggleMeditationGenrePanel(false)" aria-label="장르 선택 닫기"><i class="fa-solid fa-xmark"></i></button></div>
+                    <div class="meditation-genre-group">
+                        <div class="meditation-genre-title"><i class="fa-solid fa-earth-asia"></i> 세계 풍경</div>
+                        <div class="meditation-genre-grid" data-meditation-options="places"></div>
+                    </div>
+                    <div class="meditation-genre-group">
+                        <div class="meditation-genre-title"><i class="fa-regular fa-images"></i> 멋진 사진 감상</div>
+                        <div class="meditation-genre-grid" data-meditation-options="photos"></div>
+                    </div>
+                    <div class="meditation-genre-group">
+                        <div class="meditation-genre-title"><i class="fa-solid fa-palette"></i> 명화 감상</div>
+                        <div class="meditation-genre-grid" data-meditation-options="art"></div>
                     </div>
                 </div>
                 <div class="meditation-controls">
+                    <button type="button" class="meditation-control-btn" onclick="toggleMeditationGenrePanel()"><i class="fa-solid fa-layer-group"></i> 장르 선택</button>
                     <button type="button" class="meditation-control-btn" onclick="showNextMeditationScene()"><i class="fa-solid fa-shuffle"></i> 다른 풍경</button>
+                    <button type="button" class="meditation-control-btn" onclick="showNextMeditationSound()"><i class="fa-solid fa-music"></i> 다른 배경음</button>
                     <button type="button" id="meditationFullscreenBtn" class="meditation-control-btn" onclick="toggleMeditationFullscreen()" aria-pressed="false" title="명상 화면 전체화면 전환"><i class="fa-solid fa-expand"></i> 전체화면</button>
                     <button type="button" class="meditation-control-btn" onclick="stopMeditation()"><i class="fa-solid fa-xmark"></i> 명상 종료</button>
                 </div>
@@ -1963,6 +2059,20 @@
     let meditationTimer = null;
     let meditationSceneIndex = -1;
     let meditationSoundStatusTimer = null;
+    let meditationIntroTimer = null;
+    let meditationGenre = 'places';
+    let meditationMuted = false;
+    let meditationCurrentSoundKey = '';
+    let meditationAudioContext = null;
+    let meditationSynthGain = null;
+    let meditationSynthTimer = null;
+    let meditationSynthNodes = [];
+    let meditationDailyKey = '';
+    let meditationScenes = [];
+    let meditationImageFailureCount = 0;
+    let meditationCurrentSceneId = '';
+    let meditationSoundRotation = 0;
+    let meditationSoundGeneration = 0;
 
     // 알람 재생 요청 세대값: 정지 후 늦게 완료되는 audio.play()를 무효화합니다.
     let alarmPlayGeneration = 0;
@@ -1970,27 +2080,189 @@
 
     const whiteboard = document.getElementById('whiteboard');
     const meditationSounds = {
-        ocean: {name: '잔잔한 파도', src: '/static/meditation/ocean.mp3'},
-        rain: {name: '부드러운 빗소리', src: '/static/meditation/rain.mp3'},
-        forest: {name: '숲속 바람', src: '/static/meditation/forest.mp3'},
-        stream: {name: '계곡물 소리', src: '/static/meditation/stream.mp3'}
+        ocean: {name: '잔잔한 파도', type: 'file', src: '/static/meditation/ocean.mp3', volumeScale: 0.32},
+        birds: {name: '숲속 새소리', type: 'file', src: '/static/meditation/forest.mp3', volumeScale: 0.38},
+        rain: {name: '창가의 빗소리', type: 'file', src: '/static/meditation/rain.mp3', volumeScale: 0.34},
+        stream: {name: '맑은 계곡물', type: 'file', src: '/static/meditation/stream.mp3', volumeScale: 0.36},
+        night: {name: '여름밤 풀벌레', type: 'synth', volumeScale: 0.7},
+        fireplace: {name: '모닥불 타는 소리', type: 'synth', volumeScale: 0.64},
+        cafe: {name: '포근한 카페', type: 'synth'},
+        piano: {name: '잔잔한 피아노', type: 'synth'},
+        jazz: {name: '라운지 재즈', type: 'synth'},
+        jazzWaltz: {name: '감미로운 재즈 왈츠', type: 'synth'},
+        jazzBossa: {name: '선셋 보사노바', type: 'synth'},
+        jazzNight: {name: '한밤의 재즈 트리오', type: 'synth'},
+        musicbox: {name: '별빛 오르골', type: 'synth', volumeScale: 0.78},
+        musicboxDream: {name: '꿈꾸는 오르골', type: 'synth', volumeScale: 0.78},
+        musicboxLullaby: {name: '브람스 자장가 오르골', type: 'synth', volumeScale: 0.75},
+        musicboxStar: {name: '작은 별 오르골', type: 'synth', volumeScale: 0.75},
+        classical: {name: '고요한 클래식', type: 'synth'},
+        classicalOde: {name: '베토벤 · 환희의 송가', type: 'synth'},
+        classicalElise: {name: '베토벤 · 엘리제를 위하여', type: 'synth'},
+        classicalCanon: {name: '파헬벨 · 캐논', type: 'synth'},
+        classicalMoonlight: {name: '베토벤 · 월광 소나타', type: 'synth'},
+        classicalSpring: {name: '비발디 · 사계 중 봄', type: 'synth'},
+        classicalMinuet: {name: '바흐 · 미뉴에트', type: 'synth'},
+        meditation: {name: '명상 음악', type: 'synth'}
     };
-    const meditationScenes = [
-        {name: '햇살이 스미는 숲', url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1800&q=84'},
-        {name: '고요한 초록 숲길', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1800&q=84'},
-        {name: '깊은 숲의 숨결', url: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1800&q=84'},
-        {name: '푸른 바다와 모래사장', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1800&q=84'},
-        {name: '잔잔한 바다의 수평선', url: 'https://images.unsplash.com/photo-1471922694854-ff1b63b20054?auto=format&fit=crop&w=1800&q=84'},
-        {name: '노을이 번지는 해변', url: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=84'},
-        {name: '평온한 산과 호수', url: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1800&q=84'},
-        {name: '구름 사이의 산봉우리', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1800&q=84'},
-        {name: '광활한 산악 풍경', url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=84'},
-        {name: '숲속의 시원한 폭포', url: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?auto=format&fit=crop&w=1800&q=84'},
-        {name: '한적한 들판과 하늘', url: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?auto=format&fit=crop&w=1800&q=84'},
-        {name: '파리의 아름다운 풍경', url: 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=1800&q=84'},
-        {name: '고요한 도시의 야경', url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1800&q=84'},
-        {name: '평화로운 자연 풍경', url: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1800&q=84'}
+    const meditationSceneThemes = [
+        {id:'korea', genre:'places', label:'한국의 사계', description:'고즈넉한 산사와 한국 산의 사계절 풍경 속에서 천천히 마음을 가라앉혀 보세요.', sounds:['birds','stream','classicalSpring','musicboxLullaby','meditation'], images:[
+            ['봄꽃 핀 산사의 아침','{{ url_for('static', filename='meditation/scenes/korea-spring.png') }}'],
+            ['여름비 뒤의 푸른 산사','{{ url_for('static', filename='meditation/scenes/korea-summer.png') }}'],
+            ['단풍으로 물든 산사','{{ url_for('static', filename='meditation/scenes/korea-autumn.png') }}']
+        ]},
+        {id:'swiss', genre:'places', label:'스위스 알프스', description:'눈 덮인 봉우리와 에메랄드빛 호수가 이어지는 알프스의 맑고 장대한 풍경입니다.', sounds:['piano','stream','birds','classicalCanon','classicalSpring'], images:[
+            ['스위스 알프스의 아침','https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=2200&q=88'],
+            ['알프스의 고요한 호수','https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=2200&q=88'],
+            ['구름 사이 알프스','https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'paris', genre:'places', label:'파리 야경', description:'센강과 고전적인 건축물 위로 도시의 불빛이 번지는 낭만적인 파리의 밤입니다.', sounds:['jazz','jazzWaltz','jazzNight','cafe','musicbox'], images:[
+            ['파리의 빛나는 밤','https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=2200&q=88'],
+            ['노을 진 에펠탑','https://images.unsplash.com/photo-1499856871958-5b9627545d1a?auto=format&fit=crop&w=2200&q=88'],
+            ['센강의 저녁','https://images.unsplash.com/photo-1431274172761-fca41d930114?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'santorini', genre:'places', label:'산토리니', description:'에게해의 짙푸른 바다와 하얀 마을, 파란 돔이 햇살 아래 선명하게 펼쳐집니다.', sounds:['classical','musicbox','ocean','classicalOde','jazzBossa'], images:[
+            ['산토리니의 푸른 지붕','https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=2200&q=88'],
+            ['에게해의 하얀 마을','https://images.unsplash.com/photo-1533104816931-20fa691ff6ca?auto=format&fit=crop&w=2200&q=88'],
+            ['산토리니의 석양','https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'newyork', genre:'places', label:'뉴욕', description:'끝없이 솟은 빌딩과 반짝이는 거리에서 뉴욕 특유의 활기와 리듬을 느껴보세요.', sounds:['jazz','jazzWaltz','jazzNight','cafe','rain'], images:[
+            ['뉴욕의 도시 리듬','https://images.unsplash.com/photo-1485871981521-5b1fd3805eee?auto=format&fit=crop&w=2200&q=88'],
+            ['맨해튼의 저녁','https://images.unsplash.com/photo-1522083165195-3424ed129620?auto=format&fit=crop&w=2200&q=88'],
+            ['뉴욕 스카이라인','https://images.unsplash.com/photo-1534430480872-3498386e7856?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'kyoto', genre:'places', label:'교토', description:'전통 사찰과 계절의 색이 어우러진 교토의 길에서 천천히 흐르는 시간을 만납니다.', sounds:['meditation','birds','stream','musicboxDream','classicalMinuet'], images:[
+            ['고요한 교토','https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=2200&q=88'],
+            ['교토의 붉은 문','https://images.unsplash.com/photo-1528360983277-13d401cdc186?auto=format&fit=crop&w=2200&q=88'],
+            ['교토 사찰의 아침','https://images.unsplash.com/photo-1524413840807-0c3cb6fa808d?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'maldives', genre:'places', label:'몰디브', description:'수평선까지 이어지는 맑은 라군과 고운 모래가 마음을 가볍게 씻어주는 풍경입니다.', sounds:['ocean','piano','musicboxDream','jazzBossa'], images:[
+            ['몰디브의 투명한 바다','https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&w=2200&q=88'],
+            ['라군 위의 휴식','https://images.unsplash.com/photo-1573843981267-be1999ff37cd?auto=format&fit=crop&w=2200&q=88'],
+            ['몰디브의 푸른 수평선','https://images.unsplash.com/photo-1540202404-a2f29016b523?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'space', genre:'photos', label:'우주', description:'별과 성운이 가득한 광활한 우주를 바라보며 시선을 일상의 바깥으로 넓혀보세요.', sounds:['meditation','musicbox','musicboxStar','classicalElise','classicalMoonlight'], images:[
+            ['깊은 우주의 빛','https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=2200&q=88'],
+            ['은하수의 밤','https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=2200&q=88'],
+            ['별이 흐르는 하늘','https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'aurora', genre:'photos', label:'오로라', description:'차가운 밤하늘을 유영하는 오로라가 자연이 만든 거대한 커튼처럼 펼쳐집니다.', sounds:['classical','musicboxDream','musicboxStar','night','classicalCanon'], images:[
+            ['밤하늘의 오로라','https://images.unsplash.com/photo-1483347756197-71ef80e95f73?auto=format&fit=crop&w=2200&q=88'],
+            ['초록빛 오로라','https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=2200&q=88'],
+            ['별빛 아래 오로라','https://images.unsplash.com/photo-1486911278844-a81c5267e227?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'forest-photo', genre:'photos', label:'숲', description:'짙은 초록 사이로 들어오는 햇살과 자연의 소리가 깊고 편안한 호흡을 이끌어 줍니다.', sounds:['birds','stream','rain','night'], images:[
+            ['햇살이 스미는 숲','https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=2200&q=88'],
+            ['안개 낀 깊은 숲','https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=2200&q=88'],
+            ['초록빛 산책로','https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'ocean-photo', genre:'photos', label:'바다', description:'맑은 파도와 긴 수평선을 바라보며 복잡한 생각을 잠시 내려놓아 보세요.', sounds:['ocean','piano','musicboxDream','jazzBossa'], images:[
+            ['끝없이 푸른 바다','https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=2200&q=88'],
+            ['잔잔한 해변의 아침','https://images.unsplash.com/photo-1439405326854-014607f694d7?auto=format&fit=crop&w=2200&q=88'],
+            ['빛나는 바다 수평선','https://images.unsplash.com/photo-1484291470158-b8f8d608850d?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'snow-photo', genre:'photos', label:'설경', description:'하얀 눈으로 덮인 세상의 정적이 차분한 선율과 함께 이어집니다.', sounds:['piano','classicalElise','classicalMoonlight','musicbox','fireplace'], images:[
+            ['고요한 겨울 설경','https://images.unsplash.com/photo-1483664852095-d6cc6870702d?auto=format&fit=crop&w=2200&q=88'],
+            ['눈 덮인 산길','https://images.unsplash.com/photo-1491002052546-bf38f186af56?auto=format&fit=crop&w=2200&q=88'],
+            ['겨울 숲의 침묵','https://images.unsplash.com/photo-1453306458620-5bbef13a5bca?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'night-photo', genre:'photos', label:'야경', description:'밤을 수놓은 도시의 불빛을 감미로운 재즈와 함께 느긋하게 감상해 보세요.', sounds:['jazz','jazzWaltz','jazzNight','cafe','rain'], images:[
+            ['도시의 빛','https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=2200&q=88'],
+            ['고층 빌딩의 밤','https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=2200&q=88'],
+            ['밤하늘 아래 도시','https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'animal-photo', genre:'photos', label:'동물', description:'자연 속에서 살아가는 동물의 맑은 눈빛과 생명력에 잠시 집중해 보세요.', sounds:['birds','stream','night','piano'], images:[
+            ['숲속의 여우','https://images.unsplash.com/photo-1474511320723-9a56873867b5?auto=format&fit=crop&w=2200&q=88'],
+            ['초원의 코끼리','https://images.unsplash.com/photo-1549366021-9f761d450615?auto=format&fit=crop&w=2200&q=88'],
+            ['자유롭게 나는 새','https://images.unsplash.com/photo-1452570053594-1b985d6ea890?auto=format&fit=crop&w=2200&q=88']
+        ]},
+        {id:'vangogh', genre:'art', label:'고흐', artwork:true, description:'강렬한 색채와 붓질로 감정을 그려낸 빈센트 반 고흐의 작품을 천천히 감상해 보세요.', sounds:['classicalElise','classicalMoonlight','musicbox','meditation'], images:[
+            ['고흐 · 별이 빛나는 밤','https://commons.wikimedia.org/wiki/Special:FilePath/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg?width=2000'],
+            ['고흐 · 아를의 침실','https://commons.wikimedia.org/wiki/Special:FilePath/Vincent_van_Gogh_-_The_Bedroom_-_Google_Art_Project.jpg?width=2000'],
+            ['고흐 · 해바라기','https://commons.wikimedia.org/wiki/Special:FilePath/Vincent_van_Gogh_-_Sunflowers_-_VGM_F458.jpg?width=2000']
+        ]},
+        {id:'monet', genre:'art', label:'모네', artwork:true, description:'빛과 물결의 순간을 부드러운 색으로 담아낸 클로드 모네의 인상주의 작품입니다.', sounds:['classicalCanon','classicalSpring','piano','stream'], images:[
+            ['모네 · 수련 연못','https://commons.wikimedia.org/wiki/Special:FilePath/Water_Lilly_Pond_by_Claude_Monet.jpg?width=2000'],
+            ['모네 · 인상, 해돋이','https://commons.wikimedia.org/wiki/Special:FilePath/Monet_-_Impression,_Sunrise.jpg?width=2000'],
+            ['모네 · 수련','https://commons.wikimedia.org/wiki/Special:FilePath/Claude_Monet_-_Water_Lilies_-_1906,_Ryerson.jpg?width=2000']
+        ]},
+        {id:'renoir', genre:'art', label:'르누아르', artwork:true, description:'햇빛과 사람들의 활기를 따뜻한 색감으로 담아낸 피에르 오귀스트 르누아르의 작품입니다.', sounds:['jazzWaltz','jazzBossa','cafe','classicalOde','classicalMinuet'], images:[
+            ['르누아르 · 물랭 드 라 갈레트의 무도회','https://commons.wikimedia.org/wiki/Special:FilePath/Renoir_-_Bal_du_Moulin_de_la_Galette.jpg?width=2000'],
+            ['르누아르 · 뱃놀이 일행의 점심','https://commons.wikimedia.org/wiki/Special:FilePath/Pierre-Auguste_Renoir_-_Luncheon_of_the_Boating_Party.jpeg?width=2000'],
+            ['르누아르 · 피아노 치는 소녀들','https://commons.wikimedia.org/wiki/Special:FilePath/Pierre-Auguste_Renoir_-_Young_Girls_at_the_Piano_-_Google_Art_Project.jpg?width=2000']
+        ]},
+        {id:'klimt', genre:'art', label:'클림트', artwork:true, description:'황금빛 장식과 섬세한 문양이 돋보이는 구스타프 클림트의 작품을 감상해 보세요.', sounds:['musicbox','musicboxLullaby','classicalElise','classicalCanon'], images:[
+            ['클림트 · 키스','https://commons.wikimedia.org/wiki/Special:FilePath/Klimt_-_The_Kiss.jpg?width=2000'],
+            ['클림트 · 아델레 블로흐바우어의 초상','https://commons.wikimedia.org/wiki/Special:FilePath/Gustav_Klimt_046.jpg?width=2000'],
+            ['클림트 · 생명의 나무','https://commons.wikimedia.org/wiki/Special:FilePath/Gustav_Klimt_-_The_Tree_of_Life,_Stoclet_Frieze.jpg?width=2000']
+        ]},
+        {id:'hokusai', genre:'art', label:'호쿠사이', artwork:true, description:'대담한 구도와 선명한 색으로 자연의 움직임을 담아낸 가쓰시카 호쿠사이의 작품입니다.', sounds:['ocean','musicboxDream','classicalOde','classicalMinuet'], images:[
+            ['호쿠사이 · 가나가와 해변의 높은 파도 아래','https://commons.wikimedia.org/wiki/Special:FilePath/The_Great_Wave_off_Kanagawa.png?width=2000'],
+            ['호쿠사이 · 개선풍 쾌청','https://commons.wikimedia.org/wiki/Special:FilePath/Red_Fuji_southern_wind_clear_morning.jpg?width=2000'],
+            ['호쿠사이 · 스루가국 에지리','https://commons.wikimedia.org/wiki/Special:FilePath/Ejiri_in_Suruga_Province.jpg?width=2000']
+        ]}
     ];
+
+    function getMeditationDateKey() {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+
+    function getMeditationHash(text) {
+        let hash = 2166136261;
+        for (let index = 0; index < text.length; index++) {
+            hash ^= text.charCodeAt(index);
+            hash = Math.imul(hash, 16777619);
+        }
+        return hash >>> 0;
+    }
+
+    function shuffleMeditationItems(items, seedText) {
+        const shuffled = [...items];
+        let state = getMeditationHash(seedText) || 1;
+        const random = () => {
+            state ^= state << 13;
+            state ^= state >>> 17;
+            state ^= state << 5;
+            return (state >>> 0) / 4294967296;
+        };
+        for (let index = shuffled.length - 1; index > 0; index--) {
+            const swapIndex = Math.floor(random() * (index + 1));
+            [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+        }
+        return shuffled;
+    }
+
+    function refreshMeditationDailyScenes() {
+        const dateKey = getMeditationDateKey();
+        if (meditationDailyKey === dateKey && meditationScenes.length) return;
+        const expanded = meditationSceneThemes.flatMap(theme => theme.images.map((image, imageIndex) => ({
+            id: `${theme.id}-${imageIndex + 1}`,
+            themeId: theme.id,
+            genre: theme.genre,
+            label: theme.label,
+            name: image[0],
+            url: image[1],
+            description: image[2] || theme.description,
+            sounds: theme.sounds,
+            artwork: Boolean(theme.artwork)
+        })));
+        meditationScenes = ['places', 'photos', 'art'].flatMap(genre =>
+            shuffleMeditationItems(expanded.filter(scene => scene.genre === genre), `${dateKey}:${genre}`)
+        );
+        meditationDailyKey = dateKey;
+        meditationSceneIndex = -1;
+        meditationImageFailureCount = 0;
+        meditationCurrentSceneId = '';
+        meditationSoundRotation = 0;
+    }
+
+    function getMeditationSceneSound(scene, offset = 0) {
+        const sounds = scene && Array.isArray(scene.sounds) ? scene.sounds : ['meditation'];
+        const dailyStart = getMeditationHash(`${meditationDailyKey}:${scene.id}:sound`) % sounds.length;
+        const index = (dailyStart + Math.max(0, offset)) % sounds.length;
+        return sounds[index];
+    }
 
     function openMemoModal(id) {
         const modal = document.getElementById(id);
@@ -2189,85 +2461,407 @@
         }
     }
 
-    function stopMeditationSound(resetSelection = false) {
-        const audio = document.getElementById('meditationAudio');
-        const select = document.getElementById('meditationSoundSelect');
+    function getMeditationVolumeLevel() {
         const volume = document.getElementById('meditationVolume');
+        return Math.max(0, Math.min(1, Number(volume ? volume.value : 38) / 100));
+    }
+
+    function getMeditationSoundVolume(soundKey, baseLevel = getMeditationVolumeLevel()) {
+        const sound = meditationSounds[soundKey];
+        const scale = Number(sound && sound.volumeScale ? sound.volumeScale : 1);
+        return Math.max(0, Math.min(1, baseLevel * scale));
+    }
+
+    function updateMeditationMuteButton() {
+        const button = document.getElementById('meditationMuteBtn');
+        if (!button) return;
+        button.classList.toggle('is-muted', meditationMuted);
+        button.setAttribute('aria-pressed', String(meditationMuted));
+        button.innerHTML = meditationMuted
+            ? '<i class="fa-solid fa-volume-xmark"></i> 소리 켜기'
+            : '<i class="fa-solid fa-volume-high"></i> 무음';
+    }
+
+    function ensureMeditationAudioContext() {
+        if (!meditationAudioContext || meditationAudioContext.state === 'closed') {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return null;
+            meditationAudioContext = new AudioContextClass();
+        }
+        if (meditationAudioContext.state === 'suspended') meditationAudioContext.resume().catch(() => {});
+        return meditationAudioContext;
+    }
+
+    function stopMeditationSynth() {
+        clearTimeout(meditationSynthTimer);
+        meditationSynthTimer = null;
+        meditationSynthNodes.forEach(node => {
+            try { node.stop(); } catch (_) {}
+            try { node.disconnect(); } catch (_) {}
+        });
+        meditationSynthNodes = [];
+        if (meditationSynthGain) {
+            try { meditationSynthGain.disconnect(); } catch (_) {}
+            meditationSynthGain = null;
+        }
+    }
+
+    function scheduleMeditationTone(context, destination, frequency, start, duration, gainValue, type = 'sine') {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, gainValue), start + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain).connect(destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + 0.06);
+        meditationSynthNodes.push(oscillator);
+        oscillator.onended = () => {
+            meditationSynthNodes = meditationSynthNodes.filter(node => node !== oscillator);
+            try { oscillator.disconnect(); } catch (_) {}
+            try { gain.disconnect(); } catch (_) {}
+        };
+    }
+
+    function addCafeNoise(context, destination) {
+        const length = context.sampleRate * 2;
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const channel = buffer.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < length; i++) {
+            last = (last + (Math.random() * 2 - 1) * 0.06) / 1.04;
+            channel[i] = last * 0.45;
+        }
+        const source = context.createBufferSource();
+        const filter = context.createBiquadFilter();
+        const gain = context.createGain();
+        source.buffer = buffer;
+        source.loop = true;
+        filter.type = 'lowpass';
+        filter.frequency.value = 900;
+        gain.gain.value = 0.035;
+        source.connect(filter).connect(gain).connect(destination);
+        source.start();
+        meditationSynthNodes.push(source);
+    }
+
+    function addNatureNoise(context, destination, soundKey) {
+        const length = context.sampleRate * 3;
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const channel = buffer.getChannelData(0);
+        let last = 0;
+        for (let index = 0; index < length; index++) {
+            const white = Math.random() * 2 - 1;
+            last = soundKey === 'stream' ? (last * 0.94 + white * 0.06) : white;
+            channel[index] = last;
+        }
+        const source = context.createBufferSource();
+        const filter = context.createBiquadFilter();
+        const gain = context.createGain();
+        source.buffer = buffer;
+        source.loop = true;
+        if (soundKey === 'rain') {
+            filter.type = 'highpass';
+            filter.frequency.value = 850;
+            gain.gain.value = 0.052;
+        } else if (soundKey === 'stream') {
+            filter.type = 'bandpass';
+            filter.frequency.value = 1150;
+            filter.Q.value = 0.55;
+            gain.gain.value = 0.12;
+        } else if (soundKey === 'fireplace') {
+            filter.type = 'lowpass';
+            filter.frequency.value = 720;
+            gain.gain.value = 0.055;
+        } else {
+            filter.type = 'lowpass';
+            filter.frequency.value = 1450;
+            gain.gain.value = 0.018;
+        }
+        source.connect(filter).connect(gain).connect(destination);
+        source.start();
+        meditationSynthNodes.push(source);
+    }
+
+    function scheduleMeditationMusic(soundKey) {
+        const context = meditationAudioContext;
+        const destination = meditationSynthGain;
+        if (!context || !destination) return;
+        const start = context.currentTime + 0.06;
+
+        if (soundKey === 'piano') {
+            [261.63, 329.63, 392, 523.25, 392, 329.63, 293.66, 349.23].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.7, 1.7, 0.08, 'triangle');
+            });
+        } else if (soundKey === 'jazz') {
+            const chords = [[130.81,164.81,196,246.94], [146.83,174.61,220,261.63], [196,246.94,293.66,349.23], [130.81,164.81,196,246.94]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 1.65 + noteIndex * 0.035, 1.5, noteIndex ? 0.026 : 0.045, noteIndex ? 'sine' : 'triangle');
+            }));
+        } else if (soundKey === 'jazzWaltz') {
+            const chords = [[146.83,174.61,220,261.63], [164.81,196,246.94,293.66], [130.81,164.81,196,246.94], [146.83,174.61,220,261.63]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                const swing = noteIndex % 2 ? 0.09 : 0;
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 1.55 + noteIndex * 0.16 + swing, 1.35, noteIndex ? 0.022 : 0.044, noteIndex ? 'sine' : 'triangle');
+            }));
+        } else if (soundKey === 'jazzBossa') {
+            const chords = [[130.81,164.81,196,246.94], [110,138.59,164.81,220], [146.83,174.61,220,261.63], [98,123.47,146.83,196]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                const beat = chordIndex * 1.62 + (noteIndex ? 0.18 + noteIndex * 0.08 : 0);
+                scheduleMeditationTone(context, destination, note, start + beat, 1.28, noteIndex ? 0.021 : 0.046, noteIndex ? 'sine' : 'triangle');
+            }));
+        } else if (soundKey === 'jazzNight') {
+            const chords = [[116.54,146.83,174.61,220], [103.83,130.81,155.56,196], [98,123.47,146.83,185], [110,138.59,164.81,207.65]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                const swing = noteIndex > 1 ? 0.12 : 0;
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 1.7 + noteIndex * 0.06 + swing, 1.58, noteIndex ? 0.018 : 0.042, noteIndex ? 'sine' : 'triangle');
+            }));
+        } else if (soundKey === 'classical') {
+            [261.63,329.63,392,523.25,493.88,392,329.63,293.66,349.23,440,523.25,659.25].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.48, 1.25, 0.052, index % 3 ? 'sine' : 'triangle');
+            });
+        } else if (soundKey === 'classicalOde') {
+            [329.63,329.63,349.23,392,392,349.23,329.63,293.66,261.63,261.63,293.66,329.63,329.63,293.66,293.66].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.39, 0.88, 0.052, 'triangle');
+            });
+        } else if (soundKey === 'classicalElise') {
+            [659.25,622.25,659.25,622.25,659.25,493.88,587.33,523.25,440,261.63,329.63,440,493.88,329.63,415.3,493.88].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.36, 0.82, 0.042, index % 3 ? 'sine' : 'triangle');
+            });
+        } else if (soundKey === 'classicalCanon') {
+            const chords = [[146.83,220,293.66], [110,164.81,220], [123.47,185,246.94], [92.5,138.59,185], [98,146.83,196], [73.42,110,146.83], [98,146.83,196], [110,164.81,220]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 0.78 + noteIndex * 0.06, 1.65, noteIndex ? 0.025 : 0.045, 'sine');
+            }));
+        } else if (soundKey === 'classicalMoonlight') {
+            const triplets = [[138.59,164.81,207.65], [138.59,164.81,207.65], [123.47,164.81,207.65], [123.47,155.56,207.65], [110,146.83,220], [110,138.59,207.65]];
+            triplets.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 1.04 + noteIndex * 0.31, 1.45, noteIndex === 0 ? 0.036 : 0.023, 'sine');
+            }));
+        } else if (soundKey === 'classicalSpring') {
+            [659.25,622.25,659.25,622.25,659.25,783.99,698.46,659.25,622.25,587.33,523.25,587.33,622.25,523.25].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.39, 0.72, 0.04, index % 4 ? 'sine' : 'triangle');
+            });
+        } else if (soundKey === 'classicalMinuet') {
+            [392,523.25,440,493.88,523.25,392,392,587.33,523.25,659.25,493.88,523.25,392].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.46, 0.92, 0.043, index % 3 ? 'sine' : 'triangle');
+            });
+        } else if (['musicbox','musicboxDream','musicboxLullaby','musicboxStar'].includes(soundKey)) {
+            const melodies = {
+                musicbox: [523.25,659.25,783.99,1046.5,783.99,659.25,587.33,698.46,880,698.46],
+                musicboxDream: [659.25,783.99,987.77,783.99,698.46,880,1046.5,880,783.99,659.25],
+                musicboxLullaby: [392,392,466.16,392,392,466.16,392,466.16,622.25,587.33,523.25,523.25],
+                musicboxStar: [523.25,523.25,783.99,783.99,880,880,783.99,698.46,698.46,659.25,659.25,587.33,587.33,523.25]
+            };
+            const notes = melodies[soundKey];
+            notes.forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.58, 1.35, 0.036, index % 2 ? 'sine' : 'triangle');
+            });
+        } else if (soundKey === 'meditation') {
+            scheduleMeditationTone(context, destination, 174.61, start, 7.4, 0.06, 'sine');
+            scheduleMeditationTone(context, destination, 261.63, start + 0.4, 6.6, 0.035, 'sine');
+            [523.25, 659.25, 783.99].forEach((note, index) => scheduleMeditationTone(context, destination, note, start + 1.2 + index * 1.8, 2.8, 0.024, 'sine'));
+        } else if (soundKey === 'cafe') {
+            const chords = [[130.81,164.81,196], [110,146.83,174.61], [98,123.47,164.81], [130.81,164.81,196]];
+            chords.forEach((chord, chordIndex) => chord.forEach((note, noteIndex) => {
+                scheduleMeditationTone(context, destination, note, start + chordIndex * 1.7 + noteIndex * 0.04, 1.8, 0.025, 'sine');
+            }));
+        } else if (soundKey === 'night') {
+            [2637,3136,2349,3520,2794,3322].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + index * 0.92 + Math.random() * 0.22, 0.16, 0.012, 'sine');
+            });
+        } else if (soundKey === 'rain') {
+            [880,1046.5,1318.5,987.77].forEach((note, index) => {
+                scheduleMeditationTone(context, destination, note, start + 0.8 + index * 1.35, 0.22, 0.008, 'sine');
+            });
+        } else if (soundKey === 'fireplace') {
+            for (let index = 0; index < 12; index++) {
+                scheduleMeditationTone(context, destination, 65 + Math.random() * 95, start + Math.random() * 6.2, 0.08 + Math.random() * 0.12, 0.012, 'square');
+            }
+        }
+        meditationSynthTimer = setTimeout(() => scheduleMeditationMusic(soundKey), 6800);
+    }
+
+    function startMeditationSynth(soundKey) {
+        const context = ensureMeditationAudioContext();
+        if (!context) return false;
+        stopMeditationSynth();
+        meditationSynthGain = context.createGain();
+        meditationSynthGain.gain.value = meditationMuted ? 0 : getMeditationSoundVolume(soundKey);
+        meditationSynthGain.connect(context.destination);
+        if (soundKey === 'cafe') addCafeNoise(context, meditationSynthGain);
+        if (['rain','stream','night','fireplace'].includes(soundKey)) addNatureNoise(context, meditationSynthGain, soundKey);
+        scheduleMeditationMusic(soundKey);
+        return true;
+    }
+
+    function stopMeditationSound(resetState = false) {
+        const audio = document.getElementById('meditationAudio');
         if (audio) {
             audio.pause();
             audio.currentTime = 0;
             audio.removeAttribute('src');
             audio.load();
         }
-        if (resetSelection && select) select.value = '';
-        if (volume) volume.disabled = true;
-        if (resetSelection) showMeditationSoundStatus('배경음 없음');
+        stopMeditationSynth();
+        if (resetState) {
+            meditationSoundGeneration += 1;
+            meditationCurrentSoundKey = '';
+            const label = document.getElementById('meditationAutoSound');
+            if (label) label.textContent = '장면 맞춤 배경음';
+        }
     }
 
     async function changeMeditationSound(soundKey) {
         const audio = document.getElementById('meditationAudio');
-        const volume = document.getElementById('meditationVolume');
         const sound = meditationSounds[soundKey];
-        if (!audio || !volume) return;
-
-        if (!sound) {
-            stopMeditationSound(false);
-            showMeditationSoundStatus('배경음 없음');
+        const label = document.getElementById('meditationAutoSound');
+        if (!sound || !audio) return;
+        const alreadyPlaying = sound.type === 'file' ? !audio.paused : Boolean(meditationSynthGain);
+        if (meditationCurrentSoundKey === soundKey && alreadyPlaying) {
+            if (label) label.textContent = sound.name;
             return;
         }
 
-        audio.pause();
-        audio.src = sound.src;
-        audio.volume = Math.max(0, Math.min(1, Number(volume.value || 38) / 100));
-        audio.currentTime = 0;
-        volume.disabled = false;
+        const requestGeneration = ++meditationSoundGeneration;
+        stopMeditationSound(false);
+        meditationCurrentSoundKey = '';
+        if (label) label.textContent = sound.name;
+        audio.volume = getMeditationSoundVolume(soundKey);
+        audio.muted = meditationMuted;
 
         try {
-            await audio.play();
-            showMeditationSoundStatus(`${sound.name} 재생 중`);
+            if (sound.type === 'file') {
+                audio.src = sound.src;
+                audio.currentTime = 0;
+                await audio.play();
+            } else if (!startMeditationSynth(soundKey)) {
+                throw new Error('audio-context-unavailable');
+            }
+            if (requestGeneration !== meditationSoundGeneration) return;
+            meditationCurrentSoundKey = soundKey;
+            showMeditationSoundStatus(`${sound.name} 자동 재생 중`);
         } catch (_) {
-            showMeditationSoundStatus('브라우저에서 재생이 차단되었습니다. 배경음을 다시 선택해주세요.');
+            if (requestGeneration !== meditationSoundGeneration) return;
+            showMeditationSoundStatus('배경음 재생이 차단되었습니다. 화면을 한 번 누른 뒤 다시 시도해주세요.');
         }
+    }
+
+    function toggleMeditationMute() {
+        meditationMuted = !meditationMuted;
+        const audio = document.getElementById('meditationAudio');
+        if (audio) audio.muted = meditationMuted;
+        if (meditationSynthGain && meditationAudioContext) {
+            meditationSynthGain.gain.setTargetAtTime(meditationMuted ? 0 : getMeditationSoundVolume(meditationCurrentSoundKey), meditationAudioContext.currentTime, 0.04);
+        }
+        updateMeditationMuteButton();
+        showMeditationSoundStatus(meditationMuted ? '배경음 무음' : `${(meditationSounds[meditationCurrentSoundKey] || {}).name || '배경음'} 재생`);
     }
 
     function changeMeditationVolume(value) {
+        const level = Math.max(0, Math.min(1, Number(value || 0) / 100));
         const audio = document.getElementById('meditationAudio');
-        if (!audio) return;
-        audio.volume = Math.max(0, Math.min(1, Number(value || 0) / 100));
-        if (audio.volume === 0) showMeditationSoundStatus('배경음 음소거');
-    }
-
-    function getRandomMeditationIndex() {
-        if (meditationScenes.length <= 1) return 0;
-        let nextIndex = meditationSceneIndex;
-        while (nextIndex === meditationSceneIndex) {
-            nextIndex = Math.floor(Math.random() * meditationScenes.length);
+        if (audio) audio.volume = getMeditationSoundVolume(meditationCurrentSoundKey, level);
+        if (meditationSynthGain && meditationAudioContext && !meditationMuted) {
+            meditationSynthGain.gain.setTargetAtTime(getMeditationSoundVolume(meditationCurrentSoundKey, level), meditationAudioContext.currentTime, 0.04);
         }
-        return nextIndex;
+        if (level === 0) showMeditationSoundStatus('배경음 음소거');
     }
 
-    function showNextMeditationScene() {
+    function renderMeditationGenreOptions() {
+        document.querySelectorAll('[data-meditation-options]').forEach(container => {
+            const genre = container.dataset.meditationOptions;
+            container.innerHTML = meditationSceneThemes.filter(theme => theme.genre === genre).map(theme =>
+                `<button type="button" class="meditation-genre-option" data-theme-id="${theme.id}" onclick="selectMeditationTheme('${theme.id}')">${theme.label}<small>매일 랜덤 · ${theme.images.length}장</small></button>`
+            ).join('');
+        });
+    }
+
+    function toggleMeditationGenrePanel(forceOpen) {
+        const panel = document.getElementById('meditationGenrePanel');
+        if (!panel) return;
+        const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : panel.hidden;
+        panel.hidden = !shouldOpen;
+    }
+
+    function resetMeditationSlideshow() {
+        clearInterval(meditationTimer);
+        meditationTimer = setInterval(showNextMeditationScene, 16000);
+    }
+
+    function selectMeditationTheme(themeId) {
+        refreshMeditationDailyScenes();
+        const themeIndices = meditationScenes.map((scene, index) => scene.themeId === themeId ? index : -1).filter(index => index >= 0);
+        if (!themeIndices.length) return;
+        const currentPosition = themeIndices.findIndex(index => meditationScenes[index].id === meditationCurrentSceneId);
+        const index = themeIndices[(currentPosition + 1) % themeIndices.length];
+        if (index < 0) return;
+        meditationGenre = meditationScenes[index].genre;
+        toggleMeditationGenrePanel(false);
+        showMeditationScene(index);
+        resetMeditationSlideshow();
+    }
+
+    function getNextMeditationIndex(fromIndex = meditationSceneIndex) {
+        const indices = meditationScenes.map((scene, index) => scene.genre === meditationGenre ? index : -1).filter(index => index >= 0);
+        if (!indices.length) return 0;
+        const currentPosition = indices.indexOf(fromIndex);
+        return indices[(currentPosition + 1) % indices.length];
+    }
+
+    function showMeditationScene(nextIndex) {
+        refreshMeditationDailyScenes();
         const layer = document.getElementById('meditationLayer');
         const sceneImage = document.getElementById('meditationScene');
         const sceneName = document.getElementById('meditationSceneName');
-        if (!layer || !sceneImage || !sceneName) return;
+        const sceneDescription = document.getElementById('meditationSceneDescription');
+        if (!layer || !sceneImage || !sceneName || !sceneDescription) return;
 
-        const nextIndex = getRandomMeditationIndex();
         const scene = meditationScenes[nextIndex];
+        if (!scene) return;
         const preload = new Image();
 
         sceneImage.classList.remove('is-visible');
         preload.onload = () => {
+            meditationImageFailureCount = 0;
             meditationSceneIndex = nextIndex;
+            meditationGenre = scene.genre;
+            if (meditationCurrentSceneId !== scene.id) meditationSoundRotation = 0;
+            meditationCurrentSceneId = scene.id;
             sceneImage.src = scene.url;
             sceneImage.alt = scene.name;
             sceneName.textContent = scene.name;
+            sceneDescription.textContent = scene.description;
+            sceneImage.classList.toggle('is-artwork', Boolean(scene.artwork));
+            document.querySelectorAll('.meditation-genre-option').forEach(button => button.classList.toggle('is-active', button.dataset.themeId === scene.themeId));
+            changeMeditationSound(getMeditationSceneSound(scene, meditationSoundRotation));
             requestAnimationFrame(() => sceneImage.classList.add('is-visible'));
         };
         preload.onerror = () => {
-            sceneName.textContent = '풍경을 불러오지 못했습니다. 다른 풍경을 선택해주세요.';
+            meditationImageFailureCount += 1;
+            const genreSceneCount = meditationScenes.filter(item => item.genre === meditationGenre).length;
+            if (meditationImageFailureCount < genreSceneCount) {
+                showMeditationScene(getNextMeditationIndex(nextIndex));
+                return;
+            }
+            sceneName.textContent = '이미지를 불러오지 못했습니다.';
+            sceneDescription.textContent = '네트워크 연결을 확인한 뒤 다른 풍경을 선택해주세요.';
         };
         preload.src = scene.url;
+    }
+
+    function showNextMeditationScene() {
+        refreshMeditationDailyScenes();
+        showMeditationScene(getNextMeditationIndex());
+    }
+
+    function showNextMeditationSound() {
+        const scene = meditationScenes.find(item => item.id === meditationCurrentSceneId);
+        if (!scene || !scene.sounds || scene.sounds.length < 2) return;
+        meditationSoundRotation = (meditationSoundRotation + 1) % scene.sounds.length;
+        changeMeditationSound(getMeditationSceneSound(scene, meditationSoundRotation));
     }
 
     function getActiveFullscreenElement() {
@@ -2334,14 +2928,22 @@
     function startMeditation() {
         const layer = document.getElementById('meditationLayer');
         const button = document.getElementById('meditationToggleBtn');
-        const select = document.getElementById('meditationSoundSelect');
-        const volume = document.getElementById('meditationVolume');
         if (!layer) return;
 
-        /* 명상 시작 기본값은 항상 무음입니다. */
-        if (select) select.value = '';
-        if (volume) volume.disabled = true;
-        stopMeditationSound(false);
+        const intro = layer.querySelector('.meditation-center');
+        if (meditationIntroTimer) clearTimeout(meditationIntroTimer);
+        if (intro) {
+            intro.classList.remove('is-intro-hidden');
+            meditationIntroTimer = setTimeout(() => {
+                intro.classList.add('is-intro-hidden');
+            }, 5000);
+        }
+
+        meditationMuted = false;
+        updateMeditationMuteButton();
+        refreshMeditationDailyScenes();
+        renderMeditationGenreOptions();
+        ensureMeditationAudioContext();
 
         layer.classList.add('is-active');
         layer.setAttribute('aria-hidden', 'false');
@@ -2350,16 +2952,28 @@
             button.innerHTML = '<i class="fa-solid fa-leaf"></i> 명상 종료';
         }
         showNextMeditationScene();
-        clearInterval(meditationTimer);
-        meditationTimer = setInterval(showNextMeditationScene, 12000);
+        resetMeditationSlideshow();
     }
 
     async function stopMeditation() {
         const layer = document.getElementById('meditationLayer');
         const button = document.getElementById('meditationToggleBtn');
+        if (meditationIntroTimer) clearTimeout(meditationIntroTimer);
+        meditationIntroTimer = null;
+        const intro = layer ? layer.querySelector('.meditation-center') : null;
+        if (intro) intro.classList.remove('is-intro-hidden');
         clearInterval(meditationTimer);
         meditationTimer = null;
         stopMeditationSound(true);
+        toggleMeditationGenrePanel(false);
+        if (meditationAudioContext && meditationAudioContext.state !== 'closed') {
+            meditationAudioContext.close().catch(() => {});
+        }
+        meditationAudioContext = null;
+        meditationSceneIndex = -1;
+        meditationCurrentSceneId = '';
+        meditationSoundRotation = 0;
+        meditationGenre = 'places';
         await leaveMeditationFullscreen();
         if (layer) {
             layer.classList.remove('is-active');
