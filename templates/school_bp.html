@@ -534,15 +534,20 @@
         .school-link-item { flex-basis: 54px; width: 54px; }
     }
     
-    table.board-table { width: 100%; border-collapse: separate; border-spacing: 0; background: transparent; margin-top: 10px; }
+    table.board-table { width: 100%; table-layout:fixed; border-collapse: separate; border-spacing: 0; background: transparent; margin-top: 10px; }
     table.board-table th { background: rgba(0,0,0,0.03); color: var(--school-navy); font-size: 0.75rem; font-weight: 700; padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.05); text-align: center; }
     table.board-table td { font-size: 0.8rem; color: var(--school-text); padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.05); vertical-align: middle; cursor: pointer; transition: 0.2s; }
     .board-table tbody tr:hover td { background: rgba(0,0,0,0.02); }
+    .board-title-line { display:flex; align-items:center; min-width:0; white-space:nowrap; }
+    .board-post-title { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .board-mobile-meta { display:none; }
+    .board-title-line > .fa-paperclip, .board-list-attachment-size { flex:0 0 auto; }
     .board-list-attachment-size { margin-left:4px; color:var(--text-gray, #64748b); font-size:0.72rem; font-weight:500; white-space:nowrap; }
 
     .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; display: inline-block; text-align: center; margin: 0; background: #ffffff; border: 1px solid #cbd5e1;}
-    /* 표 안의 상태 표시와 팀장확인 버튼 높이를 맞춘다. */
-    table.board-table .badge, table.board-table .team-review-status-btn { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; height:30px; vertical-align:middle; }
+    /* 상태별 글자색만 유지하고, 사각 테두리와 배경은 표시하지 않는다. */
+    table.board-table .badge, table.board-table .team-review-status-btn { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; width:64px; min-width:64px; height:30px; padding:4px 5px; border:0; background:transparent; box-shadow:none; white-space:nowrap; vertical-align:middle; }
+    table.board-table .team-review-status-btn:hover { border:0; background:transparent; }
     .status-접수 { color: #d97706; border-color: #f59e0b; }
     .status-팀장확인 { color: #7c3aed; border-color: #a78bfa; }
     .status-처리중 { color: #0284c7; border-color: #0ea5e9; }
@@ -819,6 +824,139 @@
     /* 클릭 가능한 학교명 스타일 */
     .school-name-link { color: var(--school-blue); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; }
     .school-name-link:hover { color: var(--school-navy); }
+
+    /* 센터장 전용 업무공간 모바일 홈 */
+    @media (max-width: 760px) {
+        .school-detail-page .navbar { height: 62px; padding: 0 10px; }
+        .school-detail-page .nav-container { gap: 8px; }
+        .school-detail-page .logo { flex: 0 0 auto; }
+        .school-detail-page .logo-img { height: 30px; max-width: 76px; object-fit: contain; }
+        .school-detail-page .navbar nav { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+        .school-detail-page .navbar nav::-webkit-scrollbar { display: none; }
+        .school-detail-page .menu-list { width: max-content; gap: 4px; }
+        .school-detail-page .menu-item { width: 38px; height: 38px; padding: 0; justify-content: center; gap: 0; border-radius: 9px; font-size: 0; box-sizing: border-box; }
+        .school-detail-page .menu-item i { font-size: .95rem; }
+        .school-detail-page .user-section { display: none; }
+        .school-detail-page .main-content { padding-top: 0; overflow-x: hidden; }
+        .school-detail-page .content-container { padding: 8px 10px 24px !important; overflow-x: hidden; }
+        .dashboard-container.school-detail-spacing { padding: 0; }
+        .dashboard-container.school-detail-spacing .school-container { min-height: 0; padding: 0; }
+
+        .school-top-banner {
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr);
+            align-items: start;
+            gap: 10px 12px;
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+        }
+        .school-top-icon { width: 44px; height: 44px; flex-basis: 44px; padding: 6px; border-radius: 11px; }
+        .school-top-eyebrow { max-width: 100%; margin-bottom: 5px; padding: 2px 7px; overflow: hidden; text-overflow: ellipsis; font-size: .55rem; }
+        .school-top-title { font-size: 1.08rem; line-height: 1.35; }
+        .school-top-meta { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 2px; font-size: .69rem; }
+        .school-top-meta span { min-width: 0; align-items: flex-start; line-height: 1.35; overflow-wrap: anywhere; }
+        .school-top-actions { grid-column: 1 / -1; width: auto; margin: 0; justify-content: flex-start; }
+        .school-system-state { padding: 5px 9px; font-size: .67rem; }
+        .school-system-dot { width: 7px; height: 7px; flex-basis: 7px; }
+
+        .school-workspace-shell { display: flex; flex-direction: column; gap: 12px; padding: 12px 0 0; }
+        .school-left-rail, .school-main-rail, .school-side-rail { display: contents; }
+        .school-profile-card { order: 1; }
+        .board-section { order: 2; }
+        .school-calendar-card { order: 3; }
+        .school-link-card { order: 4; }
+        .school-chat-card { order: 5; }
+        .company-gallery-card { order: 6; }
+
+        .school-profile-card { width: 100%; padding: 14px; border-radius: 10px; box-sizing: border-box; }
+        .school-profile-main { gap: 11px; }
+        .school-profile-avatar { width: 50px; height: 50px; flex-basis: 50px; font-size: 1.35rem; }
+        .school-profile-avatar .school-profile-emoji { font-size: 1.5rem; }
+        .school-profile-name { font-size: 1.05rem; }
+        .school-profile-name-row { gap: 5px; }
+        .school-profile-point { font-size: .62rem; }
+        .school-profile-role-row { margin-top: 5px; }
+        .school-profile-role { font-size: .72rem; }
+        .school-profile-logout { padding: 4px 6px; font-size: .64rem; }
+        .school-profile-actions { grid-template-columns: 1fr 1fr 42px; gap: 7px; margin-top: 12px; }
+        .school-profile-action-btn { min-height: 42px; height: 42px; font-size: .79rem; }
+
+        .board-section { width: 100%; border-radius: 10px; box-sizing: border-box; }
+        .board-list-header { min-height: 0; padding: 14px; gap: 12px; align-items: stretch; flex-direction: column; border-radius: 10px 10px 0 0; }
+        .board-list-header h2 { width: 100%; font-size: 1.05rem; }
+        .board-list-actions { width: 100%; display: flex; align-items: stretch; justify-content: flex-start; gap: 7px; flex-wrap: wrap; }
+        .board-list-actions .btn { flex: 1 1 calc(50% - 4px); min-width: 0; min-height: 42px; padding: 9px 6px; font-size: .75rem; white-space: nowrap; }
+        #boardDropdownMenu { top: 108px; left: 8px; right: 8px; width: auto; max-width: none; padding: 10px; border-radius: 10px; }
+        #boardDropdownMenu > div { grid-template-columns: 1fr !important; gap: 6px !important; max-height: 58vh; overflow-y: auto; }
+        #boardDropdownMenu a { min-height: 42px; padding: 9px 11px !important; box-sizing: border-box; }
+
+        .board-table-wrap { height: auto; padding: 8px 8px 4px; overflow: visible; }
+        table.board-table { width: 100%; min-width: 0; margin-top: 0; }
+        table.board-table .board-col-number,
+        table.board-table .board-col-author,
+        table.board-table .board-col-date { display: none; }
+        table.board-table .board-col-select { width: 36px !important; padding-left: 3px; padding-right: 3px; }
+        table.board-table .board-col-title { padding: 9px 6px !important; }
+        table.board-table .board-col-status { width: 74px !important; padding-left: 3px; padding-right: 3px; }
+        table.board-table th { padding: 8px 5px; font-size: .69rem; }
+        table.board-table th.board-col-title { text-align: left; }
+        table.board-table td { font-size: .76rem; }
+        .board-table tbody tr { height: 58px; }
+        .board-table .board-filler-row { display: none; }
+        .board-table .board-empty-row { height: 160px; }
+        .board-post-title { font-size: .81rem; font-weight: 750; }
+        .board-mobile-meta { display: block; margin-top: 4px; overflow: hidden; color: var(--text-gray, #64748b); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+        .board-list-attachment-size { display: none; }
+        table.board-table .badge, table.board-table .team-review-status-btn { width: 68px; min-width: 68px; padding: 4px 2px; font-size: .7rem; }
+        .confirmation-count { min-width: 64px; padding: 4px 2px; font-size: .7rem; }
+        .post-checkbox, .team-review-checkbox, .board-col-select input[type="checkbox"] { width: 18px; height: 18px; }
+
+        .board-section .pagination-container { min-height: 42px; justify-content: flex-start; gap: 5px; margin: 4px 0 8px; padding: 0 9px; overflow-x: auto; }
+        .page-btn { flex: 0 0 auto; min-height: 34px; margin: 0; padding: 5px 10px; justify-content: center; box-sizing: border-box; }
+        .board-search-form { min-height: 0; padding: 4px 9px 14px; gap: 6px; }
+        .board-search-input { flex: 1 1 auto; min-width: 0; width: auto; height: 42px; }
+        .board-search-btn, .board-search-reset { flex: 0 0 auto; height: 42px; padding: 0 11px; }
+        .board-write-modal-header { margin-bottom: 14px !important; padding-bottom: 12px !important; }
+        #postFormTitle { padding-right: 36px; font-size: 1.18rem !important; line-height: 1.35; }
+
+        .school-calendar-card { width: 100%; padding: 14px !important; box-sizing: border-box; }
+        .school-weekly-summary-header { margin-bottom: 8px; padding-bottom: 9px; font-size: .93rem; }
+        .school-weekly-summary-list { max-height: none; overflow: visible; padding-right: 0; }
+        .school-weekly-summary-box { min-height: 70px; padding: 3px 0; }
+        .school-weekly-day { gap: 8px; padding: 8px; }
+        .school-weekly-date { width: 52px; flex-basis: 52px; padding: 5px 2px; }
+        .school-weekly-events { padding-left: 8px; }
+        .school-weekly-category { max-width: 75px; padding: 3px 5px; font-size: .62rem; }
+        .school-weekly-title { font-size: .75rem; }
+        .school-calendar-link-wrap .btn { min-height: 42px; padding: 10px !important; font-size: .82rem !important; }
+
+        .school-link-card { width: 100%; height: 138px; padding: 13px 12px 10px; box-sizing: border-box; }
+        .school-link-header { margin-bottom: 6px; padding-bottom: 6px; }
+        .school-link-grid { gap: 8px; padding: 5px 3px 8px; }
+        .school-link-item { flex-basis: 58px; width: 58px; min-height: 58px; }
+        .school-link-delete { opacity: 1; }
+
+        .school-chat-card { width: 100%; height: 350px; box-sizing: border-box; }
+        .school-chat-card .widget-card { padding: 14px !important; }
+        .company-gallery-card { width: 100%; max-height: none; padding: 14px 14px 10px; box-sizing: border-box; }
+        .company-gallery-list { max-height: 310px; }
+        .company-gallery-item { grid-template-columns: 48px minmax(0, 1fr); min-height: 62px; gap: 9px; padding: 7px 0; }
+        .company-gallery-thumb { width: 48px; height: 48px; }
+        .company-gallery-title { font-size: .79rem; }
+        .company-gallery-meta { font-size: .68rem; }
+
+        .school-toast-region { top: 64px; left: 10px; right: 10px; width: auto; }
+        .school-page-copyright { padding: 12px 12px 20px; font-size: 9px; }
+    }
+
+    @media (max-width: 420px) {
+        .school-top-meta { grid-template-columns: 1fr; }
+        .board-list-actions .btn { font-size: .7rem; }
+        .board-search-btn { font-size: 0; width: 42px; padding: 0; }
+        .board-search-btn i { font-size: .84rem; }
+        .school-weekly-time { display: none; }
+    }
 </style>
 
 <div class="dashboard-container{% if view_type == 'detail' %} school-detail-spacing{% endif %}">
@@ -1180,19 +1318,19 @@
                         <table class="board-table">
                             <thead>
                                 <tr>
-                                    {% if can_delete_current_board or is_team_review_board %}<th style="width:40px; text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th>{% endif %}
-                                    <th style="width:60px; text-align:center;">번호</th>
-                                    <th>제목</th>
-                                    <th style="width:100px; text-align:center;">작성자</th>
-                                    <th style="width:90px; text-align:center;">{{ '확인' if is_shared_current_board else '상태' }}</th>
-                                    <th style="width:120px; text-align:center;">작성일</th>
+                                    {% if can_delete_current_board or is_team_review_board %}<th class="board-col-select" style="width:40px; text-align:center;"><input type="checkbox" onclick="toggleAll(this)"></th>{% endif %}
+                                    <th class="board-col-number" style="width:60px; text-align:center;">번호</th>
+                                    <th class="board-col-title">제목</th>
+                                    <th class="board-col-author" style="width:100px; text-align:center;">작성자</th>
+                                    <th class="board-col-status" style="width:90px; text-align:center;">{{ '확인' if is_shared_current_board else '상태' }}</th>
+                                    <th class="board-col-date" style="width:120px; text-align:center;">작성일</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for p in posts %}
                                 <tr data-post-id="{{ p.id }}" onclick="viewPost({{ p.id }})">
                                     {% if can_delete_current_board or is_team_review_board %}
-                                    <td style="text-align:center;" onclick="event.stopPropagation();">
+                                    <td class="board-col-select" style="text-align:center;" onclick="event.stopPropagation();">
                                         {% if is_team_review_board %}
                                             {% if p.can_team_review %}<input type="checkbox" name="post_ids" value="{{ p.id }}" class="post-checkbox team-review-checkbox" aria-label="{{ p.title }} 팀장확인 선택">{% endif %}
                                         {% else %}
@@ -1200,13 +1338,16 @@
                                         {% endif %}
                                     </td>
                                     {% endif %}
-                                    <td style="text-align:center;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * pagination.per_page }}</td>
-                                    <td style="text-align:left; padding-left:20px;">
-                                        {{ p.title }}
-                                        {% if p.filename %}<i class="fas fa-paperclip" style="color:var(--text-gray, #94a3b8); margin-left:5px;"></i><span class="board-list-attachment-size" title="첨부 {{ p.attachment_count }}개 총용량">{{ p.attachment_total_size_label }}</span>{% endif %}
+                                    <td class="board-col-number" style="text-align:center;">{{ pagination.total_posts - loop.index0 - (pagination.page - 1) * pagination.per_page }}</td>
+                                    <td class="board-col-title" style="text-align:left; padding-left:20px;">
+                                        <div class="board-title-line">
+                                            <span class="board-post-title" title="{{ p.title }}">{{ p.title[:40] }}{% if p.title|length > 40 %}...{% endif %}</span>
+                                            {% if p.filename %}<i class="fas fa-paperclip" style="color:var(--text-gray, #94a3b8); margin-left:5px;"></i><span class="board-list-attachment-size" title="첨부 {{ p.attachment_count }}개 총용량">{{ p.attachment_total_size_label }}</span>{% endif %}
+                                        </div>
+                                        <span class="board-mobile-meta">{{ p.author }} · {{ p.created_at[:10] }}</span>
                                     </td>
-                                    <td style="text-align:center;">{{ p.author }}</td>
-                                    <td style="text-align:center;">
+                                    <td class="board-col-author" style="text-align:center;">{{ p.author }}</td>
+                                    <td class="board-col-status" style="text-align:center;">
                                         {% if is_shared_current_board %}
                                         <span class="confirmation-count" id="confirmation-count-{{ p.id }}" tabindex="0" aria-label="확인자 {{ p.confirmation_count or 0 }}명" title="{{ p.confirmation_names|join(', ') if p.confirmation_names else '아직 확인한 조직원이 없습니다.' }}">
                                             <i class="fa-regular fa-circle-check"></i> {{ p.confirmation_count or 0 }}명
@@ -1222,10 +1363,10 @@
                                         {% elif p.team_review_required %}
                                         <button type="button" class="team-review-status-btn" title="이 게시물을 팀장확인 처리" onclick="event.stopPropagation(); confirmTeamReview({{ p.id }}, this);">팀장확인</button>
                                         {% else %}
-                                        <span class="badge status-{{ p.status or '접수' }}">{{ p.status or '접수' }}</span>
+                                        <span class="badge status-{{ p.status or '접수' }}">{{ '본사접수' if (p.status or '접수') == '접수' else p.status }}</span>
                                         {% endif %}
                                     </td>
-                                    <td style="text-align:center;">{{ p.created_at[:10] }}</td>
+                                    <td class="board-col-date" style="text-align:center;">{{ p.created_at[:10] }}</td>
                                 </tr>
                                 {% else %}
                                 <tr class="board-empty-row">
@@ -2407,11 +2548,12 @@
         const data = await $.get('/school/post/api/' + id);
         currentPostData = data;
         const statusText = data.status || '접수';
+        const statusLabel = statusText === '접수' ? '본사접수' : statusText;
         const statusMeta = data.is_shared
             ? `<span class="read-meta-item" style="color:#0f766e;"><i class="fa-regular fa-circle-check"></i> 확인 <strong>${Number(data.confirmation_count || 0)}명</strong></span>`
             : data.can_team_review
                 ? `<button type="button" class="team-review-status-btn" onclick="confirmTeamReview(${Number(data.id)}, this)">팀장확인</button>`
-            : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusText}</span>`;
+            : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusLabel}</span>`;
         $('#readTitle').text(`제목: ${data.title || ''}`);
         $('#readMeta').html(`
             ${statusMeta}
@@ -2641,6 +2783,35 @@
         `).join('');
     }
 
+    function getItemRequestTemplate() {
+        const cellStyle = 'border:1px solid #94a3b8;padding:10px 12px;vertical-align:middle;';
+        const rows = Array.from({ length: 5 }, () => `
+            <tr>
+                <td style="${cellStyle}height:27px;">&nbsp;</td>
+                <td style="${cellStyle}height:27px;">&nbsp;</td>
+                <td style="${cellStyle}height:27px;">&nbsp;</td>
+            </tr>
+        `).join('');
+
+        return `
+            <table border="1" style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 20px;">
+                <colgroup>
+                    <col style="width:28%;">
+                    <col style="width:47%;">
+                    <col style="width:25%;">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th style="${cellStyle}background:#f1f5f9;text-align:center;font-weight:700;">요청물품</th>
+                        <th style="${cellStyle}background:#f1f5f9;text-align:center;font-weight:700;">사용처</th>
+                        <th style="${cellStyle}background:#f1f5f9;text-align:center;font-weight:700;">비고</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
     function setInstructorStatusWriteWidth(enabled) {
         const panel = document.querySelector('#boardWriteView .board-write-modal-panel');
         if(panel) panel.classList.toggle('instructor-status-write-wide', Boolean(enabled));
@@ -2649,6 +2820,7 @@
     function openPostForm(cat) {
         const isInstructorStatus = cat === 'open_class';
         const isWeeklyReport = cat === 'weekly_report';
+        const isItemRequest = cat === 'item_request';
         setInstructorStatusWriteWidth(isInstructorStatus);
         showView('boardWriteView');
         $('#postForm').attr('action', "{{ url_for('school.add_post') }}");
@@ -2666,7 +2838,9 @@
         setPostEditorContent(
             isInstructorStatus
                 ? getInstructorStatusTemplate()
-                : (isWeeklyReport ? getWeeklyReportTemplate() : '')
+                : (isWeeklyReport
+                    ? getWeeklyReportTemplate()
+                    : (isItemRequest ? getItemRequestTemplate() : ''))
         );
     }
 

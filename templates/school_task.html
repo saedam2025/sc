@@ -390,7 +390,7 @@
 
                             <select class="glass-input" id="statusFilter" style="width: 130px;">
                                 <option value="all">상태 전체</option>
-                                <option value="접수">접수</option>
+                                <option value="접수">본사접수</option>
                                 <option value="팀장확인">팀장확인</option>
                                 <option value="처리중">처리중</option>
                                 <option value="완료">완료</option>
@@ -410,7 +410,7 @@
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">
                                 상태 변경:
                             </span>
-                            <button type="button" onclick="changeStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 본사접수</button>
                             <button type="button" onclick="changeStatus('팀장확인', this)" class="btn-action" style="padding: 6px 12px; background:#7c3aed; color:#fff;"><i class="fa-solid fa-user-check"></i> 팀장확인</button>
                             <button type="button" onclick="changeStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
                             <button type="button" onclick="changeStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
@@ -437,7 +437,7 @@
                         <div style="width: 1px; height: 16px; background: var(--border-color);"></div>
                         <div style="display: flex; gap: 24px; font-size: 0.9rem; font-weight: 600;">
                             <span style="color: var(--text-gray); display: flex; align-items: center; gap: 6px;">전체 <span id="count-all" style="color: var(--text-dark); font-size: 1rem;">0</span></span>
-                            <span style="color: #d97706; display: flex; align-items: center; gap: 6px;">접수 <span id="count-wait" style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
+                            <span style="color: #d97706; display: flex; align-items: center; gap: 6px;">본사접수 <span id="count-wait" style="background: #fef3c7; color: #d97706; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                             <span style="color: #7c3aed; display: flex; align-items: center; gap: 6px;">팀장확인 <span id="count-team-reviewed" style="background: #f3e8ff; color: #7c3aed; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                             <span style="color: #2563eb; display: flex; align-items: center; gap: 6px;">처리중 <span id="count-process" style="background: #dbeafe; color: #2563eb; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
                             <span style="color: #16a34a; display: flex; align-items: center; gap: 6px;">완료 <span id="count-done" style="background: #dcfce3; color: #16a34a; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem;">0</span></span>
@@ -469,7 +469,7 @@
                                 data-category="{{ task.cat_name }}"
                                 data-school="{{ task.school_name }}"
                                 data-original-school="{{ task.original_school_name }}"
-                                data-status="{{ task.status_display }}"
+                                data-status="{{ task.status }}"
                                 data-shared="{{ 'true' if task.is_shared else 'false' }}"
                                 onclick="openTaskDetail({{ task.id }})">
 
@@ -538,7 +538,7 @@
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <div id="singleStatusControls" style="display: flex; gap: 6px; align-items: center; background: rgba(0,0,0,0.02); padding: 6px 8px 6px 12px; border-radius: 10px; border: 1px solid var(--border-color);">
                             <span style="font-size: 0.85rem; color: var(--text-gray); font-weight: 700; margin-right: 4px;">상태 변경:</span>
-                            <button type="button" onclick="changeSingleStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 접수</button>
+                            <button type="button" onclick="changeSingleStatus('접수', this)" class="btn-action wait" style="padding: 6px 12px;"><i class="fa-solid fa-inbox"></i> 본사접수</button>
                             <button type="button" onclick="changeSingleStatus('팀장확인', this)" class="btn-action" style="padding: 6px 12px; background:#7c3aed; color:#fff;"><i class="fa-solid fa-user-check"></i> 팀장확인</button>
                             <button type="button" onclick="changeSingleStatus('처리중', this)" class="btn-action process" style="padding: 6px 12px;"><i class="fa-solid fa-spinner"></i> 처리중</button>
                             <button type="button" onclick="changeSingleStatus('완료', this)" class="btn-action done" style="padding: 6px 12px;"><i class="fa-solid fa-check"></i> 완료</button>
@@ -576,6 +576,10 @@
     let filteredRows = [];
     let currentReadPostId = null;
     let statusUpdatePending = false;
+
+    function getStatusLabel(status) {
+        return status === '접수' ? '본사접수' : status;
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         initSchoolFilter();
@@ -777,7 +781,7 @@
         const checkedItems = document.querySelectorAll('.status-change-item:checked');
         const postIds = Array.from(checkedItems).map(cb => parseInt(cb.value, 10)).filter(id => !Number.isNaN(id));
         if (postIds.length === 0) { alert('상태를 변경할 게시물을 체크박스로 선택해주세요.'); return; }
-        if (!confirm(`선택한 ${postIds.length}건의 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
+        if (!confirm(`선택한 ${postIds.length}건의 게시물을 [${getStatusLabel(newStatus)}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
         await executeStatusUpdate(postIds, newStatus, false, button);
     }
 
@@ -832,7 +836,7 @@
             alert('게시물 정보를 확인할 수 없습니다. 목록으로 돌아가 게시물을 다시 선택해주세요.');
             return;
         }
-        if (!confirm(`현재 게시물을 [${newStatus}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
+        if (!confirm(`현재 게시물을 [${getStatusLabel(newStatus)}] 상태로 변경하시겠습니까?\n(현재 로그인한 계정이 처리자로 등록됩니다.)`)) return;
         await executeStatusUpdate([postId], newStatus, true, button);
     }
 
@@ -868,7 +872,7 @@
                     row.dataset.status = newStatus;
                     const badge = row.querySelector('.badge[class*="status-"]');
                     if (badge) {
-                        badge.textContent = newStatus;
+                        badge.textContent = getStatusLabel(newStatus);
                         badge.className = `badge status-${newStatus}`;
                     }
                     const processorCell = row.querySelector('.task-processor');
@@ -878,7 +882,7 @@
 
             if (isSingle) {
                 const statusBadge = document.getElementById('rStatus');
-                statusBadge.textContent = newStatus;
+                statusBadge.textContent = getStatusLabel(newStatus);
                 statusBadge.className = 'badge status-' + newStatus;
                 document.getElementById('rProcessor').textContent = data.processor || '미지정';
             }
@@ -916,9 +920,10 @@
             document.getElementById('rBody').innerHTML = post.content || '';
 
             const statusBadge = document.getElementById('rStatus');
-            const statusText = post.status_display || post.status || '접수';
-            statusBadge.textContent = statusText;
-            statusBadge.className = 'badge status-' + statusText;
+            const statusValue = post.status || '접수';
+            const statusLabel = post.status_display || getStatusLabel(statusValue);
+            statusBadge.textContent = statusLabel;
+            statusBadge.className = 'badge status-' + statusValue;
             const shared = Boolean(post.is_shared);
             document.getElementById('singleStatusControls').style.display = shared ? 'none' : 'flex';
             statusBadge.style.display = shared ? 'none' : 'inline-block';
