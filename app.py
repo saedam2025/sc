@@ -1,7 +1,10 @@
 from flask import Flask, session, redirect, url_for, request, render_template, jsonify, abort
 from datetime import datetime
 import os
+import re
+import secrets
 import sys
+import time
 import traceback
 from routes.socketio_ext import socketio
 
@@ -13,7 +16,7 @@ from routes.main import main_bp
 from routes.document import document_bp
 from routes.contract import contract_bp
 from routes.verified_contract import verified_contract_bp
-from routes.user_mgmt import user_mgmt_bp
+from routes.user_mgmt import send_account_recovery_email, user_mgmt_bp
 from routes.approval import approval_bp
 from routes.expense import expense_bp
 from routes.board import board_bp
@@ -121,6 +124,7 @@ app.config['MAX_CONTENT_LENGTH'] = 1.5 * 1024 * 1024 * 1024
 EXEMPT_ROUTES = [
     'login_page', 
     'login', 
+    'recover_login_account',
     'logout', 
     'user_mgmt.register', 
     'user_mgmt.invite_page', 
@@ -413,6 +417,127 @@ def login():
         print(f"로그인 기록 오류: {e}")
     
     return jsonify({"status": "success"})
+
+
+ACCOUNT_RECOVERY_WINDOW_SECONDS = 15 * 60
+ACCOUNT_RECOVERY_MAX_ATTEMPTS = 5
+_account_recovery_attempts = {}
+
+
+def _account_recovery_rate_limited(client_key):
+    """프로세스 단위로 로그인 정보 찾기 요청의 과도한 반복을 막는다."""
+    now = time.monotonic()
+    attempts = [
+        attempted_at for attempted_at in _account_recovery_attempts.get(client_key, [])
+        if now - attempted_at < ACCOUNT_RECOVERY_WINDOW_SECONDS
+    ]
+    limited = len(attempts) >= ACCOUNT_RECOVERY_MAX_ATTEMPTS
+    if not limited:
+        attempts.append(now)
+    _account_recovery_attempts[client_key] = attempts
+    return limited
+
+
+def _temporary_login_password():
+    letters = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    digits = '23456789'
+    tail = ''.join(secrets.choice(letters + digits) for _ in range(7))
+    return f'Sd!{secrets.choice(letters)}{secrets.choice(digits)}{tail}'
+
+
+@app.route('/account-recovery', methods=['POST'])
+def recover_login_account():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name') or '').strip()
+    rrn_digits = re.sub(r'\D', '', str(data.get('rrn') or ''))
+    client_key = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
+
+    if _account_recovery_rate_limited(client_key):
+        response = jsonify({
+            'status': 'error',
+            'message': '요청 횟수가 많습니다. 15분 후 다시 시도해주세요.',
+        })
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 429
+    if not name or len(name) > 50 or len(rrn_digits) != 13:
+        response = jsonify({
+            'status': 'error',
+            'message': '성명과 주민번호 13자리를 정확히 입력해주세요.',
+        })
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 400
+
+    conn = None
+    try:
+        conn = get_db()
+        conn.execute('BEGIN IMMEDIATE')
+        user_row = conn.execute('''
+            SELECT id, name, emp_no, email
+            FROM users
+            WHERE name=?
+              AND REPLACE(REPLACE(COALESCE(rrn, ''), '-', ''), ' ', '')=?
+              AND status='승인'
+            LIMIT 1
+        ''', (name, rrn_digits)).fetchone()
+        if not user_row:
+            conn.rollback()
+            response = jsonify({
+                'status': 'error',
+                'message': '가입 된 내용이 존재하지 않습니다. 담당자님께 직접 연락해주세요!',
+            })
+            response.headers['Cache-Control'] = 'no-store'
+            return response, 404
+
+        user = dict(user_row)
+        target_email = str(user.get('email') or '').strip().lower()
+        emp_no = str(user.get('emp_no') or '').strip()
+        if not target_email or not emp_no:
+            conn.rollback()
+            response = jsonify({
+                'status': 'error',
+                'message': '가입 이메일 또는 사번이 등록되지 않았습니다. 담당자님께 직접 연락해주세요!',
+            })
+            response.headers['Cache-Control'] = 'no-store'
+            return response, 400
+
+        temporary_password = _temporary_login_password()
+        conn.execute(
+            'UPDATE users SET password=? WHERE id=?',
+            (hash_password(temporary_password), int(user['id'])),
+        )
+        if not send_account_recovery_email(
+            target_email, user.get('name'), emp_no, temporary_password
+        ):
+            conn.rollback()
+            response = jsonify({
+                'status': 'error',
+                'message': '메일 발송에 실패했습니다. 잠시 후 다시 시도하거나 담당자님께 연락해주세요.',
+            })
+            response.headers['Cache-Control'] = 'no-store'
+            return response, 503
+
+        conn.commit()
+        response = jsonify({
+            'status': 'success',
+            'name': str(user.get('name') or ''),
+            'email': target_email,
+            'message': '가입된 e-mail로 정보가 전달되었습니다. 확인해주세요.',
+        })
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except Exception as exc:
+        if conn is not None:
+            conn.rollback()
+        print(f'로그인 정보 찾기 오류: {exc}')
+        response = jsonify({
+            'status': 'error',
+            'message': '정보 확인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
+        })
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 @app.route('/user/my_info')
 def get_my_info():
