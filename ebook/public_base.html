@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#173c35">
+  <title>{% block title %}e리플렛{% endblock %} | (사)새담청소년교육문화원</title>
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/leaflet.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body class="leaflet-public-body {% block body_class %}{% endblock %}">
+  {% block header %}
+  <header class="leaflet-site-header">
+    <a class="leaflet-brand" href="{{ url_for('ebook.library') }}">
+      <img src="{{ url_for('static', filename='logo01.gif') }}" alt="새담">
+      <span><strong>e리플렛</strong><small>(사)새담청소년교육문화원</small></span>
+    </a>
+    <nav>
+      <a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open"></i> 리플렛 서재</a>
+      {% if session.get('emp_no') %}
+      <a href="/"><i class="fa-solid fa-building"></i> 인트라넷</a>
+      {% else %}
+      <a href="{{ url_for('login_page') }}"><i class="fa-solid fa-lock"></i> 직원 로그인</a>
+      {% endif %}
+    </nav>
+  </header>
+  {% endblock %}
+  {% block content %}{% endblock %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

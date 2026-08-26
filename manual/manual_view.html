@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/manual.css') }}">
+
+{% block preview_banner %}{% endblock %}
+
+<div class="manual-view-page" id="manualViewPage">
+  <div class="manual-view-rail" id="manualRail" aria-hidden="true">
+    {% for section in sections %}
+    <a href="#manual-section-{{ loop.index }}" data-target="manual-section-{{ loop.index }}"></a>
+    {% endfor %}
+  </div>
+
+  <div class="manual-view-shell">
+    <header class="manual-hero">
+      <div class="manual-hero-eyebrow"><span></span>SAEDAM · WORK MANUAL</div>
+      <h1>{{ manual.title }}</h1>
+      {% if manual.description %}
+      <p>{{ manual.description }}</p>
+      {% endif %}
+
+      <div class="manual-hero-meta">
+        <span>목차 {{ sections|length }}개</span>
+        {% if manual.published_at %}
+        <span>업데이트 {{ manual.updated_at[:10] }}</span>
+        {% endif %}
+      </div>
+    </header>
+
+    <button class="manual-mobile-toc-btn" type="button" id="manualMobileTocBtn">
+      ☰ 목차
+    </button>
+
+    <nav class="manual-view-toc" id="manualToc">
+      <div class="manual-toc-mobile-head">
+        <strong>목차</strong>
+        <button type="button" id="manualTocClose">×</button>
+      </div>
+      <p class="manual-toc-title">목차</p>
+      {% for section in sections %}
+      <a href="#manual-section-{{ loop.index }}" data-target="manual-section-{{ loop.index }}">
+        <span class="num">{{ "%02d"|format(loop.index) }}</span>
+        <span>{{ section.title }}</span>
+      </a>
+      {% endfor %}
+    </nav>
+
+    <main class="manual-view-main">
+      {% for section in sections %}
+      <section class="manual-block" id="manual-section-{{ loop.index }}">
+        <h2><span class="badge">{{ loop.index }}</span>{{ section.title }}</h2>
+        {% if section.description %}
+        <p class="desc">{{ section.description }}</p>
+        {% endif %}
+        <div class="manual-content">
+          {{ section.content_html|safe }}
+        </div>
+      </section>
+      {% endfor %}
+    </main>
+
+    <footer class="manual-view-footer">
+      새담메뉴얼 · SAEDAM INTRANET
+    </footer>
+  </div>
+</div>
+
+<div class="manual-lightbox" id="manualLightbox" hidden>
+  <button type="button" aria-label="닫기">×</button>
+  <img src="" alt="">
+</div>
+
+<script src="{{ url_for('static', filename='js/manual_view.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "manual/manual_view.html" %}
+
+{% block preview_banner %}
+<div class="manual-preview-banner">
+  <div>
+    <strong>미리보기</strong>
+    <span>작성중인 메뉴얼 화면입니다.</span>
+  </div>
+  <a href="{{ url_for('manual.edit_manual', manual_id=manual.id) }}">편집 화면으로 돌아가기</a>
+</div>
+{% endblock %}
