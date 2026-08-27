@@ -1,203 +1,306 @@
+{% set is_employee = request.endpoint == 'document.apply2' %}
+{% set is_excellent = request.endpoint == 'document.apply_excellent' %}
+{% set applicant_label = '임직원' if is_employee else ('우수강사' if is_excellent else '강사') %}
+{% set page_title = '우수강사인증서 발급 신청' if is_excellent else applicant_label ~ ' 증명서 발급 신청' %}
+{% set company_name = certificate_company.company_name if certificate_company else '사단법인 새담청소년교육문화원' %}
+{% set company_phone = certificate_company.phone if certificate_company and certificate_company.phone else '031-8016-1900' %}
+{% set flashed = get_flashed_messages() %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="https://www.saedam.org/img_sub/favicon.ico" type="image/x-icon">
-    <title>경력증명서 신청 본인인증 | {{ certificate_company.company_name if certificate_company else '새담청소년교육문화원' }}</title>
+    <title>{{ page_title }} 인증 | {{ company_name }}</title>
     <style>
         :root {
-            --saedam-blue: #004ea2;
-            --saedam-navy: #002c63; /* 강사 시스템 공통 진한 네이비 */
+            --primary-color: #004ea2;
+            --primary-dark: #002c63;
             --border-color: #d1d8e0;
+            --border-light: #f1f3f5;
+            --text-dark: #333333;
+            --text-gray: #64748b;
+            --main-bg: #f8fafc;
         }
+
+        * { box-sizing: border-box; }
 
         body {
-            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
-            background-color: var(--saedam-navy); /* 전자계약 시스템과 동일한 배경색 */
+            min-height: 100vh;
             margin: 0;
+            padding: 24px;
+            display: grid;
+            place-items: center;
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            color: var(--text-dark);
+            background: #f4f7fa;
+        }
+
+        .login-card {
+            width: min(780px, 100%);
+            padding: 30px 34px 24px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, .07);
+        }
+
+        .login-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-light);
+        }
+
+        .title-heading {
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            column-gap: 8px;
+            align-items: center;
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .title-icon { text-align: center; }
+
+        .company-label {
+            margin: 5px 0 0 36px;
+            color: var(--primary-color);
+            font-size: 12.5px;
+            line-height: 1.7;
+        }
+
+        .company-logo {
+            width: 150px;
+            height: 46px;
+            flex: 0 0 auto;
+            object-fit: contain;
+        }
+
+        .login-content {
+            display: grid;
+            grid-template-columns: 250px minmax(0, 1fr);
+            gap: 28px;
+            align-items: stretch;
+            padding: 24px 0 22px;
+        }
+
+        .character-panel {
+            height: 210px;
+            min-height: 210px;
+            align-self: center;
             padding: 0;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 100vh;
-        }
-
-        .login-wrapper {
-            width: 92%;
-            max-width: 450px; /* 신청 로그인은 가로폭을 좀 더 컴팩트하게 설정 */
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            padding: 40px 30px;
-            text-align: center;
-        }
-
-        .login-header h2 {
-            font-size: 24px;
-            color: var(--saedam-navy);
-            margin-bottom: 10px;
-            font-weight: 800;
-        }
-
-        .login-header p {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 55px;
-        }
-
-        /* 캐릭터 및 말풍선 스타일 */
-        .character-wrapper {
+            justify-content: flex-end;
             position: relative;
-            display: block;
-            width: fit-content;
-            margin: 0 auto;
+            overflow: hidden;
+            background: var(--main-bg);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
         }
 
-        .speech-bubble {
-            position: absolute;
-            top: -45px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ffffff;
-            padding: 8px 16px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: bold;
-            white-space: nowrap;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            z-index: 10;
-        }
-
-        .speech-bubble::after {
-            content: "";
-            position: absolute;
-            bottom: -8px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 8px 8px 0 8px;
-            border-style: solid;
-            border-color: #ddd transparent transparent transparent;
+        .character-wrapper {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
         }
 
         .character {
-            max-height: 120px;
-            object-fit: contain;
             display: block;
+            width: auto;
+            height: 190px;
+            max-width: 92%;
+            object-fit: contain;
+            object-position: center bottom;
         }
 
-        .form-group {
-            text-align: left;
-            margin-bottom: 20px;
+        .auth-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
         }
+
+        .auth-panel h2 {
+            margin: 0 0 7px;
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .auth-description {
+            margin: 0 0 15px;
+            color: var(--text-gray);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .form-group { margin-bottom: 12px; }
 
         .form-group label {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
+            display: block;
+            margin-bottom: 7px;
+            color: var(--text-gray);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .form-group label.has-error {
+            color: #dc2626;
+            font-weight: 400;
         }
 
         input[type="password"] {
             width: 100%;
-            padding: 15px;
-            font-size: 18px;
-            letter-spacing: 5px; /* 비밀번호 도트 간격 */
-            text-align: center;
+            padding: 12px 14px;
+            color: var(--text-dark);
+            background: #fff;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background-color: #f9f9f9;
-            box-sizing: border-box;
-            transition: all 0.3s;
+            border-radius: 10px;
+            outline: none;
+            font: inherit;
+            font-size: 16px;
+            letter-spacing: 5px;
+            text-align: center;
+            transition: border-color .2s, box-shadow .2s;
         }
 
         input[type="password"]::placeholder {
-            color: #888;
+            color: #94a3b8;
             letter-spacing: 0;
-            opacity: 1;
         }
 
         input[type="password"]:focus {
-            border-color: var(--saedam-blue);
-            background-color: #fff;
-            outline: none;
-            box-shadow: 0 0 8px rgba(0, 78, 162, 0.1);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 78, 162, .1);
         }
 
         .btn-login {
             width: 100%;
-            padding: 15px;
-            background-color: var(--saedam-blue);
-            color: white;
-            font-size: 16px;
+            padding: 13px 16px;
+            color: #fff;
+            background: var(--primary-color);
+            border: 0;
+            border-radius: 10px;
+            font: inherit;
+            font-size: 15px;
             font-weight: 700;
-            border: none;
-            border-radius: 8px;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background .2s, transform .2s;
         }
 
         .btn-login:hover {
-            background-color: var(--saedam-navy);
+            background: var(--primary-dark);
+            transform: translateY(-1px);
         }
 
-        .footer-info {
-            margin-top: 25px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
-
-        .guide-text {
+        .login-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding-top: 17px;
+            border-top: 1px dashed var(--border-color);
+            color: var(--text-gray);
             font-size: 12px;
-            color: #888;
-            line-height: 1.6;
+        }
+
+        .contact strong {
+            color: var(--text-dark);
+            font-size: 13px;
+        }
+
+        .copyright { text-align: right; }
+
+        @media (max-width: 680px) {
+            body { padding: 15px; }
+            .login-card { padding: 24px 20px 19px; }
+            .login-header { align-items: flex-start; gap: 12px; }
+            .title-heading { font-size: 19px; }
+            .company-logo { width: 105px; height: 38px; }
+            .login-content { grid-template-columns: 1fr; gap: 16px; padding: 19px 0; }
+            .character-panel { height: 172px; min-height: 172px; padding: 0; }
+            .character { height: 158px; }
+            .login-footer { align-items: flex-start; flex-direction: column; gap: 5px; }
+            .copyright { text-align: left; }
+        }
+
+        @media (max-width: 430px) {
+            .login-header { display: grid; grid-template-columns: 1fr auto; }
+            .company-logo { width: 78px; }
+            .title-heading { font-size: 17px; grid-template-columns: 23px 1fr; column-gap: 6px; }
+            .company-label { margin-left: 29px; }
         }
     </style>
 </head>
 <body>
-
-    <div class="login-wrapper">
-        <div class="login-header">
-            <h2>{{ certificate_company.company_name if certificate_company else '자격인증' }}</h2>
-            <p>경력증명서 신청을 위해 아래 비밀번호를 입력해주세요.</p>
-        </div>
-
-        <div class="character-wrapper">
-            {% set flashed = get_flashed_messages() %}
-            <div class="speech-bubble" style="color: {{ 'red' if flashed else '#004ea2' }};">
-                {{ flashed[0] if flashed else '비밀번호 4자리를 입력해주세요.' }}
+    <main class="login-card">
+        <header class="login-header">
+            <div>
+                <h1 class="title-heading">
+                    <span class="title-icon" aria-hidden="true">📄</span>
+                    <span>{{ page_title }}</span>
+                </h1>
+                <p class="company-label">{{ company_name }} · {{ '강사' if is_excellent else applicant_label }}</p>
             </div>
-            <img src="https://www.saedam.org/img_sub/{{ 'girl2.png' if flashed else 'girl.png' }}" class="character" alt="안내 캐릭터">
-        </div>
+            <img
+                src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}"
+                class="company-logo"
+                alt="{{ company_name }} 로고"
+                onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'"
+            >
+        </header>
 
-        <form method="POST">
-            <div class="form-group">
-                <label for="certificatePassword">비밀번호 (숫자 4자리)</label>
-                <input id="certificatePassword" type="password" name="password" maxlength="4" pattern="\d{4}" placeholder="비밀번호 (숫자 4자리)" required autofocus>
+        <section class="login-content">
+            <div class="character-panel">
+                <div class="character-wrapper">
+                    <img
+                        src="{{ url_for('static', filename=('girl02.png' if flashed else 'girl01.png')) }}"
+                        class="character"
+                        alt="{{ '비밀번호 오류 안내 캐릭터' if flashed else '증명서 발급 안내 캐릭터' }}"
+                    >
+                </div>
             </div>
 
-            <button type="submit" class="btn-login">인증 후 신청하기</button>
-        </form>
-
-        <footer class="footer-info">
-            <div class="guide-text">
-                발급문의: 📞 {{ certificate_company.phone if certificate_company and certificate_company.phone else '031-8016-1900' }}<br>
-                Copyright©{{ certificate_company.company_name if certificate_company else '(사)새담청소년교육문화원' }}. All Rights Reserved.
+            <div class="auth-panel">
+                <h2>신청 비밀번호 입력</h2>
+                <p class="auth-description">안내받은 숫자 4자리 비밀번호를 입력해 주세요.</p>
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="certificatePassword" class="{{ 'has-error' if flashed else '' }}">{{ flashed[0] if flashed else '비밀번호' }}</label>
+                        <input
+                            id="certificatePassword"
+                            type="password"
+                            name="password"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength="4"
+                            pattern="\d{4}"
+                            placeholder="숫자 4자리"
+                            required
+                            autofocus
+                        >
+                    </div>
+                    <button type="submit" class="btn-login">인증 후 신청하기</button>
+                </form>
             </div>
-            <img src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="회사 로고" style="max-width:180px;height:45px;object-fit:contain;margin-top:15px;opacity:.9" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
+        </section>
+
+        <footer class="login-footer">
+            <div class="contact">발급 문의&nbsp; <strong>☎ {{ company_phone }}</strong></div>
+            <div class="copyright">Copyright © {{ company_name }}. All Rights Reserved.</div>
         </footer>
-    </div>
+    </main>
 
     <script>
-        // 비밀번호 필드에 숫자만 입력되도록 강제 (모바일 대응)
-        document.querySelector('input[name="password"]').addEventListener('input', function (e) {
+        document.querySelector('input[name="password"]').addEventListener('input', function () {
             this.value = this.value.replace(/[^0-9]/g, '');
         });
     </script>

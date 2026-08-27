@@ -1,0 +1,91 @@
+{% extends certificate_layout %}
+{% block extra_css %}
+<style>
+    {% if not intranet_layout %}
+    :root{--primary-color:#004ea2;--primary-dark:#002c63;--border-color:#d1d8e0;--border-light:#f1f3f5;--text-dark:#1f2937;--text-gray:#64748b;--main-bg:#f8fafc}
+    {% endif %}
+    .excellent-shell{min-height:{{ 'calc(100vh - 150px)' if intranet_layout else '100vh' }};padding:20px;display:flex;align-items:center;justify-content:center;background:{{ 'transparent' if intranet_layout else '#f4f7fa' }};font-family:Pretendard,"Malgun Gothic",sans-serif;box-sizing:border-box}
+    .excellent-card{width:min(1000px,100%);margin:20px auto;padding:40px;background:var(--card-bg,#fff);border:1px solid var(--border-color);border-radius:20px;box-shadow:var(--card-shadow,0 10px 30px rgba(15,23,42,.05));box-sizing:border-box}
+    .excellent-header{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid var(--border-light)}
+    .excellent-header h2{display:grid;grid-template-columns:28px 1fr;column-gap:8px;margin:0;color:var(--text-dark);font-size:22px;font-weight:800}
+    .excellent-company{margin:5px 0 0 36px;color:var(--primary-color);font-size:12.5px;line-height:1.7}
+    .excellent-logo{width:150px;height:46px;object-fit:contain}
+    .lookup-box{display:grid;grid-template-columns:1fr 1fr auto;gap:14px;align-items:end;padding:20px;margin-bottom:20px;background:var(--main-bg);border:1px solid var(--border-light);border-radius:12px}
+    .field{display:flex;flex-direction:column;gap:8px}.field.full{grid-column:1/-1}.field span{color:var(--text-gray);font-size:13px;font-weight:700}.field span.required::after{content:"*";margin-left:3px;color:#ef4444}
+    .field input,.field select{width:100%;padding:12px 14px;color:var(--text-dark);background:var(--card-bg,#fff);border:1px solid var(--border-color);border-radius:10px;font:inherit;font-size:14px;box-sizing:border-box}
+    .field input:focus,.field select:focus{outline:0;border-color:var(--primary-color);box-shadow:0 0 0 3px rgba(0,78,162,.1)}
+    .lookup-btn{min-width:130px;padding:12px 16px;color:#fff;background:var(--primary-color);border:0;border-radius:10px;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+    .lookup-btn:disabled{opacity:.65;cursor:wait}
+    .lookup-message{display:none;grid-column:1/-1;margin:0;padding:10px 12px;border-radius:8px;font-size:13px}.lookup-message.show{display:block}.lookup-message.error{color:#b91c1c;background:#fef2f2}.lookup-message.success{color:#166534;background:#f0fdf4}
+    .eligibility{display:none;margin-bottom:22px}.eligibility.show{display:block}.eligibility h3{margin:0 0 6px;font-size:16px}.eligibility>p{margin:0 0 12px;color:var(--text-gray);font-size:12.5px}
+    .eligibility-list{display:grid;gap:9px}.eligibility-item{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:13px 15px;border:1px solid #dbe5ef;border-radius:10px;background:#fff;cursor:pointer}.eligibility-item:has(input:checked){border-color:var(--primary-color);background:#f0f7ff;box-shadow:0 0 0 2px rgba(0,78,162,.08)}
+    .eligibility-item input{width:18px;height:18px;accent-color:var(--primary-color)}.eligibility-main{font-size:14px;font-weight:800;color:var(--text-dark)}.eligibility-meta{margin-top:3px;color:var(--text-gray);font-size:12.5px}
+    .detail-form{display:none;grid-template-columns:repeat(3,1fr);gap:20px;padding-top:22px;border-top:1px dashed var(--border-color)}.detail-form.show{display:grid}
+    .form-footer{grid-column:1/-1;display:grid;grid-template-columns:1.5fr 1fr;gap:25px;margin-top:3px;padding-top:24px;border-top:1px dashed var(--border-color)}
+    .notice-box{padding:20px;background:var(--main-bg);border-radius:12px;border-left:4px solid var(--primary-color)}.notice-box h3{margin:0 0 12px;font-size:15px}.notice-list{margin:0;padding:0;list-style:none}.notice-list li{position:relative;margin-bottom:6px;padding-left:15px;color:var(--text-gray);font-size:12.5px;line-height:1.7}.notice-list li::before{content:"•";position:absolute;left:0;color:var(--primary-color)}
+    .action-area{display:flex;flex-direction:column;justify-content:center;gap:15px}.submit-btn{width:100%;padding:16px;color:#fff;background:var(--primary-color);border:0;border-radius:12px;font:inherit;font-size:16px;font-weight:800;cursor:pointer}.contact{text-align:center;color:var(--text-gray);font-size:13px}.contact strong{color:var(--text-dark);font-size:15px}
+    @media(max-width:800px){.lookup-box{grid-template-columns:1fr 1fr}.lookup-btn{grid-column:1/-1}.detail-form{grid-template-columns:1fr 1fr}.field.full,.form-footer{grid-column:1/-1}.form-footer{grid-template-columns:1fr}}
+    @media(max-width:600px){.excellent-card{padding:24px 18px}.excellent-header{align-items:flex-start}.excellent-header h2{font-size:18px}.excellent-logo{width:105px;height:38px}.lookup-box,.detail-form{grid-template-columns:1fr}.lookup-btn,.field.full,.form-footer{grid-column:1}.excellent-company{margin-left:36px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="excellent-shell">
+    <main class="excellent-card">
+        <header class="excellent-header">
+            <div>
+                <h2><span aria-hidden="true">🏆</span><span>우수강사인증서 발급 신청</span></h2>
+                <div class="excellent-company">{{ certificate_company.company_name }} · 강사</div>
+            </div>
+            <img class="excellent-logo" src="{{ certificate_company.logo_url if certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="{{ certificate_company.company_name }} 로고" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
+        </header>
+
+        <form method="POST" action="{{ request.path }}" id="excellentForm">
+            <section class="lookup-box" aria-labelledby="lookupTitle">
+                <label class="field"><span class="required" id="lookupTitle">성명</span><input type="text" name="성명" id="applicantName" required autocomplete="name" placeholder="성함 입력"></label>
+                <label class="field"><span class="required">주민등록번호</span><input type="text" name="주민번호" id="residentNumber" required inputmode="numeric" maxlength="14" pattern="\d{6}-\d{7}" placeholder="000000-0000000"></label>
+                <button type="button" class="lookup-btn" id="lookupBtn">신청 대상 조회</button>
+                <p class="lookup-message" id="lookupMessage" role="status"></p>
+            </section>
+
+            <section class="eligibility" id="eligibilitySection" aria-live="polite">
+                <h3>신청 대상 학교 및 강의과목</h3>
+                <p>인증서를 신청할 항목을 모두 체크해 주세요. 여러 학교와 과목을 함께 선택할 수 있습니다.</p>
+                <div class="eligibility-list" id="eligibilityList"></div>
+            </section>
+
+            <section class="detail-form" id="detailForm">
+                <label class="field"><span class="required">증명 용도</span><select name="용도" data-detail required disabled><option value="">-- 선택하세요 --</option><option value="학교제출용">학교제출용</option><option value="기관제출용">기관제출용</option><option value="보험공단제출용">보험공단제출용</option></select></label>
+                <label class="field" style="grid-column:span 2"><span class="required">이메일 주소 (PDF 수신)</span><input type="email" name="이메일주소" data-detail required disabled placeholder="example@mail.com"></label>
+                <label class="field full"><span class="required">자택주소</span><input type="text" name="자택주소" data-detail required disabled placeholder="등본상의 현주소 입력"></label>
+                <label class="field"><span class="required">근무 시작일</span><input type="date" name="근무시작일" data-detail required disabled></label>
+                <label class="field"><span class="required">종료일 구분</span><select name="종료일선택" id="endDateSelect" data-detail required disabled><option value="날짜지정">날짜 지정</option><option value="현재까지">현재까지 (재직 중)</option></select></label>
+                <label class="field" id="endDateWrapper"><span class="required">근무 종료일</span><input type="date" name="근무종료일" id="endDate" data-detail required disabled></label>
+                <div class="form-footer">
+                    <div class="notice-box"><h3>💡 신청 전 유의사항</h3><ul class="notice-list"><li>선택한 학교·직책·강의과목은 본사 등록 명단과 대조하여 발급됩니다.</li><li>주민번호 및 자택주소 오기입 시 증명서 효력이 인정되지 않으므로 정확히 입력 바랍니다.</li><li>발급된 PDF 파일은 신청일로부터 영업일 기준 1~2일 내에 메일로 발송됩니다.</li><li>입력하신 본인 이메일주소로 발송되니 정확한 주소를 입력해 주세요.</li></ul></div>
+                    <div class="action-area"><button type="submit" class="submit-btn" id="submitBtn">신청 완료하기</button><div class="contact">문의처: <strong>{{ certificate_company.phone if certificate_company.phone else '031-8016-1900' }}</strong></div></div>
+                </div>
+            </section>
+        </form>
+    </main>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+    const form=document.getElementById('excellentForm'),nameInput=document.getElementById('applicantName'),residentInput=document.getElementById('residentNumber'),lookupBtn=document.getElementById('lookupBtn'),message=document.getElementById('lookupMessage'),section=document.getElementById('eligibilitySection'),list=document.getElementById('eligibilityList'),details=document.getElementById('detailForm'),detailFields=[...document.querySelectorAll('[data-detail]')],endType=document.getElementById('endDateSelect'),endWrapper=document.getElementById('endDateWrapper'),endDate=document.getElementById('endDate'),submitBtn=document.getElementById('submitBtn');
+    const today=new Date().toISOString().split('T')[0];endDate.max=today;
+    function showMessage(text,type){message.textContent=text;message.className=`lookup-message show ${type}`}
+    function resetResults(){section.classList.remove('show');details.classList.remove('show');list.replaceChildren();detailFields.forEach(el=>el.disabled=true);message.className='lookup-message'}
+    function syncDetails(){const selected=list.querySelectorAll('input:checked').length>0;details.classList.toggle('show',selected);detailFields.forEach(el=>el.disabled=!selected);syncEndDate()}
+    function syncEndDate(){if(endType.disabled)return;const current=endType.value==='현재까지';endWrapper.style.visibility=current?'hidden':'visible';endDate.disabled=current;endDate.required=!current}
+    residentInput.addEventListener('input',()=>{const digits=residentInput.value.replace(/\D/g,'').slice(0,13);residentInput.value=digits.length>6?`${digits.slice(0,6)}-${digits.slice(6)}`:digits;resetResults()});
+    nameInput.addEventListener('input',resetResults);endType.addEventListener('change',syncEndDate);
+    lookupBtn.addEventListener('click',async()=>{
+        if(!nameInput.value.trim()||!residentInput.checkValidity()){showMessage('성명과 주민등록번호를 정확히 입력해 주세요.','error');return}
+        lookupBtn.disabled=true;lookupBtn.textContent='조회 중...';resetResults();
+        try{const response=await fetch({{ lookup_url|tojson }},{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nameInput.value.trim(),resident_number:residentInput.value})});const data=await response.json();if(!response.ok)throw new Error(data.message||'신청 대상을 조회하지 못했습니다.');data.items.forEach(item=>{const label=document.createElement('label');label.className='eligibility-item';const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.name='대상항목';checkbox.value=String(item.id);checkbox.addEventListener('change',syncDetails);const body=document.createElement('div'),main=document.createElement('div'),meta=document.createElement('div');main.className='eligibility-main';main.textContent=item.school_name;meta.className='eligibility-meta';meta.textContent=`${item.position} · ${item.subject}`;body.append(main,meta);label.append(checkbox,body);list.append(label)});section.classList.add('show');showMessage(`${data.items.length}건의 신청 대상을 찾았습니다. 신청할 항목을 체크해 주세요.`,'success')}
+        catch(error){showMessage(error.message,'error')}
+        finally{lookupBtn.disabled=false;lookupBtn.textContent='신청 대상 조회'}
+    });
+    form.addEventListener('submit',event=>{if(!list.querySelector('input:checked')){event.preventDefault();showMessage('신청할 학교와 강의과목을 하나 이상 체크해 주세요.','error');return}submitBtn.disabled=true;submitBtn.textContent='데이터 전송 중...'});
+});
+</script>
+{% endblock %}

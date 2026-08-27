@@ -60,7 +60,12 @@
             color: var(--text-dark);
             font-weight: 800;
             margin: 0;
+            display: grid;
+            grid-template-columns: 28px 1fr;
+            column-gap: 8px;
         }
+
+        .cert-title-icon { text-align: center; }
 
         .cert-form {
             display: grid;
@@ -213,7 +218,15 @@
             .cert-form, .option-group { grid-template-columns: 1fr; }
             .full-width, .span-2, .option-group { grid-column: span 1; }
         }
-        .cert-company { font-size: 14px; font-weight: 800; color: var(--primary-color); margin-top: 5px; }
+        .cert-company {
+            margin-top: 5px;
+            margin-left: 36px;
+            font-family: inherit;
+            font-size: 12.5px;
+            font-weight: 400;
+            line-height: 1.7;
+            color: var(--primary-color);
+        }
     </style>
 {% endblock %}
 {% block content %}
@@ -221,7 +234,7 @@
 <div class="certificate-page-shell">
     <div class="cert-container">
         <div class="cert-header">
-            <div><h2>📄 임직원 경력증명서 발급 신청</h2>{% if certificate_company %}<div class="cert-company">{{ certificate_company.company_name }}{% if certificate_workgroup %} · {{ certificate_workgroup.name }}{% endif %}</div>{% endif %}</div>
+            <div><h2><span class="cert-title-icon" aria-hidden="true">📄</span><span>임직원 증명서 발급 신청</span></h2>{% if certificate_company %}<div class="cert-company">{{ certificate_company.company_name }} · 임직원</div>{% endif %}</div>
             <img src="{{ certificate_company.logo_url if certificate_company and certificate_company.logo_url else url_for('static', filename='logo01.gif') }}" alt="{{ certificate_company.company_name if certificate_company else '새담청소년교육문화원' }} 로고" onerror="this.onerror=null;this.src='{{ url_for('static', filename='logo01.gif') }}'">
         </div>
 

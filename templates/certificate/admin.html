@@ -276,7 +276,7 @@
 
                     <td>
                         {% if item.상태 == "발급완료" %}
-                            <a href="{{ url_for('document.serve_pdf', filename=item.파일명) }}" target="_blank" style="font-size: 12px; color:var(--primary-color, #4a90e2); font-weight:500; text-decoration:underline;">
+                            <a href="{{ url_for('document.serve_pdf', idx=item.index) }}" target="_blank" style="font-size: 12px; color:var(--primary-color, #4a90e2); font-weight:500; text-decoration:underline;">
                                 {{ item.발급번호 }}
                             </a>
                             <div style="font-size: 11px; opacity: 0.6; margin-top: 2px;">{{ item.발급일 }}</div>
