@@ -140,6 +140,8 @@ EXEMPT_ROUTES = [
     'verified_contract.public_download',
     'document.apply',
     'document.apply2',
+    'document.apply_excellent',
+    'document.lookup_excellent_instructor',
     'document.company_logo',
     'expense.submit_expense',
     'expense.submit_expense_instructor',
