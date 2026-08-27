@@ -30,11 +30,11 @@
 
     /* 전체 배경 및 폰트 설정 */
     .dashboard-container { padding: 20px 0; background-color: transparent; color: var(--school-text); letter-spacing: -0.02em; position: relative; z-index: 2; }
-    /* 센터장 전용 업무공간 상세 화면의 타이틀바 위 여백은 기존의 70%로 줄인다. */
-    .school-detail-page .main-content { padding-top: 14px; }
-    .school-detail-page .content-container { padding-top: 21px; }
-    .dashboard-container.school-detail-spacing { padding-top: 14px; padding-bottom: 10px; }
-    .dashboard-container.school-detail-spacing .school-container { padding-top: 17.5px; padding-bottom: 12.5px; }
+    /* 센터장 전용 업무공간 상세 화면의 최상단 누적 여백을 40% 줄인다. */
+    .school-detail-page .main-content { padding-top: 8.4px; }
+    .school-detail-page .content-container { padding-top: 12.6px; }
+    .dashboard-container.school-detail-spacing { padding-top: 8.4px; padding-bottom: 10px; }
+    .dashboard-container.school-detail-spacing .school-container { padding-top: 10.5px; padding-bottom: 12.5px; }
     .dashboard-container.school-detail-spacing .school-workspace-shell { padding-top: 13px; padding-bottom: 12px; }
 
     /* 메인 컨테이너 */
@@ -105,7 +105,7 @@
         -webkit-backdrop-filter: var(--card-backdrop, none);
     }
     
-    .school-profile-card { padding: 22px 24px; text-align: left; border-top: 4px solid var(--school-blue); }
+    .school-profile-card { --school-profile-icon-action-width: 44px; padding: 22px 24px; text-align: left; border-top: 4px solid var(--school-blue); }
     .school-profile-main { display: flex; align-items: center; gap: 15px; }
 
 
@@ -122,9 +122,10 @@
     .school-profile-point { flex: 0 0 auto; font-size: 0.72rem; }
     .school-profile-role-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; min-width:0; }
     .school-profile-role { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-gray, #64748b); font-size:0.86rem; font-weight:800; }
-    .school-profile-logout { flex:0 0 auto; border:1px solid color-mix(in srgb, var(--school-border) 78%, transparent); border-radius:6px; padding:4px 7px; background:var(--school-soft); color:var(--text-gray, #64748b); font-size:0.7rem; font-weight:800; line-height:1; text-decoration:none; white-space:nowrap; }
+    .school-profile-logout { width:var(--school-profile-icon-action-width); min-height:40px; margin-left:auto; padding:4px 0; box-sizing:border-box; flex:0 0 var(--school-profile-icon-action-width); display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border:1px solid color-mix(in srgb, var(--school-border) 78%, transparent); border-radius:6px; background:var(--school-soft); color:var(--text-gray, #64748b); font-size:0.62rem; font-weight:800; line-height:1; text-decoration:none; white-space:nowrap; }
+    .school-profile-logout i { font-size:1rem; line-height:1; }
     .school-profile-logout:hover { border-color:var(--school-blue); background:var(--input-bg, #ffffff); color:var(--school-blue); }
-    .school-profile-actions { display:grid; grid-template-columns:1fr 1fr 44px; gap:8px; margin-top:20px; }
+    .school-profile-actions { display:grid; grid-template-columns:1fr 1fr var(--school-profile-icon-action-width); gap:8px; margin-top:20px; }
     .school-profile-action-btn { height: 40px; border: 1px solid var(--school-border); border-radius: 6px; background: var(--input-bg, var(--school-card-bg)); color: var(--school-text); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.86rem; font-weight: 900; line-height: 1; cursor: pointer; text-decoration: none; transition: all 0.16s ease; box-sizing: border-box; white-space: nowrap; padding: 0 8px; }
     .school-profile-action-btn.primary { background: var(--school-blue); border-color: var(--school-blue); color: #ffffff; }
     .school-profile-action-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(15, 23, 42, 0.08); border-color: var(--school-blue); color: var(--school-blue); }
@@ -413,11 +414,11 @@
 
     /* FHD 업무환경: 3단 구성은 유지하고 과한 여백과 큰 장식 요소만 줄인다. */
     @media (min-width: 1101px) and (max-width: 2000px) and (max-height: 1200px) {
-        .dashboard-container.school-detail-spacing { padding-top: 7px; }
+        .dashboard-container.school-detail-spacing { padding-top: 4.2px; }
         .dashboard-container.school-detail-spacing .school-container {
             min-height: 0;
             padding: 14px;
-            padding-top: 9.8px;
+            padding-top: 5.9px;
             padding-bottom: 7px;
         }
         .dashboard-container.school-detail-spacing .school-workspace-shell {
@@ -446,7 +447,7 @@
         .dashboard-container.school-detail-spacing .school-top-meta { margin-top: 5px; gap: 4px 10px; font-size: .74rem; }
         .dashboard-container.school-detail-spacing .school-system-state { font-size: .76rem; padding: 6px 11px; }
 
-        .dashboard-container.school-detail-spacing .school-profile-card { padding: 16px 17px; }
+        .dashboard-container.school-detail-spacing .school-profile-card { --school-profile-icon-action-width: 38px; padding: 16px 17px; }
         .dashboard-container.school-detail-spacing .school-profile-main { gap: 12px; }
         .dashboard-container.school-detail-spacing .school-profile-avatar {
             width: 56px;
@@ -457,7 +458,8 @@
         .dashboard-container.school-detail-spacing .school-profile-name { font-size: 1.16rem; }
         .dashboard-container.school-detail-spacing .school-profile-role-row { margin-top:5px; }
         .dashboard-container.school-detail-spacing .school-profile-role { font-size:.79rem; }
-        .dashboard-container.school-detail-spacing .school-profile-actions { margin-top:14px; grid-template-columns:1fr 1fr 38px; gap:6px; }
+        .dashboard-container.school-detail-spacing .school-profile-logout { min-height:36px; }
+        .dashboard-container.school-detail-spacing .school-profile-actions { margin-top:14px; grid-template-columns:1fr 1fr var(--school-profile-icon-action-width); gap:6px; }
         .dashboard-container.school-detail-spacing .school-profile-action-btn { height: 36px; font-size: .8rem; }
         .dashboard-container.school-detail-spacing .school-profile-school { margin-top: 15px; padding: 11px 12px; }
         .dashboard-container.school-detail-spacing .school-profile-year { margin-bottom: 4px; font-size: .72rem; }
@@ -545,15 +547,15 @@
 
     .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; display: inline-block; text-align: center; margin: 0; background: #ffffff; border: 1px solid #cbd5e1;}
     /* 상태별 글자색만 유지하고, 사각 테두리와 배경은 표시하지 않는다. */
-    table.board-table .badge, table.board-table .team-review-status-btn { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; width:64px; min-width:64px; height:30px; padding:4px 5px; border:0; background:transparent; box-shadow:none; white-space:nowrap; vertical-align:middle; }
-    table.board-table .team-review-status-btn:hover { border:0; background:transparent; }
+    table.board-table .badge, table.board-table .team-review-pending-btn { box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; width:64px; min-width:64px; height:30px; padding:4px 5px; border:0; background:transparent; box-shadow:none; white-space:nowrap; vertical-align:middle; }
+    table.board-table .team-review-pending-btn:hover { border:0; background:transparent; color:#b45309; }
     .status-접수 { color: #d97706; border-color: #f59e0b; }
     .status-팀장확인 { color: #7c3aed; border-color: #a78bfa; }
     .status-처리중 { color: #0284c7; border-color: #0ea5e9; }
     .status-완료 { color: #15803d; border-color: #22c55e; }
-    /* 다른 상태(완료 등) 뱃지와 동일한 규격의 클릭 가능한 팀장확인 상태 */
-    .team-review-status-btn { margin:0; padding:4px 10px; border:1px solid #a78bfa; border-radius:4px; background:#ffffff; color:#7c3aed; font-family:inherit; font-size:.75rem; font-weight:700; white-space:nowrap; text-align:center; cursor:pointer; }
-    .team-review-status-btn:hover { background:#f5f3ff; border-color:#7c3aed; }
+    /* 확인 전에는 본사접수로 표시하며, 클릭 성공 후에만 팀장확인 상태로 전환한다. */
+    .team-review-pending-btn { margin:0; padding:4px 10px; border:1px solid #f59e0b; border-radius:4px; background:#ffffff; color:#d97706; font-family:inherit; font-size:.75rem; font-weight:700; white-space:nowrap; text-align:center; cursor:pointer; }
+    .team-review-pending-btn:hover { background:#fffbeb; border-color:#d97706; color:#b45309; }
     .confirmation-count { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:5px; min-width:55px; padding:4px 9px; border:0; background:transparent; color:#0f766e; font-size:0.75rem; font-weight:800; cursor:help; }
     .confirmation-tooltip { display:none; position:absolute; z-index:120; left:50%; bottom:calc(100% + 7px); transform:translateX(-50%); width:max-content; min-width:110px; max-width:230px; padding:7px 9px; border:1px solid #99f6e4; border-radius:8px; background:#134e4a; color:#ffffff; box-shadow:0 7px 18px rgba(15,23,42,0.2); text-align:left; font-size:0.67rem; font-weight:500; line-height:1.35; white-space:normal; pointer-events:none; }
     .confirmation-tooltip strong { display:block; margin-bottom:4px; color:#ccfbf1; font-size:0.68rem; }
@@ -687,64 +689,82 @@
     .school-chat-card .chat-widget .widget-icons { margin-right: 0; }
     .school-chat-card .chat-widget #list-chats { min-height: 0; }
 
-    .read-card { background:transparent; border:1px solid var(--school-border); border-radius:18px; overflow:hidden; box-shadow:none; }
-    .read-header { padding:26px 30px 18px; background:transparent; border-bottom:0; }
+    .read-card { background:var(--input-bg, #ffffff); border:1px solid var(--school-border); border-radius:14px; overflow:hidden; box-shadow:0 8px 24px rgba(15, 23, 42, 0.055); }
+    .read-header { padding:23px 28px 17px; background:color-mix(in srgb, var(--school-soft) 42%, #ffffff); border-bottom:1px solid var(--school-border); }
     .read-topline { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
-    .read-title { margin:0; color:var(--school-text); font-size:1.53rem; line-height:1.38; letter-spacing:-0.035em; font-weight:800; }
-    .read-meta { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; margin-top:14px; color:var(--text-gray, #6b7280); font-size:0.88rem; }
-    .read-meta-item { display:inline-flex; align-items:center; gap:6px; }
-    .read-body-wrap { margin:0; background:transparent; border:0; border-radius:0; padding:10px 30px 30px; }
-    .read-body { min-height:260px; line-height:1.85; font-size:1.04rem; color:var(--school-text); word-break:break-word; }
+    .read-title { margin:0; color:var(--school-text) !important; font-size:1.24rem; line-height:1.45; letter-spacing:-0.025em; font-weight:700; word-break:break-word; }
+    .read-meta { display:flex; align-items:center; flex-wrap:nowrap; gap:0; min-width:0; margin-top:13px; color:var(--text-gray, #6b7280); font-size:0.82rem; white-space:nowrap; }
+    .read-status-slot { display:inline-flex; align-items:center; flex:0 0 auto; margin-right:12px; }
+    .read-meta-item { display:inline-flex; align-items:center; gap:6px; min-width:0; padding:0 12px; border-left:1px solid color-mix(in srgb, var(--school-border) 78%, transparent); }
+    .read-status-slot + .read-meta-item { padding-left:0; border-left:0; }
+    .read-meta-item i { color:var(--text-gray, #8492a6); font-size:0.88rem; }
+    .read-meta-author { overflow:hidden; text-overflow:ellipsis; color:var(--school-text); font-weight:700; }
+    .read-body-wrap { margin:0; background:transparent; border:0; border-radius:0; padding:26px 28px 30px; }
+    .read-body { min-height:220px; line-height:1.78; font-size:0.98rem; color:var(--school-text); word-break:break-word; }
     .read-body img { max-width:100%; height:auto; border-radius:8px; }
     .read-image-previews { width:100%; margin-top:22px; display:flex; flex-direction:column; align-items:flex-start; gap:16px; }
     .read-image-preview-link { display:block; max-width:100%; line-height:0; }
     .read-image-preview { display:block; width:auto; max-width:100%; height:auto; object-fit:contain; background:transparent; border-radius:8px; }
-    .read-file-box { margin:0; padding:0 30px 28px; background:transparent; border:0; color:var(--text-gray, #6b7280); font-size:0.9rem; }
-    .read-file-line { display:flex; flex-wrap:wrap; gap:7px; align-items:center; color:var(--text-gray, #6b7280); }
-    .read-file-prefix { font-weight:700; color:var(--school-text); }
-    .read-file-link { display:inline; padding:0; border:0; background:transparent; color:var(--school-blue); text-decoration:none; font-weight:600; }
+    .read-file-box { margin:0; padding:0 28px 22px; background:transparent; border:0; color:var(--text-gray, #6b7280); font-size:0.86rem; }
+    .read-file-line { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:11px 13px; border:1px solid var(--school-border); border-radius:9px; background:var(--school-soft); color:var(--text-gray, #6b7280); }
+    .read-file-prefix { display:inline-flex; align-items:center; gap:6px; font-weight:700; color:var(--school-text); }
+    .read-file-link { display:inline; padding:0; border:0; background:transparent; color:var(--school-blue); text-decoration:none; font-weight:650; }
     .read-file-link:hover { text-decoration:underline; text-underline-offset:3px; }
-    .read-footer-actions { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; text-align:right; padding:0 30px 26px; border-top:0; background:transparent; }
+    .read-footer-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:64px; text-align:right; padding:13px 18px 13px 28px; border-top:1px solid var(--school-border); background:color-mix(in srgb, var(--school-soft) 48%, #ffffff); }
     .read-confirm-area { display:flex; align-items:center; gap:10px; min-width:0; text-align:left; }
     .read-confirm-btn { flex:0 0 auto; border:1px solid #14b8a6; border-radius:8px; background:#0f766e; color:#ffffff; padding:8px 13px; font-family:inherit; font-size:0.82rem; font-weight:800; cursor:pointer; }
     .read-confirm-btn:hover { background:#115e59; }
     .read-confirm-btn:disabled { border-color:#99f6e4; background:#ccfbf1; color:#0f766e; cursor:default; }
     .read-confirm-summary.confirmation-count { min-width:55px; color:#0f766e; font-size:0.75rem; line-height:normal; }
-    .read-footer-actions #readActionBtns { margin-left:auto; }
-    .read-outside-actions { display:flex; justify-content:flex-end; padding-top:12px; }
+    .read-action-group, .read-footer-actions #readActionBtns { display:inline-flex; align-items:center; justify-content:flex-end; gap:7px; }
+    .read-action-group { margin-left:auto; }
     
-    .read-back-btn, .post-action-btn, .comment-mini-btn { border:0; background:var(--input-bg, #ffffff); color:var(--text-gray, #6b7280); border-radius:7px; padding:6px 9px; cursor:pointer; font-size:0.82rem; font-weight:700; transition:all .15s ease; border: 1px solid var(--school-border); }
+    .read-back-btn, .post-action-btn, .comment-mini-btn { min-height:34px; border:1px solid var(--school-border); background:var(--input-bg, #ffffff); color:var(--text-gray, #6b7280); border-radius:8px; padding:7px 10px; cursor:pointer; font-family:inherit; font-size:0.8rem; font-weight:700; transition:all .15s ease; display:inline-flex; align-items:center; justify-content:center; gap:5px; }
     .read-back-btn:hover, .post-action-btn:hover, .comment-mini-btn:hover { background:var(--widget-hover, #f3f4f6); color:var(--school-text); }
-    .post-action-btn.primary { color:var(--school-blue); border-color:var(--school-blue); }
-    .post-action-btn.danger, .comment-mini-btn.danger { color:#dc2626; border-color:#dc2626; }
+    .post-action-btn.primary { color:var(--school-blue); border-color:color-mix(in srgb, var(--school-blue) 48%, var(--school-border)); background:color-mix(in srgb, var(--school-blue) 7%, #ffffff); }
+    .post-action-btn.danger, .comment-mini-btn.danger { color:#dc2626; border-color:#fecaca; background:#fffafa; }
     .post-action-btn.danger:hover, .comment-mini-btn.danger:hover { background:#fef2f2; color:#b91c1c; }
 
-    .comment-box { margin-top:28px; border:0; border-radius:0; background:transparent; overflow:visible; box-shadow:none; }
-    .comment-header { display:flex; align-items:center; justify-content:space-between; padding:20px 2px 12px; background:transparent; border-bottom:0; }
-    .comment-header h3 { font-size:1rem !important; font-weight:800; letter-spacing:-0.02em; }
-    .comment-write { background:transparent; border-bottom:0; padding:0 0 22px; }
-    .comment-textarea { width:100%; min-height:76px; border:1px solid var(--school-border); border-radius:12px; padding:12px 13px; resize:vertical; font-family:inherit; box-sizing:border-box; line-height:1.55; background:var(--input-bg, #ffffff); color:var(--school-text); }
-    .comment-textarea:focus { outline:none; border-color:var(--school-blue); box-shadow:none; }
+    .comment-box { margin-top:26px; padding-top:20px; border-top:1px solid var(--school-border); border-radius:0; background:transparent; overflow:visible; box-shadow:none; }
+    .comment-header { display:flex; align-items:center; justify-content:space-between; padding:0 2px 12px; background:transparent; border-bottom:0; }
+    .comment-header h3 { display:flex; align-items:center; gap:7px; font-size:0.98rem !important; font-weight:750; letter-spacing:-0.02em; }
+    .comment-count-badge { min-width:22px; height:22px; padding:0 7px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; background:color-mix(in srgb, var(--school-blue) 11%, #ffffff); color:var(--school-blue); font-size:0.74rem; font-weight:800; }
+    .comment-write { margin-top:16px; padding:14px; border:1px solid var(--school-border); border-radius:12px; background:color-mix(in srgb, var(--school-soft) 65%, #ffffff); }
+    .comment-compose-title { display:flex; align-items:center; gap:7px; margin-bottom:9px; color:var(--school-text); font-size:0.86rem; font-weight:750; }
+    .comment-compose-title i { color:var(--school-blue); }
+    .comment-textarea { width:100%; min-height:82px; border:1px solid var(--school-border); border-radius:9px; padding:11px 12px; resize:vertical; font-family:inherit; box-sizing:border-box; line-height:1.55; background:var(--input-bg, #ffffff); color:var(--school-text); }
+    .comment-textarea:focus { outline:none; border-color:var(--school-blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--school-blue) 11%, transparent); }
     .comment-file-row { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; }
-    .comment-file-input { flex:1; border:0; border-radius:0; padding:6px 0; background:transparent; font-size:0.83rem; color:var(--text-gray, #6b7280); }
-    .comment-list { padding:0; background:transparent; }
-    .comment-empty { text-align:center; padding:26px 0; color:var(--text-gray, #9ca3af); background:transparent; border:0; }
+    .comment-file-input { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    .comment-file-picker { flex:1; min-width:0; min-height:44px; padding:6px 10px; display:flex; align-items:center; gap:9px; box-sizing:border-box; border:1px dashed color-mix(in srgb, var(--school-blue) 32%, var(--school-border)); border-radius:9px; background:var(--input-bg, #ffffff); color:var(--text-gray, #64748b); cursor:pointer; transition:all .15s ease; }
+    .comment-file-picker:hover { border-color:var(--school-blue); color:var(--school-blue); background:color-mix(in srgb, var(--school-blue) 5%, #ffffff); }
+    .comment-file-input:focus + .comment-file-picker { border-color:var(--school-blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--school-blue) 11%, transparent); }
+    .comment-file-picker-icon { width:32px; height:32px; flex:0 0 32px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; background:color-mix(in srgb, var(--school-blue) 11%, #ffffff); color:var(--school-blue); font-size:0.94rem; }
+    .comment-file-picker-copy { min-width:0; display:flex; flex-direction:column; gap:2px; text-align:left; }
+    .comment-file-picker-copy strong { color:var(--school-text); font-size:0.78rem; font-weight:750; }
+    .comment-file-picker-copy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-gray, #8a97a8); font-size:0.71rem; font-weight:500; }
+    .comment-submit-btn { min-height:42px; padding:0 16px; display:inline-flex; align-items:center; justify-content:center; gap:6px; flex:0 0 auto; border:1px solid var(--school-blue); border-radius:9px; background:var(--school-blue); color:#ffffff; font-family:inherit; font-size:0.82rem; font-weight:750; cursor:pointer; }
+    .comment-submit-btn:hover { background:var(--school-navy); border-color:var(--school-navy); }
+    .comment-list { padding:0; border:1px solid var(--school-border); border-radius:12px; background:var(--input-bg, #ffffff); overflow:hidden; }
+    .comment-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; text-align:center; padding:30px 16px; color:var(--text-gray, #94a3b8); background:color-mix(in srgb, var(--school-soft) 35%, #ffffff); border:0; font-size:0.84rem; }
+    .comment-empty i { font-size:1.15rem; color:color-mix(in srgb, var(--school-blue) 55%, #94a3b8); }
     
-    .comment-item { border:0; border-radius:0; padding:16px 0; margin:0; background:transparent; overflow:visible; }
-    .comment-item + .comment-item { border-top:1px solid rgba(0,0,0,0.05); }
-    .comment-item.reply { margin-left:34px; background:transparent; border-left:0; }
+    .comment-item { border:0; border-radius:0; padding:15px 16px; margin:0; background:transparent; overflow:visible; }
+    .comment-item + .comment-item { border-top:1px solid color-mix(in srgb, var(--school-border) 72%, transparent); }
+    .comment-item.reply { margin-left:30px; padding-left:15px; background:color-mix(in srgb, var(--school-soft) 55%, #ffffff); border-left:3px solid color-mix(in srgb, var(--school-blue) 45%, var(--school-border)); }
     .comment-item.reply .comment-top-row::before { display:none; }
     .comment-top-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0; background:transparent; border-bottom:0; }
     .comment-left-meta { display:flex; align-items:center; gap:10px; min-width:0; }
-    .comment-author { color:var(--school-text); font-weight:800; display:flex; align-items:center; gap:6px; min-width:0; }
+    .comment-author { color:var(--school-text); font-weight:750; display:flex; align-items:center; gap:7px; min-width:0; font-size:0.86rem; }
+    .comment-author-avatar { width:24px; height:24px; flex:0 0 24px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background:color-mix(in srgb, var(--school-blue) 10%, #ffffff); color:var(--school-blue); font-size:0.69rem; }
     .comment-date { color:var(--text-gray, #9ca3af); font-size:0.8rem; white-space:nowrap; flex-shrink:0; }
     .comment-actions { display:flex; justify-content:flex-end; align-items:center; gap:4px; white-space:nowrap; margin-left:auto; }
-    .comment-content { color:var(--school-text); line-height:1.7; white-space:pre-wrap; word-break:break-word; padding:9px 0 0; }
-    .comment-attachments { padding:7px 0 0; color:var(--text-gray, #6b7280); font-size:0.84rem; }
+    .comment-content { color:var(--school-text); line-height:1.65; white-space:pre-wrap; word-break:break-word; padding:9px 0 0 31px; font-size:0.9rem; }
+    .comment-attachments { padding:8px 0 0 31px; display:flex; align-items:center; flex-wrap:wrap; gap:6px; color:var(--text-gray, #6b7280); font-size:0.84rem; }
     .comment-file-prefix { font-weight:700; color:var(--text-gray, #6b7280); }
-    .comment-file-link { display:inline; padding:0; border-radius:0; background:transparent; color:var(--school-blue); text-decoration:none; font-size:0.84rem; font-weight:600; border:0; }
-    .comment-file-link:hover { text-decoration:underline; text-underline-offset:3px; }
-    .reply-form { margin:12px 0 0; padding:0; background:transparent; border-radius:0; border:0; }
+    .comment-file-link { display:inline-flex; align-items:center; gap:5px; padding:5px 8px; border-radius:7px; background:var(--school-soft); color:var(--school-blue); text-decoration:none; font-size:0.8rem; font-weight:650; border:1px solid var(--school-border); }
+    .comment-file-link:hover { border-color:var(--school-blue); background:color-mix(in srgb, var(--school-blue) 6%, #ffffff); }
+    .reply-form { margin:12px 0 0 31px; padding:12px; background:var(--school-soft); border-radius:10px; border:1px solid var(--school-border); }
 
     .post-file-dropzone { background:#ffffff; border:2px dashed #c3cfde; padding:11px 16px; border-radius:10px; text-align:center; transition:all .15s ease; }
     .post-file-dropzone.dragover { background:rgba(0,0,0,0.03); border-color:var(--school-blue); }
@@ -782,15 +802,32 @@
         .board-write-modal-panel { --board-modal-padding: 14px; padding: 18px var(--board-modal-padding) 0; }
         .board-write-modal-panel.instructor-status-write-wide { --board-modal-padding: 14px; max-width: 100%; }
         .board-modal-close { top: 10px; right: 10px; width: 34px; height: 34px; }
-        .read-header { padding:22px 20px 14px; }
+        .read-header { padding:20px 16px 14px; }
         .board-modal-panel .read-header { padding-right: 48px; }
-        .read-body-wrap { padding:8px 20px 24px; }
-        .read-file-box { padding:0 20px 22px; }
-        .read-footer-actions { padding:0 20px 22px; }
+        .read-title { font-size:1.08rem; line-height:1.4; }
+        .read-meta { flex-wrap:wrap; row-gap:8px; white-space:normal; }
+        .read-status-slot { width:100%; margin:0 0 2px; }
+        .read-status-slot + .read-meta-item { padding-left:0; }
+        .read-meta-item { padding:0 9px; font-size:.76rem; }
+        .read-body-wrap { padding:22px 16px 24px; }
+        .read-body { min-height:170px; font-size:.94rem; }
+        .read-file-box { padding:0 16px 18px; }
+        .read-footer-actions { padding:12px 14px; }
+        .read-action-group { width:100%; flex-wrap:wrap; }
+        .read-action-group #readActionBtns { flex:1 1 auto; flex-wrap:wrap; }
+        .read-action-group .read-back-btn { margin-left:auto; }
+        .comment-box { margin-top:20px; padding-top:16px; }
+        .comment-write { padding:12px; }
+        .comment-file-row { flex-wrap:wrap; }
+        .comment-file-picker { flex:1 1 100%; }
+        .comment-submit-btn { width:100%; }
         .comment-top-row { flex-wrap:wrap; align-items:flex-start; gap:6px; }
         .comment-actions { width:100%; justify-content:flex-start; margin-left:0; }
         .comment-left-meta { width:100%; }
-        .comment-item.reply { margin-left:18px; }
+        .comment-item { padding:14px 12px; }
+        .comment-item.reply { margin-left:14px; }
+        .comment-content, .comment-attachments { padding-left:0; }
+        .reply-form { margin-left:0; }
     }
 
     /* 마지막 콘텐츠와 저작권 문구 사이의 여백은 기존의 50%로 줄인다. */
@@ -835,7 +872,7 @@
         .school-detail-page .menu-item i { font-size: .95rem; }
         .school-detail-page .user-section { display: none; }
         .school-detail-page .main-content { padding-top: 0; overflow-x: hidden; }
-        .school-detail-page .content-container { padding: 8px 10px 24px !important; overflow-x: hidden; }
+        .school-detail-page .content-container { padding: 4.8px 10px 24px !important; overflow-x: hidden; }
         .dashboard-container.school-detail-spacing { padding: 0; }
         .dashboard-container.school-detail-spacing .school-container { min-height: 0; padding: 0; }
 
@@ -866,7 +903,7 @@
         .school-chat-card { order: 5; }
         .company-gallery-card { order: 6; }
 
-        .school-profile-card { width: 100%; padding: 14px; border-radius: 10px; box-sizing: border-box; }
+        .school-profile-card { --school-profile-icon-action-width: 42px; width: 100%; padding: 14px; border-radius: 10px; box-sizing: border-box; }
         .school-profile-main { gap: 11px; }
         .school-profile-avatar { width: 50px; height: 50px; flex-basis: 50px; font-size: 1.35rem; }
         .school-profile-avatar .school-profile-emoji { font-size: 1.5rem; }
@@ -875,8 +912,8 @@
         .school-profile-point { font-size: .62rem; }
         .school-profile-role-row { margin-top: 5px; }
         .school-profile-role { font-size: .72rem; }
-        .school-profile-logout { padding: 4px 6px; font-size: .64rem; }
-        .school-profile-actions { grid-template-columns: 1fr 1fr 42px; gap: 7px; margin-top: 12px; }
+        .school-profile-logout { min-height: 38px; padding: 4px 0; font-size: .58rem; }
+        .school-profile-actions { grid-template-columns: 1fr 1fr var(--school-profile-icon-action-width); gap: 7px; margin-top: 12px; }
         .school-profile-action-btn { min-height: 42px; height: 42px; font-size: .79rem; }
 
         .board-section { width: 100%; border-radius: 10px; box-sizing: border-box; }
@@ -905,7 +942,7 @@
         .board-post-title { font-size: .81rem; font-weight: 750; }
         .board-mobile-meta { display: block; margin-top: 4px; overflow: hidden; color: var(--text-gray, #64748b); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
         .board-list-attachment-size { display: none; }
-        table.board-table .badge, table.board-table .team-review-status-btn { width: 68px; min-width: 68px; padding: 4px 2px; font-size: .7rem; }
+        table.board-table .badge, table.board-table .team-review-pending-btn { width: 68px; min-width: 68px; padding: 4px 2px; font-size: .7rem; }
         .confirmation-count { min-width: 64px; padding: 4px 2px; font-size: .7rem; }
         .post-checkbox, .team-review-checkbox, .board-col-select input[type="checkbox"] { width: 18px; height: 18px; }
 
@@ -1227,7 +1264,9 @@
                             </div>
                             <div class="school-profile-role-row">
                                 <div class="school-profile-role">{{ session.get('department', school.school_name) }} | {{ session.get('position', school.director_pos or '센터장') }}</div>
-                                <a class="school-profile-logout" href="{{ url_for('logout') }}">로그아웃</a>
+                                <a class="school-profile-logout" href="{{ url_for('logout') }}" title="로그아웃" aria-label="로그아웃">
+                                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -1358,7 +1397,7 @@
                                             </span>
                                         </span>
                                         {% elif p.team_review_required %}
-                                        <button type="button" class="team-review-status-btn" title="이 게시물을 팀장확인 처리" onclick="event.stopPropagation(); confirmTeamReview({{ p.id }}, this);">팀장확인</button>
+                                        <button type="button" class="team-review-pending-btn" title="현재 본사접수 · 클릭하면 팀장확인 처리" onclick="event.stopPropagation(); confirmTeamReview({{ p.id }}, this);">본사접수</button>
                                         {% else %}
                                         <span class="badge status-{{ p.status or '접수' }}">{{ '본사접수' if (p.status or '접수') == '접수' else p.status }}</span>
                                         {% endif %}
@@ -1416,7 +1455,7 @@
                     <div class="read-card">
                         <div class="read-header">
                             <div class="read-topline">
-                                <h2 id="readTitle" class="read-title" style="color:var(--school-navy);"></h2>
+                                <h2 id="readTitle" class="read-title"></h2>
                             </div>
                             <div id="readMeta" class="read-meta"></div>
                         </div>
@@ -1432,32 +1471,37 @@
                                 <button type="button" id="confirmPostBtn" class="read-confirm-btn" onclick="confirmCurrentPost()"><i class="fa-regular fa-circle-check"></i> 확인</button>
                                 <div id="readConfirmSummary" class="read-confirm-summary confirmation-count" tabindex="0" aria-label="확인자 0명"></div>
                             </div>
-                            <span id="readActionBtns" style="display:none;">
-                                <button id="editPostBtn" class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-edit"></i> 게시글 수정</button>
-                                <form id="singleDelForm" method="POST" style="display:inline;">
-                                    <input type="hidden" name="school_id" value="{{ school.id if school else '' }}">
-                                    <input type="hidden" name="category" value="{{ category }}">
-                                    <button type="submit" class="post-action-btn danger" onclick="return confirm('정말 삭제하시겠습니까?')"><i class="fas fa-trash"></i> 게시글 삭제</button>
-                                </form>
-                            </span>
+                            <div class="read-action-group">
+                                <span id="readActionBtns" style="display:none;">
+                                    <button id="editPostBtn" class="post-action-btn primary" type="button" onclick="openEditFromRead()"><i class="fas fa-pen-to-square"></i> 게시글 수정</button>
+                                    <form id="singleDelForm" method="POST" style="display:inline-flex;">
+                                        <input type="hidden" name="school_id" value="{{ school.id if school else '' }}">
+                                        <input type="hidden" name="category" value="{{ category }}">
+                                        <button type="submit" class="post-action-btn danger" onclick="return confirm('정말 삭제하시겠습니까?')"><i class="fas fa-trash-can"></i> 게시글 삭제</button>
+                                    </form>
+                                </span>
+                                <button class="read-back-btn" type="button" onclick="showBoardList()"><i class="fas fa-list-ul"></i> 목록</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="read-outside-actions">
-                        <button class="read-back-btn" onclick="showBoardList()"><i class="fas fa-list"></i> 목록으로</button>
                     </div>
 
                     <div id="commentBox" class="comment-box">
                         <div class="comment-header">
-                            <h3 style="margin:0; color:var(--school-navy); font-size:1.15em;"><i class="fa-regular fa-comments" style="color:var(--school-blue);"></i> 댓글 <span id="commentCount" style="color:var(--school-blue);">0</span></h3>
-                        </div>
-                        <div class="comment-write"{% if not can_comment_current_board %} style="display:none;"{% endif %}>
-                            <textarea id="newCommentContent" class="comment-textarea" placeholder="댓글을 입력하세요."></textarea>
-                            <div class="comment-file-row">
-                                <input type="file" id="newCommentFiles" class="comment-file-input" multiple>
-                                <button type="button" class="btn btn-primary" onclick="submitComment(null)"><i class="fas fa-comment-dots"></i> 댓글 등록</button>
-                            </div>
+                            <h3 style="margin:0; color:var(--school-navy);"><i class="fa-regular fa-comments" style="color:var(--school-blue);"></i> 댓글 <span id="commentCount" class="comment-count-badge">0</span></h3>
                         </div>
                         <div id="commentList" class="comment-list"></div>
+                        <div class="comment-write"{% if not can_comment_current_board %} style="display:none;"{% endif %}>
+                            <div class="comment-compose-title"><i class="fa-regular fa-pen-to-square"></i> 댓글 작성</div>
+                            <textarea id="newCommentContent" class="comment-textarea" placeholder="댓글을 입력하세요."></textarea>
+                            <div class="comment-file-row">
+                                <input type="file" id="newCommentFiles" class="comment-file-input" multiple onchange="updateCommentFileLabel(this, 'newCommentFileName')">
+                                <label for="newCommentFiles" class="comment-file-picker">
+                                    <span class="comment-file-picker-icon"><i class="fa-solid fa-paperclip"></i></span>
+                                    <span class="comment-file-picker-copy"><strong>파일 첨부</strong><small id="newCommentFileName">선택된 파일 없음</small></span>
+                                </label>
+                                <button type="button" class="comment-submit-btn" onclick="submitComment(null)"><i class="fas fa-comment-dots"></i> 댓글 등록</button>
+                            </div>
+                        </div>
                     </div>
                     </section>
                 </div>
@@ -2559,12 +2603,12 @@
         const statusMeta = data.is_shared
             ? `<span id="readMetaConfirmation" class="confirmation-count" tabindex="0" aria-label="확인자 ${Number(data.confirmation_count || 0)}명">${renderConfirmationTooltip(data)}</span>`
             : data.can_team_review
-                ? `<button type="button" class="team-review-status-btn" onclick="confirmTeamReview(${Number(data.id)}, this)">팀장확인</button>`
+                ? `<button type="button" class="team-review-pending-btn" title="현재 본사접수 · 클릭하면 팀장확인 처리" onclick="confirmTeamReview(${Number(data.id)}, this)">본사접수</button>`
             : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusLabel}</span>`;
-        $('#readTitle').text(`제목: ${data.title || ''}`);
+        $('#readTitle').text(data.title || '제목 없음');
         $('#readMeta').html(`
-            ${statusMeta}
-            <span class="read-meta-item"><i class="fas fa-user-circle"></i> <strong style="color:var(--school-text);">${escapeHtml(data.author || '')}</strong></span>
+            <span class="read-status-slot">${statusMeta}</span>
+            <span class="read-meta-item"><i class="fas fa-user-circle"></i> <span class="read-meta-author">${escapeHtml(data.author || '')}</span></span>
             <span class="read-meta-item"><i class="fas fa-clock"></i> ${escapeHtml(data.created_at || '')}</span>
             <span class="read-meta-item"><i class="fa-regular fa-eye"></i> 조회 ${Number(data.view_count || 0)}</span>
             <span class="read-meta-item"><i class="fa-regular fa-comments"></i> 댓글 <span id="viewCommentCount">${data.comment_count || 0}</span></span>
@@ -2589,7 +2633,7 @@
                     imagePreviews.push(`<a class="read-image-preview-link" href="${escapeHtml(previewUrl)}" target="_blank" rel="noopener" title="${escapeHtml(originalName)} 원본 보기"><img class="read-image-preview" src="${escapeHtml(previewUrl)}" alt="${escapeHtml(originalName)}" loading="lazy" onerror="this.closest('.read-image-preview-link').style.display='none'"></a>`);
                 }
             });
-            fileHtml = `<div class="read-file-line"><span class="read-file-prefix">@첨부파일:</span> ${links.join('<span style="color:var(--text-gray, #94a3b8);">/</span>')}</div>`;
+            fileHtml = `<div class="read-file-line"><span class="read-file-prefix"><i class="fa-solid fa-paperclip"></i> 첨부파일</span> ${links.join('<span style="color:var(--text-gray, #94a3b8);">/</span>')}</div>`;
             $('#readFiles').html(fileHtml).show();
         } else { $('#readFiles').hide(); }
         if(imagePreviews.length) $('#readImagePreviews').html(imagePreviews.join('')).show();
@@ -2626,8 +2670,9 @@
                 replyMap[r.parent_id].push(r);
             });
             $('#commentCount').text(comments.length);
+            $('#viewCommentCount').text(comments.length);
             if(comments.length === 0) {
-                $('#commentList').html('<div class="comment-empty">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</div>');
+                $('#commentList').html('<div class="comment-empty"><i class="fa-regular fa-comment-dots"></i><span>아직 등록된 댓글이 없습니다.</span></div>');
                 return;
             }
             let html = '';
@@ -2643,15 +2688,24 @@
         const editableBtns = canCommentCurrentBoard && canManage(c.author) ? `<button type="button" class="comment-mini-btn" onclick="editComment(${c.id}, '${encodeURIComponent(c.content || '')}')">수정</button><button type="button" class="comment-mini-btn danger" onclick="deleteComment(${c.id})">삭제</button>` : '';
         const replyBtn = canCommentCurrentBoard && !isReply ? `<button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">답글</button>` : '';
         const edited = c.updated_at ? ' · 수정됨' : '';
-        return `<div class="comment-item ${isReply ? 'reply' : ''}" id="comment-${c.id}"><div class="comment-top-row"><div class="comment-left-meta"><div class="comment-author"><span>${escapeHtml(c.author || '익명')}</span></div><div class="comment-date">${escapeHtml(c.created_at || '')}${edited}</div></div><div class="comment-actions">${replyBtn}${editableBtns}</div></div><div class="comment-content">${escapeHtml(c.content || '')}</div>${renderFileLinks(c.filename, c.filepath)}${!isReply ? `<div id="replyForm-${c.id}" class="reply-form" style="display:none;"><textarea id="replyContent-${c.id}" class="comment-textarea" placeholder="답글을 입력하세요."></textarea><div class="comment-file-row"><input type="file" id="replyFiles-${c.id}" class="comment-file-input" multiple><div style="display:flex; gap:7px; flex-shrink:0;"><button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">취소</button><button type="button" class="btn btn-primary" onclick="submitComment(${c.id})">답글 등록</button></div></div></div>` : ''}</div>`;
+        return `<div class="comment-item ${isReply ? 'reply' : ''}" id="comment-${c.id}"><div class="comment-top-row"><div class="comment-left-meta"><div class="comment-author"><span class="comment-author-avatar"><i class="fa-solid fa-user"></i></span><span>${escapeHtml(c.author || '익명')}</span></div><div class="comment-date">${escapeHtml(c.created_at || '')}${edited}</div></div><div class="comment-actions">${replyBtn}${editableBtns}</div></div><div class="comment-content">${escapeHtml(c.content || '')}</div>${renderFileLinks(c.filename, c.filepath)}${!isReply ? `<div id="replyForm-${c.id}" class="reply-form" style="display:none;"><textarea id="replyContent-${c.id}" class="comment-textarea" placeholder="답글을 입력하세요."></textarea><div class="comment-file-row"><input type="file" id="replyFiles-${c.id}" class="comment-file-input" multiple onchange="updateCommentFileLabel(this, 'replyFileName-${c.id}')"><label for="replyFiles-${c.id}" class="comment-file-picker"><span class="comment-file-picker-icon"><i class="fa-solid fa-paperclip"></i></span><span class="comment-file-picker-copy"><strong>파일 첨부</strong><small id="replyFileName-${c.id}">선택된 파일 없음</small></span></label><div style="display:flex; gap:7px; flex-shrink:0;"><button type="button" class="comment-mini-btn" onclick="toggleReplyForm(${c.id})">취소</button><button type="button" class="comment-submit-btn" onclick="submitComment(${c.id})">답글 등록</button></div></div></div>` : ''}</div>`;
     }
 
     function renderFileLinks(filename, filepath) {
         if(!filename || !filepath) return '';
         const names = String(filename).split(',');
         const paths = String(filepath).split(',');
-        const links = names.map((n, i) => `<a href="${escapeHtml(String(paths[i] || '').trim())}" target="_blank" class="comment-file-link" download="${escapeHtml(getOriginalFileName(n, paths[i]))}">${escapeHtml(getOriginalFileName(n, paths[i]))}</a>`);
-        return `<div class="comment-attachments"><span class="comment-file-prefix">@첨부파일:</span> ${links.join('<span style="color:var(--text-gray, #94a3b8);">/</span>')}</div>`;
+        const links = names.map((n, i) => `<a href="${escapeHtml(String(paths[i] || '').trim())}" target="_blank" class="comment-file-link" download="${escapeHtml(getOriginalFileName(n, paths[i]))}"><i class="fa-solid fa-paperclip"></i>${escapeHtml(getOriginalFileName(n, paths[i]))}</a>`);
+        return `<div class="comment-attachments">${links.join(' ')}</div>`;
+    }
+
+    function updateCommentFileLabel(input, targetId) {
+        const target = document.getElementById(targetId);
+        if(!target) return;
+        const files = Array.from(input && input.files ? input.files : []);
+        target.textContent = files.length
+            ? (files.length === 1 ? files[0].name : `${files[0].name} 외 ${files.length - 1}개`)
+            : '선택된 파일 없음';
     }
 
     async function submitComment(parentId) {
@@ -2669,7 +2723,12 @@
         const res = await fetch(`/school/post/${currentPostData.id}/comments/add`, { method: 'POST', body: formData });
         const data = await res.json().catch(() => ({}));
         if(!res.ok || data.ok === false) return schoolToast(data.message || '댓글 등록에 실패했습니다.', 'error');
-        contentEl.value = ''; if(fileEl) fileEl.value = ''; if(parentId) toggleReplyForm(parentId);
+        contentEl.value = '';
+        if(fileEl) {
+            fileEl.value = '';
+            updateCommentFileLabel(fileEl, parentId ? `replyFileName-${parentId}` : 'newCommentFileName');
+        }
+        if(parentId) toggleReplyForm(parentId);
         await loadComments(currentPostData.id);
         schoolToast(parentId ? '답글을 등록했습니다.' : '댓글을 등록했습니다.');
     }
