@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>새담인트라넷 사용환경 진단</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --navy:#0b1736; --navy-2:#132652; --blue:#4f8cff; --cyan:#32d5e8;
+            --green:#22c98b; --yellow:#f6bd4a; --red:#f56576; --ink:#eaf1ff;
+            --muted:#91a4c7; --panel:rgba(15,31,67,.76); --line:rgba(154,181,232,.16);
+        }
+        * { box-sizing:border-box; }
+        html { min-height:100%; background:#071128; }
+        body { margin:0; min-height:100vh; color:var(--ink); font-family:'Pretendard',sans-serif; background:
+            radial-gradient(circle at 12% 4%, rgba(79,140,255,.22), transparent 34%),
+            radial-gradient(circle at 88% 15%, rgba(50,213,232,.13), transparent 28%),
+            linear-gradient(145deg,#071128 0%,#0b1736 46%,#08132c 100%); }
+        body::before { content:""; position:fixed; inset:0; pointer-events:none; opacity:.22; background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px); background-size:34px 34px; mask-image:linear-gradient(to bottom,#000,transparent 88%); }
+        button { font:inherit; }
+        .app { width:min(1260px,100%); margin:auto; padding:16px 20px; position:relative; }
+        body.fit-screen { overflow:hidden; }
+        body.fit-screen .app { transform:scale(var(--fit-scale,1)); transform-origin:top center; }
+        .topbar { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:11px; }
+        .brand { display:flex; align-items:center; gap:14px; }
+        .brand-icon { width:52px; height:52px; border-radius:17px; display:grid; place-items:center; font-size:1.35rem; background:linear-gradient(145deg,var(--blue),#6b5cff); box-shadow:0 15px 35px rgba(52,107,230,.35), inset 0 1px rgba(255,255,255,.34); }
+        h1 { margin:0; font-size:1.38rem; letter-spacing:-.04em; }
+        .brand p { margin:5px 0 0; color:var(--muted); font-size:.82rem; }
+        .actions { display:flex; gap:9px; }
+        .btn { min-height:40px; border:1px solid var(--line); border-radius:12px; padding:0 15px; color:var(--ink); background:rgba(255,255,255,.07); font-weight:800; cursor:pointer; transition:.18s ease; }
+        .btn:hover { transform:translateY(-1px); background:rgba(255,255,255,.12); }
+        .btn.primary { border:0; background:linear-gradient(135deg,var(--blue),#6a63ee); box-shadow:0 9px 22px rgba(66,110,224,.27); }
+        .btn:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+        .panel { border:1px solid var(--line); border-radius:22px; background:var(--panel); box-shadow:0 20px 55px rgba(0,0,0,.18); backdrop-filter:blur(18px); }
+        .status-panel { display:grid; grid-template-columns:255px 1fr; overflow:hidden; min-height:218px; }
+        .gauge-side { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:17px; border-right:1px solid var(--line); background:linear-gradient(150deg,rgba(79,140,255,.11),rgba(50,213,232,.025)); }
+        .gauge { position:relative; width:190px; height:104px; overflow:hidden; }
+        .gauge-ring { position:absolute; width:190px; height:190px; border-radius:50%; background:conic-gradient(from 270deg,var(--red) 0deg 45deg,var(--yellow) 45deg 90deg,var(--green) 90deg 180deg,transparent 180deg); }
+        .gauge-ring::after { content:""; position:absolute; inset:18px; border-radius:50%; background:#102148; box-shadow:inset 0 0 24px rgba(0,0,0,.25); }
+        .gauge-needle { position:absolute; left:50%; bottom:9px; width:73px; height:4px; border-radius:99px; background:#fff; transform-origin:4px 50%; transform:rotate(180deg); transition:transform 1.1s cubic-bezier(.2,.85,.25,1); box-shadow:0 0 14px rgba(255,255,255,.75); z-index:3; }
+        .gauge-needle::after { content:""; position:absolute; width:15px; height:15px; left:-4px; top:-5px; border:4px solid #d9e6ff; border-radius:50%; background:var(--navy); }
+        .gauge-score { margin-top:-4px; text-align:center; }
+        .gauge-score strong { display:block; font-size:1.65rem; line-height:1; letter-spacing:-.05em; }
+        .gauge-score span { display:block; color:var(--muted); margin-top:7px; font-size:.76rem; font-weight:700; }
+        .overall { margin-top:9px; min-width:142px; padding:7px 13px; border-radius:999px; text-align:center; font-weight:900; font-size:.82rem; background:rgba(145,164,199,.13); }
+        .overall.good { color:#73edbd; background:rgba(34,201,139,.14); }
+        .overall.warn { color:#ffd477; background:rgba(246,189,74,.14); }
+        .overall.bad { color:#ff94a1; background:rgba(245,101,118,.14); }
+        .progress-side { padding:17px 20px; }
+        .progress-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:11px; }
+        .progress-head h2 { margin:0; font-size:1.12rem; }
+        .progress-head p { margin:6px 0 0; color:var(--muted); font-size:.8rem; line-height:1.5; }
+        .running-dot { display:inline-flex; align-items:center; gap:7px; color:var(--cyan); font-size:.76rem; font-weight:800; }
+        .running-dot::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; box-shadow:0 0 0 0 rgba(50,213,232,.55); animation:pulse 1.4s infinite; }
+        .running-dot.done { color:var(--green); }
+        @keyframes pulse { 70% { box-shadow:0 0 0 8px rgba(50,213,232,0); } }
+        .progress-list { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+        .progress-item { min-height:54px; display:flex; align-items:center; gap:9px; padding:8px 10px; border:1px solid var(--line); border-radius:13px; background:rgba(255,255,255,.035); transition:.25s ease; }
+        .progress-item i { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; color:var(--muted); background:rgba(145,164,199,.11); }
+        .progress-item strong { display:block; font-size:.8rem; }
+        .progress-item small { display:block; color:var(--muted); margin-top:3px; font-size:.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+        .progress-item.active { border-color:rgba(50,213,232,.42); background:rgba(50,213,232,.07); }
+        .progress-item.active i { color:var(--cyan); animation:spin 1.2s linear infinite; }
+        .progress-item.done i { color:var(--green); background:rgba(34,201,139,.12); animation:none; }
+        .progress-item.error i { color:var(--red); background:rgba(245,101,118,.12); animation:none; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .results { margin-top:10px; opacity:0; transform:translateY(10px); transition:.45s ease; }
+        .results.visible { opacity:1; transform:none; }
+        .metric-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+        .metric-card { padding:12px 14px; min-height:99px; position:relative; overflow:hidden; }
+        .metric-card::after { content:""; position:absolute; width:75px; height:75px; right:-28px; top:-28px; border-radius:50%; background:var(--metric-color, var(--blue)); opacity:.09; }
+        .metric-title { display:flex; align-items:center; justify-content:space-between; gap:9px; color:var(--muted); font-size:.76rem; font-weight:800; }
+        .metric-icon { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; color:var(--metric-color,var(--blue)); background:color-mix(in srgb,var(--metric-color,var(--blue)) 13%,transparent); }
+        .metric-value { margin-top:8px; font-size:1.28rem; font-weight:900; letter-spacing:-.04em; }
+        .metric-card.theme-metric .metric-value { font-size:1.05rem; }
+        .metric-value small { font-size:.73rem; color:var(--muted); margin-left:3px; }
+        .badge { display:inline-flex; align-items:center; gap:5px; margin-top:5px; color:var(--muted); font-size:.67rem; font-weight:800; }
+        .badge::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
+        .badge.good { color:#67e4b1; } .badge.warn { color:#ffd06d; } .badge.bad { color:#ff8997; }
+        .analysis-grid { display:grid; grid-template-columns:1.12fr .88fr; gap:9px; margin-top:9px; }
+        .chart-card { padding:14px 17px; min-height:220px; }
+        .chart-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .chart-head h3 { margin:0; font-size:.94rem; }
+        .chart-head span { color:var(--muted); font-size:.7rem; }
+        .speed-bars { display:grid; gap:9px; }
+        .speed-row { display:grid; grid-template-columns:82px 1fr 82px; align-items:center; gap:10px; font-size:.75rem; }
+        .speed-label { color:var(--muted); font-weight:700; }
+        .bar-track { height:11px; border-radius:99px; background:rgba(255,255,255,.07); overflow:hidden; }
+        .bar-fill { width:0; height:100%; border-radius:inherit; transition:width 1s cubic-bezier(.2,.8,.2,1); background:linear-gradient(90deg,var(--blue),var(--cyan)); box-shadow:0 0 16px rgba(50,213,232,.28); }
+        .speed-row:nth-child(2) .bar-fill { background:linear-gradient(90deg,#7e6df2,#b16ee8); }
+        .speed-row:nth-child(3) .bar-fill { background:linear-gradient(90deg,var(--yellow),#ff8a65); }
+        .speed-number { text-align:right; font-weight:900; }
+        .canvas-wrap { height:92px; margin-top:11px; }
+        canvas { width:100%; height:100%; display:block; }
+        .environment-list { display:grid; gap:0; }
+        .env-row { display:flex; align-items:center; justify-content:space-between; gap:15px; min-height:34px; border-top:1px solid var(--line); font-size:.74rem; }
+        .env-row:first-child { border-top:0; }
+        .env-row span { color:var(--muted); }
+        .env-row strong { text-align:right; }
+        .note { margin:7px 2px 0; color:#8094ba; font-size:.65rem; line-height:1.4; text-align:center; }
+        .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+        @media (max-width:1050px) {
+            .progress-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        }
+        @media (max-width:820px) {
+            .app { padding:14px; } .topbar { align-items:flex-start; } .brand p { display:none; }
+            .status-panel { grid-template-columns:1fr; } .gauge-side { border-right:0; border-bottom:1px solid var(--line); }
+            .progress-list,.metric-grid,.analysis-grid { grid-template-columns:1fr 1fr; }
+            .analysis-grid .chart-card:first-child { grid-column:1/-1; }
+        }
+        @media (max-width:560px) {
+            h1 { font-size:1.05rem; } .brand-icon { width:43px;height:43px;border-radius:14px; }
+            .actions .btn:not(.primary) { display:none; } .progress-side { padding:20px 16px; }
+            .progress-list,.metric-grid,.analysis-grid { grid-template-columns:1fr; }
+            .analysis-grid .chart-card:first-child { grid-column:auto; }
+            .metric-card { min-height:112px; } .speed-row { grid-template-columns:66px 1fr 72px; }
+        }
+        @media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms!important; transition-duration:.01ms!important; } }
+    </style>
+</head>
+<body>
+<main class="app">
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-icon"><i class="fa-solid fa-gauge-high"></i></span>
+            <div><h1>새담인트라넷 사용환경 진단</h1><p>현재 기기와 인트라넷 서버 사이의 연결 품질을 실시간으로 확인합니다.</p></div>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn" onclick="window.close()"><i class="fa-solid fa-xmark"></i> 닫기</button>
+            <button type="button" class="btn primary" id="rerunBtn"><i class="fa-solid fa-rotate"></i> 다시 측정</button>
+        </div>
+    </header>
+
+    <section class="panel status-panel" aria-live="polite">
+        <div class="gauge-side">
+            <div class="gauge" aria-label="종합 진단 점수">
+                <div class="gauge-ring"></div><div class="gauge-needle" id="gaugeNeedle"></div>
+            </div>
+            <div class="gauge-score"><strong id="scoreValue">--</strong><span>환경 품질 점수</span></div>
+            <div class="overall" id="overallLabel">측정 준비 중</div>
+        </div>
+        <div class="progress-side">
+            <div class="progress-head">
+                <div><h2 id="progressTitle">사용환경을 확인하고 있습니다</h2><p id="progressDescription">측정 중에는 이 창을 닫거나 다른 탭으로 이동하지 마세요.</p></div>
+                <span class="running-dot" id="runningStatus">진단 중</span>
+            </div>
+            <div class="progress-list">
+                <div class="progress-item" data-step="environment"><i class="fa-solid fa-laptop"></i><div><strong>브라우저 · OS</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="latency"><i class="fa-solid fa-arrows-left-right-to-line"></i><div><strong>서버 응답속도</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="download"><i class="fa-solid fa-arrow-down"></i><div><strong>다운로드</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="upload"><i class="fa-solid fa-arrow-up"></i><div><strong>업로드</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="page"><i class="fa-solid fa-window-maximize"></i><div><strong>페이지 로딩</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="theme"><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>테마 액션 부하</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="notification"><i class="fa-solid fa-bell"></i><div><strong>푸시알림</strong><small>대기 중</small></div></div>
+                <div class="progress-item" data-step="device"><i class="fa-solid fa-microchip"></i><div><strong>기기 성능</strong><small>대기 중</small></div></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="results" id="results">
+        <div class="metric-grid">
+            <article class="panel metric-card" style="--metric-color:#32d5e8"><div class="metric-title"><span>서버 응답속도</span><span class="metric-icon"><i class="fa-solid fa-bolt"></i></span></div><div class="metric-value"><span id="latencyValue">--</span><small>ms</small></div><span class="badge" id="latencyBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#4f8cff"><div class="metric-title"><span>다운로드</span><span class="metric-icon"><i class="fa-solid fa-arrow-down"></i></span></div><div class="metric-value"><span id="downloadValue">--</span><small>Mbps</small></div><span class="badge" id="downloadBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#a675ee"><div class="metric-title"><span>업로드</span><span class="metric-icon"><i class="fa-solid fa-arrow-up"></i></span></div><div class="metric-value"><span id="uploadValue">--</span><small>Mbps</small></div><span class="badge" id="uploadBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#f6bd4a"><div class="metric-title"><span>페이지 로딩</span><span class="metric-icon"><i class="fa-solid fa-hourglass-half"></i></span></div><div class="metric-value"><span id="pageValue">--</span><small>초</small></div><span class="badge" id="pageBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#22c98b"><div class="metric-title"><span>서버 연결 상태</span><span class="metric-icon"><i class="fa-solid fa-signal"></i></span></div><div class="metric-value"><span id="connectionValue">--</span></div><span class="badge" id="connectionBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#f56576"><div class="metric-title"><span>알림 권한</span><span class="metric-icon"><i class="fa-solid fa-bell"></i></span></div><div class="metric-value"><span id="notificationValue">--</span></div><span class="badge" id="notificationBadge">측정 전</span></article>
+            <article class="panel metric-card theme-metric" style="--metric-color:#ff8a65"><div class="metric-title"><span>테마 액션 부하</span><span class="metric-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span></div><div class="metric-value"><span id="themeValue">--</span></div><span class="badge" id="themeBadge">측정 전</span></article>
+            <article class="panel metric-card" style="--metric-color:#38bdf8"><div class="metric-title"><span>기기 성능</span><span class="metric-icon"><i class="fa-solid fa-microchip"></i></span></div><div class="metric-value"><span id="deviceValue">--</span></div><span class="badge" id="deviceBadge">측정 전</span></article>
+        </div>
+
+        <div class="analysis-grid">
+            <article class="panel chart-card">
+                <div class="chart-head"><div><h3>연결 성능 분석</h3><span>권장 기준 대비 현재 성능</span></div><i class="fa-solid fa-chart-simple"></i></div>
+                <div class="speed-bars">
+                    <div class="speed-row"><span class="speed-label">다운로드</span><div class="bar-track"><div class="bar-fill" id="downloadBar"></div></div><strong class="speed-number" id="downloadBarValue">--</strong></div>
+                    <div class="speed-row"><span class="speed-label">업로드</span><div class="bar-track"><div class="bar-fill" id="uploadBar"></div></div><strong class="speed-number" id="uploadBarValue">--</strong></div>
+                    <div class="speed-row"><span class="speed-label">응답속도</span><div class="bar-track"><div class="bar-fill" id="latencyBar"></div></div><strong class="speed-number" id="latencyBarValue">--</strong></div>
+                </div>
+                <div class="canvas-wrap"><canvas id="latencyChart" aria-label="서버 응답속도 측정 그래프"></canvas></div>
+            </article>
+            <article class="panel chart-card">
+                <div class="chart-head"><div><h3>접속 환경</h3><span>현재 브라우저에서 확인된 정보</span></div><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="environment-list">
+                    <div class="env-row"><span>브라우저</span><strong id="browserText">확인 중</strong></div>
+                    <div class="env-row"><span>운영체제</span><strong id="osText">확인 중</strong></div>
+                    <div class="env-row"><span>서비스워커</span><strong id="workerText">확인 중</strong></div>
+                    <div class="env-row"><span>푸시 구독</span><strong id="subscriptionText">확인 중</strong></div>
+                    <div class="env-row"><span>테마 액션</span><strong id="themeText">확인 중</strong></div>
+                    <div class="env-row"><span>테마 구성</span><strong id="themeDetailText">확인 중</strong></div>
+                    <div class="env-row"><span>측정 시각</span><strong id="testedAtText">-</strong></div>
+                </div>
+            </article>
+        </div>
+        <p class="note">다운로드·업로드 값은 현재 기기와 새담인트라넷 서버 사이의 실제 표본 전송 결과입니다. 공인 인터넷 회선 속도와는 서버 부하·사내망·VPN 환경에 따라 차이가 날 수 있습니다.</p>
+    </section>
+</main>
+
+<script>
+(() => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const endpoints = {
+        ping: {{ url_for('memo.diagnostics_ping')|tojson }},
+        download: {{ url_for('memo.diagnostics_download')|tojson }},
+        upload: {{ url_for('memo.diagnostics_upload')|tojson }}
+    };
+    const state = {
+        running:false, pings:[], latencyRuns:[], downloadRuns:[], uploadRuns:[],
+        latency:null, download:null, upload:null, page:null, theme:null, device:null,
+        environment:null, notification:null
+    };
+    const TEST_ROUNDS = 3;
+
+    function withTimeout(url, options={}, timeout=15000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeout);
+        return fetch(url, {...options, signal:controller.signal}).finally(() => clearTimeout(timer));
+    }
+    function step(name, mode, detail) {
+        const item = document.querySelector(`[data-step="${name}"]`);
+        if (!item) return;
+        item.classList.remove('active','done','error');
+        item.classList.add(mode);
+        const icon = item.querySelector('i');
+        if (mode === 'active') icon.className = 'fa-solid fa-spinner';
+        if (mode === 'done') icon.className = 'fa-solid fa-check';
+        if (mode === 'error') icon.className = 'fa-solid fa-triangle-exclamation';
+        item.querySelector('small').textContent = detail || '';
+    }
+    function parseEnvironment() {
+        const ua = navigator.userAgent;
+        let browser='알 수 없음', os='알 수 없음', match;
+        if ((match=ua.match(/Edg\/([\d.]+)/))) browser=`Edge ${match[1].split('.')[0]}`;
+        else if ((match=ua.match(/OPR\/([\d.]+)/))) browser=`Opera ${match[1].split('.')[0]}`;
+        else if ((match=ua.match(/Chrome\/([\d.]+)/))) browser=`Chrome ${match[1].split('.')[0]}`;
+        else if ((match=ua.match(/Firefox\/([\d.]+)/))) browser=`Firefox ${match[1].split('.')[0]}`;
+        else if ((match=ua.match(/Version\/([\d.]+).*Safari/))) browser=`Safari ${match[1].split('.')[0]}`;
+        if (/Windows NT 10\.0/.test(ua)) os='Windows 10/11';
+        else if (/Windows NT 6\.3/.test(ua)) os='Windows 8.1';
+        else if (/Android ([\d.]+)/.test(ua)) os=`Android ${RegExp.$1}`;
+        else if (/iPhone OS ([\d_]+)/.test(ua)) os=`iOS ${RegExp.$1.replaceAll('_','.')}`;
+        else if (/iPad.*OS ([\d_]+)/.test(ua)) os=`iPadOS ${RegExp.$1.replaceAll('_','.')}`;
+        else if (/Mac OS X ([\d_]+)/.test(ua)) os=`macOS ${RegExp.$1.replaceAll('_','.')}`;
+        else if (/Linux/.test(ua)) os='Linux';
+        return {browser,os};
+    }
+    async function testEnvironment() {
+        step('environment','active','기기 정보 분석 중');
+        state.environment=parseEnvironment();
+        $('browserText').textContent=state.environment.browser;
+        $('osText').textContent=state.environment.os;
+        step('environment','done',`${state.environment.browser} · ${state.environment.os}`);
+    }
+    async function testDevice() {
+        step('device','active','CPU 코어와 메모리 확인 중');
+        const cores=Number(navigator.hardwareConcurrency||0);
+        const memory=Number(navigator.deviceMemory||0);
+        let level='good', text='원활';
+        if ((!cores&&!memory)||(cores&&cores<4)||(memory&&memory<4)) { level='warn';text='보통'; }
+        if ((cores&&cores<=2)||(memory&&memory<=2)) { level='bad';text='제한'; }
+        const coreText=cores?`${cores}코어`:'코어 미공개';
+        const memoryText=memory?`메모리 약 ${memory}GB`:'메모리 미공개';
+        state.device={cores,memory,level,text,detail:`${coreText} · ${memoryText}`};
+        step('device','done',state.device.detail);
+    }
+    async function testLatency(round) {
+        step('latency','active',`${round}/${TEST_ROUNDS}회 · 서버 왕복 측정 중`);
+        const roundPings=[];
+        for (let i=0;i<5;i++) {
+            const start=performance.now();
+            const response=await withTimeout(`${endpoints.ping}?n=${Date.now()}-${round}-${i}`,{cache:'no-store'},7000);
+            if (!response.ok) throw new Error('서버 응답 오류');
+            await response.json();
+            roundPings.push(performance.now()-start);
+            if (i<4) await new Promise(resolve=>setTimeout(resolve,90));
+        }
+        state.pings.push(...roundPings);
+        const sorted=[...roundPings].sort((a,b)=>a-b);
+        state.latencyRuns.push(sorted.slice(1,-1).reduce((sum,value)=>sum+value,0)/3);
+        state.latency=state.latencyRuns.reduce((sum,value)=>sum+value,0)/state.latencyRuns.length;
+        step('latency',round===TEST_ROUNDS?'done':'active',round===TEST_ROUNDS?`3회 평균 ${Math.round(state.latency)}ms`:`${round}/${TEST_ROUNDS}회 완료`);
+    }
+    async function testDownload(round) {
+        step('download','active',`${round}/${TEST_ROUNDS}회 · 4MB 내려받는 중`);
+        const start=performance.now();
+        const response=await withTimeout(`${endpoints.download}?n=${Date.now()}-${round}`,{cache:'no-store'},30000);
+        if (!response.ok) throw new Error('다운로드 응답 오류');
+        const data=await response.arrayBuffer();
+        const seconds=(performance.now()-start)/1000;
+        state.downloadRuns.push((data.byteLength*8/seconds)/1000000);
+        state.download=state.downloadRuns.reduce((sum,value)=>sum+value,0)/state.downloadRuns.length;
+        step('download',round===TEST_ROUNDS?'done':'active',round===TEST_ROUNDS?`3회 평균 ${state.download.toFixed(1)} Mbps`:`${round}/${TEST_ROUNDS}회 완료`);
+    }
+    function randomBytes(size) {
+        const data=new Uint8Array(size);
+        if (window.crypto?.getRandomValues) {
+            for (let offset=0;offset<size;offset+=65536) window.crypto.getRandomValues(data.subarray(offset,Math.min(offset+65536,size)));
+        } else {
+            for (let i=0;i<size;i++) data[i]=Math.floor(Math.random()*256);
+        }
+        return data;
+    }
+    async function testUpload(round) {
+        step('upload','active',`${round}/${TEST_ROUNDS}회 · 2MB 올려보내는 중`);
+        const payload=randomBytes(2*1024*1024);
+        const start=performance.now();
+        const response=await withTimeout(`${endpoints.upload}?n=${Date.now()}-${round}`,{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:payload,cache:'no-store'},30000);
+        if (!response.ok) throw new Error('업로드 응답 오류');
+        const result=await response.json();
+        if (result.received_bytes!==payload.byteLength) throw new Error('업로드 표본 손실');
+        const seconds=(performance.now()-start)/1000;
+        state.uploadRuns.push((payload.byteLength*8/seconds)/1000000);
+        state.upload=state.uploadRuns.reduce((sum,value)=>sum+value,0)/state.uploadRuns.length;
+        step('upload',round===TEST_ROUNDS?'done':'active',round===TEST_ROUNDS?`3회 평균 ${state.upload.toFixed(1)} Mbps`:`${round}/${TEST_ROUNDS}회 완료`);
+    }
+    async function testPageLoad() {
+        step('page','active','화이트보드 로딩 기록 확인 중');
+        let performanceSource=performance;
+        try { if (window.opener&&!window.opener.closed) performanceSource=window.opener.performance; } catch (_) {}
+        const nav=performanceSource.getEntriesByType('navigation')[0];
+        state.page=Math.max(0.01,((nav?.loadEventEnd||performance.now())-(nav?.startTime||0))/1000);
+        step('page','done',`${state.page.toFixed(2)}초`);
+    }
+    function themeLabel(effectType) {
+        const labels={none:'테마 액션 없음',stars:'별빛',bubbles:'물방울',blobs:'블롭',orbs:'오로라 오브',waves:'웨이브',geometry:'도형',rings:'링',polygons:'폴리곤',lines:'빛줄기',starPop:'별 팝',starSprinkle:'별가루',glitterField:'글리터',cometTwinkle:'꼬리별',neonGeometryFlow:'네온 도형',snowfall:'눈송이',fireflies:'반딧불',aurora:'오로라',confetti:'컨페티'};
+        return labels[effectType]||String(effectType||'기본 액션');
+    }
+    function measureFrames(frameCount=45) {
+        return new Promise(resolve=>{
+            const times=[];
+            const tick=time=>{times.push(time);if(times.length>=frameCount){const intervals=times.slice(1).map((value,index)=>value-times[index]);resolve({average:intervals.reduce((sum,value)=>sum+value,0)/Math.max(1,intervals.length),dropped:intervals.filter(value=>value>25).length});return;}requestAnimationFrame(tick);};
+            requestAnimationFrame(tick);
+        });
+    }
+    async function testTheme() {
+        step('theme','active','테마 구성과 화면 프레임 분석 중');
+        let meta=null, effectType='none', elementCount=0, animationCount=0;
+        try {
+            effectType=localStorage.getItem('saedam_theme_effect')||'none';
+            if (window.opener&&!window.opener.closed) {
+                meta=window.opener.SAEDAM_THEME_PERFORMANCE||null;
+                const container=window.opener.document.getElementById('bg-effect-container');
+                if (container) elementCount=container.querySelectorAll('*').length;
+            }
+        } catch (_) {}
+        if (meta) {
+            effectType=meta.effectType||effectType;
+            elementCount=Number(meta.elementCount||elementCount);
+            animationCount=Number(meta.animationCount||0);
+        }
+        const frames=await measureFrames();
+        const renderMs=Number(meta?.renderMs||0);
+        let level='good', text=effectType==='none'?'사용 안 함':'가벼움', score=100;
+        if (effectType!=='none'&&(renderMs>70||frames.average>28||elementCount>120||frames.dropped>12)) { level='bad';text='부담 높음';score=35; }
+        else if (effectType!=='none'&&(renderMs>25||frames.average>20||elementCount>70||frames.dropped>5)) { level='warn';text='보통';score=70; }
+        state.theme={effectType,label:themeLabel(effectType),elementCount,animationCount,renderMs,frameMs:frames.average,dropped:frames.dropped,level,text,score};
+        $('themeText').textContent=state.theme.label;
+        $('themeDetailText').textContent=`요소 ${elementCount}개 · 애니메이션 ${animationCount}개`;
+        step('theme','done',`${text} · 생성 ${renderMs.toFixed(1)}ms`);
+    }
+    async function testNotification() {
+        step('notification','active','권한과 서비스워커 확인 중');
+        const supported=('Notification' in window)&&('serviceWorker' in navigator)&&('PushManager' in window);
+        let registrations=[], subscription=false;
+        if ('serviceWorker' in navigator) {
+            try { registrations=await navigator.serviceWorker.getRegistrations(); } catch (_) {}
+            for (const registration of registrations) {
+                try { if (await registration.pushManager?.getSubscription()) { subscription=true; break; } } catch (_) {}
+            }
+        }
+        const permission=('Notification' in window)?Notification.permission:'unsupported';
+        state.notification={supported,permission,worker:registrations.some(item=>item.active),subscription,secure:window.isSecureContext};
+        const permissionText=!supported?'미지원':permission==='granted'?'허용':permission==='denied'?'차단':'미설정';
+        $('workerText').textContent=!supported?'미지원':state.notification.worker?'정상 작동':'미등록';
+        $('subscriptionText').textContent=subscription?'구독 중':permission==='granted'?'미구독':'권한 필요';
+        step('notification','done',permissionText);
+    }
+    function classify(metric,value) {
+        const rules={latency:[100,350],download:[50,10],upload:[20,5],page:[1,2.5]};
+        if (metric==='download'||metric==='upload') return value>=rules[metric][0]?{level:'good',text:'양호'}:value>=rules[metric][1]?{level:'warn',text:'보통'}:{level:'bad',text:'느림'};
+        return value<=rules[metric][0]?{level:'good',text:'양호'}:value<=rules[metric][1]?{level:'warn',text:'지연'}:{level:'bad',text:'불안정'};
+    }
+    function metricScore(metric,value) {
+        if (metric==='latency') return Math.max(0,Math.min(100,115-value*.32));
+        if (metric==='page') return Math.max(0,Math.min(100,115-value*24));
+        if (metric==='download') return Math.max(0,Math.min(100,value/80*100));
+        return Math.max(0,Math.min(100,value/35*100));
+    }
+    function setMetric(name,value,classification) {
+        $(`${name}Value`).textContent=value;
+        const badge=$(`${name}Badge`);
+        badge.className=`badge ${classification.level}`;
+        badge.textContent=classification.text;
+    }
+    function connectionResult() {
+        const mean=state.pings.reduce((a,b)=>a+b,0)/Math.max(1,state.pings.length);
+        const jitter=Math.sqrt(state.pings.reduce((sum,value)=>sum+Math.pow(value-mean,2),0)/Math.max(1,state.pings.length));
+        if (state.latency>350||jitter>160) return {level:'bad',text:'불안정',detail:`편차 ${Math.round(jitter)}ms`};
+        if (state.latency>100||jitter>65) return {level:'warn',text:'지연',detail:`편차 ${Math.round(jitter)}ms`};
+        return {level:'good',text:'정상',detail:`편차 ${Math.round(jitter)}ms`};
+    }
+    function notificationResult() {
+        const n=state.notification;
+        if (!n.supported||!n.secure) return {level:'bad',text:'사용 불가',detail:'브라우저 또는 보안 연결 미지원',score:0};
+        if (n.permission==='denied') return {level:'bad',text:'차단',detail:'브라우저 설정에서 허용 필요',score:20};
+        if (n.permission==='granted'&&n.worker&&n.subscription) return {level:'good',text:'허용',detail:'푸시 구독 정상',score:100};
+        if (n.permission==='granted') return {level:'warn',text:'허용',detail:'푸시 구독 확인 필요',score:70};
+        return {level:'warn',text:'미설정',detail:'알림 사용 시 권한 허용 필요',score:55};
+    }
+    function drawLatencyChart(values) {
+        const canvas=$('latencyChart'), rect=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+        canvas.width=Math.max(1,Math.floor(rect.width*dpr)); canvas.height=Math.max(1,Math.floor(rect.height*dpr));
+        const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr); const w=rect.width,h=rect.height,p=12;
+        ctx.clearRect(0,0,w,h); ctx.strokeStyle='rgba(145,164,199,.14)'; ctx.lineWidth=1;
+        for(let i=1;i<4;i++){const y=h*i/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}
+        const max=Math.max(120,...values)*1.15, points=values.map((value,index)=>({x:p+index*(w-p*2)/Math.max(1,values.length-1),y:h-p-(value/max)*(h-p*2)}));
+        const gradient=ctx.createLinearGradient(0,0,w,0);gradient.addColorStop(0,'#4f8cff');gradient.addColorStop(1,'#32d5e8');
+        ctx.strokeStyle=gradient;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();points.forEach((point,index)=>index?ctx.lineTo(point.x,point.y):ctx.moveTo(point.x,point.y));ctx.stroke();
+        points.forEach(point=>{ctx.fillStyle='#dffcff';ctx.beginPath();ctx.arc(point.x,point.y,4,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#32d5e8';ctx.lineWidth=3;ctx.stroke();});
+        ctx.fillStyle='#91a4c7';ctx.font='10px Pretendard';ctx.fillText(`${values.length}회 응답속도 변화`,2,11);
+    }
+    function renderResults() {
+        const latencyClass=classify('latency',state.latency), downloadClass=classify('download',state.download), uploadClass=classify('upload',state.upload), pageClass=classify('page',state.page);
+        const connection=connectionResult(), notification=notificationResult();
+        latencyClass.text+=' · 3회 평균';downloadClass.text+=' · 3회 평균';uploadClass.text+=' · 3회 평균';
+        setMetric('latency',Math.round(state.latency),latencyClass);
+        setMetric('download',state.download.toFixed(1),downloadClass);
+        setMetric('upload',state.upload.toFixed(1),uploadClass);
+        setMetric('page',state.page.toFixed(2),pageClass);
+        setMetric('connection',connection.text,{level:connection.level,text:connection.detail});
+        setMetric('notification',notification.text,{level:notification.level,text:notification.detail});
+        setMetric('theme',state.theme.text,{level:state.theme.level,text:`${state.theme.label} · 생성 ${state.theme.renderMs.toFixed(1)}ms`});
+        setMetric('device',state.device.text,{level:state.device.level,text:state.device.detail});
+        const connectionScore=connection.level==='good'?100:connection.level==='warn'?60:20;
+        const score=Math.round(metricScore('latency',state.latency)*.18+metricScore('download',state.download)*.22+metricScore('upload',state.upload)*.18+metricScore('page',state.page)*.14+connectionScore*.10+notification.score*.08+state.theme.score*.10);
+        const overall=score>=90?{text:'매우 양호',level:'good'}:score>=75?{text:'양호',level:'good'}:score>=55?{text:'보통',level:'warn'}:{text:'개선 필요',level:'bad'};
+        $('scoreValue').textContent=score;
+        $('overallLabel').textContent=`종합평가: ${overall.text}`;$('overallLabel').className=`overall ${overall.level}`;
+        $('gaugeNeedle').style.transform=`rotate(${180-Math.max(0,Math.min(180,score*1.8))}deg)`;
+        $('downloadBar').style.width=`${Math.min(100,state.download/100*100)}%`;$('downloadBarValue').textContent=`${state.download.toFixed(1)}M`;
+        $('uploadBar').style.width=`${Math.min(100,state.upload/50*100)}%`;$('uploadBarValue').textContent=`${state.upload.toFixed(1)}M`;
+        $('latencyBar').style.width=`${Math.max(4,100-Math.min(100,state.latency/4))}%`;$('latencyBarValue').textContent=`${Math.round(state.latency)}ms`;
+        $('testedAtText').textContent=new Intl.DateTimeFormat('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date());
+        drawLatencyChart(state.pings);
+        $('results').classList.add('visible');
+        requestAnimationFrame(fitToWindow);
+    }
+    function fitToWindow() {
+        const app=document.querySelector('.app');
+        document.body.classList.remove('fit-screen');
+        app.style.removeProperty('--fit-scale');
+        if (window.innerWidth<900) return;
+        const scale=Math.min(1,(window.innerHeight-6)/Math.max(1,app.scrollHeight));
+        if (scale<1) {
+            app.style.setProperty('--fit-scale',String(scale));
+            document.body.classList.add('fit-screen');
+        }
+    }
+    async function run() {
+        if (state.running) return;
+        state.running=true;state.pings=[];state.latencyRuns=[];state.downloadRuns=[];state.uploadRuns=[];state.theme=null;state.device=null;
+        document.body.classList.remove('fit-screen');document.querySelector('.app').style.removeProperty('--fit-scale');
+        $('rerunBtn').disabled=true;$('results').classList.remove('visible');
+        $('scoreValue').textContent='--';$('overallLabel').textContent='측정 중';$('overallLabel').className='overall';$('gaugeNeedle').style.transform='rotate(180deg)';
+        $('progressTitle').textContent='사용환경을 3회 반복 확인하고 있습니다';$('progressDescription').textContent='전송속도와 응답속도를 3회 측정해 평균값을 계산합니다. 약 15~40초 정도 걸립니다.';
+        $('runningStatus').textContent='진단 중';$('runningStatus').className='running-dot';
+        document.querySelectorAll('.progress-item').forEach(item=>{item.className='progress-item';item.querySelector('small').textContent='대기 중';});
+        try {
+            await testEnvironment();
+            for(let round=1;round<=TEST_ROUNDS;round++) {
+                $('runningStatus').textContent=`${round}/${TEST_ROUNDS}회`;
+                await testLatency(round);await testDownload(round);await testUpload(round);
+            }
+            await testPageLoad();await testTheme();await testNotification();await testDevice();
+            renderResults();$('progressTitle').textContent='진단이 완료되었습니다';$('progressDescription').textContent='3회 반복 평균과 테마 액션 부하를 반영한 결과입니다.';
+            $('runningStatus').textContent='완료';$('runningStatus').className='running-dot done';
+        } catch (error) {
+            const active=document.querySelector('.progress-item.active');if(active){active.classList.remove('active');active.classList.add('error');active.querySelector('small').textContent=error.name==='AbortError'?'응답 시간 초과':'측정 실패';}
+            $('progressTitle').textContent='일부 진단을 완료하지 못했습니다';$('progressDescription').textContent='연결 상태를 확인한 뒤 다시 측정해주세요.';
+            $('runningStatus').textContent='확인 필요';$('runningStatus').className='running-dot';$('overallLabel').textContent='측정 실패';$('overallLabel').className='overall bad';
+        } finally { state.running=false;$('rerunBtn').disabled=false; }
+    }
+    $('rerunBtn').addEventListener('click',run);
+    window.addEventListener('resize',()=>{if(state.pings.length){drawLatencyChart(state.pings);fitToWindow();}});
+    window.addEventListener('load',()=>setTimeout(run,180));
+})();
+</script>
+</body>
+</html>

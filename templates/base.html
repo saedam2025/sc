@@ -1458,6 +1458,19 @@ if (currentMyInfo) {
             return false;
         }
 
+        function recordThemeEffectPerformance(container, effectType, startedAt) {
+            const elements = Array.from(container.querySelectorAll('*'));
+            window.SAEDAM_THEME_PERFORMANCE = {
+                effectType,
+                renderMs: Math.max(0, performance.now() - startedAt),
+                elementCount: elements.length,
+                // 테마 효과 요소는 CSS 애니메이션용으로 생성되므로 별도의
+                // getComputedStyle 순회 없이 개수를 사용해 진단 자체의 부하를 없앤다.
+                animationCount: effectType === 'none' ? 0 : elements.length,
+                measuredAt: Date.now()
+            };
+        }
+
         function renderSavedLoginThemeEffects() {
             const container = document.getElementById('bg-effect-container');
             if (!container) return;
@@ -1472,10 +1485,12 @@ if (currentMyInfo) {
             container.style.opacity = '0';
 
             setTimeout(() => {
+                const themeRenderStartedAt = performance.now();
                 container.innerHTML = '';
 
                 if (effectType === 'none') {
                     container.style.opacity = '1';
+                    recordThemeEffectPerformance(container, effectType, themeRenderStartedAt);
                     return;
                 } else if (effectType === 'stars') {
                     container.innerHTML = `
@@ -1870,9 +1885,10 @@ if (currentMyInfo) {
                     <div class="blob blob-2" style="background: var(--effect-color2)"></div>
                     <div class="blob blob-3" style="background: var(--effect-color3)"></div>
                 `;
-            }
+                }
                 
                 container.style.opacity = '1';
+                recordThemeEffectPerformance(container, effectType, themeRenderStartedAt);
             }, 100);
         }
 
