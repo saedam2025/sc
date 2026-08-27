@@ -542,6 +542,8 @@
     .board-title-line { display:flex; align-items:center; min-width:0; white-space:nowrap; }
     .board-post-title { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .board-mobile-meta { display:none; }
+    .board-author-name { color:var(--school-text); font-weight:600; line-height:1.25; }
+    .board-author-school { margin-top:3px; overflow:hidden; color:var(--text-gray, #64748b); font-size:0.68rem; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }
     .board-title-line > .fa-paperclip, .board-list-attachment-size { flex:0 0 auto; }
     .board-list-attachment-size { margin-left:4px; color:var(--text-gray, #64748b); font-size:0.72rem; font-weight:500; white-space:nowrap; }
 
@@ -699,6 +701,7 @@
     .read-status-slot + .read-meta-item { padding-left:0; border-left:0; }
     .read-meta-item i { color:var(--text-gray, #8492a6); font-size:0.88rem; }
     .read-meta-author { overflow:hidden; text-overflow:ellipsis; color:var(--school-text); font-weight:700; }
+    .read-meta-school { overflow:hidden; text-overflow:ellipsis; color:var(--text-gray, #64748b); font-size:0.76rem; font-weight:600; }
     .read-body-wrap { margin:0; background:transparent; border:0; border-radius:0; padding:26px 28px 30px; }
     .read-body { min-height:220px; line-height:1.78; font-size:0.98rem; color:var(--school-text); word-break:break-word; }
     .read-body img { max-width:100%; height:auto; border-radius:8px; }
@@ -1380,9 +1383,12 @@
                                             <span class="board-post-title" title="{{ p.title }}">{{ p.title[:40] }}{% if p.title|length > 40 %}...{% endif %}</span>
                                             {% if p.filename %}<i class="fas fa-paperclip" style="color:var(--text-gray, #94a3b8); margin-left:5px;"></i><span class="board-list-attachment-size" title="첨부 {{ p.attachment_count }}개 총용량">{{ p.attachment_total_size_label }}</span>{% endif %}
                                         </div>
-                                        <span class="board-mobile-meta">{{ p.author }} · {{ p.created_at[:10] }}</span>
+                                        <span class="board-mobile-meta">{{ p.author }}{% if is_team_review_board and p.author_school_name %} · {{ p.author_school_name }}{% endif %} · {{ p.created_at[:10] }}</span>
                                     </td>
-                                    <td class="board-col-author" style="text-align:center;">{{ p.author }}</td>
+                                    <td class="board-col-author" style="text-align:center;">
+                                        <div class="board-author-name">{{ p.author }}</div>
+                                        {% if is_team_review_board and p.author_school_name %}<div class="board-author-school" title="{{ p.author_school_name }}">{{ p.author_school_name }}</div>{% endif %}
+                                    </td>
                                     <td class="board-col-status" style="text-align:center;">
                                         {% if is_shared_current_board %}
                                         <span class="confirmation-count" id="confirmation-count-{{ p.id }}" tabindex="0" aria-label="확인자 {{ p.confirmation_count or 0 }}명" title="{{ p.confirmation_names|join(', ') if p.confirmation_names else '아직 확인한 조직원이 없습니다.' }}">
@@ -2605,10 +2611,13 @@
             : data.can_team_review
                 ? `<button type="button" class="team-review-pending-btn" title="현재 본사접수 · 클릭하면 팀장확인 처리" onclick="confirmTeamReview(${Number(data.id)}, this)">본사접수</button>`
             : `<span class="badge status-${statusText}" style="font-size: 0.85rem;">${statusLabel}</span>`;
+        const authorSchoolMeta = isTeamReviewBoard && data.author_school_name
+            ? `<span class="read-meta-school">${escapeHtml(data.author_school_name)}</span>`
+            : '';
         $('#readTitle').text(data.title || '제목 없음');
         $('#readMeta').html(`
             <span class="read-status-slot">${statusMeta}</span>
-            <span class="read-meta-item"><i class="fas fa-user-circle"></i> <span class="read-meta-author">${escapeHtml(data.author || '')}</span></span>
+            <span class="read-meta-item"><i class="fas fa-user-circle"></i> <span class="read-meta-author">${escapeHtml(data.author || '')}</span>${authorSchoolMeta}</span>
             <span class="read-meta-item"><i class="fas fa-clock"></i> ${escapeHtml(data.created_at || '')}</span>
             <span class="read-meta-item"><i class="fa-regular fa-eye"></i> 조회 ${Number(data.view_count || 0)}</span>
             <span class="read-meta-item"><i class="fa-regular fa-comments"></i> 댓글 <span id="viewCommentCount">${data.comment_count || 0}</span></span>
