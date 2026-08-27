@@ -34,6 +34,7 @@ from routes.school_team_review import (
     TEAM_REVIEW_STATUS,
     build_team_review_post_queries,
     ensure_team_review_schema,
+    get_post_author_school_name,
     get_team_leader,
     post_matches_team,
     post_requires_team_review,
@@ -808,6 +809,9 @@ def school_detail(school_key):
     query_params.extend([per_page, offset])
     posts = [dict(row) for row in conn.execute(data_query, query_params).fetchall()]
     for post in posts:
+        post['author_school_name'] = (
+            get_post_author_school_name(conn, post) if is_team_review_board else ''
+        )
         post['team_review_required'] = bool(
             team_leader
             and str(team_leader['custom_team'] or '').strip()
@@ -1370,6 +1374,11 @@ def get_post_api(post_id):
         and post_matches_team(conn, data, team_name)
     )
     data['can_team_review'] = data['team_review_required']
+    data['author_school_name'] = (
+        get_post_author_school_name(conn, data)
+        if team_name and post_matches_team(conn, data, team_name)
+        else ''
+    )
     if data['is_shared']:
         data.update(get_confirmation_summary(conn, post_id))
         data['can_confirm'] = bool(

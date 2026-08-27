@@ -112,6 +112,21 @@ def get_post_author_user(conn, post):
     ''', (author_name,)).fetchone()
 
 
+def get_post_author_school_name(conn, post):
+    """게시물 작성자가 센터장으로 지정된 학교명을 반환한다."""
+    author = get_post_author_user(conn, post)
+    if not author:
+        return ''
+    row = conn.execute('''
+        SELECT school_name
+        FROM schools
+        WHERE ? IN (center_director_id, center_director_id_2)
+        ORDER BY COALESCE(year, 0) DESC, id DESC
+        LIMIT 1
+    ''', (str(author['emp_no'] or '').strip(),)).fetchone()
+    return str(row['school_name'] or '').strip() if row else ''
+
+
 def post_requires_team_review(conn, post):
     post_data = dict(post)
     if not category_requires_team_review(post_data.get('category')):
