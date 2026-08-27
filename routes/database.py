@@ -133,12 +133,36 @@ def ensure_certificate_schema(conn):
             access_token TEXT NOT NULL UNIQUE,
             allow_instructor INTEGER NOT NULL DEFAULT 1,
             allow_employee INTEGER NOT NULL DEFAULT 1,
+            allow_excellent_instructor INTEGER NOT NULL DEFAULT 0,
             is_active INTEGER NOT NULL DEFAULT 1,
             created_by TEXT NOT NULL DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (company_id) REFERENCES certificate_companies(id),
             FOREIGN KEY (sender_id) REFERENCES ai_mail_senders(id)
+        )
+    ''')
+    workgroup_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute('PRAGMA table_info(certificate_workgroups)').fetchall()
+    }
+    if 'allow_excellent_instructor' not in workgroup_columns:
+        conn.execute(
+            'ALTER TABLE certificate_workgroups '
+            'ADD COLUMN allow_excellent_instructor INTEGER NOT NULL DEFAULT 0'
+        )
+
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS excellent_instructor_eligibility (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            applicant_name TEXT NOT NULL,
+            resident_number TEXT NOT NULL,
+            resident_number_normalized TEXT NOT NULL,
+            school_name TEXT NOT NULL,
+            position TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            uploaded_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     conn.execute(
@@ -160,6 +184,10 @@ def ensure_certificate_schema(conn):
     conn.execute(
         'CREATE INDEX IF NOT EXISTS idx_certificate_workgroups_active '
         'ON certificate_workgroups(is_active, company_id)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_excellent_instructor_identity '
+        'ON excellent_instructor_eligibility(applicant_name, resident_number_normalized)'
     )
 
 

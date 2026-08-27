@@ -9,6 +9,7 @@ import secrets
 import base64
 import mimetypes
 import tempfile
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, abort
@@ -16,6 +17,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from jinja2 import Template
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 from .ai_mail import _csrf_required, _csrf_token, _owner_emp_no
 from .database import (
     ensure_certificate_schema,
@@ -69,6 +72,7 @@ CERTIFICATE_FORM_PASSWORD = "0070"
 CERTIFICATE_FORM_SESSION_KEYS = {
     "document.apply": "certificate_apply_verified",
     "document.apply2": "certificate_apply2_verified",
+    "document.apply_excellent": "certificate_apply_excellent_verified",
 }
 CERTIFICATE_FORM_AUTH_TOKEN = "certificate-form-v2"
 
@@ -165,7 +169,12 @@ def _certificate_workgroup_by_token(token, applicant_type):
         ''', (str(token).strip(),)).fetchone()
         if not row:
             return None, None
-        allowed = row['allow_instructor'] if applicant_type == '강사' else row['allow_employee']
+        if applicant_type == '우수강사':
+            allowed = row['allow_excellent_instructor']
+        elif applicant_type == '강사':
+            allowed = row['allow_instructor']
+        else:
+            allowed = row['allow_employee']
         if not allowed:
             return None, None
         company = {
@@ -302,6 +311,25 @@ def validate_dismissal_end_date(form_data):
     return None
 
 
+def _normalize_resident_number(value):
+    """주민번호 비교용으로 숫자만 남긴다."""
+    return re.sub(r'\D', '', _clean_certificate_value(value))
+
+
+def _format_resident_number(value):
+    digits = _normalize_resident_number(value)
+    return f'{digits[:6]}-{digits[6:]}' if len(digits) == 13 else digits
+
+
+def _unique_join(values):
+    unique = []
+    for value in values:
+        cleaned = _clean_certificate_value(value)
+        if cleaned and cleaned not in unique:
+            unique.append(cleaned)
+    return ', '.join(unique)
+
+
 # --- [외부 라우트: 강사 신청용] ---
 @document_bp.route('/apply', defaults={'token': None}, methods=['GET', 'POST'])
 @document_bp.route('/apply/<token>', methods=['GET', 'POST'])
@@ -416,6 +444,143 @@ def apply2(token=None):
         'certificate/form2.html',
         **certificate_form_template_context(workgroup, company),
     )
+
+
+# --- [외부 라우트: 우수강사인증서 전용 신청] ---
+@document_bp.route('/apply-excellent/<token>', methods=['GET', 'POST'])
+def apply_excellent(token):
+    ensure_db_initialized()
+    workgroup, company = _certificate_workgroup_by_token(token, '우수강사')
+    if not workgroup:
+        return render_template(
+            'certificate/link_unavailable.html',
+            message='사용할 수 없거나 종료된 우수강사인증서 신청 링크입니다.',
+        ), 404
+
+    login_response = require_certificate_form_password(workgroup, company)
+    if login_response is not None:
+        return login_response
+
+    if request.method == 'POST':
+        applicant_name = _clean_certificate_value(request.form.get('성명'))
+        resident_number_normalized = _normalize_resident_number(
+            request.form.get('주민번호')
+        )
+        selected_ids = [
+            int(value) for value in request.form.getlist('대상항목')
+            if str(value).isdigit()
+        ]
+        if not applicant_name or len(resident_number_normalized) != 13:
+            return '성명과 주민등록번호를 정확히 입력해 주세요.', 400
+        if not selected_ids:
+            return '신청할 학교와 강의과목을 하나 이상 선택해 주세요.', 400
+
+        placeholders = ','.join('?' for _ in selected_ids)
+        conn = get_db()
+        try:
+            rows = conn.execute(f'''
+                SELECT id, school_name, position, subject
+                FROM excellent_instructor_eligibility
+                WHERE applicant_name=? AND resident_number_normalized=?
+                  AND id IN ({placeholders})
+                ORDER BY id
+            ''', (applicant_name, resident_number_normalized, *selected_ids)).fetchall()
+        finally:
+            conn.close()
+        if len(rows) != len(set(selected_ids)):
+            return '선택한 신청 대상 정보를 확인할 수 없습니다. 다시 조회해 주세요.', 400
+
+        required_fields = (
+            '용도', '이메일주소', '자택주소', '근무시작일', '종료일선택',
+        )
+        if any(not _clean_certificate_value(request.form.get(field)) for field in required_fields):
+            return '필수 신청 정보를 모두 입력해 주세요.', 400
+        if request.form.get('종료일선택') != '현재까지' and not request.form.get('근무종료일'):
+            return '근무 종료일을 입력해 주세요.', 400
+
+        form_data = dict(request.form)
+        form_data.update({
+            '신청일': now_kst().strftime('%Y-%m-%d'),
+            '신청구분': '강사',
+            '증명서종류': '우수강사인증서',
+            '성명': applicant_name,
+            '주민번호': _format_resident_number(resident_number_normalized),
+            '근무장소': _unique_join(row['school_name'] for row in rows),
+            '직책': _unique_join(row['position'] for row in rows),
+            '강의과목': _unique_join(row['subject'] for row in rows),
+            '근무종료일': (
+                '현재까지' if request.form.get('종료일선택') == '현재까지'
+                else _clean_certificate_value(request.form.get('근무종료일'))
+            ),
+            '상태': '대기',
+            '발급일': '',
+            '발급번호': '',
+            '파일명': '',
+            '_workgroup_id': int(workgroup['id']),
+            '_company_id': int(workgroup['company_id']),
+            '_workgroup_name': workgroup['name'],
+            '_company_name': workgroup['company_name'],
+        })
+        form_data.pop('종료일선택', None)
+        form_data.pop('대상항목', None)
+        _insert_certificate_request(form_data)
+        send_admin_alert(
+            applicant_name, '우수강사인증서', role='강사님',
+            sender_id=workgroup['sender_id'],
+            company_name=workgroup['company_name'],
+        )
+        clear_certificate_form_password()
+        return render_template(
+            'certificate/success.html', data=form_data,
+            certificate_workgroup=dict(workgroup), certificate_company=company,
+        )
+
+    return render_template(
+        'certificate/excellent_form.html',
+        lookup_url=url_for('document.lookup_excellent_instructor', token=token),
+        **certificate_form_template_context(workgroup, company),
+    )
+
+
+@document_bp.post('/apply-excellent/<token>/lookup')
+def lookup_excellent_instructor(token):
+    ensure_db_initialized()
+    workgroup, _company = _certificate_workgroup_by_token(token, '우수강사')
+    if not workgroup:
+        return jsonify({'status': 'error', 'message': '사용할 수 없는 신청 링크입니다.'}), 404
+    if not session.get('emp_no') and session.get(
+        CERTIFICATE_FORM_SESSION_KEYS['document.apply_excellent']
+    ) != CERTIFICATE_FORM_AUTH_TOKEN:
+        return jsonify({'status': 'error', 'message': '신청 비밀번호 인증이 필요합니다.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    applicant_name = _clean_certificate_value(data.get('name'))
+    resident_number_normalized = _normalize_resident_number(data.get('resident_number'))
+    if not applicant_name or len(resident_number_normalized) != 13:
+        return jsonify({
+            'status': 'error',
+            'message': '성명과 주민등록번호를 정확히 입력해 주세요.',
+        }), 400
+
+    conn = get_db()
+    try:
+        rows = conn.execute('''
+            SELECT id, school_name, position, subject
+            FROM excellent_instructor_eligibility
+            WHERE applicant_name=? AND resident_number_normalized=?
+            ORDER BY school_name, subject, id
+        ''', (applicant_name, resident_number_normalized)).fetchall()
+    finally:
+        conn.close()
+    if not rows:
+        return jsonify({
+            'status': 'error',
+            'message': '등록된 우수강사 인증 대상 정보를 찾을 수 없습니다.',
+        }), 404
+    return jsonify({
+        'status': 'success',
+        'items': [dict(row) for row in rows],
+    })
 
 
 # --- [내부 라우트: 관리자용] ---
@@ -826,6 +991,9 @@ def _certificate_settings_payload():
             WHERE owner_emp_no=? AND is_active=1
             ORDER BY updated_at DESC, id DESC
         ''', (_owner_emp_no(),)).fetchall()
+        excellent_roster_count = int(conn.execute(
+            'SELECT COUNT(*) FROM excellent_instructor_eligibility'
+        ).fetchone()[0])
         company_items = []
         for row in companies:
             item = dict(row)
@@ -850,11 +1018,15 @@ def _certificate_settings_payload():
             token = item['access_token']
             item['instructor_path'] = url_for('document.apply', token=token)
             item['employee_path'] = url_for('document.apply2', token=token)
+            item['excellent_instructor_path'] = url_for(
+                'document.apply_excellent', token=token,
+            )
             group_items.append(item)
         return {
             'companies': company_items,
             'workgroups': group_items,
             'senders': [_payroll_sender_dict(row) for row in senders],
+            'excellent_roster_count': excellent_roster_count,
             'csrf_token': _csrf_token(),
         }
     finally:
@@ -871,6 +1043,104 @@ def certificate_settings():
 @menu_permission_required("document_admin")
 def certificate_settings_api():
     return jsonify({'status': 'success', **_certificate_settings_payload()})
+
+
+@document_bp.route('/api/excellent-instructors/upload', methods=['POST'])
+@menu_permission_required("document_admin")
+@_csrf_required
+def upload_excellent_instructors():
+    uploaded = request.files.get('file')
+    if not uploaded or not uploaded.filename:
+        return jsonify({'status': 'error', 'message': '업로드할 엑셀 파일을 선택해 주세요.'}), 400
+    if os.path.splitext(uploaded.filename)[1].lower() != '.xlsx':
+        return jsonify({'status': 'error', 'message': 'XLSX 형식의 엑셀 파일만 등록할 수 있습니다.'}), 400
+
+    expected_headers = ['성명', '주민번호', '학교명', '직책', '강의과목']
+    try:
+        workbook = load_workbook(uploaded.stream, read_only=True, data_only=True)
+        worksheet = workbook.active
+        headers = [
+            _clean_certificate_value(cell.value)
+            for cell in next(worksheet.iter_rows(min_row=1, max_row=1))
+        ]
+        header_positions = {}
+        for header in expected_headers:
+            if header not in headers:
+                return jsonify({
+                    'status': 'error',
+                    'message': f'필수 열 [{header}]이 없습니다. 샘플 양식을 사용해 주세요.',
+                }), 400
+            header_positions[header] = headers.index(header)
+
+        records = []
+        errors = []
+        seen = set()
+        for row_number, row in enumerate(worksheet.iter_rows(min_row=2, values_only=True), start=2):
+            raw = [row[index] if index < len(row) else '' for index in range(len(headers))]
+            values = {
+                header: _clean_certificate_value(raw[index])
+                for header, index in header_positions.items()
+            }
+            if not any(values.values()):
+                continue
+            resident_digits = _normalize_resident_number(values['주민번호'])
+            missing = [header for header in expected_headers if not values[header]]
+            if missing:
+                errors.append(f'{row_number}행: {", ".join(missing)} 누락')
+                continue
+            if len(resident_digits) != 13:
+                errors.append(f'{row_number}행: 주민번호는 숫자 13자리여야 합니다.')
+                continue
+            record_key = (
+                values['성명'], resident_digits, values['학교명'],
+                values['직책'], values['강의과목'],
+            )
+            if record_key in seen:
+                continue
+            seen.add(record_key)
+            records.append((
+                values['성명'], _format_resident_number(resident_digits), resident_digits,
+                values['학교명'], values['직책'], values['강의과목'], _owner_emp_no(),
+            ))
+    except (InvalidFileException, OSError, ValueError, StopIteration) as exc:
+        return jsonify({
+            'status': 'error',
+            'message': f'엑셀 파일을 읽을 수 없습니다: {exc}',
+        }), 400
+    finally:
+        try:
+            workbook.close()
+        except (NameError, AttributeError):
+            pass
+
+    if errors:
+        preview = ' / '.join(errors[:5])
+        more = f' 외 {len(errors) - 5}건' if len(errors) > 5 else ''
+        return jsonify({'status': 'error', 'message': f'{preview}{more}'}), 400
+    if not records:
+        return jsonify({'status': 'error', 'message': '등록할 강사 데이터가 없습니다.'}), 400
+
+    conn = get_db()
+    try:
+        ensure_certificate_schema(conn)
+        conn.execute('DELETE FROM excellent_instructor_eligibility')
+        conn.executemany('''
+            INSERT INTO excellent_instructor_eligibility (
+                applicant_name, resident_number, resident_number_normalized,
+                school_name, position, subject, uploaded_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', records)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return jsonify({
+        'status': 'success',
+        'message': f'우수강사 인증 대상 {len(records)}건을 등록했습니다.',
+        'count': len(records),
+    })
 
 
 @document_bp.route('/api/senders/<int:sender_id>', methods=['DELETE'])
@@ -1150,13 +1420,16 @@ def _save_certificate_workgroup(workgroup_id, data):
     sender_id = data.get('sender_id')
     allow_instructor = _json_bool(data, 'allow_instructor')
     allow_employee = _json_bool(data, 'allow_employee')
+    allow_excellent_instructor = _json_bool(
+        data, 'allow_excellent_instructor', default=False,
+    )
     if not name:
         return jsonify({'status': 'error', 'message': '작업그룹명을 입력해 주세요.'}), 400
     if not str(company_id or '').isdigit():
         return jsonify({'status': 'error', 'message': '발급 회사를 선택해 주세요.'}), 400
     if not str(sender_id or '').isdigit():
         return jsonify({'status': 'error', 'message': '발송계정을 선택해 주세요.'}), 400
-    if not allow_instructor and not allow_employee:
+    if not allow_instructor and not allow_employee and not allow_excellent_instructor:
         return jsonify({'status': 'error', 'message': '신청 대상 유형을 하나 이상 선택해 주세요.'}), 400
 
     conn = get_db()
@@ -1182,22 +1455,25 @@ def _save_certificate_workgroup(workgroup_id, data):
             conn.execute('''
                 UPDATE certificate_workgroups
                 SET name=?, company_id=?, sender_id=?, allow_instructor=?,
-                    allow_employee=?, updated_at=CURRENT_TIMESTAMP
+                    allow_employee=?, allow_excellent_instructor=?,
+                    updated_at=CURRENT_TIMESTAMP
                 WHERE id=?
             ''', (
                 name, int(company_id), int(sender_id), allow_instructor,
-                allow_employee, workgroup_id,
+                allow_employee, allow_excellent_instructor, workgroup_id,
             ))
             message = '작업그룹을 수정했습니다.'
         else:
             cursor = conn.execute('''
                 INSERT INTO certificate_workgroups (
                     name, company_id, sender_id, access_token,
-                    allow_instructor, allow_employee, created_by
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    allow_instructor, allow_employee, allow_excellent_instructor,
+                    created_by
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 name, int(company_id), int(sender_id), secrets.token_urlsafe(18),
-                allow_instructor, allow_employee, _owner_emp_no(),
+                allow_instructor, allow_employee, allow_excellent_instructor,
+                _owner_emp_no(),
             ))
             workgroup_id = int(cursor.lastrowid)
             message = '작업그룹과 신청 링크를 생성했습니다.'
@@ -1212,14 +1488,35 @@ def _save_certificate_workgroup(workgroup_id, data):
     finally:
         conn.close()
 
-@document_bp.route('/pdf/<filename>')
+@document_bp.route('/pdf/<int:idx>')
 @menu_permission_required("document_admin")
-def serve_pdf(filename):
-    """관리자 페이지에서 발급된 PDF 보기"""
+def serve_pdf(idx):
+    """관리자 페이지에서 발급된 PDF를 개인정보 없는 URL로 제공한다."""
     if 'emp_no' not in session: return abort(403)
-    safe_name = os.path.basename(filename)
+
+    conn = get_db()
+    try:
+        row = conn.execute(
+            '''
+            SELECT filename
+            FROM certificate_requests
+            WHERE id=? AND status='발급완료' AND filename IS NOT NULL
+            ''',
+            (idx,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row or not row['filename']:
+        return abort(404)
+
+    safe_name = os.path.basename(row['filename'])
+    pdf_path = os.path.join(PDF_FOLDER, safe_name)
+    if not os.path.isfile(pdf_path):
+        return abort(404)
+
     return encrypted_response(
-        os.path.join(PDF_FOLDER, safe_name), safe_name,
+        pdf_path, 'certificate.pdf',
         as_attachment=False, mimetype='application/pdf'
     )
 
