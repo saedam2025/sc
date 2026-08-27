@@ -15,6 +15,7 @@ from __future__ import annotations
 import mimetypes
 import os
 import sqlite3
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -42,6 +43,9 @@ memo_bp = Blueprint("memo", __name__)
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MEMO_USER_QUOTA_BYTES = 30 * 1024 * 1024
+DIAGNOSTIC_TRANSFER_BYTES = 4 * 1024 * 1024
+# 전송 속도 측정값이 압축률에 의해 부풀려지지 않도록 압축하기 어려운 표본을 사용한다.
+DIAGNOSTIC_DOWNLOAD_PAYLOAD = os.urandom(DIAGNOSTIC_TRANSFER_BYTES)
 
 POSTIT_SHAPES = {
     "square",
@@ -455,6 +459,62 @@ def memo_board():
         return response
     finally:
         conn.close()
+
+
+@memo_bp.route("/diagnostics")
+def diagnostics():
+    """현재 접속자의 인트라넷 사용환경을 새 창에서 진단한다."""
+    response = make_response(render_template("network_diagnostics.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@memo_bp.route("/diagnostics/ping")
+def diagnostics_ping():
+    """브라우저에서 인트라넷 서버까지의 왕복 지연을 측정하는 경량 응답."""
+    response = jsonify({
+        "ok": True,
+        "server_time_ms": int(time.time() * 1000),
+    })
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@memo_bp.route("/diagnostics/download")
+def diagnostics_download():
+    """압축되지 않은 4MB 표본을 보내 인트라넷 구간 다운로드 속도를 측정한다."""
+    response = make_response(DIAGNOSTIC_DOWNLOAD_PAYLOAD)
+    response.headers["Content-Type"] = "application/octet-stream"
+    response.headers["Content-Length"] = str(DIAGNOSTIC_TRANSFER_BYTES)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0, no-transform"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Content-Encoding"] = "identity"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+@memo_bp.route("/diagnostics/upload", methods=["POST"])
+def diagnostics_upload():
+    """브라우저가 보낸 표본을 읽어 인트라넷 구간 업로드 속도를 측정한다."""
+    max_bytes = DIAGNOSTIC_TRANSFER_BYTES
+    if request.content_length is not None and request.content_length > max_bytes:
+        return _json_error("속도 측정 표본의 허용 크기를 초과했습니다.", 413)
+
+    started = time.perf_counter()
+    payload = request.stream.read(max_bytes + 1)
+    read_ms = (time.perf_counter() - started) * 1000
+    if len(payload) > max_bytes:
+        return _json_error("속도 측정 표본의 허용 크기를 초과했습니다.", 413)
+
+    response = jsonify({
+        "ok": True,
+        "received_bytes": len(payload),
+        "server_read_ms": round(read_ms, 2),
+    })
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @memo_bp.route("/add_postit", methods=["POST"])
