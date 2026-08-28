@@ -153,17 +153,192 @@ def ensure_certificate_schema(conn):
         )
 
     conn.execute('''
+        CREATE TABLE IF NOT EXISTS excellent_instructor_roster_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            company_id INTEGER,
+            valid_from TEXT NOT NULL,
+            valid_until TEXT NOT NULL,
+            original_filename TEXT NOT NULL DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    roster_group_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute(
+            'PRAGMA table_info(excellent_instructor_roster_groups)'
+        ).fetchall()
+    }
+    if 'company_id' not in roster_group_columns:
+        conn.execute(
+            'ALTER TABLE excellent_instructor_roster_groups '
+            'ADD COLUMN company_id INTEGER'
+        )
+    conn.execute('''
         CREATE TABLE IF NOT EXISTS excellent_instructor_eligibility (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            group_id INTEGER,
             applicant_name TEXT NOT NULL,
             resident_number TEXT NOT NULL,
             resident_number_normalized TEXT NOT NULL,
             school_name TEXT NOT NULL,
             position TEXT NOT NULL,
             subject TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
             uploaded_by TEXT NOT NULL DEFAULT '',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS excellent_instructor_request_groups (
+            request_id INTEGER NOT NULL,
+            group_id INTEGER NOT NULL,
+            applicant_name TEXT NOT NULL,
+            resident_number_normalized TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (request_id, group_id),
+            FOREIGN KEY (request_id) REFERENCES certificate_requests(id) ON DELETE CASCADE,
+            FOREIGN KEY (group_id) REFERENCES excellent_instructor_roster_groups(id)
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS certificate_schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT '',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    eligibility_columns = {
+        row['name'] if hasattr(row, 'keys') else row[1]
+        for row in conn.execute(
+            'PRAGMA table_info(excellent_instructor_eligibility)'
+        ).fetchall()
+    }
+    eligibility_additions = {
+        'group_id': 'INTEGER',
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        # SQLite는 기존 테이블에 비상수 기본값(CURRENT_TIMESTAMP)을
+        # ALTER TABLE로 추가할 수 없으므로 마이그레이션 열은 기본값 없이 만든다.
+        'updated_at': 'DATETIME',
+    }
+    for column_name, column_ddl in eligibility_additions.items():
+        if column_name not in eligibility_columns:
+            conn.execute(
+                'ALTER TABLE excellent_instructor_eligibility '
+                f'ADD COLUMN {column_name} {column_ddl}'
+            )
+    conn.execute('''
+        UPDATE excellent_instructor_eligibility
+        SET updated_at=COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)
+        WHERE updated_at IS NULL
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS excellent_instructor_roster_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            valid_from TEXT NOT NULL DEFAULT '',
+            valid_until TEXT NOT NULL DEFAULT '',
+            updated_by TEXT NOT NULL DEFAULT '',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.execute('''
+        INSERT OR IGNORE INTO excellent_instructor_roster_settings (
+            id, valid_from, valid_until
+        ) VALUES (1, '', '')
+    ''')
+    legacy_count = int(conn.execute('''
+        SELECT COUNT(*) FROM excellent_instructor_eligibility
+        WHERE group_id IS NULL AND is_active=1
+    ''').fetchone()[0])
+    if legacy_count:
+        legacy_period = conn.execute('''
+            SELECT valid_from, valid_until
+            FROM excellent_instructor_roster_settings WHERE id=1
+        ''').fetchone()
+        valid_from = (legacy_period['valid_from'] if hasattr(legacy_period, 'keys') else legacy_period[0]) or ''
+        valid_until = (legacy_period['valid_until'] if hasattr(legacy_period, 'keys') else legacy_period[1]) or ''
+        cursor = conn.execute('''
+            INSERT INTO excellent_instructor_roster_groups (
+                name, valid_from, valid_until, original_filename
+            ) VALUES (?, ?, ?, ?)
+        ''', ('기존 등록 명단', valid_from, valid_until, ''))
+        conn.execute('''
+            UPDATE excellent_instructor_eligibility
+            SET group_id=? WHERE group_id IS NULL AND is_active=1
+        ''', (int(cursor.lastrowid),))
+    # 그룹 연결 기능 도입 전에 접수된 우수강사인증서는 신청일과
+    # 학교·과목이 일치하는 기존 명단 그룹에 가능한 범위에서 연결한다.
+    history_columns = {
+        'resident_number', 'applied_date', 'workplace', 'subject_or_duty',
+    }
+    history_backfilled = conn.execute('''
+        SELECT 1 FROM certificate_schema_meta
+        WHERE key='excellent_request_group_backfill_v1'
+    ''').fetchone()
+    if history_columns <= request_columns and not history_backfilled:
+        conn.execute('''
+            INSERT OR IGNORE INTO excellent_instructor_request_groups (
+                request_id, group_id, applicant_name, resident_number_normalized
+            )
+            SELECT DISTINCT
+                r.id, g.id, r.applicant_name,
+                REPLACE(REPLACE(r.resident_number, '-', ''), ' ', '')
+            FROM certificate_requests r
+            JOIN excellent_instructor_eligibility e
+              ON e.applicant_name=r.applicant_name
+             AND e.resident_number_normalized=
+                 REPLACE(REPLACE(r.resident_number, '-', ''), ' ', '')
+             AND e.is_active=1
+            JOIN excellent_instructor_roster_groups g
+              ON g.id=e.group_id
+            WHERE REPLACE(r.certificate_type, ' ', '')='우수강사인증서'
+              AND (r.applied_date='' OR r.applied_date IS NULL
+                   OR (g.valid_from<=r.applied_date AND g.valid_until>=r.applied_date))
+              AND (r.workplace='' OR r.workplace IS NULL
+                   OR INSTR(',' || REPLACE(r.workplace, ', ', ',') || ',',
+                            ',' || e.school_name || ',')>0)
+              AND (r.subject_or_duty='' OR r.subject_or_duty IS NULL
+                   OR INSTR(',' || REPLACE(r.subject_or_duty, ', ', ',') || ',',
+                            ',' || e.subject || ',')>0)
+        ''')
+        conn.execute('''
+            INSERT INTO certificate_schema_meta (key, value, updated_at)
+            VALUES ('excellent_request_group_backfill_v1', 'complete', CURRENT_TIMESTAMP)
+        ''')
+    # 기존 전역 명단은 연결된 발급 이력의 회사를 우선 사용한다. 이력이 없는
+    # 과거 명단은 새담 회사(없으면 최초 등록 회사)에 연결해 회사 간 노출을 막는다.
+    conn.execute('''
+        UPDATE excellent_instructor_roster_groups
+        SET company_id=(
+            SELECT r.company_id
+            FROM excellent_instructor_request_groups rg
+            JOIN certificate_requests r ON r.id=rg.request_id
+            WHERE rg.group_id=excellent_instructor_roster_groups.id
+              AND r.company_id IS NOT NULL
+            ORDER BY r.id DESC
+            LIMIT 1
+        )
+        WHERE company_id IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM excellent_instructor_request_groups rg
+            JOIN certificate_requests r ON r.id=rg.request_id
+            WHERE rg.group_id=excellent_instructor_roster_groups.id
+              AND r.company_id IS NOT NULL
+          )
+    ''')
+    conn.execute('''
+        UPDATE excellent_instructor_roster_groups
+        SET company_id=COALESCE(
+            (SELECT id FROM certificate_companies
+             WHERE company_name LIKE '%새담%' ORDER BY id LIMIT 1),
+            (SELECT id FROM certificate_companies ORDER BY id LIMIT 1)
+        )
+        WHERE company_id IS NULL
     ''')
     conn.execute(
         'CREATE INDEX IF NOT EXISTS idx_certificate_requests_status '
@@ -188,6 +363,23 @@ def ensure_certificate_schema(conn):
     conn.execute(
         'CREATE INDEX IF NOT EXISTS idx_excellent_instructor_identity '
         'ON excellent_instructor_eligibility(applicant_name, resident_number_normalized)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_excellent_instructor_group '
+        'ON excellent_instructor_eligibility(group_id, is_active)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_excellent_roster_groups_active '
+        'ON excellent_instructor_roster_groups(is_active, valid_from, valid_until)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_excellent_roster_groups_company '
+        'ON excellent_instructor_roster_groups(company_id, is_active, valid_from, valid_until)'
+    )
+    conn.execute(
+        'CREATE INDEX IF NOT EXISTS idx_excellent_request_group_identity '
+        'ON excellent_instructor_request_groups('
+        'group_id, applicant_name, resident_number_normalized)'
     )
 
 

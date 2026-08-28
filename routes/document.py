@@ -251,12 +251,14 @@ def _certificate_record(row):
     return result
 
 
-def _insert_certificate_request(form_data):
+def _insert_certificate_request(form_data, conn=None, commit=True):
     values = {
         field: _clean_certificate_value(form_data.get(field, ''))
         for field in CERTIFICATE_FIELD_MAP
     }
-    conn = get_db()
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
     try:
         cursor = conn.execute('''
             INSERT INTO certificate_requests (
@@ -273,10 +275,12 @@ def _insert_certificate_request(form_data):
             _clean_certificate_value(form_data.get('_workgroup_name')),
             _clean_certificate_value(form_data.get('_company_name')),
         ))
-        conn.commit()
+        if commit:
+            conn.commit()
         return int(cursor.lastrowid)
     finally:
-        conn.close()
+        if owns_connection:
+            conn.close()
 
 def get_next_issue_number():
     """연도별 발급 번호 자동 생성"""
@@ -328,6 +332,59 @@ def _unique_join(values):
         if cleaned and cleaned not in unique:
             unique.append(cleaned)
     return ', '.join(unique)
+
+
+def _validity_period(valid_from, valid_until):
+    start_text = _clean_certificate_value(valid_from)
+    end_text = _clean_certificate_value(valid_until)
+    if not start_text or not end_text:
+        raise ValueError('명단 유효 시작일과 종료일을 모두 입력해 주세요.')
+    try:
+        start_date = datetime.strptime(start_text, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_text, '%Y-%m-%d').date()
+    except ValueError as exc:
+        raise ValueError('명단 유효기간의 날짜 형식을 확인해 주세요.') from exc
+    if end_date < start_date:
+        raise ValueError('명단 유효 종료일은 시작일보다 빠를 수 없습니다.')
+    return start_date.isoformat(), end_date.isoformat()
+
+
+def _excellent_group_status(row):
+    group = dict(row)
+    today = now_kst().date().isoformat()
+    group['is_valid'] = bool(
+        group.get('is_active') and group.get('valid_from')
+        and group.get('valid_until')
+        and group['valid_from'] <= today <= group['valid_until']
+    )
+    group['is_upcoming'] = bool(
+        group.get('is_active') and group.get('valid_from')
+        and today < group['valid_from']
+    )
+    group['today'] = today
+    return group
+
+
+def _excellent_roster_summary(conn):
+    today = now_kst().date().isoformat()
+    row = conn.execute('''
+        SELECT
+            (SELECT COUNT(*) FROM excellent_instructor_roster_groups
+             WHERE is_active=1) AS group_count,
+            (SELECT COUNT(*) FROM excellent_instructor_roster_groups
+             WHERE is_active=1 AND valid_from<=? AND valid_until>=?) AS valid_group_count,
+            (SELECT COUNT(*) FROM excellent_instructor_eligibility e
+             JOIN excellent_instructor_roster_groups g ON g.id=e.group_id
+             WHERE e.is_active=1 AND g.is_active=1) AS member_count
+    ''', (today, today)).fetchone()
+    return dict(row)
+
+
+def _masked_resident_number(value):
+    digits = _normalize_resident_number(value)
+    if len(digits) != 13:
+        return ''
+    return f'{digits[:6]}-{digits[6]}******'
 
 
 # --- [외부 라우트: 강사 신청용] ---
@@ -473,23 +530,12 @@ def apply_excellent(token):
         if not applicant_name or len(resident_number_normalized) != 13:
             return '성명과 주민등록번호를 정확히 입력해 주세요.', 400
         if not selected_ids:
-            return '신청할 학교와 강의과목을 하나 이상 선택해 주세요.', 400
-
-        placeholders = ','.join('?' for _ in selected_ids)
-        conn = get_db()
-        try:
-            rows = conn.execute(f'''
-                SELECT id, school_name, position, subject
-                FROM excellent_instructor_eligibility
-                WHERE applicant_name=? AND resident_number_normalized=?
-                  AND id IN ({placeholders})
-                ORDER BY id
-            ''', (applicant_name, resident_number_normalized, *selected_ids)).fetchall()
-        finally:
-            conn.close()
-        if len(rows) != len(set(selected_ids)):
-            return '선택한 신청 대상 정보를 확인할 수 없습니다. 다시 조회해 주세요.', 400
-
+            return '신청할 학교와 강의과목을 한 건 선택해 주세요.', 400
+        if len(set(selected_ids)) != 1:
+            return (
+                '한번에 한 건씩 발급 가능합니다. '
+                '한 건을 신청한 후 다른 건을 신청해 주세요.'
+            ), 400
         required_fields = (
             '용도', '이메일주소', '자택주소', '근무시작일', '종료일선택',
         )
@@ -498,32 +544,99 @@ def apply_excellent(token):
         if request.form.get('종료일선택') != '현재까지' and not request.form.get('근무종료일'):
             return '근무 종료일을 입력해 주세요.', 400
 
-        form_data = dict(request.form)
-        form_data.update({
-            '신청일': now_kst().strftime('%Y-%m-%d'),
-            '신청구분': '강사',
-            '증명서종류': '우수강사인증서',
-            '성명': applicant_name,
-            '주민번호': _format_resident_number(resident_number_normalized),
-            '근무장소': _unique_join(row['school_name'] for row in rows),
-            '직책': _unique_join(row['position'] for row in rows),
-            '강의과목': _unique_join(row['subject'] for row in rows),
-            '근무종료일': (
-                '현재까지' if request.form.get('종료일선택') == '현재까지'
-                else _clean_certificate_value(request.form.get('근무종료일'))
-            ),
-            '상태': '대기',
-            '발급일': '',
-            '발급번호': '',
-            '파일명': '',
-            '_workgroup_id': int(workgroup['id']),
-            '_company_id': int(workgroup['company_id']),
-            '_workgroup_name': workgroup['name'],
-            '_company_name': workgroup['company_name'],
-        })
-        form_data.pop('종료일선택', None)
-        form_data.pop('대상항목', None)
-        _insert_certificate_request(form_data)
+        placeholders = ','.join('?' for _ in selected_ids)
+        conn = get_db()
+        try:
+            conn.execute('BEGIN IMMEDIATE')
+            today = now_kst().date().isoformat()
+            rows = conn.execute(f'''
+                SELECT e.id, e.group_id, e.school_name, e.position, e.subject,
+                       g.name AS group_name
+                FROM excellent_instructor_eligibility e
+                JOIN excellent_instructor_roster_groups g ON g.id=e.group_id
+                WHERE e.applicant_name=? AND e.resident_number_normalized=?
+                  AND e.id IN ({placeholders}) AND e.is_active=1
+                  AND g.company_id=?
+                  AND g.is_active=1 AND g.valid_from<=? AND g.valid_until>=?
+                ORDER BY e.id
+            ''', (
+                applicant_name, resident_number_normalized, *selected_ids,
+                int(workgroup['company_id']),
+                today, today,
+            )).fetchall()
+            if len(rows) != len(set(selected_ids)):
+                conn.rollback()
+                return '선택한 신청 대상 정보를 확인할 수 없습니다. 다시 조회해 주세요.', 400
+
+            selected_group_ids = sorted({int(row['group_id']) for row in rows})
+            group_placeholders = ','.join('?' for _ in selected_group_ids)
+            duplicate = conn.execute(f'''
+                SELECT rg.group_id, g.name, r.status
+                FROM excellent_instructor_request_groups rg
+                JOIN certificate_requests r ON r.id=rg.request_id
+                JOIN excellent_instructor_roster_groups g ON g.id=rg.group_id
+                WHERE rg.applicant_name=?
+                  AND rg.resident_number_normalized=?
+                  AND rg.group_id IN ({group_placeholders})
+                  AND REPLACE(r.certificate_type, ' ', '')='우수강사인증서'
+                ORDER BY CASE WHEN r.status='발급완료' THEN 0 ELSE 1 END, r.id DESC
+                LIMIT 1
+            ''', (
+                applicant_name, resident_number_normalized, *selected_group_ids,
+            )).fetchone()
+            if duplicate:
+                conn.rollback()
+                duplicate_status = (
+                    '발급완료' if duplicate['status'] == '발급완료' else '신청중'
+                )
+                return (
+                    f'{duplicate["name"]} 그룹은 이미 {duplicate_status}입니다. '
+                    '신청 대상을 다시 조회해 주세요.'
+                ), 409
+
+            form_data = dict(request.form)
+            form_data.update({
+                '신청일': now_kst().strftime('%Y-%m-%d'),
+                '신청구분': '강사',
+                '증명서종류': '우수강사인증서',
+                '성명': applicant_name,
+                '주민번호': _format_resident_number(resident_number_normalized),
+                '근무장소': _unique_join(row['school_name'] for row in rows),
+                '직책': _unique_join(row['position'] for row in rows),
+                '강의과목': _unique_join(row['subject'] for row in rows),
+                '근무종료일': (
+                    '현재까지' if request.form.get('종료일선택') == '현재까지'
+                    else _clean_certificate_value(request.form.get('근무종료일'))
+                ),
+                '상태': '대기',
+                '발급일': '',
+                '발급번호': '',
+                '파일명': '',
+                '_workgroup_id': int(workgroup['id']),
+                '_company_id': int(workgroup['company_id']),
+                '_workgroup_name': workgroup['name'],
+                '_company_name': workgroup['company_name'],
+            })
+            form_data.pop('종료일선택', None)
+            form_data.pop('대상항목', None)
+            request_id = _insert_certificate_request(
+                form_data, conn=conn, commit=False,
+            )
+            conn.executemany('''
+                INSERT INTO excellent_instructor_request_groups (
+                    request_id, group_id, applicant_name,
+                    resident_number_normalized
+                ) VALUES (?, ?, ?, ?)
+            ''', [(
+                request_id, group_id, applicant_name,
+                resident_number_normalized,
+            ) for group_id in selected_group_ids])
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
         send_admin_alert(
             applicant_name, '우수강사인증서', role='강사님',
             sender_id=workgroup['sender_id'],
@@ -564,22 +677,91 @@ def lookup_excellent_instructor(token):
 
     conn = get_db()
     try:
+        today = now_kst().date().isoformat()
         rows = conn.execute('''
-            SELECT id, school_name, position, subject
-            FROM excellent_instructor_eligibility
-            WHERE applicant_name=? AND resident_number_normalized=?
-            ORDER BY school_name, subject, id
-        ''', (applicant_name, resident_number_normalized)).fetchall()
+            SELECT e.id, e.group_id, e.school_name, e.position, e.subject,
+                   g.name AS group_name, g.valid_from, g.valid_until
+            FROM excellent_instructor_eligibility e
+            JOIN excellent_instructor_roster_groups g ON g.id=e.group_id
+            WHERE e.applicant_name=? AND e.resident_number_normalized=?
+              AND e.is_active=1 AND g.is_active=1 AND g.company_id=?
+            ORDER BY g.valid_from DESC, g.id DESC,
+                     e.school_name, e.subject, e.id
+        ''', (
+            applicant_name, resident_number_normalized,
+            int(workgroup['company_id']),
+        )).fetchall()
+        history_rows = conn.execute('''
+            SELECT rg.group_id, r.id AS request_id, r.status AS request_status,
+                   r.applied_date, r.issued_date, r.issue_number
+            FROM excellent_instructor_request_groups rg
+            JOIN certificate_requests r ON r.id=rg.request_id
+            JOIN excellent_instructor_roster_groups g ON g.id=rg.group_id
+            WHERE rg.applicant_name=?
+              AND rg.resident_number_normalized=?
+              AND g.company_id=?
+              AND REPLACE(r.certificate_type, ' ', '')='우수강사인증서'
+            ORDER BY CASE WHEN r.status='발급완료' THEN 0 ELSE 1 END,
+                     r.id DESC
+        ''', (
+            applicant_name, resident_number_normalized,
+            int(workgroup['company_id']),
+        )).fetchall()
     finally:
         conn.close()
     if not rows:
         return jsonify({
             'status': 'error',
-            'message': '등록된 우수강사 인증 대상 정보를 찾을 수 없습니다.',
+            'message': '우수강사인증서 신청 대상자가 아닙니다.',
         }), 404
+    history_by_group = {}
+    for history in history_rows:
+        history_by_group.setdefault(int(history['group_id']), dict(history))
+
+    groups_by_id = {}
+    for row in rows:
+        item = dict(row)
+        group_id = int(item.pop('group_id'))
+        group = groups_by_id.setdefault(group_id, {
+            'id': group_id,
+            'name': item.pop('group_name'),
+            'valid_from': item.pop('valid_from'),
+            'valid_until': item.pop('valid_until'),
+            'items': [],
+        })
+        group['items'].append(item)
+
+    status_counts = {
+        'available': 0, 'pending': 0, 'issued': 0,
+        'upcoming': 0, 'expired': 0,
+    }
+    status_labels = {
+        'available': '발급 가능', 'pending': '신청중',
+        'issued': '발급완료', 'upcoming': '신청기간 전',
+        'expired': '신청기간 만료',
+    }
+    for group in groups_by_id.values():
+        history = history_by_group.get(group['id'])
+        if history and history['request_status'] == '발급완료':
+            group_status = 'issued'
+        elif history:
+            group_status = 'pending'
+        elif group['valid_from'] <= today <= group['valid_until']:
+            group_status = 'available'
+        elif today < group['valid_from']:
+            group_status = 'upcoming'
+        else:
+            group_status = 'expired'
+        group['application_status'] = group_status
+        group['status_label'] = status_labels[group_status]
+        group['selectable'] = group_status == 'available'
+        group['history'] = history
+        status_counts[group_status] += 1
+
     return jsonify({
         'status': 'success',
-        'items': [dict(row) for row in rows],
+        'groups': list(groups_by_id.values()),
+        'summary': status_counts,
     })
 
 
@@ -645,7 +827,8 @@ def admin_list():
         paginated_submissions = [_certificate_record(row) for row in rows]
         workgroups = conn.execute('''
             SELECT w.id, w.name, w.company_id, w.sender_id, w.access_token,
-                   w.allow_instructor, w.allow_employee, c.company_name
+                   w.allow_instructor, w.allow_employee,
+                   w.allow_excellent_instructor, c.company_name
             FROM certificate_workgroups w
             JOIN certificate_companies c ON c.id=w.company_id
             WHERE w.is_active=1 AND c.is_active=1
@@ -721,7 +904,11 @@ def generate_certificate(idx):
             return redirect(url_for('document.admin_list'))
         if bundle:
             applicant_type = record.get('신청구분', '')
-            if applicant_type == '강사' and not bundle.get('allow_instructor'):
+            is_excellent = record.get('증명서종류') == '우수강사인증서'
+            if is_excellent and not bundle.get('allow_excellent_instructor'):
+                flash('선택한 작업그룹은 우수강사인증서 발급을 허용하지 않습니다.')
+                return redirect(url_for('document.admin_list'))
+            if applicant_type == '강사' and not is_excellent and not bundle.get('allow_instructor'):
                 flash('선택한 작업그룹은 강사 증명서 발급을 허용하지 않습니다.')
                 return redirect(url_for('document.admin_list'))
             if applicant_type == '임직원' and not bundle.get('allow_employee'):
@@ -991,9 +1178,7 @@ def _certificate_settings_payload():
             WHERE owner_emp_no=? AND is_active=1
             ORDER BY updated_at DESC, id DESC
         ''', (_owner_emp_no(),)).fetchall()
-        excellent_roster_count = int(conn.execute(
-            'SELECT COUNT(*) FROM excellent_instructor_eligibility'
-        ).fetchone()[0])
+        excellent_roster_summary = _excellent_roster_summary(conn)
         company_items = []
         for row in companies:
             item = dict(row)
@@ -1026,7 +1211,7 @@ def _certificate_settings_payload():
             'companies': company_items,
             'workgroups': group_items,
             'senders': [_payroll_sender_dict(row) for row in senders],
-            'excellent_roster_count': excellent_roster_count,
+            'excellent_roster_summary': excellent_roster_summary,
             'csrf_token': _csrf_token(),
         }
     finally:
@@ -1045,17 +1230,252 @@ def certificate_settings_api():
     return jsonify({'status': 'success', **_certificate_settings_payload()})
 
 
-@document_bp.route('/api/excellent-instructors/upload', methods=['POST'])
+@document_bp.get('/api/excellent-instructor-groups')
+@menu_permission_required("document_admin")
+def excellent_instructor_groups_api():
+    conn = get_db()
+    try:
+        ensure_certificate_schema(conn)
+        rows = conn.execute('''
+            SELECT g.*, c.company_name,
+                   COUNT(CASE WHEN e.is_active=1 THEN 1 END) AS member_count
+            FROM excellent_instructor_roster_groups g
+            LEFT JOIN excellent_instructor_eligibility e ON e.group_id=g.id
+            LEFT JOIN certificate_companies c ON c.id=g.company_id
+            WHERE g.is_active=1
+            GROUP BY g.id
+            ORDER BY g.created_at DESC, g.id DESC
+        ''').fetchall()
+        creator_names = {}
+        has_users_table = conn.execute('''
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='users'
+        ''').fetchone()
+        creator_ids = sorted({
+            _clean_certificate_value(row['created_by'])
+            for row in rows if _clean_certificate_value(row['created_by'])
+        })
+        if has_users_table and creator_ids:
+            placeholders = ','.join('?' for _ in creator_ids)
+            creator_names = {
+                str(row['emp_no']): _clean_certificate_value(row['name'])
+                for row in conn.execute(f'''
+                    SELECT emp_no, name FROM users
+                    WHERE CAST(emp_no AS TEXT) IN ({placeholders})
+                ''', creator_ids).fetchall()
+            }
+    finally:
+        conn.close()
+    groups = []
+    for row in rows:
+        group = dict(row)
+        creator_id = _clean_certificate_value(group.get('created_by'))
+        group['created_by_name'] = creator_names.get(
+            creator_id, creator_id or '알 수 없음',
+        )
+        group['created_date'] = _clean_certificate_value(
+            group.get('created_at')
+        )[:10]
+        groups.append(_excellent_group_status(group))
+    return jsonify({
+        'status': 'success',
+        'groups': groups,
+    })
+
+
+@document_bp.get('/api/excellent-instructor-groups/<int:group_id>/members')
+@menu_permission_required("document_admin")
+def excellent_instructor_group_members_api(group_id):
+    page = max(request.args.get('page', 1, type=int), 1)
+    per_page = 50
+    search = _clean_certificate_value(request.args.get('q'))
+    conditions = ['group_id=?', 'is_active=1']
+    params = [group_id]
+    if search:
+        pattern = f'%{search}%'
+        conditions.append('''(
+            applicant_name LIKE ? OR school_name LIKE ?
+            OR position LIKE ? OR subject LIKE ?
+        )''')
+        params.extend([pattern, pattern, pattern, pattern])
+    where_sql = ' AND '.join(conditions)
+    conn = get_db()
+    try:
+        ensure_certificate_schema(conn)
+        group_row = conn.execute('''
+            SELECT * FROM excellent_instructor_roster_groups
+            WHERE id=? AND is_active=1
+        ''', (group_id,)).fetchone()
+        if not group_row:
+            return jsonify({'status': 'error', 'message': '명단 그룹을 찾을 수 없습니다.'}), 404
+        total = int(conn.execute(
+            f'SELECT COUNT(*) FROM excellent_instructor_eligibility WHERE {where_sql}',
+            params,
+        ).fetchone()[0])
+        total_pages = max((total + per_page - 1) // per_page, 1)
+        page = min(page, total_pages)
+        rows = conn.execute(f'''
+            SELECT e.id, e.applicant_name, e.resident_number, e.school_name,
+                   e.position, e.subject,
+                   CASE
+                     WHEN EXISTS (
+                       SELECT 1
+                       FROM excellent_instructor_request_groups rg
+                       JOIN certificate_requests r ON r.id=rg.request_id
+                       WHERE rg.group_id=e.group_id
+                         AND rg.applicant_name=e.applicant_name
+                         AND rg.resident_number_normalized=e.resident_number_normalized
+                         AND REPLACE(r.certificate_type, ' ', '')='우수강사인증서'
+                         AND r.status='발급완료'
+                     ) THEN '발급완료'
+                     WHEN EXISTS (
+                       SELECT 1
+                       FROM excellent_instructor_request_groups rg
+                       JOIN certificate_requests r ON r.id=rg.request_id
+                       WHERE rg.group_id=e.group_id
+                         AND rg.applicant_name=e.applicant_name
+                         AND rg.resident_number_normalized=e.resident_number_normalized
+                         AND REPLACE(r.certificate_type, ' ', '')='우수강사인증서'
+                     ) THEN '신청중'
+                     ELSE '미신청'
+                   END AS application_status
+            FROM excellent_instructor_eligibility e
+            WHERE {where_sql}
+            ORDER BY e.applicant_name, e.school_name, e.subject, e.id
+            LIMIT ? OFFSET ?
+        ''', (*params, per_page, (page - 1) * per_page)).fetchall()
+    finally:
+        conn.close()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item['resident_number_masked'] = _masked_resident_number(item['resident_number'])
+        items.append(item)
+    return jsonify({
+        'status': 'success', 'group': _excellent_group_status(group_row),
+        'items': items, 'total': total, 'page': page,
+        'total_pages': total_pages,
+    })
+
+
+@document_bp.route('/api/excellent-instructor-groups/<int:group_id>', methods=['PATCH', 'DELETE'])
 @menu_permission_required("document_admin")
 @_csrf_required
-def upload_excellent_instructors():
+def update_excellent_instructor_group(group_id):
+    conn = get_db()
+    try:
+        ensure_certificate_schema(conn)
+        group_row = conn.execute('''
+            SELECT * FROM excellent_instructor_roster_groups
+            WHERE id=? AND is_active=1
+        ''', (group_id,)).fetchone()
+        if not group_row:
+            return jsonify({'status': 'error', 'message': '명단 그룹을 찾을 수 없습니다.'}), 404
+        if request.method == 'DELETE':
+            conn.execute('''
+                UPDATE excellent_instructor_roster_groups
+                SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?
+            ''', (group_id,))
+            conn.commit()
+            return jsonify({'status': 'success', 'message': '명단 그룹을 삭제했습니다.'})
+        data = request.get_json(silent=True) or {}
+        name = _clean_certificate_value(data.get('name'))
+        if not name:
+            return jsonify({'status': 'error', 'message': '그룹명을 입력해 주세요.'}), 400
+        if len(name) > 100:
+            return jsonify({'status': 'error', 'message': '그룹명은 100자 이하로 입력해 주세요.'}), 400
+        try:
+            valid_from, valid_until = _validity_period(
+                data.get('valid_from'), data.get('valid_until'),
+            )
+        except ValueError as exc:
+            return jsonify({'status': 'error', 'message': str(exc)}), 400
+        company_id = data.get('company_id', group_row['company_id'])
+        try:
+            company_id = int(company_id)
+        except (TypeError, ValueError):
+            return jsonify({'status': 'error', 'message': '발급 회사를 선택해 주세요.'}), 400
+        company = conn.execute('''
+            SELECT id FROM certificate_companies WHERE id=? AND is_active=1
+        ''', (company_id,)).fetchone()
+        if not company:
+            return jsonify({'status': 'error', 'message': '선택한 발급 회사를 찾을 수 없습니다.'}), 400
+        conn.execute('''
+            UPDATE excellent_instructor_roster_groups
+            SET name=?, company_id=?, valid_from=?, valid_until=?,
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (name, company_id, valid_from, valid_until, group_id))
+        conn.commit()
+        return jsonify({'status': 'success', 'message': '명단 그룹을 수정했습니다.'})
+    finally:
+        conn.close()
+
+
+@document_bp.route('/api/excellent-instructors/<int:member_id>', methods=['PATCH', 'DELETE'])
+@menu_permission_required("document_admin")
+@_csrf_required
+def update_excellent_instructor(member_id):
+    conn = get_db()
+    try:
+        ensure_certificate_schema(conn)
+        row = conn.execute('''
+            SELECT e.id FROM excellent_instructor_eligibility e
+            JOIN excellent_instructor_roster_groups g ON g.id=e.group_id
+            WHERE e.id=? AND e.is_active=1 AND g.is_active=1
+        ''', (member_id,)).fetchone()
+        if not row:
+            return jsonify({'status': 'error', 'message': '명단 항목을 찾을 수 없습니다.'}), 404
+        if request.method == 'DELETE':
+            conn.execute('''
+                UPDATE excellent_instructor_eligibility
+                SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?
+            ''', (member_id,))
+            conn.commit()
+            return jsonify({'status': 'success', 'message': '명단 항목을 삭제했습니다.'})
+        data = request.get_json(silent=True) or {}
+        values = {
+            'applicant_name': _clean_certificate_value(data.get('applicant_name')),
+            'resident_number': _clean_certificate_value(data.get('resident_number')),
+            'school_name': _clean_certificate_value(data.get('school_name')),
+            'position': _clean_certificate_value(data.get('position')),
+            'subject': _clean_certificate_value(data.get('subject')),
+        }
+        if any(not value for value in values.values()):
+            return jsonify({'status': 'error', 'message': '명단 정보를 모두 입력해 주세요.'}), 400
+        resident_digits = _normalize_resident_number(values['resident_number'])
+        if len(resident_digits) != 13:
+            return jsonify({'status': 'error', 'message': '주민번호는 숫자 13자리여야 합니다.'}), 400
+        conn.execute('''
+            UPDATE excellent_instructor_eligibility
+            SET applicant_name=?, resident_number=?, resident_number_normalized=?,
+                school_name=?, position=?, subject=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        ''', (
+            values['applicant_name'], _format_resident_number(resident_digits),
+            resident_digits, values['school_name'], values['position'],
+            values['subject'], member_id,
+        ))
+        conn.commit()
+        return jsonify({'status': 'success', 'message': '명단 항목을 수정했습니다.'})
+    finally:
+        conn.close()
+
+
+def _excellent_upload_file():
+    if request.content_length and request.content_length > 10 * 1024 * 1024:
+        raise ValueError('엑셀 파일은 10MB 이하만 등록할 수 있습니다.')
     uploaded = request.files.get('file')
     if not uploaded or not uploaded.filename:
-        return jsonify({'status': 'error', 'message': '업로드할 엑셀 파일을 선택해 주세요.'}), 400
+        raise ValueError('업로드할 엑셀 파일을 선택해 주세요.')
     if os.path.splitext(uploaded.filename)[1].lower() != '.xlsx':
-        return jsonify({'status': 'error', 'message': 'XLSX 형식의 엑셀 파일만 등록할 수 있습니다.'}), 400
+        raise ValueError('XLSX 형식의 엑셀 파일만 등록할 수 있습니다.')
+    return uploaded
 
-    expected_headers = ['성명', '주민번호', '학교명', '직책', '강의과목']
+
+def _parse_excellent_instructor_upload(uploaded):
+    expected_headers = ['학교명', '성명', '주민번호', '직책', '강의과목']
+    workbook = None
     try:
         workbook = load_workbook(uploaded.stream, read_only=True, data_only=True)
         worksheet = workbook.active
@@ -1066,19 +1486,22 @@ def upload_excellent_instructors():
         header_positions = {}
         for header in expected_headers:
             if header not in headers:
-                return jsonify({
-                    'status': 'error',
-                    'message': f'필수 열 [{header}]이 없습니다. 샘플 양식을 사용해 주세요.',
-                }), 400
+                raise ValueError(f'필수 열 [{header}]이 없습니다. 샘플 양식을 사용해 주세요.')
             header_positions[header] = headers.index(header)
 
         records = []
         errors = []
         seen = set()
-        for row_number, row in enumerate(worksheet.iter_rows(min_row=2, values_only=True), start=2):
-            raw = [row[index] if index < len(row) else '' for index in range(len(headers))]
+        for row_number, row in enumerate(
+            worksheet.iter_rows(min_row=2, values_only=True), start=2,
+        ):
+            if row_number > 20001:
+                errors.append('등록 가능한 명단은 최대 20,000행입니다.')
+                break
             values = {
-                header: _clean_certificate_value(raw[index])
+                header: _clean_certificate_value(
+                    row[index] if index < len(row) else ''
+                )
                 for header, index in header_positions.items()
             }
             if not any(values.values()):
@@ -1098,38 +1521,108 @@ def upload_excellent_instructors():
             if record_key in seen:
                 continue
             seen.add(record_key)
-            records.append((
-                values['성명'], _format_resident_number(resident_digits), resident_digits,
-                values['학교명'], values['직책'], values['강의과목'], _owner_emp_no(),
-            ))
-    except (InvalidFileException, OSError, ValueError, StopIteration) as exc:
-        return jsonify({
-            'status': 'error',
-            'message': f'엑셀 파일을 읽을 수 없습니다: {exc}',
-        }), 400
+            records.append({
+                'applicant_name': values['성명'],
+                'resident_number': _format_resident_number(resident_digits),
+                'resident_number_normalized': resident_digits,
+                'school_name': values['학교명'],
+                'position': values['직책'],
+                'subject': values['강의과목'],
+            })
+    except (InvalidFileException, OSError, StopIteration) as exc:
+        raise ValueError(f'엑셀 파일을 읽을 수 없습니다: {exc}') from exc
     finally:
-        try:
+        if workbook is not None:
             workbook.close()
-        except (NameError, AttributeError):
-            pass
 
     if errors:
         preview = ' / '.join(errors[:5])
         more = f' 외 {len(errors) - 5}건' if len(errors) > 5 else ''
-        return jsonify({'status': 'error', 'message': f'{preview}{more}'}), 400
+        raise ValueError(f'{preview}{more}')
     if not records:
-        return jsonify({'status': 'error', 'message': '등록할 강사 데이터가 없습니다.'}), 400
+        raise ValueError('등록할 강사 데이터가 없습니다.')
+    return records
+
+
+@document_bp.post('/api/excellent-instructors/preview')
+@menu_permission_required("document_admin")
+@_csrf_required
+def preview_excellent_instructors():
+    try:
+        records = _parse_excellent_instructor_upload(_excellent_upload_file())
+    except ValueError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+    preview_limit = 500
+    return jsonify({
+        'status': 'success',
+        'count': len(records),
+        'preview_limit': preview_limit,
+        'items': [{
+            'number': index,
+            'school_name': record['school_name'],
+            'applicant_name': record['applicant_name'],
+            'resident_number_masked': _masked_resident_number(record['resident_number']),
+            'position': record['position'],
+            'subject': record['subject'],
+        } for index, record in enumerate(records[:preview_limit], start=1)],
+    })
+
+
+@document_bp.route('/api/excellent-instructors/upload', methods=['POST'])
+@menu_permission_required("document_admin")
+@_csrf_required
+def upload_excellent_instructors():
+    try:
+        uploaded = _excellent_upload_file()
+        records = _parse_excellent_instructor_upload(uploaded)
+    except ValueError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+    try:
+        valid_from, valid_until = _validity_period(
+            request.form.get('valid_from'), request.form.get('valid_until'),
+        )
+    except ValueError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+
+    group_name = _clean_certificate_value(request.form.get('group_name'))
+    if not group_name:
+        group_name = f'{valid_from} ~ {valid_until}'
+    if len(group_name) > 100:
+        return jsonify({'status': 'error', 'message': '그룹명은 100자 이하로 입력해 주세요.'}), 400
+    source_filename = original_filename(uploaded.filename, '우수강사명단.xlsx')
+    try:
+        company_id = int(request.form.get('company_id', ''))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': '발급 회사를 선택해 주세요.'}), 400
 
     conn = get_db()
     try:
         ensure_certificate_schema(conn)
-        conn.execute('DELETE FROM excellent_instructor_eligibility')
+        company = conn.execute('''
+            SELECT id FROM certificate_companies WHERE id=? AND is_active=1
+        ''', (company_id,)).fetchone()
+        if not company:
+            return jsonify({'status': 'error', 'message': '선택한 발급 회사를 찾을 수 없습니다.'}), 400
+        group_cursor = conn.execute('''
+            INSERT INTO excellent_instructor_roster_groups (
+                name, company_id, valid_from, valid_until,
+                original_filename, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            group_name, company_id, valid_from, valid_until, source_filename,
+            _owner_emp_no(),
+        ))
+        group_id = int(group_cursor.lastrowid)
         conn.executemany('''
             INSERT INTO excellent_instructor_eligibility (
-                applicant_name, resident_number, resident_number_normalized,
+                group_id, applicant_name, resident_number, resident_number_normalized,
                 school_name, position, subject, uploaded_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', records)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', [(
+            group_id, record['applicant_name'], record['resident_number'],
+            record['resident_number_normalized'], record['school_name'],
+            record['position'], record['subject'], _owner_emp_no(),
+        ) for record in records])
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1138,8 +1631,9 @@ def upload_excellent_instructors():
         conn.close()
     return jsonify({
         'status': 'success',
-        'message': f'우수강사 인증 대상 {len(records)}건을 등록했습니다.',
-        'count': len(records),
+        'message': f'새 명단 그룹에 우수강사 {len(records)}건을 추가했습니다.',
+        'count': len(records), 'valid_from': valid_from,
+        'valid_until': valid_until, 'group_id': group_id,
     })
 
 
