@@ -289,7 +289,7 @@
                         <select class="workgroup-select" id="workgroup-{{ item.index }}">
                             <option value="">작업그룹 선택</option>
                             {% for group in workgroups %}
-                            {% if not item.신청구분 or (item.신청구분 == '강사' and group.allow_instructor) or (item.신청구분 == '임직원' and group.allow_employee) %}
+                            {% if not item.신청구분 or (item.증명서종류 == '우수강사인증서' and group.allow_excellent_instructor) or (item.신청구분 == '강사' and item.증명서종류 != '우수강사인증서' and group.allow_instructor) or (item.신청구분 == '임직원' and group.allow_employee) %}
                             <option value="{{ group.id }}" {% if item.작업그룹ID|string == group.id|string %}selected{% endif %}>{{ group.company_name }} · {{ group.name }}</option>
                             {% endif %}
                             {% endfor %}
