@@ -474,7 +474,9 @@
                                 onclick="openTaskDetail({{ task.id }})">
 
                                 <td class="task-select-cell" style="text-align: center;" onclick="event.stopPropagation()">
-                                    <input type="checkbox" class="chk-box chk-item {% if not task.is_shared %}status-change-item{% endif %}" value="{{ task.id }}">
+                                    {% if not task.is_shared %}
+                                    <input type="checkbox" class="chk-box chk-item status-change-item" value="{{ task.id }}">
+                                    {% endif %}
                                 </td>
 
                                 <td style="color:var(--text-gray);">{{ task.id }}</td>

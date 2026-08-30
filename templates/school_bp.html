@@ -2666,6 +2666,11 @@
         showView('boardReadView');
     }
 
+    document.addEventListener('DOMContentLoaded', () => {
+        const requestedPostId = Number(new URLSearchParams(window.location.search).get('open_post'));
+        if (requestedPostId > 0) viewPost(requestedPostId);
+    });
+
     async function loadComments(postId) {
         try {
             const res = await fetch(`/school/post/${postId}/comments`);

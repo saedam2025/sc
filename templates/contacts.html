@@ -161,8 +161,6 @@
     }
     .contact-team-row td { padding: 8px 12px !important; background: #f8fafc !important; color: #334155 !important; text-align: left !important; font-size: 0.78rem; font-weight: 900; }
     .contact-team-row small { margin-left: 7px; color: #64748b; font-size: 0.7rem; }
-    .contact-leader-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 5px; padding: 2px 5px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 0.62rem; font-weight: 900; vertical-align: middle; }
-    .contact-team-select { width: 82px; height: 30px; border: 1px solid #cbd5e1; border-radius: 7px; background: #ffffff; color: #334155; font-size: 0.74rem; font-weight: 800; }
     .contact-table tbody tr:hover td {
         background: #f8fafc;
     }
@@ -503,7 +501,6 @@
     }
     .contact-btn,
     .contact-icon-btn,
-    .contact-team-select,
     .contact-edit-field input,
     .contact-edit-field select,
     .contact-edit-field textarea,
@@ -542,10 +539,6 @@
     .contact-table td,
     .contact-team-row td {
         color: var(--text-dark) !important;
-    }
-    .contact-leader-badge {
-        background: var(--primary-light);
-        color: var(--primary-color);
     }
     .business-card-link:hover,
     .contact-icon-btn:hover {
@@ -594,6 +587,11 @@
     .contact-search input:focus { border-color:var(--ct-primary); box-shadow:0 0 0 3px var(--ct-soft); }
     .contact-search-clear { position:absolute; right:7px; top:6px; width:30px; height:30px; border:0; border-radius:8px; background:transparent; color:var(--ct-muted); cursor:pointer; }
     .contact-section { margin-bottom:14px; border-color:var(--ct-border); border-radius:18px; background:var(--ct-card); box-shadow:var(--card-shadow,0 8px 28px rgba(15,23,42,.05)); }
+    .contact-row-split { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-bottom:14px; }
+    .contact-row-split .contact-section { margin-bottom:0; }
+    .contact-row-split .contact-table { min-width:0; }
+    .contact-table th.contact-index-col,
+    .contact-table td.contact-index { width:44px; text-align:center; color:var(--ct-muted); font-weight:800; }
     .section-head { padding:17px 19px; border-color:var(--ct-border); background:var(--ct-card); }
     .section-title > i { width:38px; height:38px; display:grid; place-items:center; border-radius:11px; background:var(--ct-soft); color:var(--ct-primary)!important; }
     .section-title h3 { color:var(--ct-text); }
@@ -641,7 +639,7 @@
     .contact-builder-head, .contact-builder-foot { flex:0 0 auto; }
     .contact-builder-body { flex:1 1 auto; min-height:0; overflow:hidden; }
     .contact-builder-controls, .contact-builder-preview { min-height:0; overflow-y:auto; overscroll-behavior:contain; }
-    @media (max-width:980px) { .contact-overview { grid-template-columns:1fr 1fr; } .contact-smartbar { align-items:stretch; flex-direction:column; } .contact-search { width:100%; } }
+    @media (max-width:980px) { .contact-overview { grid-template-columns:1fr 1fr; } .contact-smartbar { align-items:stretch; flex-direction:column; } .contact-search { width:100%; } .contact-row-split { grid-template-columns:1fr; } }
     @media (max-width:980px) { .contact-builder-body { display:block; overflow-y:auto; } .contact-builder-controls { overflow:visible; border-right:0; } .contact-builder-preview { overflow:visible; } }
     @media (max-width:620px) { .contact-header { align-items:flex-start; padding:17px; } .contact-actions { width:100%; } .contact-overview { grid-template-columns:1fr; } .contact-help-grid { grid-template-columns:1fr; } .contact-builder-backdrop { padding:4px; } .contact-builder-modal { height:calc(100vh - 8px); height:calc(100dvh - 8px); border-radius:12px; } .contact-builder-foot { overflow-x:auto; justify-content:flex-start; } }
 
@@ -696,17 +694,104 @@
         }
         body.print-headquarters .contact-section:not([data-print-section="headquarters"]),
         body.print-centers .contact-section:not([data-print-section="centers"]),
-        body.print-schools .contact-section:not([data-print-section="schools"]) {
+        body.print-schools .contact-section:not([data-print-section="schools"]),
+        body.print-partners .contact-section:not([data-print-section="partners"]) {
             display: none !important;
+        }
+        .contact-row-split {
+            display: block !important;
         }
     }
 </style>
 {% endblock %}
 
 {% block content %}
+{% macro manual_contact_rows(groups, can_edit_defaults) %}
+{% set has_items = namespace(value=false) %}
+{% for group in groups %}
+{% for item in group['items'] %}
+{% set has_items.value = true %}
+<tr class="contact-primary-row">
+    <td class="contact-name contact-click-cell">
+        {% if item.person_name and item.person_name != '-' %}
+        <a href="#" class="business-card-link" data-card-name="{{ item.person_name }}" data-card-position="{{ item.role_title }}" data-card-department="{{ item.organization_name }}" data-card-phone="{{ item.phone }}" data-card-email="{{ item.email }}">{{ item.person_name }}</a>
+        {% else %}
+        -
+        {% endif %}
+        <button type="button" class="contact-expand-link" aria-expanded="false" onclick="toggleContactDetail(this)" title="상세 펼치기">
+            <i class="fa-solid fa-chevron-down"></i>
+        </button>
+    </td>
+    <td>{{ item.organization_name }}</td>
+    <td>{{ item.role_title }}</td>
+    <td>{{ item.phone }}</td>
+    <td>{{ item.email }}</td>
+    {% if can_edit_defaults %}
+    <td class="contact-manage-col">
+        <button
+            type="button"
+            class="contact-icon-btn"
+            title="수정"
+            data-id="{{ item.id }}"
+            data-category-key="{{ item.category_key }}"
+            data-category-name="{{ group.name }}"
+            data-organization-name="{{ item.organization_name }}"
+            data-role-title="{{ item.role_title }}"
+            data-person-name="{{ item.person_name }}"
+            data-address="{{ item.address }}"
+            data-phone="{{ item.phone }}"
+            data-fax="{{ item.fax }}"
+            data-email="{{ item.email }}"
+            data-extra-contact="{{ item.extra_contact }}"
+            data-memo="{{ item.memo }}"
+            onclick="openManualContactEdit(this)">
+            <i class="fa-solid fa-pen"></i>
+        </button>
+        <form method="POST" action="{{ url_for('contacts.delete_manual_contact', contact_id=item.id) }}" style="display:inline;" onsubmit="return confirm('이 연락처를 삭제할까요?');">
+            <button type="submit" class="contact-icon-btn danger" title="삭제">
+                <i class="fa-regular fa-trash-can"></i>
+            </button>
+        </form>
+    </td>
+    {% endif %}
+</tr>
+<tr class="contact-detail-row">
+    <td colspan="{{ 6 if can_edit_defaults else 5 }}">
+        <div class="contact-detail-panel manual-detail-panel">
+            <div class="contact-detail-list manual-detail-list">
+                <span class="contact-detail-item">
+                    <span class="contact-detail-label">팩스</span>
+                    <span class="contact-detail-value">{{ item.fax }}</span>
+                </span>
+                <span class="contact-detail-item">
+                    <span class="contact-detail-label">주소</span>
+                    <span class="contact-detail-value">{{ item.address }}</span>
+                </span>
+                <span class="contact-detail-item">
+                    <span class="contact-detail-label">추가 담당자</span>
+                    <span class="contact-detail-value">{{ item.extra_contact }}</span>
+                </span>
+                <span class="contact-detail-item">
+                    <span class="contact-detail-label">메모</span>
+                    <span class="contact-detail-value">{{ item.memo }}</span>
+                </span>
+            </div>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+{% endfor %}
+{% if not has_items.value %}
+<tr>
+    <td colspan="{{ 6 if can_edit_defaults else 5 }}">
+        <div class="empty-row">등록된 연락처가 없습니다.</div>
+    </td>
+</tr>
+{% endif %}
+{% endmacro %}
 <div class="contact-page">
     <div class="contact-shell">
-        {% set manual_count = namespace(value=0) %}{% for group in manual_contact_groups %}{% set manual_count.value = manual_count.value + (group['items']|length) %}{% endfor %}
+        {% set manual_count = namespace(value=0) %}{% for group in partner_manual_groups %}{% set manual_count.value = manual_count.value + (group['items']|length) %}{% endfor %}
         <div class="contact-header">
             <div class="contact-title">
                 <div class="contact-title-icon"><i class="fa-solid fa-address-book"></i></div>
@@ -738,13 +823,14 @@
         </div>
         <div class="contact-no-results" id="contactNoResults"><i class="fa-solid fa-magnifying-glass"></i><strong>검색 결과가 없습니다.</strong><div>이름, 소속, 학교명 또는 전화번호를 다시 확인해주세요.</div></div>
 
+        <div class="contact-row-split">
         <section class="contact-section" data-print-section="headquarters">
             <div class="section-head">
                 <div class="section-title">
                     <i class="fa-solid fa-building" style="color:#2563eb;"></i>
                     <div>
                         <h3>본부 연락망</h3>
-                        <span>수동 입력 연락처 + 인사관리 직급 기준 대표이사~계약직</span>
+                        <span>인사관리 직급 기준 대표이사~계약직 (사람 기준 1회만 표시)</span>
                     </div>
                 </div>
                 <div class="section-tools">
@@ -752,122 +838,19 @@
                 </div>
             </div>
             <div class="contact-table-wrap">
-                <table class="contact-table" style="min-width:980px;">
-                    <thead>
-                        <tr>
-                            <th style="width:100px;">구분</th>
-                            <th style="width:140px;">항목</th>
-                            <th style="width:100px;">직책</th>
-                            <th style="width:110px;">성명</th>
-                            <th style="width:140px;">연락처</th>
-                            <th style="width:130px;">팩스</th>
-                            <th style="width:170px;">이메일</th>
-                            <th style="width:150px;">추가 담당자</th>
-                            {% if can_edit_defaults %}<th class="contact-manage-col" style="width:88px;">관리</th>{% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% set manual_has_items = namespace(value=false) %}
-                        {% for group in manual_contact_groups %}
-                        {% for item in group['items'] %}
-                        {% set manual_has_items.value = true %}
-                        <tr class="contact-primary-row">
-                            <td class="contact-name">{{ group.name }}</td>
-                            <td class="contact-name contact-click-cell">
-                                <button type="button" class="contact-expand-link" aria-expanded="false" onclick="toggleContactDetail(this)">
-                                    <span class="contact-expand-text">{{ item.organization_name }}</span>
-                                    <i class="fa-solid fa-chevron-down"></i>
-                                </button>
-                            </td>
-                            <td>{{ item.role_title }}</td>
-                            <td class="contact-name">
-                                {% if item.person_name and item.person_name != '-' %}
-                                <a href="#" class="business-card-link" data-card-name="{{ item.person_name }}" data-card-position="{{ item.role_title }}" data-card-department="{{ item.organization_name }}" data-card-phone="{{ item.phone }}" data-card-email="{{ item.email }}">{{ item.person_name }}</a>
-                                {% else %}-{% endif %}
-                            </td>
-                            <td>{{ item.phone }}</td>
-                            <td>{{ item.fax }}</td>
-                            <td>{{ item.email }}</td>
-                            <td>{{ item.extra_contact }}</td>
-                            {% if can_edit_defaults %}
-                            <td class="contact-manage-col">
-                                <button
-                                    type="button"
-                                    class="contact-icon-btn"
-                                    title="수정"
-                                    data-id="{{ item.id }}"
-                                    data-category-key="{{ item.category_key }}"
-                                    data-category-name="{{ group.name }}"
-                                    data-organization-name="{{ item.organization_name }}"
-                                    data-role-title="{{ item.role_title }}"
-                                    data-person-name="{{ item.person_name }}"
-                                    data-address="{{ item.address }}"
-                                    data-phone="{{ item.phone }}"
-                                    data-fax="{{ item.fax }}"
-                                    data-email="{{ item.email }}"
-                                    data-extra-contact="{{ item.extra_contact }}"
-                                    data-memo="{{ item.memo }}"
-                                    onclick="openManualContactEdit(this)">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <form method="POST" action="{{ url_for('contacts.delete_manual_contact', contact_id=item.id) }}" style="display:inline;" onsubmit="return confirm('이 연락처를 삭제할까요?');">
-                                    <button type="submit" class="contact-icon-btn danger" title="삭제">
-                                        <i class="fa-regular fa-trash-can"></i>
-                                    </button>
-                                </form>
-                            </td>
-                            {% endif %}
-                        </tr>
-                        <tr class="contact-detail-row">
-                            <td colspan="{{ 9 if can_edit_defaults else 8 }}">
-                                <div class="contact-detail-panel manual-detail-panel">
-                                    <div class="contact-detail-list manual-detail-list">
-                                        <span class="contact-detail-item">
-                                            <span class="contact-detail-label">주소</span>
-                                            <span class="contact-detail-value">{{ item.address }}</span>
-                                        </span>
-                                        <span class="contact-detail-item">
-                                            <span class="contact-detail-label">메모</span>
-                                            <span class="contact-detail-value">{{ item.memo }}</span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% endfor %}
-                        {% if not manual_has_items.value %}
-                        <tr>
-                            <td colspan="{{ 9 if can_edit_defaults else 8 }}">
-                                <div class="empty-row">등록된 수동 연락처가 없습니다.</div>
-                            </td>
-                        </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-            {% if can_edit_defaults %}
-            <div class="manual-contact-footer">
-                <button type="button" class="contact-btn primary" onclick="openManualContactAdd()">
-                    <i class="fa-solid fa-plus"></i> 수동 연락처 추가
-                </button>
-            </div>
-            {% endif %}
-            <div class="contact-table-wrap" style="border-top:1px solid #e2e8f0;">
                 <table class="contact-table">
                     <thead>
                         <tr>
-                            <th style="width:110px;">직급</th>
                             <th style="width:120px;">성명</th>
-                            <th style="width:150px;">소속</th>
-                            <th style="width:150px;">연락처</th>
+                            <th style="width:100px;">직급</th>
+                            <th style="width:130px;">소속</th>
+                            <th style="width:130px;">연락처</th>
                             <th>이메일</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in headquarters_contacts %}
                         <tr>
-                            <td>{{ item.position }}</td>
                             <td class="contact-name">
                                 {% if item.name and item.name != '-' %}
                                 <a href="#" class="business-card-link" data-card-name="{{ item.name }}" data-card-position="{{ item.position }}" data-card-department="{{ item.department }}" data-card-phone="{{ item.phone }}" data-card-email="{{ item.email }}">{{ item.name }}</a>
@@ -875,6 +858,7 @@
                                 -
                                 {% endif %}
                             </td>
+                            <td>{{ item.position }}</td>
                             <td>{{ item.department }}</td>
                             <td>{{ item.phone }}</td>
                             <td>{{ item.email }}</td>
@@ -904,20 +888,18 @@
                 <table class="contact-table">
                     <thead>
                         <tr>
-                            <th style="width:125px;">직급</th>
                             <th style="width:120px;">성명</th>
-                            <th>소속</th>
-                            <th style="width:145px;">연락처</th>
-                            <th>이메일</th>
-                            {% if can_edit_defaults %}<th class="contact-manage-col" style="width:88px;">팀 지정</th>{% endif %}
+                            <th style="width:110px;">직급</th>
+                            <th>담당학교</th>
+                            <th style="width:130px;">연락처</th>
+                            {% if can_edit_defaults %}<th class="contact-manage-col" style="width:80px;">관리</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
                         {% for team in center_contact_groups %}
-                        <tr class="contact-team-row"><td colspan="{{ 6 if can_edit_defaults else 5 }}"><i class="fa-solid fa-people-group"></i> {{ team.team_name }} <small>{{ team.contacts|length }}명 · 팀장은 항상 맨 위에 표시됩니다.</small></td></tr>
+                        <tr class="contact-team-row"><td colspan="{{ 5 if can_edit_defaults else 4 }}"><i class="fa-solid fa-people-group"></i> {{ team.team_name }} <small>{{ team.contacts|length }}명</small></td></tr>
                         {% for item in team.contacts %}
                         <tr class="contact-primary-row">
-                            <td>{{ item.position }}{% if item.is_team_leader %}<span class="contact-leader-badge"><i class="fa-solid fa-crown"></i> 팀장</span>{% endif %}</td>
                             <td class="contact-name contact-click-cell">
                                 {% if item.name and item.name != '-' %}
                                 <a href="#" class="business-card-link" data-card-name="{{ item.name }}" data-card-position="{{ item.position }}" data-card-department="{{ item.department }}" data-card-phone="{{ item.phone }}" data-card-email="{{ item.email }}">{{ item.name }}</a>
@@ -928,25 +910,39 @@
                                     <i class="fa-solid fa-chevron-down"></i>
                                 </button>
                             </td>
-                            <td>{{ item.department }}</td>
+                            <td>{{ item.position }}</td>
+                            <td>{{ item.assigned_schools }}</td>
                             <td>{{ item.phone }}</td>
-                            <td>{{ item.email }}</td>
                             {% if can_edit_defaults %}
                             <td class="contact-manage-col">
-                                <select class="contact-team-select" data-emp-no="{{ item.emp_no }}" onchange="saveCenterTeam(this)" aria-label="{{ item.name }} 팀 지정">
-                                    <option value="">미지정</option>
-                                    {% for team_number in range(1, 21) %}<option value="{{ team_number }}"{% if item.team_no == team_number %} selected{% endif %}>{{ team_number }}팀</option>{% endfor %}
-                                </select>
+                                <button
+                                    type="button"
+                                    class="contact-icon-btn"
+                                    title="담당학교·팀 수정"
+                                    data-emp-no="{{ item.emp_no }}"
+                                    data-name="{{ item.name }}"
+                                    data-team-no="{{ item.team_no or '' }}"
+                                    data-school-ids="{{ item.assigned_school_ids|join(',') }}"
+                                    onclick="openCenterAssignEdit(this)">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button
+                                    type="button"
+                                    class="contact-icon-btn danger"
+                                    title="담당학교 배정 해제"
+                                    onclick="clearCenterAssign('{{ item.emp_no }}', {{ item.name|tojson }})">
+                                    <i class="fa-regular fa-trash-can"></i>
+                                </button>
                             </td>
                             {% endif %}
                         </tr>
                         <tr class="contact-detail-row">
-                            <td colspan="{{ 6 if can_edit_defaults else 5 }}">
+                            <td colspan="{{ 5 if can_edit_defaults else 4 }}">
                                 <div class="contact-detail-panel manual-detail-panel">
                                     <div class="contact-detail-list center-detail-list">
                                         <span class="contact-detail-item">
-                                            <span class="contact-detail-label">담당 학교</span>
-                                            <span class="contact-detail-value">{{ item.assigned_schools }}</span>
+                                            <span class="contact-detail-label">이메일</span>
+                                            <span class="contact-detail-value">{{ item.email }}</span>
                                         </span>
                                         <span class="contact-detail-item">
                                             <span class="contact-detail-label">지원실 위치</span>
@@ -958,12 +954,13 @@
                         </tr>
                         {% endfor %}
                         {% else %}
-                        <tr><td colspan="{{ 6 if can_edit_defaults else 5 }}"><div class="empty-row">센터장 연락망에 표시할 인사관리 데이터가 없습니다.</div></td></tr>
+                        <tr><td colspan="{{ 5 if can_edit_defaults else 4 }}"><div class="empty-row">센터장 연락망에 표시할 인사관리 데이터가 없습니다.</div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </section>
+        </div>
 
         <section class="contact-section" data-print-section="schools">
             <div class="section-head">
@@ -982,6 +979,7 @@
                 <table class="contact-table" style="min-width:840px;">
                     <thead>
                         <tr>
+                            <th class="contact-index-col">번호</th>
                             <th style="width:150px;">학교명</th>
                             <th style="width:130px;">계약과목</th>
                             <th style="width:125px;">지원실 전화</th>
@@ -994,6 +992,7 @@
                     <tbody>
                         {% for item in school_contacts %}
                         <tr class="contact-primary-row">
+                            <td class="contact-index">{{ loop.index }}</td>
                             <td class="contact-name contact-click-cell">
                                 <button type="button" class="contact-expand-link" aria-expanded="false" onclick="toggleContactDetail(this)">
                                     <span class="contact-expand-text">{{ item.school_name }}</span>
@@ -1026,7 +1025,7 @@
                             </td>
                         </tr>
                         <tr class="contact-detail-row">
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="contact-detail-panel school-detail-panel">
                                     <div class="contact-detail-list school-detail-list">
                                         <span class="contact-detail-item">
@@ -1050,11 +1049,50 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="7"><div class="empty-row">학교업무공간에 등록된 학교 연락망 데이터가 없습니다.</div></td></tr>
+                        <tr><td colspan="8"><div class="empty-row">학교업무공간에 등록된 학교 연락망 데이터가 없습니다.</div></td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+        </section>
+
+        <section class="contact-section" data-print-section="partners">
+            <div class="section-head">
+                <div class="section-title">
+                    <i class="fa-solid fa-handshake" style="color:#2563eb;"></i>
+                    <div>
+                        <h3>협력사 연락망</h3>
+                        <span>수동 입력 연락처</span>
+                    </div>
+                </div>
+                <div class="section-tools">
+                    <button type="button" class="contact-btn" onclick="printContactSection('partners')"><i class="fa-solid fa-print"></i> 출력/PDF</button>
+                </div>
+            </div>
+            <div class="contact-table-wrap">
+                <table class="contact-table">
+                    <thead>
+                        <tr>
+                            <th style="width:130px;">성명</th>
+                            <th style="width:160px;">항목</th>
+                            <th style="width:110px;">직책</th>
+                            <th style="width:140px;">연락처</th>
+                            <th>이메일</th>
+                            {% if can_edit_defaults %}<th class="contact-manage-col" style="width:88px;">관리</th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{ manual_contact_rows(partner_manual_groups, can_edit_defaults) }}
+                    </tbody>
+                </table>
+            </div>
+            {% if can_edit_defaults %}
+            <div class="manual-contact-footer">
+                <button type="button" class="contact-btn primary" onclick="openManualContactAdd('partner','협력사')">
+                    <i class="fa-solid fa-plus"></i> 협력사 연락처 추가
+                </button>
+            </div>
+            {% endif %}
         </section>
     </div>
 </div>
@@ -1210,14 +1248,7 @@
         <form method="POST" action="{{ url_for('contacts.save_manual_contact') }}">
             <input type="hidden" name="contact_id" id="manual_contact_id">
             <div class="contact-edit-body">
-                <div class="contact-edit-field">
-                    <label>구분</label>
-                    <select name="category_key" id="manual_category_key">
-                        {% for key, label in manual_contact_group_options %}
-                        <option value="{{ key }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                <input type="hidden" name="category_key" id="manual_category_key" value="partner">
                 <div class="contact-edit-field">
                     <label>항목명</label>
                     <input type="text" name="organization_name" id="manual_organization_name" placeholder="예: 교구재업체">
@@ -1262,10 +1293,47 @@
         </form>
     </div>
 </div>
+
+<div id="centerAssignModal" class="contact-edit-modal" onclick="if(event.target === this) closeCenterAssignModal();">
+    <div class="contact-edit-panel">
+        <div class="contact-edit-head">
+            <h3 id="centerAssignModalTitle"><i class="fa-solid fa-school"></i> 담당학교 · 팀 배정</h3>
+            <button type="button" class="contact-icon-btn" onclick="closeCenterAssignModal()" title="닫기">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="contact-edit-body" style="grid-template-columns:1fr;">
+            <input type="hidden" id="centerAssign_empNo">
+            <div class="contact-edit-field">
+                <label>팀 지정</label>
+                <select id="centerAssign_teamNo">
+                    <option value="">미지정</option>
+                    {% for team_number in range(1, 21) %}<option value="{{ team_number }}">{{ team_number }}팀</option>{% endfor %}
+                </select>
+            </div>
+            <div class="contact-edit-field">
+                <label>담당 학교 (다중 선택 가능)</label>
+                <div style="max-height:260px; overflow-y:auto; border:1px solid #cbd5e1; border-radius:8px; padding:10px; display:grid; gap:6px;">
+                    {% for school in school_options %}
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:0.85rem; cursor:pointer;">
+                        <input type="checkbox" class="center-assign-school-checkbox" value="{{ school.id }}"> {{ school.school_name }}
+                    </label>
+                    {% else %}
+                    <span class="muted">등록된 학교가 없습니다.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="contact-edit-foot">
+            <button type="button" class="contact-btn" onclick="closeCenterAssignModal()">취소</button>
+            <button type="button" class="contact-btn primary" onclick="saveCenterAssign()"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+        </div>
+    </div>
+</div>
 {% endif %}
 
 <script>
-    const contactPrintClasses = ['print-headquarters', 'print-centers', 'print-schools'];
+    const contactPrintClasses = ['print-headquarters', 'print-centers', 'print-schools', 'print-partners'];
     const contactBuilderRecords = {{ contact_builder_records|tojson }};
     let savedContactDirectories = {{ saved_contact_directories|tojson }};
     let activeDirectoryId = null;
@@ -1617,20 +1685,55 @@
         printWindow.document.close();
     }
 
-    async function saveCenterTeam(select) {
-        select.disabled = true;
+    function openCenterAssignEdit(button) {
+        const data = button.dataset;
+        document.getElementById('centerAssignModalTitle').innerHTML = '<i class="fa-solid fa-school"></i> ' + contactEscape(data.name) + ' · 담당학교/팀 배정';
+        document.getElementById('centerAssign_empNo').value = data.empNo;
+        document.getElementById('centerAssign_teamNo').value = data.teamNo || '';
+        const selectedIds = (data.schoolIds || '').split(',').filter(Boolean);
+        document.querySelectorAll('.center-assign-school-checkbox').forEach(checkbox => {
+            checkbox.checked = selectedIds.includes(checkbox.value);
+        });
+        document.getElementById('centerAssignModal').style.display = 'block';
+    }
+
+    function closeCenterAssignModal() {
+        document.getElementById('centerAssignModal').style.display = 'none';
+    }
+
+    async function saveCenterAssign() {
+        const empNo = document.getElementById('centerAssign_empNo').value;
+        const teamNo = document.getElementById('centerAssign_teamNo').value;
+        const schoolIds = Array.from(document.querySelectorAll('.center-assign-school-checkbox:checked')).map(checkbox => parseInt(checkbox.value, 10));
         try {
-            const response = await fetch('/contacts/center-team', {
+            const response = await fetch('/contacts/center-assign', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({emp_no: select.dataset.empNo, team_no: select.value})
+                body: JSON.stringify({emp_no: empNo, team_no: teamNo, school_ids: schoolIds})
             });
             const data = await response.json().catch(() => ({}));
-            if (!response.ok || data.success === false) throw new Error(data.error || '팀 지정에 실패했습니다.');
-            contactToast(data.message || '센터장 팀을 저장했습니다.', 'success');
+            if (!response.ok || data.success === false) throw new Error(data.error || '저장에 실패했습니다.');
+            contactToast(data.message || '담당학교·팀 배정을 저장했습니다.', 'success');
+            closeCenterAssignModal();
             setTimeout(() => location.reload(), 650);
         } catch (error) {
-            select.disabled = false;
+            contactToast(error.message, 'error');
+        }
+    }
+
+    async function clearCenterAssign(empNo, name) {
+        if (!confirm(name + '님의 담당학교 배정을 모두 해제할까요?')) return;
+        try {
+            const response = await fetch('/contacts/center-assign/clear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({emp_no: empNo})
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data.success === false) throw new Error(data.error || '해제에 실패했습니다.');
+            contactToast(data.message || '담당학교 배정을 해제했습니다.', 'success');
+            setTimeout(() => location.reload(), 650);
+        } catch (error) {
             contactToast(error.message, 'error');
         }
     }

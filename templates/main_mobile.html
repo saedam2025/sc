@@ -249,6 +249,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                 {% if menu_access.get('memo_main', true) %}<a class="mobile-quick" href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>메모장</a>{% endif %}
                 {% if menu_access.get('expense_main', true) %}<a class="mobile-quick" href="/expense"><i class="fa-solid fa-receipt"></i>지출결의</a>{% endif %}
                 {% if menu_access.get('gallery_main', true) %}<a class="mobile-quick" href="/gall2"><i class="fa-regular fa-images"></i>갤러리</a>{% endif %}
+                {% if menu_access.get('ai_agent_main', true) %}<a class="mobile-quick" href="{{ url_for('ai_agent.index') }}"><i class="fa-solid fa-robot"></i>AI에이전트</a>{% endif %}
             </div>
         </section>
 
@@ -353,6 +354,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock"></i>근태관리</a>{% endif %}
             {% if menu_access.get('memo_main', true) %}<a href="{{ url_for('memo.memo_board') }}"><i class="fa-solid fa-chalkboard"></i>메모장</a>{% endif %}
             {% if menu_access.get('board_manual', true) %}<a href="/manual"><i class="fa-solid fa-book-open"></i>업무매뉴얼</a>{% endif %}
+            {% if menu_access.get('ai_agent_main', true) %}<a href="{{ url_for('ai_agent.index') }}"><i class="fa-solid fa-robot"></i>AI에이전트</a>{% endif %}
         </div>
     </div>
 </div>

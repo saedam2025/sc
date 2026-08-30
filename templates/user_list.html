@@ -295,7 +295,13 @@
             <div class="full-width profile-setup-area">
                 <div style="flex:1;">
                     <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
-                    <input type="file" id="profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_invite')">
+                    <div class="file-upload-row">
+                        <label class="file-upload-btn" for="profile_image">
+                            <i class="fa-solid fa-camera"></i> 파일 선택
+                            <input type="file" id="profile_image" accept="image/*" onchange="previewImage(this, 'preview_invite'); onProfileFileChange(this, 'invite_file_name', null, null)">
+                        </label>
+                        <span id="invite_file_name" class="file-upload-filename">선택된 파일 없음</span>
+                    </div>
                     <img id="preview_invite" class="profile-img-preview">
                 </div>
                 <div style="flex:2;">
@@ -1027,7 +1033,13 @@ function openDirectRegisterModal() {
             <div class="full-width profile-setup-area">
                 <div style="flex:1;">
                     <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진 (선택)</label>
-                    <input type="file" id="reg_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_direct')">
+                    <div class="file-upload-row">
+                        <label class="file-upload-btn" for="reg_profile_image">
+                            <i class="fa-solid fa-camera"></i> 파일 선택
+                            <input type="file" id="reg_profile_image" accept="image/*" onchange="previewImage(this, 'preview_direct'); onProfileFileChange(this, 'reg_file_name', null, null)">
+                        </label>
+                        <span id="reg_file_name" class="file-upload-filename">선택된 파일 없음</span>
+                    </div>
                     <img id="preview_direct" class="profile-img-preview">
                 </div>
                 <div style="flex:2;">
@@ -1379,8 +1391,18 @@ function openEditModal(i) {
             <div class="full-width profile-setup-area" style="${isAdminAcc ? 'display:none;' : ''}">
                 <div style="flex:1;">
                     <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진</label>
-                    <input type="file" id="edit_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_edit')">
-                    <img id="preview_edit" class="profile-img-preview" src="${u.profile_path || ''}" style="display:${u.profile_path ? 'block' : 'none'}; width:70px; height:70px;">
+                    <div class="file-upload-row">
+                        <label class="file-upload-btn" for="edit_profile_image">
+                            <i class="fa-solid fa-camera"></i> 파일 선택
+                            <input type="file" id="edit_profile_image" accept="image/*" onchange="previewImage(this, 'preview_edit'); onProfileFileChange(this, 'edit_file_name', 'edit_remove_flag', 'edit_remove_btn')">
+                        </label>
+                        <span id="edit_file_name" class="file-upload-filename">${u.profile_path ? '등록된 사진 있음' : '선택된 파일 없음'}</span>
+                    </div>
+                    <input type="hidden" id="edit_remove_flag" value="0">
+                    <div class="profile-img-preview-row">
+                        <img id="preview_edit" class="profile-img-preview" src="${u.profile_path || ''}" style="display:${u.profile_path ? 'block' : 'none'}; width:70px; height:70px;">
+                        <button type="button" id="edit_remove_btn" class="file-remove-btn" style="display:${u.profile_path ? 'inline-flex' : 'none'};" onclick="removeProfileImage('edit_profile_image', 'preview_edit', 'edit_file_name', 'edit_remove_btn', 'edit_remove_flag')"><i class="fa-solid fa-trash"></i> 사진 삭제</button>
+                    </div>
                 </div>
                 <div style="flex:2;">
                     <label style="font-size:0.9em; margin-bottom:8px; display:block;">프로필 아이콘</label>
@@ -1461,11 +1483,13 @@ async function submitUpdate(dbId) {
     if(editIconInput) formData.append('profile_icon', editIconInput.value);
     
     const imgFile = document.getElementById('edit_profile_image') ? document.getElementById('edit_profile_image').files[0] : null;
+    const removeFlagEl = document.getElementById('edit_remove_flag');
     if(imgFile) formData.append('profile_image', imgFile);
+    else if(removeFlagEl && removeFlagEl.value === '1') formData.append('remove_profile_image', '1');
 
     try {
         // 🚀 [해결3] 서버 통신오류 방지: 정확히 일치하는 업데이트 라우트 사용
-        const res = await fetch('/user/update', { 
+        const res = await fetch('/user/update', {
             method: 'POST', 
             body: formData 
         });

@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/smart_document.css', v='20260829-18') }}">
+
+<main class="sd-page">
+    <section class="sd-hero" aria-labelledby="smartDocumentTitle">
+        <div class="sd-hero-copy">
+            <span class="sd-hero-icon" aria-hidden="true"><i class="fa-solid fa-feather-pointed"></i></span>
+            <div>
+                <span class="sd-eyebrow">SAEDAM AI WORKSPACE</span>
+                <h1 id="smartDocumentTitle">스마트 공문발송</h1>
+                <p>AI를 이용하여 공문을 쉽고 빠르게 작성할 수 있습니다.</p>
+            </div>
+        </div>
+        <div class="sd-api-status-pill {{ 'is-connected' if ai_status.source != 'none' else '' }}" id="openAiStatusPill" title="AI API 설정은 통합관리 > AI api설정에서 관리합니다.">
+            <i class="fa-solid {{ 'fa-circle-check' if ai_status.source != 'none' else 'fa-circle-info' }}"></i>
+            <span id="openAiStatusText">{{ ai_status.status_text }}</span>
+        </div>
+    </section>
+
+    <section class="sd-workspace">
+        <article class="sd-card sd-compose-card">
+            <header class="sd-card-head">
+                <div>
+                    <span class="sd-step">01</span>
+                    <h2>AI에게 공문 작성 요청</h2>
+                    <p>누구에게 어떤 내용의 공문을 보낼지 자연스럽게 입력해 주세요.</p>
+                </div>
+                <span class="sd-ready-badge"><i class="fa-solid fa-sparkles"></i> AI 초안</span>
+            </header>
+
+            <div class="sd-compose-settings">
+                <div class="sd-field"><label for="composeCompany">발송 회사</label><select id="composeCompany"><option value="">회사 정보를 등록해주세요</option></select></div>
+                <div class="sd-field"><label for="composeTemplate">공문 템플릿</label><select id="composeTemplate"><option value="">기본 템플릿</option></select></div>
+                <div class="sd-field"><label for="composeRecipient">저장 수신자 <small>선택</small></label><select id="composeRecipient"><option value="">요청 내용에서 수신처 판단</option></select></div>
+            </div>
+
+            <div class="sd-field">
+                <label for="documentPrompt">작성 요청</label>
+                <div class="sd-prompt-shell">
+                    <textarea id="documentPrompt" rows="6" maxlength="3000" placeholder="예: 오늘 날짜로 초록초등학교 강사파견 공문 만들어줘."></textarea>
+                    <div class="sd-prompt-meta">
+                        <span><i class="fa-regular fa-lightbulb"></i> 학교명, 공문 목적, 날짜를 함께 적으면 더 정확해집니다.</span>
+                        <span id="promptCounter">0 / 3,000</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sd-divider"><span>파일 구분 업로드</span></div>
+
+            <div class="sd-upload-grid">
+                <div class="sd-field">
+                    <div class="sd-label-row">
+                        <label for="documentFiles">AI 참고자료</label>
+                        <span>AI 분석 전용</span>
+                    </div>
+                    <label class="sd-dropzone" id="documentDropzone" for="documentFiles">
+                        <input id="documentFiles" type="file" accept=".pdf,.hwp,.hwpx,.doc,.docx" multiple hidden>
+                        <span class="sd-upload-icon"><i class="fa-solid fa-magnifying-glass-chart"></i></span>
+                        <strong>AI가 읽고 참고할 파일</strong>
+                        <small>이력서·경력증명서 등 작성 근거로만 사용하며 메일에는 첨부하지 않습니다.</small>
+                    </label>
+                    <div class="sd-file-list" id="documentFileList" aria-live="polite"></div>
+                </div>
+                <div class="sd-field">
+                    <div class="sd-label-row">
+                        <label for="deliveryFiles">메일 붙임파일</label>
+                        <span>수신자에게 발송</span>
+                    </div>
+                    <label class="sd-dropzone sd-delivery-dropzone" id="deliveryDropzone" for="deliveryFiles">
+                        <input id="deliveryFiles" type="file" accept=".pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.zip" multiple hidden>
+                        <span class="sd-upload-icon"><i class="fa-solid fa-paperclip"></i></span>
+                        <strong>공문과 함께 보낼 파일</strong>
+                        <small>AI는 읽지 않으며 이메일 발송 시 원본 파일 그대로 첨부합니다. 전체 18MB 이하</small>
+                    </label>
+                    <div class="sd-file-list" id="deliveryFileList" aria-live="polite"></div>
+                </div>
+            </div>
+
+            <button class="sd-button sd-button-primary" id="generateDocument" type="button">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                AI 공문 작성
+            </button>
+
+            <section class="sd-progress" id="documentProgress" aria-live="polite" hidden>
+                <div class="sd-progress-head">
+                    <span class="sd-progress-spinner" aria-hidden="true"></span>
+                    <div>
+                        <strong id="progressTitle">작성 요청을 준비하고 있습니다.</strong>
+                        <p id="progressMessage">입력한 내용을 확인하는 중입니다.</p>
+                    </div>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="sd-progress-track"><span id="progressBar"></span></div>
+                <ol class="sd-progress-log" id="progressLog"></ol>
+            </section>
+        </article>
+
+        <aside class="sd-side-column">
+            <article class="sd-card sd-flow-card">
+                <span class="sd-card-kicker">DOCUMENT FLOW</span>
+                <h2>공문 작업 흐름</h2>
+                <ol class="sd-flow-list" id="workflowList">
+                    <li class="is-current" data-flow-step="request"><span>1</span><div><strong>작성 요청</strong><small>회사·템플릿·참고 파일 입력</small></div></li>
+                    <li data-flow-step="generate"><span>2</span><div><strong>AI 문서 작성</strong><small>첨부자료 분석 및 초안 생성</small></div></li>
+                    <li data-flow-step="preview"><span>3</span><div><strong>검토·미리보기</strong><small>문서번호·직인·파견일 확인</small></div></li>
+                    <li data-flow-step="saved"><span>4</span><div><strong>기록 저장</strong><small>초안과 API 사용량 자동 보관</small></div></li>
+                </ol>
+            </article>
+
+            <nav class="sd-card sd-management-menu" aria-label="스마트 공문 관리 메뉴">
+                <button type="button" data-management="companies"><i class="fa-solid fa-building"></i><span><strong>회사 정보</strong><small>회사·대표자·직인·문서번호</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" data-management="templates"><i class="fa-solid fa-layer-group"></i><span><strong>공문 템플릿</strong><small>공문 작성 형식 관리</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" data-management="recipients"><i class="fa-solid fa-address-book"></i><span><strong>수신자 목록</strong><small>기관·담당자·이메일 관리</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" data-management="history"><i class="fa-solid fa-clock-rotate-left"></i><span><strong>사용 기록</strong><small>발송 공문 보기·기록 삭제</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" data-management="usage"><i class="fa-solid fa-chart-simple"></i><span><strong>API 사용량</strong><small>요청·입출력 토큰 집계</small></span><i class="fa-solid fa-chevron-right"></i></button>
+            </nav>
+        </aside>
+    </section>
+
+    <section class="sd-preview-section" aria-labelledby="documentPreviewTitle">
+        <header class="sd-section-head">
+            <div>
+                <span class="sd-step">02</span>
+                <h2 id="documentPreviewTitle">공문 미리보기</h2>
+                <p>AI가 작성한 공문을 기본 공문폼에 적용해 이곳에서 검토하게 됩니다.</p>
+            </div>
+            <div class="sd-preview-actions" aria-label="공문 미리보기 작업">
+                <button class="sd-button sd-button-ghost" id="editDocumentButton" type="button" disabled><i class="fa-solid fa-pen"></i> 수정</button>
+                <button class="sd-button sd-button-ghost" id="pdfDocumentButton" type="button" disabled><i class="fa-regular fa-file-pdf"></i> PDF</button>
+                <button class="sd-button sd-button-dark" id="emailDocumentButton" type="button" disabled><i class="fa-regular fa-paper-plane"></i> 이메일 발송</button>
+            </div>
+        </header>
+        <div class="sd-preview-stage">
+            <div class="sd-paper" id="documentPreview">
+                <div class="sd-paper-placeholder">
+                    <span><i class="fa-regular fa-file-lines"></i></span>
+                    <strong>작성된 공문이 여기에 표시됩니다</strong>
+                    <p>위에서 요청 내용과 참고 파일을 입력한 뒤<br>AI 공문 작성 버튼을 눌러주세요.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div class="sd-modal-backdrop" id="editDocumentModal" hidden>
+    <section class="sd-modal sd-document-action-modal" role="dialog" aria-modal="true" aria-labelledby="editDocumentTitle">
+        <header><div><span class="sd-card-kicker">EDIT OFFICIAL DOCUMENT</span><h2 id="editDocumentTitle">공문 내용 수정</h2></div><button class="sd-icon-button" id="closeEditDocument" type="button" aria-label="수정창 닫기"><i class="fa-solid fa-xmark"></i></button></header>
+        <div class="sd-modal-body">
+            <div class="sd-form-grid">
+                <div class="full"><label for="editDocumentSubject">공문 제목</label><input id="editDocumentSubject" maxlength="300"></div>
+                <div class="full"><label for="editDocumentRecipient">수신처</label><input id="editDocumentRecipient" maxlength="200"></div>
+                <div><label for="editAssignmentStart">파견 시작일</label><input id="editAssignmentStart" maxlength="40"></div>
+                <div><label for="editAssignmentEnd">파견 종료일</label><input id="editAssignmentEnd" maxlength="40"></div>
+                <div class="full"><label for="editDocumentGreeting">인사말</label><textarea id="editDocumentGreeting" rows="3"></textarea></div>
+                <div class="full"><label for="editDocumentBody">공문 본문 <small>문단과 문단 사이는 빈 줄로 구분합니다.</small></label><textarea id="editDocumentBody" rows="11"></textarea></div>
+                <div class="full"><label for="editDocumentClosing">맺음말</label><input id="editDocumentClosing" maxlength="500"></div>
+                <div class="full"><label for="editDocumentContact">담당 연락처</label><input id="editDocumentContact" maxlength="300"></div>
+            </div>
+        </div>
+        <footer><span id="editDocumentFeedback" role="status"></span><button class="sd-button" id="cancelEditDocument" type="button">취소</button><button class="sd-button sd-button-primary" id="saveEditedDocument" type="button"><i class="fa-solid fa-floppy-disk"></i> 수정 저장</button></footer>
+    </section>
+</div>
+
+<div class="sd-modal-backdrop" id="emailDocumentModal" hidden>
+    <section class="sd-modal sd-document-action-modal" role="dialog" aria-modal="true" aria-labelledby="emailDocumentTitle">
+        <header><div><span class="sd-card-kicker">SEND OFFICIAL DOCUMENT</span><h2 id="emailDocumentTitle">공문 이메일 발송</h2></div><button class="sd-icon-button" id="closeEmailDocument" type="button" aria-label="이메일 발송창 닫기"><i class="fa-solid fa-xmark"></i></button></header>
+        <div class="sd-modal-body">
+            <div class="sd-notice"><i class="fa-solid fa-envelope-circle-check"></i><p><strong>발송 안내</strong><span>현재 미리보기의 공문 내용과 등록된 메일 붙임파일을 함께 발송합니다.</span></p></div>
+            <div class="sd-form-grid sd-email-form-grid">
+                <div class="full"><label for="emailSender">발송 계정</label><select id="emailSender"><option value="">발송 계정을 선택해주세요</option></select><small>스마트명세서 발송계정 메뉴에 등록된 Gmail·ZeptoMail 계정과 연결 설정을 그대로 사용합니다.</small></div>
+                <div class="full"><label for="emailSavedRecipient">저장 수신자</label><select id="emailSavedRecipient"><option value="">직접 입력</option></select></div>
+                <div class="full"><label for="emailRecipientAddress">수신 이메일</label><input id="emailRecipientAddress" type="email" placeholder="recipient@example.com"></div>
+                <div class="full"><label for="emailDocumentSubject">이메일 제목</label><input id="emailDocumentSubject" maxlength="300"></div>
+                <div class="full sd-email-attachment-summary" id="emailAttachmentSummary"></div>
+            </div>
+        </div>
+        <footer><span id="emailDocumentFeedback" role="status"></span><button class="sd-button" id="cancelEmailDocument" type="button">취소</button><button class="sd-button sd-button-dark" id="sendDocumentEmail" type="button"><i class="fa-regular fa-paper-plane"></i> 이메일 발송</button></footer>
+    </section>
+</div>
+
+<div class="sd-modal-backdrop" id="managementModal" hidden>
+    <section class="sd-modal sd-management-modal" role="dialog" aria-modal="true" aria-labelledby="managementTitle">
+        <header><div><span class="sd-card-kicker">SMART DOCUMENT SETTINGS</span><h2 id="managementTitle">스마트 공문 관리</h2></div><button class="sd-icon-button" id="closeManagement" type="button" aria-label="관리창 닫기"><i class="fa-solid fa-xmark"></i></button></header>
+        <div class="sd-management-tabs">
+            <button data-management-tab="companies">회사 정보</button><button data-management-tab="templates">템플릿</button><button data-management-tab="recipients">수신자</button><button data-management-tab="history">사용 기록</button><button data-management-tab="usage">API 사용량</button>
+        </div>
+        <div class="sd-modal-body sd-management-body">
+            <section class="sd-management-panel" data-panel="companies">
+                <div class="sd-panel-layout"><form id="companyForm" class="sd-manage-form"><input id="companyId" type="hidden"><div class="sd-form-grid"><div><label>회사명</label><input id="companyName" required></div><div><label>대표자명</label><input id="companyRepresentative" required></div><div><label>사업자번호</label><input id="companyBusinessNumber"></div><div><label>문서번호 앞자리</label><input id="companyDocumentPrefix" value="새담"></div><div class="full"><label>회사 주소</label><input id="companyAddress"></div><div><label>전화번호</label><input id="companyPhone"></div><div><label>이메일</label><input id="companyEmail" type="email"></div><div class="full"><label>회사 직인 <small>PNG·JPG·WEBP, 2MB 이하</small></label><input id="companySeal" type="file" accept="image/png,image/jpeg,image/webp"></div><label class="sd-inline-check full"><input id="companyDefault" type="checkbox"> 기본 발송 회사로 사용</label></div><div class="sd-form-actions"><button class="sd-button" id="resetCompanyForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 회사 저장</button></div></form><div class="sd-resource-list" id="companyList"></div></div>
+            </section>
+            <section class="sd-management-panel" data-panel="templates" hidden>
+                <div class="sd-panel-layout"><form id="templateForm" class="sd-manage-form"><input id="templateId" type="hidden"><div class="sd-form-grid"><div class="full"><label>템플릿 이름</label><input id="templateName" required></div><div class="full"><label>작성 지침</label><textarea id="templateInstruction" rows="6" placeholder="공문 어조, 필수 항목, 문단 구성 등을 입력하세요."></textarea></div><div class="full"><label>기본 인사말</label><input id="templateGreeting"></div><div class="full"><label>기본 맺음말</label><input id="templateClosing" value="끝."></div><label class="sd-inline-check full"><input id="templateDefault" type="checkbox"> 기본 템플릿으로 사용</label></div><div class="sd-form-actions"><button class="sd-button" id="resetTemplateForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit">템플릿 저장</button></div></form><div class="sd-resource-list" id="templateList"></div></div>
+            </section>
+            <section class="sd-management-panel" data-panel="recipients" hidden>
+                <div class="sd-panel-layout"><form id="recipientForm" class="sd-manage-form"><input id="recipientId" type="hidden"><div class="sd-form-grid"><div class="full"><label>기관명</label><input id="recipientOrganization" required></div><div><label>담당자명</label><input id="recipientName"></div><div><label>이메일</label><input id="recipientEmail" type="email" required></div><div class="full"><label>메모</label><textarea id="recipientMemo" rows="4"></textarea></div></div><div class="sd-form-actions"><button class="sd-button" id="resetRecipientForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit">수신자 저장</button></div></form><div class="sd-resource-list" id="recipientList"></div></div>
+            </section>
+            <section class="sd-management-panel" data-panel="history" hidden><div class="sd-history-list" id="historyList"></div></section>
+            <section class="sd-management-panel" data-panel="usage" hidden><div class="sd-usage-summary" id="usageSummary"></div><div class="sd-history-list" id="usageMonthly"></div><p class="sd-usage-note">토큰 사용량은 실제 Responses API 응답 기준입니다. 금액은 모델별 가격 변동 때문에 표시하지 않습니다.</p></section>
+        </div>
+        <footer><span id="managementFeedback" role="status"></span><button class="sd-button" id="closeManagementFooter" type="button">닫기</button></footer>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/smart_document.js', v='20260830-03') }}"></script>
+{% endblock %}

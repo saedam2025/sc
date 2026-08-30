@@ -60,29 +60,20 @@
     .tab-group { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 9px; }
     .tab-btn { min-height: 44px; padding: 10px 18px; border: 1px solid #aebdca; background: #eaf0f6; border-radius: 9px; box-sizing: border-box; font-size: 0.85rem; font-weight: 750; color: #334155; cursor: pointer; transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.18s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); }
     .tab-btn:hover { border-color: #64748b; filter: saturate(1.1); color: #0f172a; transform: translateY(-1px); box-shadow: 0 3px 8px rgba(15, 23, 42, 0.13); }
-    .tab-btn.active { position: relative; z-index: 1; border-width: 2px; font-weight: 850; transform: translateY(-1px); box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.14); }
+    .tab-btn.active { position: relative; z-index: 1; border-width: 2px; font-weight: 850; transform: translateY(-1px); background: color-mix(in srgb, var(--primary-color, #14b8a6) 18%, #ffffff); border-color: var(--primary-color, #14b8a6); color: var(--primary-dark, #0f766e); box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.14); }
 
-    #tab-pending { background: color-mix(in srgb, var(--primary-color, #14b8a6) 10%, #ffffff); border-color: color-mix(in srgb, var(--primary-color, #14b8a6) 50%, #cbd5e1); color: var(--primary-dark, #0f766e); }
-    #tab-pending.active { background: color-mix(in srgb, var(--primary-color, #14b8a6) 20%, #ffffff); border-color: var(--primary-color, #14b8a6); }
-    #tab-draft { background: #eef2ff; border-color: #a5b4fc; color: #3730a3; }
-    #tab-draft.active { background: #dfe7ff; border-color: #6366f1; }
-    #tab-completed { background: #ecfdf5; border-color: #86efac; color: #166534; }
-    #tab-completed.active { background: #d1fae5; border-color: #22c55e; }
-    #tab-reference { background: #f0fdfa; border-color: #5eead4; color: #115e59; }
-    #tab-reference.active { background: #ccfbf1; border-color: #14b8a6; }
-    
     .search-container { padding-bottom: 10px; }
     
     /* 요약 카운트 뱃지 */
     .count-badge { background: var(--primary-color, #3b82f6); color: white; padding: 2px 6px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; }
     .tab-btn.completed-tab .count-badge { background: #22c55e; }
     .tab-btn.reference-tab .count-badge { background: #14b8a6; }
+    .tab-btn.rejected-tab .count-badge { background: #ef4444; }
     .tab-btn:not(.active) .count-badge { filter: saturate(0.82); }
-    .tab-btn.archive-tab { position: relative; margin-left: 12px; background: #f1f5f9; border-color: #94a3b8; color: #334155; }
+    .tab-btn.archive-tab { position: relative; margin-left: 12px; }
     .tab-btn.archive-tab::before { content: ""; position: absolute; left: -11px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: #94a3b8; }
     .tab-btn.archive-tab i { color: var(--text-gray, #64748b); }
-    .tab-btn.archive-tab:hover { background: #e2e8f0; border-color: #64748b; color: #0f172a; }
-    .tab-btn.archive-tab.active { background: #dbe3ec; color: #1e293b; border-color: #475569; box-shadow: 0 0 0 3px rgba(71, 85, 105, 0.13), 0 4px 10px rgba(15, 23, 42, 0.14); }
+    .tab-btn.archive-tab.active i { color: var(--primary-dark, #0f766e); }
     .tab-btn.archive-tab .count-badge,
     .tab-btn.archive-tab:not(.active) .count-badge { background: var(--text-gray, #64748b); }
     .tab-btn.archive-tab.active .count-badge { background: var(--text-dark, #475569); }
@@ -114,6 +105,24 @@
     .st-1차승인 { color: #0284c7; border: 1px solid #0ea5e9; }
     .st-완료 { color: #15803d; border: 1px solid #22c55e; }
     .st-반려 { color: #dc2626; border: 1px solid #ef4444; }
+
+    /* 반려 사유 박스 */
+    .reject-reason-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 14px 16px; }
+    .reject-reason-title { font-weight: 800; color: #dc2626; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+    .reject-reason-text { white-space: pre-wrap; color: var(--text-dark, #334155); font-size: 0.9rem; line-height: 1.5; }
+    .reject-reason-meta { margin-top: 8px; font-size: 0.8rem; color: var(--text-gray, #64748b); }
+
+    /* 반려 사유 입력 모달 */
+    .reject-reason-modal { z-index: 10000020 !important; }
+    .reject-reason-content {
+        width: 440px;
+        max-width: 92vw;
+        height: auto;
+        max-height: 82vh;
+        overflow-y: auto;
+        padding: 28px;
+    }
+    .reject-reason-modal textarea { width: 100%; min-height: 110px; box-sizing: border-box; padding: 10px 12px; margin-top: 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; font-size: 0.88rem; resize: vertical; background: var(--input-bg, #fff); color: var(--text-dark, #0f172a); }
 
     /* 모달 기본 스타일 */
     .modal { display: none; position: fixed; z-index: 9999999 !important; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
@@ -511,6 +520,9 @@
                 <button class="tab-btn" id="tab-draft" onclick="switchTab('draft')">
                     진행: 내 기안함 <span class="count-badge" id="count-draft">0</span>
                 </button>
+                <button class="tab-btn rejected-tab" id="tab-rejected" onclick="switchTab('rejected')" title="내가 상신한 문서 중 반려된 문서">
+                    <i class="fa-solid fa-rotate-left"></i> 반려함 <span class="count-badge" id="count-rejected">0</span>
+                </button>
                 <button class="tab-btn completed-tab" id="tab-completed" onclick="switchTab('completed')">
                     결재/수신 완료 <span class="count-badge" id="count-completed">0</span>
                 </button>
@@ -703,6 +715,25 @@
     </div>
 </div>
 
+<div id="rejectReasonModal" class="modal reject-reason-modal">
+    <div class="modal-content reject-reason-content">
+        <span onclick="closeRejectReasonModal()" style="position:absolute; right:22px; top:18px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        <h3 style="color:#dc2626; margin:0; font-size:1.15rem; display:flex; align-items:center; gap:10px;">
+            <i class="fa-solid fa-ban"></i> 결재 반려
+        </h3>
+        <p style="margin:10px 0 0; font-size:0.85rem; color:var(--text-gray, #64748b);">반려 사유를 입력하면 기안자에게 전달됩니다.</p>
+        <textarea id="rejectReasonInput" placeholder="반려 사유를 입력하세요."></textarea>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+            <button type="button" onclick="closeRejectReasonModal()" class="draft-footer-btn draft-footer-secondary" style="flex:1;">
+                취소
+            </button>
+            <button type="button" onclick="confirmRejectApproval()" class="draft-footer-btn draft-footer-primary" style="flex:2; background:#dc2626; border-color:#dc2626;">
+                <i class="fa-solid fa-ban"></i> 반려 확정
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="detailModal" class="modal">
     <div id="detailModalContent" class="modal-content">
         <span class="detail-modal-close" onclick="closeDetailModal()" style="position:absolute; right:25px; top:20px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
@@ -715,7 +746,7 @@
         <div class="detail-box" id="dt_dynamic_box"></div>
         
         <div id="actionArea" style="display:none; text-align:center; margin-top:25px; border-top:1px dashed var(--border-color); padding-top:25px;">
-            <button class="action-btn btn-reject" onclick="processApproval('reject')"><i class="fa-solid fa-xmark"></i> 결재 반려</button>
+            <button class="action-btn btn-reject" onclick="openRejectReasonModal()"><i class="fa-solid fa-xmark"></i> 결재 반려</button>
             <button class="action-btn btn-approve" onclick="processApproval('approve')" style="margin-left:10px;"><i class="fa-solid fa-check"></i> 결재 승인</button>
         </div>
         <div id="referenceArea" style="display:none; text-align:center; margin-top:18px; border-top:1px dashed var(--border-color); padding-top:18px;">
@@ -726,6 +757,18 @@
                 <i class="fa-solid fa-print"></i> 인쇄
             </button>
         </div>
+        <div id="rejectedArea" style="display:none; margin-top:20px;">
+            <div class="reject-reason-box">
+                <div class="reject-reason-title"><i class="fa-solid fa-ban"></i> 반려 사유</div>
+                <div id="dt_reject_reason" class="reject-reason-text"></div>
+                <div id="dt_reject_meta" class="reject-reason-meta"></div>
+            </div>
+            <div style="text-align:center; margin-top:16px;">
+                <button class="action-btn btn-approve" onclick="resubmitFromRejected()" style="background:#0f766e; border-color:#0f766e;">
+                    <i class="fa-solid fa-rotate-right"></i> 이 문서로 다시 상신
+                </button>
+            </div>
+        </div>
         <input type="hidden" id="currentDocId">
     </div>
 </div>
@@ -735,6 +778,7 @@ const currentUser = '{{ current_user }}';
 const docsData = {
     'pending': {{ pending_docs | tojson | safe }},
     'draft': {{ my_drafts | tojson | safe }},
+    'rejected': {{ rejected_docs | tojson | safe }},
     'completed': {{ completed_docs | tojson | safe }},
     'reference': {{ reference_docs | tojson | safe }},
     'archive': {{ archive_docs | tojson | safe }}
@@ -960,6 +1004,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initDragAndDrop();
     initCustomSelects();
     initParticipantSelection();
+    const requestedDocumentId = Number(new URLSearchParams(window.location.search).get('open_doc'));
+    if (requestedDocumentId > 0) openDetailModal(requestedDocumentId);
 });
 
 function initCustomSelects() {
@@ -1179,6 +1225,7 @@ function removeFile(index) {
 function updateCounts() {
     document.getElementById('count-pending').innerText = docsData['pending'].length;
     document.getElementById('count-draft').innerText = docsData['draft'].length;
+    document.getElementById('count-rejected').innerText = docsData['rejected'].length;
     document.getElementById('count-completed').innerText = docsData['completed'].length;
     document.getElementById('count-reference').innerText = docsData['reference'].length;
     document.getElementById('count-archive').innerText = docsData['archive'].length;
@@ -1214,10 +1261,20 @@ function formatDocDate(value) {
     return value ? String(value).substring(0, 16) : '';
 }
 
+function getRejectInfo(doc) {
+    try {
+        const parsed = doc.doc_data ? JSON.parse(doc.doc_data) : {};
+        return { reason: parsed.reject_reason || '', by: parsed.rejected_by || '', at: parsed.rejected_at || '' };
+    } catch (e) {
+        return { reason: '', by: '', at: '' };
+    }
+}
+
 function renderTable() {
     const headers = {
         'pending': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">수신일시</th><th style="width:15%;">상태</th></tr>`,
         'draft': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">결재/수신자</th><th style="width:15%;">기안일시</th><th style="width:15%; text-align:left; padding-left:25px;">진행 상황</th></tr>`,
+        'rejected': `<tr><th style="width:12%;">문서종류</th><th style="width:33%;">제목</th><th style="width:13%;">반려자</th><th style="width:27%; text-align:left; padding-left:20px;">반려 사유</th><th style="width:15%;">반려일시</th></tr>`,
         'completed': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
         'reference': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
         'archive': `<tr><th style="width:12%;">문서종류</th><th style="width:34%;">제목</th><th style="width:15%;">기안자</th><th style="width:19%;">결재/수신자</th><th style="width:12%;">완료일시</th><th style="width:8%;">상태</th></tr>`
@@ -1250,8 +1307,8 @@ function renderTable() {
             const approverText = receiverText ? receiverText.substring(0,15) + (receiverText.length > 15 ? '...' : '') : `${approver1} / ${approver2}`;
             const displayCol = currentTab === 'pending' ? doc.drafter :
                                currentTab === 'draft' ? approverText : doc.drafter;
-            const dateCol = ['completed', 'reference', 'archive'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
-            
+            const dateCol = ['completed', 'reference', 'archive', 'rejected'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
+
             const statusCell = currentTab === 'draft' ? renderProgressBar(doc) : `<span class="status-badge st-${doc.status}">${doc.status}</span>`;
 
             if (currentTab === 'archive') {
@@ -1262,6 +1319,16 @@ function renderTable() {
                     <td style="color:var(--text-dark, #475569);">${approverText}</td>
                     <td style="color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
                     <td>${statusCell}</td>
+                </tr>`;
+            } else if (currentTab === 'rejected') {
+                const rejectInfo = getRejectInfo(doc);
+                const reasonPreview = rejectInfo.reason ? (rejectInfo.reason.length > 28 ? rejectInfo.reason.substring(0, 28) + '...' : rejectInfo.reason) : '';
+                html += `<tr onclick="openDetailModal(${doc.id})">
+                    <td><span style="font-weight:700; color:var(--text-dark, #475569);">${doc.doc_type || ''}</span></td>
+                    <td style="font-weight:600; font-size:0.85rem; text-align:left; padding-left:20px;">${doc.title || ''}</td>
+                    <td style="color:var(--text-dark, #475569);">${rejectInfo.by || ''}</td>
+                    <td style="color:var(--text-gray, #64748b); font-size:0.8rem; text-align:left; padding-left:20px;">${reasonPreview}</td>
+                    <td style="color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
                 </tr>`;
             } else {
                 html += `<tr onclick="openDetailModal(${doc.id})">
@@ -1287,7 +1354,7 @@ function switchTab(tab) {
     currentTab = tab; currentPage = 1;
     document.getElementById('searchInput').value = ''; searchTerm = '';
     
-    ['pending', 'draft', 'completed', 'reference', 'archive'].forEach(t => {
+    ['pending', 'draft', 'rejected', 'completed', 'reference', 'archive'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('active', t === tab);
     });
     renderTable();
@@ -1651,7 +1718,17 @@ async function openDetailModal(docId) {
         const isApp2 = (doc.status === '1차승인' && doc.approver_2 === currentUser);
         document.getElementById('actionArea').style.display = (isApp1 || isApp2) ? 'block' : 'none';
         document.getElementById('referenceArea').style.display = doc.status === '완료' ? 'block' : 'none';
-        
+
+        const isRejectedOwner = doc.status === '반려' && doc.drafter === currentUser;
+        document.getElementById('rejectedArea').style.display = isRejectedOwner ? 'block' : 'none';
+        if (isRejectedOwner) {
+            document.getElementById('dt_reject_reason').innerText = parsed.reject_reason || '(반려 사유가 입력되지 않았습니다)';
+            const metaParts = [];
+            if (parsed.rejected_by) metaParts.push(`반려자: ${parsed.rejected_by}`);
+            if (parsed.rejected_at) metaParts.push(parsed.rejected_at);
+            document.getElementById('dt_reject_meta').innerText = metaParts.join(' · ');
+        }
+
         const detailModal = document.getElementById('detailModal');
         detailModal.style.display = 'block';
         
@@ -1692,6 +1769,53 @@ function createDraftFromReference() {
     document.getElementById('draftModalContent').scrollTop = 0;
 }
 
+function selectCustomOption(inputId, name) {
+    if (!name) return;
+    const input = document.getElementById(inputId);
+    const wrapper = input ? input.previousElementSibling : null;
+    if (!input || !wrapper) return;
+    const option = Array.from(wrapper.querySelectorAll('.select-items div[data-value]'))
+        .find(opt => opt.getAttribute('data-value') === name);
+    if (!option) return;
+    input.value = name;
+    wrapper.querySelector('.select-selected').innerHTML = option.innerHTML;
+}
+
+function resubmitFromRejected() {
+    if (!currentDetailDoc || currentDetailDoc.status !== '반려' || currentDetailDoc.drafter !== currentUser) return;
+
+    const originalBody = currentDetailDoc.parsed ? currentDetailDoc.parsed['본문'] : '';
+    referenceDraftContent = extractReferenceDetailContent(originalBody);
+
+    closeDetailModal();
+    openDraftModal(currentDetailDoc.doc_type || '기안서', true);
+    document.getElementById('draftTitle').value = currentDetailDoc.title || '';
+
+    const isReceiverType = ['보고서', '업무일지', '회의록'].includes(currentDetailDoc.doc_type);
+    if (isReceiverType) {
+        const recvNames = String(currentDetailDoc.receivers || '').split(',').map(s => s.trim()).filter(Boolean);
+        document.querySelectorAll('.recv-cb').forEach(cb => { cb.checked = recvNames.includes(cb.value); });
+    } else {
+        selectCustomOption('app1', currentDetailDoc.approver_1);
+        selectCustomOption('app2', currentDetailDoc.approver_2);
+    }
+
+    const ccNames = String(currentDetailDoc.cc_receivers || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (ccNames.length) {
+        document.querySelectorAll('.cc-cb').forEach(cb => { cb.checked = ccNames.includes(cb.value); });
+        document.getElementById('cc-box').style.display = 'block';
+        document.getElementById('cc-toggle-icon').style.transform = 'rotate(180deg)';
+    }
+
+    if (currentDetailDoc.doc_type === '휴가원' && currentDetailDoc.parsed) {
+        document.getElementById('vacationStartDate').value = currentDetailDoc.parsed.vacation_start_date || '';
+        document.getElementById('vacationEndDate').value = currentDetailDoc.parsed.vacation_end_date || '';
+    }
+
+    updateApproverOptionStates();
+    document.getElementById('draftModalContent').scrollTop = 0;
+}
+
 function printCompletedDocument() {
     if (!currentDetailDoc || currentDetailDoc.status !== '완료') {
         alert('결재가 완료된 문서만 인쇄할 수 있습니다.');
@@ -1723,13 +1847,46 @@ function printCompletedDocument() {
     }
 }
 
-async function processApproval(actionStr) {
+async function sendApprovalAction(actionStr, reason) {
     const docId = document.getElementById('currentDocId').value;
-    if(!confirm(actionStr === 'approve' ? "결재를 승인하시겠습니까?" : "결재를 반려하시겠습니까?")) return;
     try {
-        const res = await fetch(`/approval/action/${docId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: actionStr }) });
-        if(res.ok) { alert("처리되었습니다."); location.reload(); }
-    } catch(e) {}
+        const res = await fetch(`/approval/action/${docId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionStr, reason: reason || '' })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+            alert("처리되었습니다.");
+            location.reload();
+        } else {
+            alert(data.message || "처리 중 오류가 발생했습니다.");
+        }
+    } catch (e) {}
+}
+
+async function processApproval(actionStr) {
+    if (actionStr === 'reject') { openRejectReasonModal(); return; }
+    if (!confirm("결재를 승인하시겠습니까?")) return;
+    await sendApprovalAction('approve');
+}
+
+function openRejectReasonModal() {
+    document.getElementById('rejectReasonInput').value = '';
+    document.getElementById('rejectReasonModal').style.display = 'block';
+    document.getElementById('rejectReasonInput').focus();
+}
+
+function closeRejectReasonModal() {
+    document.getElementById('rejectReasonModal').style.display = 'none';
+}
+
+async function confirmRejectApproval() {
+    const reason = document.getElementById('rejectReasonInput').value.trim();
+    if (!reason) { alert("반려 사유를 입력해주세요."); return; }
+    if (!confirm("입력한 사유로 결재를 반려하시겠습니까?")) return;
+    closeRejectReasonModal();
+    await sendApprovalAction('reject', reason);
 }
 </script>
 {% endblock %}

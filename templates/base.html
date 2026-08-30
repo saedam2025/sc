@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/unified_search.css', v='20260830-1') }}">
     
     <!-- === 로그인 테마 적용 스크립트 === -->
     <script>
@@ -895,6 +896,26 @@
         .emoji-scroll-box::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 10px; }
         
         .profile-img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: contain; background-color: #fff; border: 2px solid var(--border-color); margin-top: 10px; display: none; }
+
+        /* 프로필 사진 업로드/삭제 UI */
+        .file-upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .file-upload-btn {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border-color);
+            background: var(--card-bg, #fff); color: var(--text-dark); font-weight: 700;
+            font-size: 0.85rem; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+        }
+        .file-upload-btn:hover { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .file-upload-btn input[type="file"] { display: none; }
+        .file-upload-filename { font-size: 0.8rem; color: var(--text-gray); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .profile-img-preview-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+        .file-remove-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px; border-radius: 8px; border: 1px solid #ffc9c9;
+            background: #fff5f5; color: #c92a2a; font-weight: 700; font-size: 0.78rem;
+            cursor: pointer; transition: all 0.2s;
+        }
+        .file-remove-btn:hover { background: #c92a2a; color: #fff; border-color: #c92a2a; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -925,7 +946,7 @@
                         <!-- 2. 사내결재 메뉴 통합 (드롭다운 구조로 변경) -->
                         {% if menu_access.get('approval_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'approval' in request.path or 'expense' in request.path or 'contract' in request.path or 'document' in request.path %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/approval') or request.path.startswith('/expense') or request.path.startswith('/contract') or request.path.startswith('/verified-contract') or request.path.startswith('/document') %}active{% endif %}">
                                 <i class="fa-solid fa-file-signature"></i> 사내결재
                             </a>
                             <div class="dropdown-content">
@@ -961,15 +982,17 @@
                         <!-- 4. 업무지원 메뉴 (기존 유지) -->
                         {% if menu_access.get('support_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'excel-generator' in request.path or request.path.startswith('/parent-notifications') or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'payroll' in request.path or 'ai-mail' in request.path or 'ai-agent' in request.path or 'smart-document' in request.path or 'excel-generator' in request.path or request.path.startswith('/parent-notifications') or (request.path.startswith('/ebook') and not request.path.startswith('/ebook/books')) %}active{% endif %}">
                                 <i class="fa-solid fa-briefcase"></i> 업무지원
                             </a>
                             <div class="dropdown-content">
+                                {% if menu_access.get('smart_document_main', true) %}<a href="/smart-document"><i class="fa-solid fa-file-circle-check"></i>스마트 공문발송</a>{% endif %}
                                 {% if menu_access.get('payroll_main', true) %}<a href="/payroll"><i class="fa-solid fa-envelope-open-text"></i>스마트 명세서 발송</a>{% endif %}
                                 {% if menu_access.get('ai_mail_main', true) %}<a href="/ai-mail"><i class="fa-solid fa-wand-magic-sparkles"></i>스마트 메일 발송</a>{% endif %}
                                 {% if menu_access.get('excel_generator', true) %}<a href="{{ url_for('excel_generator.deposit_index') }}"><i class="fa-solid fa-file-excel"></i>입금용 엑셀 생성기</a>{% endif %}
                                 {% if menu_access.get('ebook_library', true) %}<a href="{{ url_for('ebook.library') }}"><i class="fa-solid fa-book-open-reader"></i>e리플렛</a>{% endif %}
                                 {% if menu_access.get('parent_notifications', false) %}<a href="/parent-notifications"><i class="fa-solid fa-bell"></i>학부모알림전송</a>{% endif %}
+                                {% if menu_access.get('ai_agent_main', true) %}<a href="{{ url_for('ai_agent.index') }}"><i class="fa-solid fa-robot"></i>AI에이전트</a>{% endif %}
                             </div>
                         </li>
                         {% endif %}
@@ -1018,6 +1041,7 @@
                                 {% if menu_access.get('admin_themes', false) %}<a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>{% endif %}
                                 {% if menu_access.get('ebook_library', false) %}<a href="{{ url_for('ebook.text_library') }}"><i class="fa-solid fa-book-open-reader"></i>eBook 관리</a>{% endif %}
                                 {% if menu_access.get('admin_stats', false) %}<a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>{% endif %}
+                                {% if menu_access.get('admin_ai_settings', false) %}<a href="/admin/ai-settings"><i class="fa-solid fa-robot"></i>AI api설정</a>{% endif %}
                                 {% if menu_access.get('admin_settings', false) %}<a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>{% endif %}
                             </div>
                         </li>
@@ -1031,12 +1055,22 @@
                         <i class="fa-solid fa-chalkboard"></i>
                     </a>{% endif %}
 
-                    <div class="user-profile" onclick="openMyInfoModal()">
-                        <div id="nav-profile-icon-container" style="background: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; font-size: 1.1rem;">
-                            {{ session.get('profile_icon', '👤') }}
-                        </div>
-                        <span id="nav-user-name">{{ session.get('name', session.get('user_name')) }}</span>
-                        <span class="user-point-badge js-current-user-points" title="내 보유 포인트">P0점</span>
+                    <div class="global-search" id="globalSearch" data-search-url="{{ url_for('unified_search.unified_search') }}">
+                        <label class="global-search-box" for="globalSearchInput">
+                            <i class="fa-solid fa-magnifying-glass global-search-leading" aria-hidden="true"></i>
+                            <input id="globalSearchInput" type="search" inputmode="search" autocomplete="off"
+                                   placeholder="통합검색" aria-label="인트라넷 통합검색" aria-autocomplete="list"
+                                   aria-controls="globalSearchPanel" aria-expanded="false">
+                            <kbd class="global-search-shortcut" aria-hidden="true">Ctrl K</kbd>
+                            <span class="global-search-spinner" aria-hidden="true"></span>
+                        </label>
+                        <section class="global-search-panel" id="globalSearchPanel" role="dialog" aria-label="통합검색 결과" hidden>
+                            <div class="global-search-state">
+                                <span id="globalSearchSummary">검색어를 2글자 이상 입력하세요.</span>
+                                <span class="global-search-scope"><i class="fa-solid fa-shield-halved"></i> 개인정보 보호중</span>
+                            </div>
+                            <div class="global-search-results" id="globalSearchResults" role="listbox"></div>
+                        </section>
                     </div>
                     <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
                         <i class="fa-solid fa-right-from-bracket"></i>
@@ -1106,6 +1140,8 @@
         window.addEventListener('DOMContentLoaded', async () => {
     window.refreshCurrentPoints();
     window.setInterval(window.refreshCurrentPoints, 60000);
+    const navContainer = document.getElementById('nav-profile-icon-container');
+    if (!navContainer) return;
     try {
         const res = await fetch('/user/my_info');
         if (!res.ok) return;
@@ -1114,15 +1150,13 @@
         if (result.status !== 'success') return;
 
         const me = result.data;
-        const navContainer = document.getElementById('nav-profile-icon-container');
-
         if (me.profile_path) {
-            navContainer.innerHTML = `<img src="${me.profile_path}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            navContainer.innerHTML = `<img src="${me.profile_path}" style="width: 100%; height: 100%; object-fit: contain; background: #fff;">`;
         } else if (me.profile_icon) {
             navContainer.innerHTML = me.profile_icon;
         }
 
-        if (me.name) {
+        if (me.name && document.getElementById('nav-user-name')) {
             document.getElementById('nav-user-name').innerText = me.name;
         }
     } catch(e) {}
@@ -1141,6 +1175,32 @@
                 preview.src = "";
                 preview.style.display = 'none';
             }
+        }
+
+        function onProfileFileChange(input, filenameId, removeFlagId, removeBtnId) {
+            const nameEl = document.getElementById(filenameId);
+            const removeFlag = document.getElementById(removeFlagId);
+            const removeBtn = document.getElementById(removeBtnId);
+            if (input.files && input.files[0]) {
+                if (nameEl) nameEl.textContent = input.files[0].name;
+                if (removeFlag) removeFlag.value = '0';
+                if (removeBtn) removeBtn.style.display = 'inline-flex';
+            } else if (nameEl) {
+                nameEl.textContent = '선택된 파일 없음';
+            }
+        }
+
+        function removeProfileImage(fileInputId, previewId, filenameId, removeBtnId, removeFlagId) {
+            const fileInput = document.getElementById(fileInputId);
+            if (fileInput) fileInput.value = '';
+            const preview = document.getElementById(previewId);
+            if (preview) { preview.src = ''; preview.style.display = 'none'; }
+            const nameEl = document.getElementById(filenameId);
+            if (nameEl) nameEl.textContent = '선택된 파일 없음';
+            const removeBtn = document.getElementById(removeBtnId);
+            if (removeBtn) removeBtn.style.display = 'none';
+            const removeFlag = document.getElementById(removeFlagId);
+            if (removeFlag) removeFlag.value = '1';
         }
 
         function formatPhoneNumber(input) {
@@ -1209,8 +1269,18 @@ if (currentMyInfo) {
         <div class="full-width profile-setup-area">
             <div style="flex:1;">
                 <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 사진</label>
-                <input type="file" id="myinfo_profile_image" class="glass-input" style="padding: 8px; font-size: 0.85em;" accept="image/*" onchange="previewImage(this, 'preview_myinfo')">
-                <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px;">
+                <div class="file-upload-row">
+                    <label class="file-upload-btn" for="myinfo_profile_image">
+                        <i class="fa-solid fa-camera"></i> 파일 선택
+                        <input type="file" id="myinfo_profile_image" accept="image/*" onchange="previewImage(this, 'preview_myinfo'); onProfileFileChange(this, 'myinfo_file_name', 'myinfo_remove_flag', 'myinfo_remove_btn')">
+                    </label>
+                    <span id="myinfo_file_name" class="file-upload-filename">${profilePath ? '등록된 사진 있음' : '선택된 파일 없음'}</span>
+                </div>
+                <input type="hidden" id="myinfo_remove_flag" value="0">
+                <div class="profile-img-preview-row">
+                    <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px;">
+                    <button type="button" id="myinfo_remove_btn" class="file-remove-btn" style="display:${profilePath ? 'inline-flex' : 'none'};" onclick="removeProfileImage('myinfo_profile_image', 'preview_myinfo', 'myinfo_file_name', 'myinfo_remove_btn', 'myinfo_remove_flag')"><i class="fa-solid fa-trash"></i> 사진 삭제</button>
+                </div>
             </div>
             <div style="flex:2;">
                 <label style="font-weight:bold; font-size:0.9em; margin-bottom:8px; display:block;">프로필 아이콘</label>
@@ -1288,6 +1358,7 @@ if (currentMyInfo) {
             const address = document.getElementById('myinfo_address').value;
             const profileIcon = document.getElementById('myinfo_profile_icon').value;
             const profileImage = document.getElementById('myinfo_profile_image').files[0];
+            const removeProfile = document.getElementById('myinfo_remove_flag').value === '1';
 
             if (password) {
                 if (password !== passwordConfirm) return alert("입력하신 새 비밀번호가 서로 일치하지 않습니다.");
@@ -1313,6 +1384,7 @@ if (currentMyInfo) {
             formData.append('bank_account', currentMyInfo.계좌 || '');
             
             if (profileImage) formData.append('profile_image', profileImage);
+            else if (removeProfile) formData.append('remove_profile_image', '1');
 
             try {
                 const res = await fetch('/user/update_my_info', {
@@ -1335,7 +1407,8 @@ if (currentMyInfo) {
 
         function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
-    </script>
+</script>
+<script src="{{ url_for('static', filename='js/unified_search.js', v='20260830-1') }}" defer></script>
 
     <script>
         // === 로그인 테마 배경 액션 효과를 내부 화면에도 렌더링 ===

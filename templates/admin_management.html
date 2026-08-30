@@ -2,30 +2,53 @@
 
 {% block content %}
 <style>
-    .admin-shell { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; color: var(--text-dark, #1e293b); }
-    .admin-side { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 12px; height: fit-content; box-shadow: var(--dashboard-card-shadow, 0 8px 24px rgba(15,23,42,.05)); }
-    .admin-side-title { font-weight: 800; font-size: 15px; padding: 10px; display: flex; gap: 8px; align-items: center; }
-    .admin-nav-link { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border-radius: 8px; color: var(--text-gray, #64748b); text-decoration: none; font-weight: 700; font-size: 14px; }
-    .admin-nav-link:hover, .admin-nav-link.active { background: rgba(74,144,226,.12); color: var(--primary-color, #4a90e2); }
+    .admin-shell { display: flex; flex-direction: column; color: var(--text-dark, #1e293b); }
     .admin-main { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-    
-    /* 1. 상단 메뉴 띠 (테마 색상 자동 적용) */
-    .page-ribbon { 
-        height: 6px; 
-        background: linear-gradient(90deg, var(--primary-color, #4a90e2), var(--effect-color1, #93c5fd)); 
-        border-radius: 6px; 
-        margin-bottom: 16px; 
-    }
 
-    .admin-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--border-color, #e2e8f0); padding-bottom: 14px; }
-    .admin-title { margin: 0; font-size: 24px; font-weight: 900; display: flex; align-items: center; gap: 10px; }
-    .admin-subtitle { margin-top: 6px; color: var(--text-gray, #64748b); font-weight: 600; font-size: 13px; }
-    .panel { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 16px; box-shadow: var(--dashboard-card-shadow, 0 8px 24px rgba(15,23,42,.05)); }
-    .panel-title { font-size: 17px; font-weight: 900; margin: 0; display: flex; gap: 8px; align-items: center; }
+    .admin-header {
+        display: flex; align-items: center; justify-content: space-between; gap: 18px;
+        margin: 0; padding: 20px 24px; border: 1px solid var(--border-color, #dbe3ef);
+        border-radius: 20px; background:
+            radial-gradient(circle at 85% 10%, color-mix(in srgb, var(--primary-color, #4a90e2) 17%, transparent), transparent 32%),
+            var(--card-bg, #fff);
+        box-shadow: var(--dashboard-card-shadow, 0 10px 35px rgba(15,23,42,.07));
+    }
+    .admin-title {
+        margin: 0; font-size: clamp(1.35rem, 2vw, 1.75rem); font-weight: 900; letter-spacing: -.035em;
+        display: flex; align-items: center; gap: 15px;
+    }
+    .admin-title > i:first-child {
+        width: 52px; height: 52px; flex: 0 0 52px; display: grid; place-items: center;
+        border-radius: 16px; background: var(--primary-color, #4a90e2); color: #fff; font-size: 1.35rem;
+        box-shadow: 0 10px 22px color-mix(in srgb, var(--primary-color, #4a90e2) 28%, transparent);
+    }
+    .admin-subtitle { margin-top: 6px; color: var(--text-gray, #64748b); font-weight: 600; font-size: .92rem; line-height: 1.5; }
+    .panel { background: var(--card-bg, #fff); border: 1px solid var(--border-color, #dbe3ef); border-radius: 18px; padding: 18px; box-shadow: var(--dashboard-card-shadow, 0 8px 28px rgba(15,23,42,.055)); }
+    .panel-title { font-size: 1.02rem; font-weight: 900; margin: 0; display: flex; gap: 8px; align-items: center; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .stats-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-    .stat-box { border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; padding: 14px; background: rgba(255,255,255,.55); }
+    .stat-box { border: 1px solid var(--border-color, #dbe3ef); border-radius: 13px; padding: 14px; background: var(--widget-bg, #f7f9fc); }
+    .stat-box.preset-active {
+        border-color: #0bd18a;
+        box-shadow: 0 0 0 1px #0bd18a, 0 0 18px 2px rgba(11, 209, 138, .35);
+    }
+    .preset-active-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 3px 10px 3px 8px; border-radius: 999px;
+        background: color-mix(in srgb, #0bd18a 14%, transparent);
+        color: #087b67; font-size: 11px; font-weight: 800; letter-spacing: .02em;
+    }
+    .preset-active-led {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #0bd18a;
+        box-shadow: 0 0 4px 1px #0bd18a, 0 0 8px 2px rgba(11, 209, 138, .7);
+        animation: preset-led-blink 1.4s ease-in-out infinite;
+    }
+    @keyframes preset-led-blink {
+        0%, 100% { opacity: 1; box-shadow: 0 0 6px 2px #0bd18a, 0 0 14px 4px rgba(11, 209, 138, .85); }
+        50% { opacity: .35; box-shadow: 0 0 2px 0px #0bd18a, 0 0 4px 1px rgba(11, 209, 138, .35); }
+    }
     .stat-label { color: var(--text-gray, #64748b); font-weight: 800; font-size: 12px; }
     .stat-value { margin-top: 8px; font-size: 22px; font-weight: 900; color: var(--primary-color, #4a90e2); }
     .stat-hint { margin-top: 5px; color: var(--text-gray, #64748b); font-size: 11px; font-weight: 700; }
@@ -174,26 +197,98 @@
     }
 
     .table-actions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 8px; padding: 9px 12px; font-weight: 900; cursor: pointer; text-decoration: none; font-size: 13px; white-space: nowrap; }
-    .btn-primary { background: var(--primary-color, #4a90e2); color: #fff; }
-    .btn-ghost { background: rgba(100,116,139,.11); color: var(--text-dark, #1e293b); }
-    .btn-danger { background: #ef4444; color: #fff; }
-    .btn-small { padding: 7px 9px; font-size: 12px; }
+    .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+        min-height: 40px; border: 1px solid var(--border-color, #dbe3ef); border-radius: 11px;
+        padding: 9px 14px; background: var(--card-bg, #fff); color: var(--text-dark, #1e293b);
+        font-weight: 750; font-size: .84rem; cursor: pointer; text-decoration: none; white-space: nowrap;
+        transition: .17s ease;
+    }
+    .btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--primary-color, #4a90e2) 55%, var(--border-color, #dbe3ef)); color: var(--primary-color, #4a90e2); transform: translateY(-1px); }
+    .btn:disabled { opacity: .48; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--primary-color, #4a90e2); border-color: var(--primary-color, #4a90e2); color: #fff; box-shadow: 0 7px 15px color-mix(in srgb, var(--primary-color, #4a90e2) 22%, transparent); }
+    .btn-primary:hover:not(:disabled) { color: #fff; filter: brightness(.97); }
+    .btn-ghost { background: color-mix(in srgb, var(--primary-color, #4a90e2) 8%, transparent); border-color: transparent; color: var(--primary-color, #4a90e2); }
+    .btn-danger { background: #ef4444; border-color: #ef4444; color: #fff; }
+    .btn-danger:hover:not(:disabled) { color: #fff; filter: brightness(.95); }
+    .btn-small { min-height: 34px; padding: 7px 10px; font-size: .77rem; border-radius: 9px; }
     .muted { color: var(--text-gray, #64748b); font-weight: 600; }
     
     .mono { font-family: Consolas, monospace; font-size: 15px; font-weight: 800; color: #334155; }
     .row-num { font-size: 15px; font-weight: 900; color: #64748b; text-align: center; }
     
-    .disk-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 14px; }
-    .disk-root-list { max-height: 680px; overflow-y: auto; padding-right: 3px; }
-    .root-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; margin-bottom: 8px; text-decoration: none; color: inherit; }
+    .disk-layout { display: grid; grid-template-columns: 560px minmax(0, 1fr); gap: 14px; }
+    .disk-root-list { padding-right: 3px; }
+    .root-card { display: flex; align-items: stretch; gap: 6px; padding: 0; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; margin-bottom: 8px; }
     .root-card.active { border-color: var(--primary-color, #4a90e2); background: rgba(74,144,226,.11); }
-    .root-card.static { cursor: default; background: rgba(100,116,139,.045); }
-    .root-card-label { min-width: 0; display: flex; align-items: flex-start; gap: 8px; }
+    .root-card.static { background: rgba(100,116,139,.045); }
+    .root-card-label { min-width: 0; flex: 1 1 auto; display: flex; align-items: flex-start; gap: 8px; padding: 10px; text-decoration: none; color: inherit; font-size: 12.8px; }
     .root-card-label > i { margin-top: 2px; color: var(--primary-color, #4a90e2); }
-    .root-card-label small { display: block; margin-top: 3px; color: var(--text-gray, #64748b); font-size: 10px; font-weight: 700; }
-    .root-card-size { flex: 0 0 auto; text-align: right; }
+    .root-card-label small { display: block; margin-top: 3px; color: var(--text-gray, #64748b); font-size: 10px; font-weight: 700; white-space: normal; }
+    .root-card-size {
+        flex: 0 0 auto; display: flex; align-items: center; gap: 8px; text-align: right;
+        border: 0; background: transparent; font: inherit; font-size: 12.8px;
+        padding: 10px 12px; color: inherit; cursor: pointer; border-radius: 7px;
+    }
+    .root-card-size:hover { background: rgba(74,144,226,.09); }
+    .root-card-size .expand-icon { color: var(--text-gray, #94a3b8); font-size: 11px; }
+    .root-card-size[aria-expanded="true"] .expand-icon { transform: rotate(180deg); }
     .root-card-size small { display: block; margin-top: 3px; color: var(--text-gray, #64748b); font-size: 9px; }
+    .root-detail-row[hidden] { display: none; }
+    .root-detail-box { margin: -4px 0 10px; padding: 13px; border: 1px solid var(--border-color, #dbe4ee); border-radius: 8px; background: rgba(248,250,252,.62); }
+    .root-detail-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .root-detail-list { display: grid; gap: 4px; font-size: 12px; }
+    .root-detail-list > div { display: flex; justify-content: space-between; gap: 10px; padding: 4px 2px; border-bottom: 1px dashed var(--border-color, #e2e8f0); min-width: 0; overflow: hidden; }
+    .root-detail-list > div > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dark, #1e293b); }
+    .root-detail-list > div > span:last-child { flex: 0 0 auto; color: var(--text-gray, #64748b); font-weight: 800; }
+
+    .disk-usage-widget { min-width: 360px; }
+    .disk-usage-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .disk-usage-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--text-gray, #64748b); }
+    .disk-usage-title i { color: var(--primary-color, #4a90e2); }
+    .disk-usage-total { font-size: 13px; font-weight: 800; color: var(--text-dark, #1e293b); }
+    .disk-usage-bar { position: relative; height: 18px; border-radius: 999px; background: rgba(100,116,139,.14); overflow: hidden; margin-top: 8px; box-shadow: inset 0 1px 3px rgba(15,23,42,.09); }
+    .disk-usage-bar > span {
+        display: block; height: 100%; border-radius: 999px;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--primary-color, #4a90e2) 60%, #fff), var(--primary-color, #4a90e2));
+        box-shadow: 0 0 10px color-mix(in srgb, var(--primary-color, #4a90e2) 55%, transparent);
+        transition: width .5s ease;
+    }
+    .disk-usage-bar.is-high > span { background: linear-gradient(90deg, #fca5a5, #ef4444); box-shadow: 0 0 10px rgba(239,68,68,.5); }
+    .disk-usage-legend { display: flex; justify-content: flex-end; gap: 16px; margin-top: 8px; }
+    .disk-usage-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--text-gray, #64748b); }
+    .disk-usage-chip i { font-size: 8px; color: var(--primary-color, #4a90e2); }
+    .disk-usage-chip.is-high i { color: #ef4444; }
+    .disk-usage-chip.free i { color: #cbd5e1; }
+
+    .disk-summary-chart-wrap { display: flex; align-items: flex-end; gap: 4px; }
+    .disk-summary-axis { flex: 0 0 38px; display: flex; flex-direction: column; align-items: flex-end; }
+    .disk-summary-axis-spacer.top { height: 17px; }
+    .disk-summary-axis-spacer.bottom { height: 26px; }
+    .disk-summary-axis-zone { position: relative; width: 100%; height: 70px; }
+    .disk-summary-tick { position: absolute; right: 4px; transform: translateY(50%); font-size: 9px; font-weight: 700; line-height: 1; color: var(--text-gray, #94a3b8); white-space: nowrap; }
+    .disk-summary-chart { position: relative; display: flex; align-items: flex-end; gap: 10px; overflow-x: auto; padding: 17px 2px 2px; min-width: 0; }
+    .disk-summary-gridlines { position: absolute; left: 2px; right: 2px; bottom: 26px; height: 70px; pointer-events: none; }
+    .disk-summary-gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border-color, #e2e8f0); }
+    .disk-summary-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto; width: 46px; position: relative; z-index: 1; }
+    .disk-summary-value { font-size: 9px; font-weight: 800; white-space: nowrap; color: var(--text-gray, #64748b); }
+    .disk-summary-bar { width: 18px; height: 70px; display: flex; align-items: flex-end; border-radius: 5px; background: rgba(100,116,139,.12); overflow: hidden; }
+    .disk-summary-bar > span { display: block; width: 100%; min-height: 2px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color, #4a90e2) 45%, #ffffff), var(--primary-color, #4a90e2)); }
+    .disk-summary-label {
+        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        min-height: 22px; max-width: 46px; font-size: 9px; font-weight: 600; line-height: 1.2;
+        text-align: center; color: var(--text-gray, #64748b);
+    }
+
+    .disk-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .disk-toolbar .form-field { flex: 1 1 220px; margin: 0; }
+    .disk-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -6px 0 12px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 700; }
+    .disk-breadcrumb a { color: var(--primary-color, #4a90e2); text-decoration: none; }
+    .disk-breadcrumb a:hover { text-decoration: underline; }
+    .data-table th.is-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+    .data-table th.is-sortable:hover { color: var(--primary-color, #4a90e2); }
+    .data-table th.is-sortable .sort-icon { margin-left: 4px; opacity: .5; font-size: 11px; }
+    .data-table th.is-sortable[data-sort-active="true"] .sort-icon { opacity: 1; }
     .disk-personal-note { margin: 8px 0 14px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 650; line-height: 1.6; }
     .disk-person { display: flex; align-items: center; gap: 9px; min-width: 180px; }
     .disk-person-icon { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: var(--primary-light, #eff6ff); color: var(--primary-color, #4a90e2); }
@@ -206,7 +301,7 @@
     .empty-note { padding: 34px; text-align: center; color: var(--text-gray, #64748b); font-weight: 700; }
     
     @media (max-width: 980px) {
-        .admin-shell, .disk-layout, .grid-2, .grid-3, .detail-grid { grid-template-columns: 1fr; }
+        .disk-layout, .grid-2, .grid-3, .detail-grid { grid-template-columns: 1fr; }
         .stats-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
         .menu-permission-guide { grid-template-columns:1fr; }
@@ -219,35 +314,9 @@
         .stats-summary-grid { grid-template-columns: 1fr; }
     }
 
-    /* 상단 메뉴 테마 색상 띠 (테두리를 덮으며 둥글게) */
-    .admin-side, .panel {
-        position: relative;
-    }
-    .admin-side::before, .panel::before {
-        content: "";
-        position: absolute;
-        top: -1px; left: -1px; right: -1px;
-        height: 6px;
-        background: linear-gradient(90deg, var(--primary-color, #4a90e2), var(--effect-color1, #93c5fd));
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
-        z-index: 10;
-    }
-
-    /* 좌측 메뉴판도 상단 메뉴 아래 공통 50px 시작선에 맞춤 */
-    .admin-side { margin-top: 0; }
 </style>
 
 <div class="admin-shell">
-    <aside class="admin-side">
-        <div class="admin-side-title"><i class="fa-solid fa-screwdriver-wrench"></i> 통합관리</div>
-        {% for key, label, icon, href in admin_tabs %}
-            <a class="admin-nav-link {% if active_section == key %}active{% endif %}" href="{{ href }}">
-                <i class="fa-solid {{ icon }}"></i>{{ label }}
-            </a>
-        {% endfor %}
-    </aside>
-
     <section class="admin-main">
 
         {% if active_section == 'menu_permissions' %}
@@ -442,45 +511,102 @@
                 <h1 class="admin-title"><i class="fa-solid fa-hard-drive"></i> 디스크관리</h1>
                 <div class="admin-subtitle">메뉴별 사용량을 확인하고 허용된 데이터 폴더 안의 파일을 접근/삭제합니다.</div>
             </div>
-            <div class="muted">전체 {{ disk_stats.used }} / {{ disk_stats.total }} ({{ disk_stats.percent }}%)</div>
+            <div class="disk-usage-widget">
+                <div class="disk-usage-head">
+                    <span class="disk-usage-title"><i class="fa-solid fa-database"></i> 전체 저장공간</span>
+                    <span class="disk-usage-total">{{ disk_stats.used }} / {{ disk_stats.total }}</span>
+                </div>
+                <div class="disk-usage-bar {% if disk_stats.percent >= 90 %}is-high{% endif %}"><span style="width:{{ disk_stats.percent }}%;"></span></div>
+                <div class="disk-usage-legend">
+                    <span class="disk-usage-chip {% if disk_stats.percent >= 90 %}is-high{% endif %}"><i class="fa-solid fa-circle"></i> 사용 {{ disk_stats.percent }}%</span>
+                    <span class="disk-usage-chip free"><i class="fa-solid fa-circle"></i> 여유 {{ disk_stats.free_percent }}%</span>
+                </div>
+            </div>
+        </div>
+        <div class="panel" style="margin-bottom:14px;">
+            <h2 class="panel-title" style="margin-bottom: 14px;"><i class="fa-solid fa-chart-simple"></i> 메뉴별 용량 요약 <small class="muted" style="font-weight:600;font-size:11px;">용량이 큰 순서, 전체 {{ chart_roots|length }}개</small></h2>
+            <div class="disk-summary-chart-wrap">
+                <div class="disk-summary-axis">
+                    <div class="disk-summary-axis-spacer top"></div>
+                    <div class="disk-summary-axis-zone">
+                        {% for tick in chart_ticks %}
+                        <div class="disk-summary-tick" style="bottom:{{ tick.percent }}%;">{{ tick.label }}</div>
+                        {% endfor %}
+                    </div>
+                    <div class="disk-summary-axis-spacer bottom"></div>
+                </div>
+                <div class="disk-summary-chart">
+                    <div class="disk-summary-gridlines">
+                        {% for tick in chart_ticks %}
+                        <div class="disk-summary-gridline" style="bottom:{{ tick.percent }}%;"></div>
+                        {% endfor %}
+                    </div>
+                    {% for root in chart_roots %}
+                    <div class="disk-summary-col" title="{{ root.label }} · {{ root.size_text }}">
+                        <span class="disk-summary-value">{{ root.size_text }}</span>
+                        <div class="disk-summary-bar"><span style="height:{{ ((root.size / chart_axis_max * 100) if chart_axis_max else 0)|round(2) }}%;"></span></div>
+                        <span class="disk-summary-label">{{ root.label }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
         <div class="disk-layout">
             <div class="panel">
-                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-layer-group"></i> 메뉴별 용량</h2>
+                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-layer-group"></i> 메뉴별 용량 <small class="muted" style="font-weight:600;font-size:11px;">용량을 클릭하면 세부 내역이 열립니다</small></h2>
                 <div class="disk-root-list">
                 {% for root in roots %}
-                {% if root.browseable %}
-                <a class="root-card {% if root.key == selected_root.key %}active{% endif %}" href="/admin/disk?root={{ root.key }}">
-                    <span class="root-card-label">
+                <div class="root-card {% if root.browseable and root.key == selected_root.key %}active{% endif %} {% if not root.browseable %}static{% endif %}">
+                    {% if root.browseable %}
+                    <a class="root-card-label" href="/admin/disk?root={{ root.key }}">
                         <i class="fa-solid {{ root.icon }}"></i>
                         <span>{{ root.label }}
                             <small>{{ root.file_count }}개 파일{% if root.db_count %} · DB {{ root.db_count }}건{% endif %}{% if root.auto_discovered %} · 신규 자동등록{% endif %}</small>
                         </span>
-                    </span>
-                    <strong class="root-card-size">{{ root.size_text }}{% if root.db_size %}<small>DB 포함</small>{% endif %}</strong>
-                </a>
-                {% else %}
-                <div class="root-card static">
+                    </a>
+                    {% else %}
                     <span class="root-card-label">
                         <i class="fa-solid {{ root.icon }}"></i>
                         <span>{{ root.label }}<small>DB 저장 {{ root.db_count }}건</small></span>
                     </span>
-                    <strong class="root-card-size">{{ root.size_text }}<small>DB 데이터</small></strong>
+                    {% endif %}
+                    <button type="button" class="root-card-size js-disk-detail" data-root-key="{{ root.key }}" aria-expanded="false">
+                        <span>{{ root.size_text }}{% if root.db_size and root.browseable %}<small>DB 포함</small>{% elif not root.browseable %}<small>DB 데이터</small>{% endif %}</span>
+                        <i class="fa-solid fa-chevron-down expand-icon"></i>
+                    </button>
                 </div>
-                {% endif %}
+                <div class="root-detail-row" data-root-key="{{ root.key }}" hidden><div class="root-detail-box">불러오는 중...</div></div>
                 {% endfor %}
                 </div>
             </div>
             <div class="panel">
-                <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-folder-open"></i> {{ selected_root.label }} / {{ current_path }}</h2>
-                <table class="data-table">
-                    <thead><tr><th>이름</th><th>크기</th><th>수정일</th><th>작업</th></tr></thead>
+                <h2 class="panel-title" style="margin-bottom: 12px;"><i class="fa-solid fa-folder-open"></i> {{ selected_root.label }}</h2>
+                <nav class="disk-breadcrumb">
+                    <a href="/admin/disk?root={{ selected_root.key }}"><i class="fa-solid fa-house"></i> 루트</a>
+                    {% set crumb_path = [] %}
+                    {% for part in current_path.split('/') if part %}
+                        {% set _ = crumb_path.append(part) %}
+                        <span>/</span><a href="/admin/disk?root={{ selected_root.key }}&path={{ crumb_path|join('/')|urlencode }}">{{ part }}</a>
+                    {% endfor %}
+                </nav>
+                <div class="disk-toolbar">
+                    <div class="form-field">
+                        <input type="text" id="diskFileFilter" placeholder="현재 폴더에서 파일/폴더 이름 검색">
+                    </div>
+                </div>
+                <table class="data-table" id="diskFileTable">
+                    <thead><tr>
+                        <th class="is-sortable" data-sort="name">이름 <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th class="is-sortable" data-sort="size">크기 <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th class="is-sortable" data-sort="mtime">수정일 <i class="fa-solid fa-sort sort-icon"></i></th>
+                        <th>작업</th>
+                    </tr></thead>
                     <tbody>
                         {% if parent_path != None %}
                         <tr><td colspan="4"><a class="btn btn-ghost btn-small" href="/admin/disk?root={{ selected_root.key }}&path={{ parent_path }}"><i class="fa-solid fa-level-up-alt"></i>상위 폴더</a></td></tr>
                         {% endif %}
                         {% for file in files %}
-                        <tr>
+                        <tr data-name="{{ file.name|lower }}" data-is-dir="{{ '1' if file.is_dir else '0' }}" data-size-bytes="{{ file.size_bytes }}" data-mtime="{{ file.mtime_sort }}">
                             <td>
                                 {% if file.is_dir %}
                                 <a href="/admin/disk?root={{ selected_root.key }}&path={{ file.rel_path|urlencode }}"><i class="fa-solid fa-folder" style="color:#f59e0b;"></i> {{ file.name }}</a>
@@ -665,6 +791,89 @@
         </div>
         {% endif %}
 
+        {% if active_section == 'ai_settings' %}
+        <div class="admin-header">
+            <div>
+                <h1 class="admin-title"><i class="fa-solid fa-robot"></i> AI api설정</h1>
+                <div class="admin-subtitle">AI에이전트와 스마트공문발송이 공통으로 사용할 AI 프리셋(OpenAI·Claude)을 여기서 관리합니다. 필요에 따라 프리셋을 최대 {{ max_presets }}개까지 늘려 바꿔 적용할 수 있습니다.</div>
+            </div>
+        </div>
+        {% if error %}<div class="empty-note" style="color:#c43d3d;border-color:#f0b8b8;background:#fdf3f3;">{{ error }}</div>{% endif %}
+
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-plug-circle-bolt"></i> 현재 적용 프리셋</h2>
+            {% set active_preset = preset_data.presets[preset_data.active] %}
+            <p class="muted" style="font-size:15px;">
+                <strong>{{ active_preset.label }} · {{ active_preset.provider_label }} {{ active_preset.model }}</strong>
+                {% if active_preset.has_menu_key %} · 등록 키 {{ active_preset.masked_key }}{% endif %}
+                {% if not active_preset.configured %} · <span style="color:#c43d3d;">API 미설정</span>{% endif %}
+                {% if active_preset.updated_by %} · {{ active_preset.updated_by }}님이 {{ active_preset.updated_at }}에 등록{% endif %}
+            </p>
+            <div class="form-row" style="margin-top:14px;">
+                {% for i in range(1, preset_data.visible_count + 1) %}
+                {% set preset_id = i|string %}
+                {% set p = preset_data.presets[preset_id] %}
+                <form action="/admin/ai-settings/activate" method="post" style="display:contents;">
+                    <input type="hidden" name="preset_id" value="{{ preset_id }}">
+                    <button class="btn {{ 'btn-primary' if preset_data.active == preset_id else 'btn-ghost' }}" type="submit"
+                            {% if preset_data.active == preset_id %}disabled{% endif %}>
+                        {% if preset_data.active == preset_id %}<i class="fa-solid fa-check"></i>{% endif %}
+                        {{ p.label }} ({{ p.provider_label }}{% if not p.configured %} · 미설정{% endif %})
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-key"></i> 프리셋 등록</h2>
+            <div class="grid-3">
+                {% for i in range(1, preset_data.visible_count + 1) %}
+                {% set preset_id = i|string %}
+                {% set p = preset_data.presets[preset_id] %}
+                <div class="stat-box{% if preset_data.active == preset_id %} preset-active{% endif %}" style="text-align:left; padding:16px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                        <strong>{{ p.label }}{% if preset_data.active == preset_id %} <span class="preset-active-badge"><span class="preset-active-led"></span>적용 중</span>{% endif %}</strong>
+                    </div>
+                    <form action="/admin/ai-settings/save" method="post" class="ai-preset-form" data-preset-id="{{ preset_id }}">
+                        <input type="hidden" name="preset_id" value="{{ preset_id }}">
+                        <div class="form-field" style="margin-bottom:10px;">
+                            <label>제공사</label>
+                            <select name="provider" class="ai-preset-provider">
+                                {% for value, label in provider_labels.items() %}
+                                <option value="{{ value }}" {% if value == p.provider %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-field" style="margin-bottom:10px;">
+                            <label>모델</label>
+                            <select name="model" class="ai-preset-model"></select>
+                        </div>
+                        <div class="form-field" style="margin-bottom:10px;">
+                            <label>API 키 {% if p.has_menu_key %}<small>(변경 시에만 입력, 현재 {{ p.masked_key }})</small>{% endif %}</label>
+                            <input type="password" name="api_key" class="ai-preset-key" autocomplete="new-password" placeholder="API 키 입력">
+                        </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+                            <button class="btn btn-ghost ai-preset-test" type="button"><i class="fa-solid fa-plug-circle-check"></i> 테스트</button>
+                            {% if p.has_menu_key %}
+                            <button class="btn btn-danger" type="submit" name="clear_key" value="1" onclick="return confirm('{{ p.label }}의 등록된 API 키를 삭제할까요?');"><i class="fa-solid fa-trash"></i> 키 삭제</button>
+                            {% endif %}
+                        </div>
+                        <p class="muted ai-preset-feedback" style="margin-top:8px; font-size:12px;"></p>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% if preset_data.visible_count < max_presets %}
+            <form action="/admin/ai-settings/add-slot" method="post" style="margin-top:14px;">
+                <button class="btn btn-ghost" type="submit"><i class="fa-solid fa-plus"></i> 프리셋 추가 ({{ preset_data.visible_count }}/{{ max_presets }})</button>
+            </form>
+            {% endif %}
+            <p class="muted" style="margin-top:14px;">프리셋에 키를 등록하지 않으면 그 프리셋의 제공사에 맞는 서버 환경변수(OpenAI: OPENAI_API_KEY, Claude: ANTHROPIC_API_KEY)를 대신 사용합니다.</p>
+        </div>
+        {% endif %}
+
         {% if active_section == 'settings' %}
         <div class="admin-header">
             <div>
@@ -751,6 +960,61 @@ function selectTheme(index) {
     document.getElementById('themePreviewDesc').textContent = `배경 효과: ${selectedTheme.effect}`;
 }
 
+{% if active_section == 'ai_settings' %}
+const aiPresetForms = document.querySelectorAll('.ai-preset-form');
+if (aiPresetForms.length) {
+    const providerModels = {{ provider_models|tojson }};
+    const modelLabels = {{ model_labels|tojson }};
+    const presetModels = {{ preset_data.presets|tojson }};
+
+    function populateModelSelect(form) {
+        const provider = form.querySelector('.ai-preset-provider').value;
+        const modelSelect = form.querySelector('.ai-preset-model');
+        const presetId = form.dataset.presetId;
+        const currentModel = (presetModels[presetId] && presetModels[presetId].provider === provider) ? presetModels[presetId].model : '';
+        const models = providerModels[provider] || [];
+        modelSelect.innerHTML = models.map((value) => {
+            const label = modelLabels[value] || value;
+            const selected = value === currentModel ? ' selected' : '';
+            return `<option value="${value}"${selected}>${label}</option>`;
+        }).join('');
+    }
+
+    aiPresetForms.forEach(function (form) {
+        populateModelSelect(form);
+        form.querySelector('.ai-preset-provider').addEventListener('change', function () { populateModelSelect(form); });
+
+        const testBtn = form.querySelector('.ai-preset-test');
+        const feedback = form.querySelector('.ai-preset-feedback');
+        testBtn.addEventListener('click', async function () {
+            const provider = form.querySelector('.ai-preset-provider').value;
+            const model = form.querySelector('.ai-preset-model').value;
+            const apiKey = form.querySelector('.ai-preset-key').value.trim();
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 확인 중';
+            feedback.style.color = '';
+            feedback.textContent = '인증과 모델 접근 권한을 확인하고 있습니다.';
+            try {
+                const res = await fetch('/admin/ai-settings/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({preset_id: form.dataset.presetId, provider: provider, model: model, api_key: apiKey})
+                });
+                const data = await res.json();
+                feedback.style.color = res.ok ? '#087b67' : '#c43d3d';
+                feedback.textContent = data.message || (res.ok ? '연결에 성공했습니다.' : '연결 테스트에 실패했습니다.');
+            } catch (error) {
+                feedback.style.color = '#c43d3d';
+                feedback.textContent = '연결 테스트 요청을 처리하지 못했습니다.';
+            } finally {
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> 테스트';
+            }
+        });
+    });
+}
+{% endif %}
+
 async function applyRawTheme(theme) {
     const res = await fetch('/admin/themes/apply', {
         method: 'POST',
@@ -836,6 +1100,93 @@ async function deleteDiskItem(root, path) {
         alert(`삭제 요청을 완료하지 못했습니다.\n${error.message || error}`);
     }
 }
+
+function escapeDiskHtml(value) {
+    return String(value ?? '-').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    })[char]);
+}
+
+function renderDiskDetail(result) {
+    const folderRows = result.folders.length
+        ? result.folders.map((item) => `
+            <div><span><i class="fa-solid ${item.is_dir === true ? 'fa-folder' : item.is_dir === false ? 'fa-file' : 'fa-ellipsis'}" style="margin-right:6px;color:#94a3b8;"></i>${escapeDiskHtml(item.name)}</span><span>${escapeDiskHtml(item.size_text)}</span></div>
+        `).join('')
+        : '<div class="empty-note" style="padding:14px;">하위 파일이 없습니다.</div>';
+    const ownerRows = result.owners.length
+        ? result.owners.map((item) => `
+            <div><span>${escapeDiskHtml(item.owner)}</span><span>${escapeDiskHtml(item.size_text)} (${item.count}건)</span></div>
+        `).join('')
+        : '<div class="empty-note" style="padding:14px;">DB 소유자별 내역이 없습니다.</div>';
+    return `
+        <div class="root-detail-cols">
+            <div>
+                <h3 class="detail-title" style="font-size:12px;"><i class="fa-solid fa-folder-tree"></i> 하위 항목 (용량 상위 ${result.folders.length}개)</h3>
+                <div class="root-detail-list">${folderRows}</div>
+            </div>
+            <div>
+                <h3 class="detail-title" style="font-size:12px;"><i class="fa-solid fa-user"></i> DB 소유자별 내역 (상위 ${result.owners.length}명)</h3>
+                <div class="root-detail-list">${ownerRows}</div>
+            </div>
+        </div>
+    `;
+}
+
+document.querySelectorAll('.js-disk-detail').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const rootKey = button.dataset.rootKey;
+        const detailRow = document.querySelector(`.root-detail-row[data-root-key="${rootKey}"]`);
+        if (!detailRow) return;
+        const opening = detailRow.hidden;
+        detailRow.hidden = !opening;
+        button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+        if (!opening || detailRow.dataset.loaded === 'true') return;
+        const box = detailRow.querySelector('.root-detail-box');
+        try {
+            const res = await fetch(`/admin/disk/detail?root=${encodeURIComponent(rootKey)}`);
+            const result = await res.json();
+            if (!res.ok) throw new Error(result.message || '내역을 불러오지 못했습니다.');
+            box.innerHTML = renderDiskDetail(result);
+            detailRow.dataset.loaded = 'true';
+        } catch (error) {
+            box.innerHTML = `<div class="empty-note">${escapeDiskHtml(error.message || '내역을 불러오지 못했습니다.')}</div>`;
+        }
+    });
+});
+
+const diskFileFilter = document.getElementById('diskFileFilter');
+if (diskFileFilter) {
+    diskFileFilter.addEventListener('input', () => {
+        const needle = diskFileFilter.value.trim().toLowerCase();
+        document.querySelectorAll('#diskFileTable tbody tr[data-name]').forEach((row) => {
+            row.style.display = !needle || row.dataset.name.includes(needle) ? '' : 'none';
+        });
+    });
+}
+
+document.querySelectorAll('#diskFileTable th.is-sortable').forEach((header) => {
+    header.addEventListener('click', () => {
+        const key = header.dataset.sort;
+        const table = document.getElementById('diskFileTable');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr[data-name]'));
+        const ascending = header.dataset.sortDir !== 'asc';
+        table.querySelectorAll('th.is-sortable').forEach((th) => { th.removeAttribute('data-sort-active'); th.removeAttribute('data-sort-dir'); th.querySelector('.sort-icon').className = 'fa-solid fa-sort sort-icon'; });
+        header.setAttribute('data-sort-active', 'true');
+        header.dataset.sortDir = ascending ? 'asc' : 'desc';
+        header.querySelector('.sort-icon').className = `fa-solid fa-sort-${ascending ? 'up' : 'down'} sort-icon`;
+        rows.sort((a, b) => {
+            let av, bv;
+            if (key === 'size') { av = Number(a.dataset.sizeBytes); bv = Number(b.dataset.sizeBytes); }
+            else if (key === 'mtime') { av = Number(a.dataset.mtime); bv = Number(b.dataset.mtime); }
+            else { av = a.dataset.name; bv = b.dataset.name; }
+            if (av < bv) return ascending ? -1 : 1;
+            if (av > bv) return ascending ? 1 : -1;
+            return 0;
+        });
+        rows.forEach((row) => tbody.appendChild(row));
+    });
+});
 
 function applyBulkMenuLevel() {
     const picker = document.getElementById('bulkMenuLevel');

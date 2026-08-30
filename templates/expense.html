@@ -1094,7 +1094,11 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-document.addEventListener('DOMContentLoaded', renderExpensePagination);
+document.addEventListener('DOMContentLoaded', function() {
+    renderExpensePagination();
+    const requestedReportId = Number(new URLSearchParams(window.location.search).get('open_report'));
+    if (requestedReportId > 0) openExpenseDetail(requestedReportId);
+});
 
 document.getElementById('copyInstructorExpenseLink')?.addEventListener('click', async function() {
     const instructorUrl = new URL('/expense/submit/instructor', window.location.origin).href;
