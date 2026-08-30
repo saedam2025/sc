@@ -22,6 +22,8 @@ from routes.expense import expense_bp
 from routes.board import board_bp
 from routes.payroll import payroll_bp
 from routes.ai_mail import ai_mail_bp
+from routes.ai_agent import ai_agent_bp
+from routes.smart_document import ensure_smart_document_schema, smart_document_bp
 from routes.memo import memo_bp
 from routes.attendance import attendance_bp
 from routes.excel_generator import excel_bp
@@ -39,6 +41,7 @@ from routes.parent_notifications import (
     parent_notification_bp,
 )
 from routes.points import points_bp, award_response_activity
+from routes.unified_search import unified_search_bp
 
 # [수정] gall2.py가 routes 폴더 안에 있다면 아래와 같이 수정해야 합니다.
 from routes.gall2 import gall2_bp
@@ -88,6 +91,7 @@ with app.app_context():
         init_ebook_schema()
         init_manual_schema()
         ensure_parent_notification_schema()
+        ensure_smart_document_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -243,6 +247,8 @@ def _classify_menu(path):
         ('/approval', '사내결재'),
         ('/expense', '지출결의'),
         ('/ai-mail', 'AI메일전송'),
+        ('/ai-agent', 'AI에이전트'),
+        ('/smart-document', '스마트공문발송'),
         ('/payroll', '급여/업무지원'),
         ('/attendance', '근태관리'),
         ('/contacts', '본사연락망'),
@@ -581,6 +587,7 @@ def update_my_info():
     new_phone = data.get('phone', '')
     new_address = data.get('address', '')
     new_profile_icon = data.get('profile_icon', '👤')
+    remove_profile_image = str(data.get('remove_profile_image', '')).strip().lower() in ('1', 'true', 'on')
 
     conn = get_db()
     new_profile_file_path = None
@@ -633,6 +640,19 @@ def update_my_info():
             update_fields.append("profile_path=?")
             params.append(profile_path)
             session['profile_path'] = profile_path
+
+        elif remove_profile_image and 'profile_path' in columns:
+            profile_root = str(PROFILE_ROOT)
+            old_row = conn.execute(
+                "SELECT profile_path FROM users WHERE emp_no=?", (session['emp_no'],)
+            ).fetchone()
+            if old_row and old_row['profile_path']:
+                old_profile_file_path = os.path.join(
+                    profile_root, os.path.basename(str(old_row['profile_path']))
+                )
+            update_fields.append("profile_path=?")
+            params.append(None)
+            session['profile_path'] = ''
 
         if new_password and 'password' in columns:
             update_fields.append("password=?")
@@ -888,6 +908,8 @@ app.register_blueprint(expense_bp, url_prefix='/expense')
 app.register_blueprint(board_bp, url_prefix='/board')
 app.register_blueprint(payroll_bp, url_prefix='/payroll')
 app.register_blueprint(ai_mail_bp, url_prefix='/ai-mail')
+app.register_blueprint(ai_agent_bp)
+app.register_blueprint(smart_document_bp, url_prefix='/smart-document')
 app.register_blueprint(memo_bp, url_prefix='/memo')  
 app.register_blueprint(attendance_bp)  
 app.register_blueprint(excel_bp)       
@@ -903,6 +925,7 @@ app.register_blueprint(ebook_bp, url_prefix='/ebook')
 app.register_blueprint(manual_bp, url_prefix='/manual')
 app.register_blueprint(parent_notification_bp)
 app.register_blueprint(points_bp)
+app.register_blueprint(unified_search_bp)
 
 # 🚀 새로 분리한 메신저 블루프린트 등록 추가
 
