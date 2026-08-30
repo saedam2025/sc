@@ -34,6 +34,7 @@ def test_chat_organization(database):
             position TEXT,
             level INTEGER,
             profile_icon TEXT,
+            profile_path TEXT,
             status TEXT
         );
         CREATE TABLE messages (
@@ -41,11 +42,11 @@ def test_chat_organization(database):
             filepath TEXT,
             sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        INSERT INTO users(emp_no, name, department, position, level, profile_icon, status) VALUES
-            ('admin', 'admin', '본부', '대표이사', 1, 'A', '승인'),
-            ('hq-1', '본부직원', '본부', '사원', 5, 'H', '승인'),
-            ('dir-1', '센터장사용자', '파견', '센터장', 8, 'D', '승인'),
-            ('wait-1', '승인대기', '파견', '강사', 10, 'W', '대기');
+        INSERT INTO users(emp_no, name, department, position, level, profile_icon, profile_path, status) VALUES
+            ('admin', 'admin', '본부', '대표이사', 1, 'A', '', '승인'),
+            ('hq-1', '본부직원', '본부', '사원', 5, 'H', '', '승인'),
+            ('dir-1', '센터장사용자', '파견', '센터장', 8, 'D', '', '승인'),
+            ('wait-1', '승인대기', '파견', '강사', 10, 'W', '', '대기');
         """
     )
     connection.commit()
@@ -102,7 +103,15 @@ def test_shared_boards(database):
             (1, 'reference', '전역 자료 1', '', '본부'),
             (2, '자료실', '전역 자료 2', '', '본부'),
             (1, 'notice', '1번 학교 안내', '', '센터장1'),
-            (2, 'notice', '2번 학교 안내', '', '센터장2');
+            (2, 'notice', '2번 학교 안내', '', '센터장2'),
+            (1, 'open_class', '강사정보 ID 자료', '', '센터장1'),
+            (1, '공개수업', '강사정보 구 명칭 자료', '', '센터장1'),
+            (1, '강사정보현황', '강사정보 새 명칭 자료', '', '센터장1'),
+            (1, 'survey', '통합조사 ID 자료', '', '센터장1'),
+            (1, '만족도조사', '통합조사 구 명칭 자료', '', '센터장1'),
+            (1, '공개수업&만족도조사', '통합조사 새 명칭 자료', '', '센터장1'),
+            (1, 'director_resources', '1번 학교 기타자료', '', '센터장1'),
+            (2, '센터장 기타자료', '2번 학교 기타자료', '', '센터장2');
         """
     )
     connection.commit()
@@ -118,7 +127,34 @@ def test_shared_boards(database):
 
     assert query_posts(connection, 1, 'notice', '수강안내문')[1] == ['1번 학교 안내']
     assert query_posts(connection, 2, 'notice', '수강안내문')[1] == ['2번 학교 안내']
+    assert set(query_posts(connection, 1, 'open_class', '강사정보현황')[1]) == {
+        '강사정보 ID 자료', '강사정보 구 명칭 자료', '강사정보 새 명칭 자료'
+    }
+    assert set(query_posts(connection, 1, 'survey', '공개수업&만족도조사')[1]) == {
+        '통합조사 ID 자료', '통합조사 구 명칭 자료', '통합조사 새 명칭 자료'
+    }
+    assert query_posts(connection, 1, 'director_resources', '센터장 기타자료')[1] == ['1번 학교 기타자료']
+    assert query_posts(connection, 2, 'director_resources', '센터장 기타자료')[1] == ['2번 학교 기타자료']
+    assert school_routes.SCHOOL_CATEGORY_ALIASES['강사정보현황'] == 'open_class'
+    assert school_routes.SCHOOL_CATEGORY_ALIASES['공개수업&만족도조사'] == 'survey'
+    assert school_routes.SCHOOL_CATEGORY_ALIASES['센터장 기타자료'] == 'director_resources'
+    assert not is_shared_board('director_resources')
     connection.close()
+
+
+def test_reference_upload_limits():
+    megabyte = 1024 * 1024
+    validate = school_routes.validate_post_attachment_sizes
+
+    assert validate('reference', [100 * megabyte]) == ''
+    assert '파일당 100MB 이하' in validate('reference', [100 * megabyte + 1])
+    assert validate('자료실', [100 * megabyte] * 10) == ''
+    assert '최대 10개' in validate('reference', [1] * 11)
+    assert validate('notice', [15 * megabyte]) == ''
+    assert '총용량은 최대 15MB' in validate('notice', [15 * megabyte + 1])
+    assert school_routes.format_school_file_size(0) == '0B'
+    assert school_routes.format_school_file_size(1536) == '2KB'
+    assert school_routes.format_school_file_size(10 * megabyte) == '10.0MB'
 
 
 def test_org_chart_function_names_are_isolated():
@@ -147,6 +183,81 @@ def test_org_chart_function_names_are_isolated():
     assert '@media (min-width: 1101px) and (max-width: 2000px) and (max-height: 1200px)' in school_template
     assert 'grid-template-columns: 278px minmax(420px, 1fr) 282px' in school_template
     assert '.dashboard-container.school-detail-spacing .school-chat-card { height: 300px; }' in school_template
+    assert '{% with hide_chat_title_icon = true %}' in school_template
+    assert '{% if not hide_chat_title_icon %}<i class="fa-regular fa-comment-dots"' in chat_template
+    assert "{% block body_class %}{% if view_type == 'detail' %}school-detail-page{% endif %}{% endblock %}" in school_template
+    assert '.school-detail-page .main-content { padding-top: 8.4px; }' in school_template
+    assert '.school-detail-page .content-container { padding-top: 12.6px; }' in school_template
+    assert '.dashboard-container.school-detail-spacing { padding-top: 8.4px; padding-bottom: 10px; }' in school_template
+    assert '.dashboard-container.school-detail-spacing .school-container { padding-top: 10.5px; padding-bottom: 12.5px; }' in school_template
+    assert '.dashboard-container.school-detail-spacing .school-workspace-shell { padding-top: 13px; padding-bottom: 12px; }' in school_template
+    assert "$('#readTitle').text(data.title || '제목 없음');" in school_template
+    assert '<span class="read-status-slot">${statusMeta}</span>' in school_template
+    assert '<div class="read-action-group">' in school_template
+    assert 'class="read-outside-actions"' not in school_template
+    assert school_template.index('<div id="commentList" class="comment-list"></div>') < school_template.index('<div class="comment-write"')
+    assert 'class="comment-file-picker"' in school_template
+    assert 'function updateCommentFileLabel(input, targetId)' in school_template
+    assert 'margin: 1px auto 0; padding: 3px 16px 12px;' in school_template
+    assert 'function getInstructorStatusTemplate()' in school_template
+    assert "const isInstructorStatus = cat === 'open_class';" in school_template
+    assert '? getInstructorStatusTemplate()' in school_template
+    assert "? '(      )월 강사현황보고'" in school_template
+    assert 'function getWeeklyReportTemplate()' in school_template
+    assert "const isWeeklyReport = cat === 'weekly_report';" in school_template
+    assert '? getWeeklyReportTemplate()' in school_template
+    assert "(isWeeklyReport ? '(        )월   (       )주차 주간업무보고' : '')" in school_template
+    assert 'function getItemRequestTemplate()' in school_template
+    assert "const isItemRequest = cat === 'item_request';" in school_template
+    assert '(isItemRequest ? getItemRequestTemplate() : \'\')' in school_template
+    assert 'Array.from({ length: 5 }' in school_template
+    assert '>요청물품</th>' in school_template
+    assert '>사용처</th>' in school_template
+    assert '>비고</th>' in school_template
+    assert "setInstructorStatusWriteWidth(false);" in school_template
+    assert '.board-write-modal-panel.instructor-status-write-wide' in school_template
+    assert 'max-width: min(1364px, calc(100vw - 36px));' in school_template
+    assert '수익자(선택형) 강사 현황' in school_template
+    assert '맞춤형 강사 현황' in school_template
+    assert '기타 강사전달사항' in school_template
+    assert "['주민번호 (-제외/숫자만기재)', '16%']" in school_template
+    assert "['계좌번호 (-제외/숫자만기재)', '17%']" in school_template
+    assert 'const beneficiaryRows = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 22, 23, 24];' in school_template
+    assert "beneficiaryRows, '#dbeafe'" in school_template
+    assert "customizedRows, '#dcfce7'" in school_template
+    assert "buildInstructorStatusTable('수익자(선택형) 강사 현황', beneficiaryRows, '#dbeafe', true)" in school_template
+    assert "const headingSpacer = extraTopSpace ? '<p style=\"height:1.5em;margin:0;\">&nbsp;</p>' : '';" in school_template
+    assert "const monthBlank" not in school_template
+    assert '엑셀에서 내용 복사하여 위의 표에 붙여넣기가 가능합니다.' in school_template
+    assert '위 형식이 필요없을 시 글과 표를 다 삭제하고 작성하세요.' in school_template
+    assert '필요 시 파일첨부가 가능합니다.' in school_template
+    assert '파일당 100MB 이하 · 대용량 업로드 진행률 표시' in school_template
+    assert 'const REFERENCE_POST_MAX_FILE_SIZE = 100 * 1024 * 1024;' in school_template
+    assert 'function submitReferencePostWithProgress(form, btn)' in school_template
+    assert "xhr.upload.addEventListener('progress'" in school_template
+    assert "$('#postCategory').val(activePostCategory);" in school_template
+    assert 'board-list-attachment-size' in school_template
+    assert 'const sizes = Array.isArray(data.attachment_sizes) ? data.attachment_sizes : [];' in school_template
+    assert 'class="read-file-size">(${sizeLabel})' in school_template
+    assert "if(event.target.classList.contains('board-modal-shell')) showBoardList();" not in school_template
+    assert '모달은 배경 클릭이나 드래그 후 클릭으로 닫지 않는다.' in school_template
+
+
+def test_board_list_title_and_status_badge_display():
+    template_path = os.path.join(PROJECT_ROOT, 'templates', 'school_bp.html')
+    with open(template_path, encoding='utf-8') as file:
+        school_template = file.read()
+
+    assert 'class="board-post-title" title="{{ p.title }}"' in school_template
+    assert "{{ p.title[:40] }}{% if p.title|length > 40 %}...{% endif %}" in school_template
+    assert 'table-layout:fixed;' in school_template
+    assert '.board-title-line { display:flex; align-items:center; min-width:0; white-space:nowrap; }' in school_template
+    assert '.board-post-title { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }' in school_template
+    assert "{{ '본사접수' if (p.status or '접수') == '접수' else p.status }}" in school_template
+    assert "const statusLabel = statusText === '접수' ? '본사접수' : statusText;" in school_template
+    assert 'width:64px; min-width:64px; height:30px;' in school_template
+    assert 'border:0; background:transparent; box-shadow:none;' in school_template
+    assert 'table.board-table .team-review-pending-btn:hover { border:0; background:transparent; color:#b45309; }' in school_template
 
 
 def test_center_expense_form_prefill(database):
@@ -244,6 +355,8 @@ def test_assigned_level_7_can_open_school_workspace(database):
             ('school_group', 5),
             ('school_workspace', 6),
             ('school_calendar', 6),
+            ('workspace_group', -1),
+            ('memo_main', -1),
             ('school_center_boards', 14),
             ('school_center_shared', 8),
             ('school_center_shared_read', 8),
@@ -275,6 +388,15 @@ def test_assigned_level_7_can_open_school_workspace(database):
             assert menu_access.enforce_request_menu_access() is None
             assert school_routes.can_manage_schools() is False
 
+            # 상단 업무공간/화이트보드 메뉴 권한이 차단돼 있어도 전용모드에서는
+            # 프로필 카드 아이콘을 통한 개인화이트보드 직접 접속을 허용한다.
+            with app.test_request_context('/memo/'):
+                session['user_name'] = '센터장팀장'
+                session['emp_no'] = 'dir-team-1'
+                session['user_level'] = 7
+                assert menu_access.center_director_mode_active(7) is True
+                assert menu_access.enforce_request_menu_access() is None
+
             connection = connect(database)
             assert school_routes.can_access_school(connection, 1) is True
             assert school_routes.can_access_school(connection, 2) is False
@@ -298,7 +420,7 @@ def test_assigned_level_7_can_open_school_workspace(database):
             assert menu_access.shared_board_action_is_allowed('write') is False
             assert menu_access.shared_board_action_is_allowed('delete') is False
 
-            # 일반 8개 메뉴의 일괄 권한을 끄면 표시와 직접 URL이 함께 막힌다.
+            # 일반 9개 메뉴의 일괄 권한을 끄면 표시와 직접 URL이 함께 막힌다.
             # 본부 공용 2개 메뉴는 접근/읽기/쓰기/삭제/댓글을 별도 제어한다.
             connection = connect(database)
             connection.execute(
@@ -311,6 +433,7 @@ def test_assigned_level_7_can_open_school_workspace(database):
             connection.close()
             assert school_routes.can_access_school_category('notice') is False
             assert school_routes.can_access_school_category('expense') is False
+            assert school_routes.can_access_school_category('director_resources') is False
             assert school_routes.can_access_school_category('community') is True
             assert school_routes.can_access_school_category('reference') is True
             assert menu_access.shared_board_action_is_allowed('access') is True
@@ -336,6 +459,13 @@ def test_assigned_level_7_can_open_school_workspace(database):
             connection.close()
             assert menu_access.center_director_mode_active(7) is False
             assert school_routes.can_manage_schools() is True
+            with app.test_request_context('/memo/'):
+                session['user_name'] = '센터장팀장'
+                session['emp_no'] = 'dir-team-1'
+                session['user_level'] = 7
+                denied = menu_access.enforce_request_menu_access()
+                assert denied is not None
+                assert denied[1] == 403
             connection = connect(database)
             assert school_routes.can_access_school(connection, 2) is True
             connection.execute(
@@ -363,7 +493,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='saedam-center-director-test-') as directory:
         test_chat_organization(os.path.join(directory, 'chat.db'))
         test_shared_boards(os.path.join(directory, 'school.db'))
+        test_reference_upload_limits()
         test_org_chart_function_names_are_isolated()
+        test_board_list_title_and_status_badge_display()
         test_center_expense_form_prefill(os.path.join(directory, 'expense-prefill.db'))
         test_assigned_level_7_can_open_school_workspace(
             os.path.join(directory, 'level-7-director.db')

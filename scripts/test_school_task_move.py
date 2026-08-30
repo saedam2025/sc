@@ -173,6 +173,13 @@ def test_template():
     assert '.task-table i.fa-solid' in template
     assert 'font-size: 0.855rem' in template
     assert 'font-weight: 400 !important' in template
+    assert '<option value="접수">본사접수</option>' in template
+    assert 'function getStatusLabel(status)' in template
+    assert "return status === '접수' ? '본사접수' : status;" in template
+    assert 'data-status="{{ task.status }}"' in template
+    assert 'class="badge status-{{ task.status }}">{{ task.status_display }}</span>' in template
+    assert 'badge.textContent = getStatusLabel(newStatus);' in template
+    assert "statusBadge.className = 'badge status-' + statusValue;" in template
 
 
 def test_category_display_names():
@@ -180,6 +187,9 @@ def test_category_display_names():
     assert school_task_routes.get_mapped_category('공개수업') == '강사정보현황'
     assert school_task_routes.get_mapped_category('survey') == '공개수업&만족도조사'
     assert school_task_routes.get_mapped_category('만족도조사') == '공개수업&만족도조사'
+    assert school_task_routes.get_status_display('접수') == '본사접수'
+    assert school_task_routes.get_status_display('처리중') == '처리중'
+    assert school_task_routes.get_status_display('') == '본사접수'
 
 
 def main():

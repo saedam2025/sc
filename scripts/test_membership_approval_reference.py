@@ -1,4 +1,4 @@
-"""가입 승인 결과 메일과 전자결재 참조함 회귀 검사."""
+"""가입 승인 결과와 전자결재 완료·수신·참조함 회귀 검사."""
 
 import sqlite3
 import sys
@@ -9,7 +9,7 @@ from flask import Flask, jsonify
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from routes import approval, database, user_mgmt
+from routes import approval, database
 
 
 def _connect(path):
@@ -34,6 +34,8 @@ def _session(client, *, emp_no, name, level):
 
 
 def _test_membership_rejection(db_path):
+    from routes import user_mgmt
+
     app = Flask(__name__)
     app.secret_key = 'membership-test-secret'
     app.register_blueprint(user_mgmt.user_mgmt_bp, url_prefix='/user')
@@ -98,6 +100,7 @@ def _test_approval_reference_box(db_path):
         test_users = (
             ('approval-drafter-test', '기안테스트', 5),
             ('approval-approver-test', '결재테스트', 4),
+            ('approval-receiver-test', '수신테스트', 5),
             ('approval-reference-test', '참조테스트', 5),
         )
         for emp_no, name, level in test_users:
@@ -138,6 +141,18 @@ def _test_approval_reference_box(db_path):
         assert doc['status'] == '대기'
         assert doc['cc_receivers'] == '참조테스트'
 
+        received = client.post('/approval/submit', data={
+            'doc_type': '보고서', 'title': '수신 완료함 테스트', 'doc_data': '{}',
+            'receivers': '수신테스트', 'cc_receivers': '',
+        })
+        assert received.status_code == 200
+        conn = _connect(db_path)
+        receiver_doc = conn.execute(
+            "SELECT * FROM approvals WHERE title='수신 완료함 테스트' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        assert receiver_doc['status'] == '완료'
+
         captured_context = {}
 
         def capture_template(_name, **context):
@@ -146,6 +161,12 @@ def _test_approval_reference_box(db_path):
             return jsonify({'ok': True})
 
         approval.render_template = capture_template
+        _session(client, emp_no='approval-receiver-test', name='수신테스트', level=5)
+        receiver_box = client.get('/approval/')
+        assert receiver_box.status_code == 200
+        assert any(item['id'] == receiver_doc['id'] for item in captured_context['completed_docs'])
+        assert any(item['id'] == receiver_doc['id'] for item in captured_context['archive_docs'])
+
         _session(client, emp_no='approval-reference-test', name='참조테스트', level=5)
         before = client.get('/approval/')
         assert before.status_code == 200
@@ -154,11 +175,23 @@ def _test_approval_reference_box(db_path):
         _session(client, emp_no='approval-approver-test', name='결재테스트', level=4)
         completed = client.post(f"/approval/action/{doc['id']}", json={'action': 'approve'})
         assert completed.status_code == 200
+        approver_box = client.get('/approval/')
+        assert approver_box.status_code == 200
+        assert any(item['id'] == doc['id'] for item in captured_context['completed_docs'])
+        assert any(item['id'] == doc['id'] for item in captured_context['archive_docs'])
 
         _session(client, emp_no='approval-reference-test', name='참조테스트', level=5)
         after = client.get('/approval/')
         assert after.status_code == 200
         assert any(item['id'] == doc['id'] for item in captured_context['reference_docs'])
+        assert not any(item['id'] == doc['id'] for item in captured_context['completed_docs'])
+        assert any(item['id'] == doc['id'] for item in captured_context['archive_docs'])
+
+        _session(client, emp_no='approval-drafter-test', name='기안테스트', level=5)
+        drafter_box = client.get('/approval/')
+        assert drafter_box.status_code == 200
+        completed_ids = {item['id'] for item in captured_context['completed_docs']}
+        assert {doc['id'], receiver_doc['id']} <= completed_ids
 
         conn = _connect(db_path)
         notification = conn.execute('''

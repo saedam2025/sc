@@ -182,7 +182,7 @@ assert permissions_response.status_code == 200, permissions_response.get_data(as
 permissions_html = permissions_response.get_data(as_text=True)
 for menu_key in expected_center_menu_keys | expected_shared_action_keys:
     assert f'name="{menu_key}"' in permissions_html
-assert '[센터장] 수강안내문~만족도조사 (8개 메뉴 일괄)' in permissions_html
+assert '[센터장] 수강안내문~공개수업&만족도조사 (8개 메뉴 일괄)' in permissions_html
 for action_label in ('접근', '읽기', '쓰기', '삭제', '댓글'):
     assert f'[센터장] 본부공지사항·자료실 - {action_label}' in permissions_html
 
@@ -307,5 +307,35 @@ assert [fallback_sheet.cell(4, column).value for column in range(1, 8)] == [
     '날짜', '구분', '사용내역', '사용출처', '결제수단', '지출금액', '비고'
 ]
 assert fallback_sheet['F25'].value == '=SUM(F5:F24)'
+
+center_template_response = client.get('/expense/template?channel=center')
+assert center_template_response.status_code == 200
+center_template_workbook = load_workbook(BytesIO(center_template_response.data), data_only=False)
+center_template_sheet = center_template_workbook.active
+assert center_template_sheet.max_column == 5
+assert [center_template_sheet.cell(4, column).value for column in range(1, 6)] == [
+    '날짜', '사용내역', '사용출처', '지출금액', '비고'
+]
+assert center_template_sheet['B5'].value == '강사 출석부용 황파일 구입'
+assert center_template_sheet['C5'].value == '문구점'
+assert center_template_sheet['D5'].value == 5700
+assert center_template_sheet['D25'].value == '=SUM(D5:D24)'
+
+original_center_template_path = expense_routes.CENTER_EXPENSE_TEMPLATE_PATH
+expense_routes.CENTER_EXPENSE_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, 'missing-center-expense-template.xlsx')
+try:
+    center_fallback_response = client.get('/expense/template?channel=center')
+finally:
+    expense_routes.CENTER_EXPENSE_TEMPLATE_PATH = original_center_template_path
+
+assert center_fallback_response.status_code == 200
+center_fallback_workbook = load_workbook(BytesIO(center_fallback_response.data), data_only=False)
+center_fallback_sheet = center_fallback_workbook.active
+assert center_fallback_sheet.max_column == 5
+assert [center_fallback_sheet.cell(4, column).value for column in range(1, 6)] == [
+    '날짜', '사용내역', '사용출처', '지출금액', '비고'
+]
+assert center_fallback_sheet['B5'].value == '강사 출석부용 황파일 구입'
+assert center_fallback_sheet['D25'].value == '=SUM(D5:D24)'
 
 print('Expense submit layout test: PASS')
