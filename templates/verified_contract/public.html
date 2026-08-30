@@ -6,26 +6,65 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <meta name="referrer" content="no-referrer">
   <title>새담 인증전자계약</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
   <style>
-    :root{--navy:#123b6d;--blue:#1d5d9b;--line:#d8e0e9;--muted:#65758a}
-    *{box-sizing:border-box}body{margin:0;background:#f2f5f8;color:#1e2d3d;font-family:Arial,'Malgun Gothic',sans-serif}
+    :root{--navy:#002c63;--blue:#004ea2;--line:#d8e0e9;--muted:#65758a}
+    *{box-sizing:border-box}body{margin:0;background:var(--navy);color:#1e2d3d;font-family:'Noto Sans KR','Pretendard','Malgun Gothic',Arial,sans-serif}
     .top{background:linear-gradient(135deg,#0e2f58,#1c578d);color:#fff;padding:22px}.top-inner{max-width:980px;margin:auto}.top h1{font-size:1.35rem;margin:0}.top p{margin:6px 0 0;font-size:.86rem;color:#dbe9f7}
     .wrap{max-width:980px;margin:22px auto;padding:0 14px}.card{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 5px 20px rgba(32,52,73,.08);padding:24px;margin-bottom:15px}
     .center{text-align:center}.badge{display:inline-block;background:#e9f2fb;color:var(--navy);padding:6px 10px;border-radius:999px;font-size:.78rem;font-weight:bold}
     h2,h3{color:var(--navy)}.muted{color:var(--muted);font-size:.87rem;line-height:1.65}.btn{border:0;border-radius:8px;padding:12px 18px;background:var(--navy);color:#fff;font-weight:bold;cursor:pointer}.btn.light{background:#edf3f8;color:var(--navy);border:1px solid #cbd8e5}.btn:disabled{opacity:.55}
-    input{width:100%;padding:12px;border:1px solid #cbd5e0;border-radius:8px;font-size:1rem}.verify-box{max-width:510px;margin:18px auto}.code-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
-    .contract-head{border-bottom:2px solid var(--navy);padding-bottom:13px;margin-bottom:18px}.contract-head h2{margin:0}.contract-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.meta{background:#f5f8fb;border-radius:8px;padding:10px;font-size:.86rem}
-    .terms{line-height:1.75;word-break:keep-all}.terms table{width:100%;border-collapse:collapse}.terms th,.terms td{border:1px solid #bbb;padding:8px}.terms p{white-space:pre-wrap}
+    input,select{width:100%;padding:12px;border:1px solid #cbd5e0;border-radius:8px;font-size:1rem;background:#fff;font-family:inherit}input[readonly]{background:#eef1f5;color:#5a6b80}input.invalid,select.invalid{border-color:#c0392b;background:#fdf1f0}.verify-box{max-width:510px;margin:18px auto}.code-row{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+    .contract-head{border-bottom:2px solid var(--navy);padding-bottom:13px;margin-bottom:18px}.contract-head .badge-row{text-align:right}.contract-head h2{margin:18px 0 0}.contract-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.meta{background:#f5f8fb;border-radius:8px;padding:12px}.meta b{display:block;font-size:.78rem;color:#5a6b80;margin-bottom:6px}.meta .meta-value{display:inline-block;font-size:1.2rem;font-weight:700;color:#12233a}
+    .terms{line-height:1.75;word-break:keep-all}.terms table{width:100%;border-collapse:collapse}.terms th,.terms td{border:1px solid #bbb;padding:8px}.terms p{margin:0}
     .agreement{display:block;border:1px solid #d6e0ea;background:#f7faff;border-radius:9px;padding:13px;margin:9px 0;cursor:pointer}.agreement input{width:18px;height:18px;vertical-align:middle;margin-right:7px}.agreement b{color:var(--navy)}.agreement span{display:block;margin-left:30px;margin-top:5px;color:#52657a;font-size:.84rem;line-height:1.55}
-    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:.8rem;font-weight:bold;color:#40536a;margin-bottom:5px}.field.full{grid-column:span 2}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.form-grid+.form-grid{margin-top:12px}.form-grid-3{grid-template-columns:.85fr .85fr 1.3fr}.field label{display:block;font-size:.8rem;font-weight:bold;color:#40536a;margin-bottom:5px}.field.full{grid-column:span 2}
     #signature{width:100%;height:180px;border:2px dashed #8ca4ba;border-radius:9px;touch-action:none;background:#fff}.sign-actions{display:flex;justify-content:flex-end;margin-top:7px}.submit-area{text-align:center;margin-top:20px}
     .notice{background:#fff7df;border:1px solid #ecd48c;color:#6e5310;padding:12px;border-radius:8px;font-size:.84rem}.error{color:#a82d2d}
-    @media(max-width:640px){.contract-meta,.form-grid{grid-template-columns:1fr}.field.full{grid-column:span 1}.card{padding:17px}}
+    .btn-lg{font-size:1.3rem;padding:16px 27px}
+    .main-col{font-size:.86rem;line-height:1.65}
+    .main-col .card{padding:18px 31px}
+    .main-col h2{font-size:1.3rem;margin:14px 0 0}
+    .main-col h3{font-size:.95rem;margin:0 0 8px}
+    .main-col .badge{font-size:.72rem;padding:5px 9px}
+    .main-col .contract-head{padding-bottom:10px;margin-bottom:14px}
+    .main-col .contract-meta{gap:8px;margin-top:10px}
+    .main-col .meta{padding:9px}
+    .main-col .meta b{font-size:.72rem;margin-bottom:4px}
+    .main-col .meta .meta-value{font-size:.98rem}
+    .main-col .form-grid{gap:9px;margin-top:12px}
+    .main-col .form-grid+.form-grid{margin-top:9px}
+    .main-col .field label{font-size:.74rem;margin-bottom:4px}
+    .main-col input,.main-col select{padding:9px;font-size:.84rem}
+    .main-col .terms{font-size:.86rem;line-height:1.65}
+    .main-col .agreement{padding:10px;margin:7px 0}
+    .main-col .agreement span{font-size:.78rem;line-height:1.5;margin-left:26px;margin-top:3px}
+    .main-col .notice{font-size:.78rem;padding:10px}
+    .main-col .btn{padding:9px 15px;font-size:.84rem}
+    .main-col .btn-lg{font-size:1.3rem;padding:16px 27px}
+    .main-col #signature{height:150px}
+    .main-col .submit-area{margin-top:16px}
+    .wrap-wide{max-width:1120px}
+    .sign-layout{display:grid;grid-template-columns:1fr 300px;gap:15px;align-items:start}
+    .side-col{position:sticky;top:15px}
+    .guide-card{font-size:.82rem;line-height:1.65;color:#3a4a5e}
+    .guide-card h3{margin:0 0 12px}
+    .guide-card h4{color:var(--navy);margin:16px 0 6px;font-size:.9rem}
+    .guide-card h4:first-of-type{margin-top:0}
+    .guide-card p{margin:0 0 6px}
+    .guide-card ul{margin:6px 0;padding-left:18px}
+    .guide-card li{margin-bottom:4px}
+    .guide-card .callout{background:#fff7df;border:1px solid #ecd48c;border-radius:8px;padding:12px;margin-top:16px;font-size:.8rem;color:#6e5310}
+    .guide-card .flow{margin:8px 0;font-weight:bold;word-break:keep-all}
+    @media(max-width:900px){.sign-layout{grid-template-columns:1fr}.side-col{position:static}}
+    @media(max-width:640px){.contract-meta,.form-grid{grid-template-columns:1fr}.field.full{grid-column:span 1}.card{padding:17px}.main-col .card{padding:14px 22px}}
   </style>
 </head>
 <body>
 <header class="top"><div class="top-inner"><h1>새담 인증전자계약</h1><p>일회용 계약 링크 · 이메일 인증 · 전자서명 · 체결기록 보관</p></div></header>
-<main class="wrap">
+<main class="wrap{% if state == 'sign' %} wrap-wide{% endif %}">
 {% if state == 'error' %}
   <section class="card center"><h2 class="error">계약 링크를 사용할 수 없습니다</h2><p>{{ message }}</p><p class="muted">새담 계약 담당자에게 새 링크를 요청해 주세요.</p></section>
 {% elif state == 'completed' %}
@@ -38,8 +77,58 @@
     <div class="notice">계약 링크와 인증번호를 다른 사람에게 전달하지 마세요. 본인이 요청한 계약이 아니면 담당자에게 알려주세요.</div>
   </section>
 {% elif state == 'sign' %}
+<div class="sign-layout">
+<div class="main-col">
   <section class="card">
-    <div class="contract-head"><span class="badge">이메일 인증 완료</span><h2>{{ data.title_snapshot }}</h2><div class="contract-meta"><div class="meta"><b>계약자</b><br>{{ data.signer_name }}</div><div class="meta"><b>학교 / 담당업무</b><br>{{ data.school_name or '-' }} / {{ data.department or '-' }}</div></div></div>
+    <div class="contract-head"><div class="badge-row"><span class="badge">이메일 인증 완료</span></div><h2>{{ data.title_snapshot }}</h2><div class="contract-meta"><div class="meta"><b>계약자 성명:</b><span class="meta-value">{{ data.signer_name }}</span></div><div class="meta"><b>수탁학교 / 담당부서</b><span class="meta-value">{{ data.school_name or '-' }} / {{ data.department or '-' }}</span></div></div></div>
+    <div class="form-grid form-grid-3">
+      <div class="field"><label>주민등록번호 *</label><input id="residentNumber" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000000-0000000"></div>
+      <div class="field"><label>연락처 *</label><input id="phone" inputmode="numeric" maxlength="13" autocomplete="tel" placeholder="010-1234-5678"></div>
+      <div class="field"><label>이메일 <span style="font-weight:normal;color:#65758a;font-size:.78em">(자동입력 됨: 계약서가 이메일로 전송됩니다.)</span></label><input id="signerEmail" value="{{ data.signer_email }}" readonly></div>
+    </div>
+    <div class="form-grid">
+      <div class="field full">
+        <label>주소 *</label>
+        <div style="display:flex;gap:8px">
+          <input id="address" autocomplete="off" placeholder="주소찾기를 눌러 주소를 검색하세요" readonly style="flex:1">
+          <button type="button" class="btn light" style="white-space:nowrap" onclick="searchAddress()">주소찾기</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field full"><label>상세주소</label><input id="address2" autocomplete="off" placeholder="동/호수 등 상세주소를 입력하세요"></div>
+    </div>
+    <div class="form-grid" style="margin-bottom:28px">
+      <div class="field"><label>은행 *</label>
+        <select id="bankName">
+          <option value="">은행 선택</option>
+          <option>KB국민은행</option>
+          <option>신한은행</option>
+          <option>우리은행</option>
+          <option>하나은행</option>
+          <option>NH농협은행</option>
+          <option>IBK기업은행</option>
+          <option>SC제일은행</option>
+          <option>한국씨티은행</option>
+          <option>케이뱅크</option>
+          <option>카카오뱅크</option>
+          <option>토스뱅크</option>
+          <option>iM뱅크(대구)</option>
+          <option>부산은행</option>
+          <option>광주은행</option>
+          <option>전북은행</option>
+          <option>경남은행</option>
+          <option>제주은행</option>
+          <option>Sh수협은행</option>
+          <option>새마을금고</option>
+          <option>신협</option>
+          <option>우체국예금보험</option>
+          <option>산업은행</option>
+          <option>기타 (선택 시 계좌번호만 정확히 입력하시면 됩니다.)</option>
+        </select>
+      </div>
+      <div class="field"><label>계좌번호 *</label><input id="accountNumber" inputmode="numeric" maxlength="30" autocomplete="off" placeholder="숫자만 입력하세요"></div>
+    </div>
     <div class="terms">{{ content1|safe }}</div>
     {% if content2 %}<hr style="border:0;border-top:1px dashed #c5d0db;margin:25px 0"><div class="terms">{{ content2|safe }}</div>{% endif %}
   </section>
@@ -48,18 +137,47 @@
     {% for item in agreements %}
     <label class="agreement"><input type="checkbox" class="agreement-check" data-key="{{ item.key }}"><b>{{ item.title }}</b><span>{{ item.text }}</span></label>
     {% endfor %}
-    <div class="form-grid" style="margin-top:18px">
-      <div class="field"><label>연락처 *</label><input id="phone" autocomplete="tel"></div>
-      <div class="field"><label>본인 성명 직접 입력 *</label><input id="confirmedName" autocomplete="off" placeholder="{{ data.signer_name }}"></div>
-      <div class="field full"><label>주소 *</label><input id="address" autocomplete="street-address"></div>
-      <div class="field"><label>주민등록번호 *</label><input id="residentNumber" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000000-0000000"></div>
-      <div class="field"><label>은행 *</label><input id="bankName" maxlength="50" autocomplete="off" placeholder="예: 국민은행"></div>
-      <div class="field full"><label>계좌번호 *</label><input id="accountNumber" inputmode="numeric" maxlength="80" autocomplete="off" placeholder="숫자와 하이픈(-)만 입력"></div>
-      <div class="field full"><label>본인 서명 *</label><canvas id="signature"></canvas><div class="sign-actions"><button class="btn light" onclick="clearSignature()">다시 서명</button></div></div>
+    <h3 style="margin-top:22px">계약자 성명입력 및 서명란</h3>
+    <div style="margin-bottom:14px">
+      <input id="confirmedName" autocomplete="off" placeholder="계약자 성명 입력" style="width:260px;border:2px solid var(--navy);text-align:center;font-weight:bold">
+      <span style="font-size:.85em;color:#666;margin-left:8px">* 성명 입력 후 아래 서명란에 서명해 주세요.</span>
     </div>
-    <div class="notice" style="margin-top:15px">주민번호와 계좌정보는 계약 및 대금 지급을 위해 암호화하여 보관합니다. 계약완료를 누르면 현재 계약내용, 동의문, 이메일 인증시각, 서명시각, 접속기록 및 계약서 위변조 확인용 고유번호가 함께 저장됩니다.</div>
-    <div class="submit-area"><button id="completeBtn" class="btn" onclick="completeContract()">계약완료 및 최종본 받기</button><p id="completeMessage" class="muted"></p></div>
+    <div class="field full"><canvas id="signature"></canvas><div class="sign-actions"><button class="btn light" onclick="clearSignature()">다시 서명</button></div></div>
+    <div class="notice" style="margin-top:15px">주민번호와 계좌정보등은 계약 및 대금 지급을 위해 암호화하여 보관합니다. 계약완료를 누르면 현재 계약내용, 이메일 인증시각, 서명시각, 접속기록 및 계약서 위변조 확인용 고유번호가 함께 저장됩니다.</div>
+    <div class="submit-area"><button id="completeBtn" class="btn btn-lg" onclick="completeContract()">계약완료 및 계약서 전송받기</button><p id="completeMessage" class="muted"></p></div>
   </section>
+</div>
+<aside class="side-col">
+  <section class="card guide-card">
+    <h3>📄 인증전자계약서 이용안내</h3>
+
+    <h4>1. 전자계약서 작성 및 발송</h4>
+    <p>계약 당사자의 주민등록번호, 연락처, 주소 등 정보를 정확하게 입력한 후 계약 내용을 작성해 주세요.<br>내용이 정확하지 않으면 세금 및 보험관련 불이익을 받을 수 있으며 책임은 본인에게 있습니다.</p>
+
+    <h4>2. 계약 체결 전 확인사항</h4>
+    <p>계약을 완료하기 전에 다음 사항을 반드시 확인해 주세요.</p>
+    <ul>
+      <li>입력된 본인의 성명 및 정보가 정확한지 확인</li>
+      <li>입력한 본인의 개인정보가 정확한지 확인</li>
+      <li>전체 계약내용의 확인</li>
+    </ul>
+
+    <h4>3. 전자계약서의 법적 효력</h4>
+    <p>본 화면에서 작성되는 전자문서 및 전자서명은 종이문서 및 자필서명과 마찬가지로 법적 효력을 가집니다.<br>본인인증, 전자서명, 계약 체결 일시 및 관련 전자기록은 계약 당사자의 의사와 계약 체결 사실을 확인하는 자료로 활용될 수 있습니다.</p>
+
+    <h4>4. 계약 완료 후 보관</h4>
+    <p>계약이 완료되면 최종 체결되어 이메일 전송받은 본 계약서를 다운받아 별도 보관하여야 합니다.<br>전송받은 계약서의 보관책임은 계약자 본인에게 있으며 분실 시 발생하는 각종 사항에 대한 책임은 본인에게 있습니다.</p>
+
+
+    <div class="callout">
+      <b>🔐 꼭 확인하세요</b>
+      <p class="flow">계약 내용확인 → 개인정보입력 → 계약 확인 체크 및 성명 재입력 → 전자서명 → 계약완료 및 계약서 전송받기 클릭 → 이메일로 계약서 자동 전송 → 계약서 보관</p>
+      <p style="margin:0">계약 체결 전 계약내용을 충분히 확인하시기 바라며, 계약내용에 대한 문의가 필요한 경우 담당자 또는 본사로 연락하시기 바랍니다.</p>
+    </div>
+    <div style="text-align:center;margin-top:18px"><img src="https://www.saedam.org/img/logo01.gif" alt="새담" style="max-width:98px;height:auto"></div>
+  </section>
+</aside>
+</div>
 {% endif %}
 </main>
 {% if state in ['verify','sign'] %}
@@ -79,8 +197,32 @@ function move(e){if(!drawing)return;e.preventDefault();const p=point(e);ctx.line
 function stop(){drawing=false;ctx.closePath()}
 canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);window.addEventListener('mouseup',stop);canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',stop);resizeCanvas();
 function clearSignature(){ctx.clearRect(0,0,canvas.width,canvas.height);signed=false}
-document.getElementById('residentNumber').addEventListener('input',function(){const d=this.value.replace(/\D/g,'').slice(0,13);this.value=d.length>6?`${d.slice(0,6)}-${d.slice(6)}`:d});
-async function completeContract(){const b=document.getElementById('completeBtn'),agreements={};document.querySelectorAll('.agreement-check').forEach(c=>agreements[c.dataset.key]=c.checked);if(Object.values(agreements).some(v=>!v)){message('completeMessage','모든 확인사항에 동의해 주세요.',true);return}if(!signed){message('completeMessage','서명란에 직접 서명해 주세요.',true);return}b.disabled=true;b.textContent='계약서 생성 중...';try{const d=await call(`/verified-contract/sign/${TOKEN}/complete`,{agreements,phone:document.getElementById('phone').value.trim(),address:document.getElementById('address').value.trim(),resident_number:document.getElementById('residentNumber').value.trim(),bank_name:document.getElementById('bankName').value.trim(),account_number:document.getElementById('accountNumber').value.trim(),confirmed_name:document.getElementById('confirmedName').value.trim(),signature:canvas.toDataURL('image/png')});message('completeMessage',d.message);setTimeout(()=>location.reload(),900)}catch(e){message('completeMessage',e.message,true);b.disabled=false;b.textContent='계약완료 및 최종본 받기'}}
+function isValidRrnDate(d6){const mm=parseInt(d6.slice(2,4),10),dd=parseInt(d6.slice(4,6),10);if(mm<1||mm>12)return false;const dim=[31,29,31,30,31,30,31,31,30,31,30,31];return dd>=1&&dd<=dim[mm-1]}
+function rrnError(v){const d=v.replace(/\D/g,'');if(d.length!==13||!'12345678'.includes(d[6]))return'주민등록번호를 13자리로 정확히 입력해 주세요.';if(!isValidRrnDate(d.slice(0,6)))return'주민등록번호 앞자리의 생년월일을 확인해 주세요.';return null}
+document.getElementById('residentNumber').addEventListener('input',function(){const d=this.value.replace(/\D/g,'').slice(0,13);this.value=d.length>6?`${d.slice(0,6)}-${d.slice(6)}`:d;this.classList.remove('invalid')});
+document.getElementById('residentNumber').addEventListener('blur',function(){if(this.value.trim())this.classList.toggle('invalid',!!rrnError(this.value))});
+document.getElementById('accountNumber').addEventListener('input',function(){this.value=this.value.replace(/\D/g,'')});
+document.getElementById('phone').addEventListener('input',function(){const d=this.value.replace(/\D/g,'').slice(0,11);let v=d;if(d.length>3&&d.length<=6)v=`${d.slice(0,3)}-${d.slice(3)}`;else if(d.length>6&&d.length<=10)v=`${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`;else if(d.length>10)v=`${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7,11)}`;this.value=v});
+function searchAddress(){new daum.Postcode({oncomplete:function(data){const addr=data.userSelectedType==='R'?data.roadAddress:data.jibunAddress;document.getElementById('address').value=addr;document.getElementById('address').classList.remove('invalid');document.getElementById('address2').focus()}}).open()}
+function focusInvalid(el){el.scrollIntoView({behavior:'smooth',block:'center'});if(el.focus)el.focus()}
+async function completeContract(){
+  const b=document.getElementById('completeBtn');
+  const checks=[...document.querySelectorAll('.agreement-check')];
+  const firstUnchecked=checks.find(c=>!c.checked);
+  if(firstUnchecked){message('completeMessage','모든 확인사항에 동의해 주세요.',true);focusInvalid(firstUnchecked.closest('.agreement'));firstUnchecked.focus();return}
+  const requiredFields=[['residentNumber','주민등록번호를 입력해 주세요.'],['phone','연락처를 입력해 주세요.'],['address','주소를 입력해 주세요.'],['bankName','은행을 입력해 주세요.'],['accountNumber','계좌번호를 입력해 주세요.'],['confirmedName','서명란 바로 위의 계약자 성명 입력란에 성명을 한번 더 입력해 주세요.']];
+  for(const[id,msg]of requiredFields){
+    const el=document.getElementById(id);
+    if(!el.value.trim()){message('completeMessage',msg,true);focusInvalid(el);return}
+  }
+  const rrnMsg=rrnError(document.getElementById('residentNumber').value);
+  if(rrnMsg){message('completeMessage',rrnMsg,true);const el=document.getElementById('residentNumber');el.classList.add('invalid');focusInvalid(el);return}
+  if(!signed){message('completeMessage','서명란에 직접 서명해 주세요.',true);focusInvalid(canvas);return}
+  const agreements={};checks.forEach(c=>agreements[c.dataset.key]=c.checked);
+  const addr1=document.getElementById('address').value.trim(),addr2=document.getElementById('address2').value.trim();
+  b.disabled=true;b.textContent='계약서 생성 중...';
+  try{const d=await call(`/verified-contract/sign/${TOKEN}/complete`,{agreements,phone:document.getElementById('phone').value.trim(),address:addr2?`${addr1} ${addr2}`:addr1,resident_number:document.getElementById('residentNumber').value.trim(),bank_name:document.getElementById('bankName').value.trim(),account_number:document.getElementById('accountNumber').value.trim(),confirmed_name:document.getElementById('confirmedName').value.trim(),signature:canvas.toDataURL('image/png')});message('completeMessage',d.message);setTimeout(()=>location.reload(),900)}catch(e){message('completeMessage',e.message,true);b.disabled=false;b.textContent='계약완료 및 계약서 전송받기'}
+}
 {% endif %}
 </script>
 {% endif %}
