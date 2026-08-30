@@ -415,6 +415,23 @@ def _storage_roots():
     return roots
 
 
+def _emp_name_lookup(conn):
+    """사번(emp_no)을 로그인 이름으로 바꿔 보여주기 위한 조회 테이블.
+    소유자 컬럼에 이름을 직접 저장하는 테이블(예: school_posts.author)도 있고,
+    사번을 저장하는 테이블(예: memos.owner_key)도 있어서 화면 표시 직전에 통일한다."""
+    try:
+        rows = conn.execute("SELECT emp_no, name FROM users").fetchall()
+    except sqlite3.Error:
+        return {}
+    lookup = {}
+    for row in rows:
+        emp_no = str(row['emp_no'] or '').strip()
+        name = str(row['name'] or '').strip()
+        if emp_no and name:
+            lookup[emp_no.lower()] = name
+    return lookup
+
+
 def _logical_storage_usage(conn):
     """DB 안에 직접 저장되는 메뉴 데이터와 소유자별 논리 용량을 집계한다."""
     features = {
@@ -1065,6 +1082,7 @@ def disk_detail():
     conn = get_db()
     try:
         logical_usage = _logical_storage_usage(conn)
+        emp_name_lookup = _emp_name_lookup(conn)
     finally:
         conn.close()
     roots = _build_disk_roots(storage_roots, logical_usage)
@@ -1076,10 +1094,17 @@ def disk_detail():
     logical = logical_usage.get(root_key)
     owners = []
     if logical and logical.get('owners'):
+        # 같은 사람이 사번/이름 등 서로 다른 형태로 저장돼 있어도 표시 이름 기준으로 합친다.
+        merged: dict[str, dict[str, int]] = {}
+        for owner, values in logical['owners'].items():
+            display_name = emp_name_lookup.get(str(owner).lower(), owner)
+            entry = merged.setdefault(display_name, {'size': 0, 'count': 0})
+            entry['size'] += values['size']
+            entry['count'] += values['count']
         owners = sorted(
             ({'owner': owner, 'size': values['size'], 'count': values['count'],
               'size_text': _format_size(values['size'])}
-             for owner, values in logical['owners'].items()),
+             for owner, values in merged.items()),
             key=lambda item: item['size'], reverse=True,
         )[:12]
     return jsonify({
