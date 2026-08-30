@@ -48,6 +48,17 @@
         }
     }
 
+    function decodedFileName(value) {
+        let text = String(value || '').trim();
+        if (!text) return '';
+        if (text.startsWith('~e~')) text = text.slice(3);
+        try {
+            return decodeURIComponent(text);
+        } catch (_) {
+            return text;
+        }
+    }
+
     function scrollToBottom() {
         window.requestAnimationFrame(function () {
             messages.scrollTop = messages.scrollHeight;
@@ -234,8 +245,9 @@
                 const icon = element('span', 'ai-file-icon');
                 icon.appendChild(element('i', 'fa-regular fa-file-lines'));
                 const meta = element('span', 'ai-file-meta');
-                meta.appendChild(element('strong', '', item.name || item.title || '파일'));
-                meta.appendChild(element('span', '', [item.source, item.title, item.date].filter(Boolean).join(' · ')));
+                const fileLabel = decodedFileName(item.name);
+                meta.appendChild(element('strong', '', item.title || fileLabel || '파일'));
+                meta.appendChild(element('span', '', [item.source, fileLabel, item.date].filter(Boolean).join(' · ')));
                 row.append(icon, meta);
                 list.appendChild(row);
             });
