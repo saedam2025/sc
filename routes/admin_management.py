@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, session, url_for
 import json
+import math
 import os
 import re
 import shutil
@@ -17,6 +18,7 @@ from .storage import (
     DATA_ROOT,
     DEPOSIT_UPLOADS,
     EBOOK_UPLOADS,
+    EXPENSE_UPLOADS,
     GALL2_ROOT,
     LEGACY_ARCHIVE_ROOT,
     MANUAL_UPLOADS,
@@ -33,6 +35,7 @@ from .menu_access import (
     load_menu_max_levels,
     school_director_scope_enabled,
 )
+from . import openai_settings as ai_settings
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -127,17 +130,6 @@ def _normalize_default_theme_background(theme):
     return normalized
 
 
-ADMIN_TABS = [
-    ('people', '인사관리', 'fa-user-gear', '/user'),
-    ('menu_permissions', '메뉴 권한관리', 'fa-key', '/admin/menu-permissions'),
-    ('boards', '게시판관리', 'fa-clipboard-list', '/admin/boards'),
-    ('disk', '디스크관리', 'fa-hard-drive', '/admin/disk'),
-    ('themes', '테마관리', 'fa-palette', '/admin/theme'),
-    ('stats', '이용통계', 'fa-chart-line', '/admin/stats'),
-    ('settings', 'Admin설정', 'fa-user-shield', '/admin/settings'),
-]
-
-
 def is_admin_level():
     return is_admin_session()
 
@@ -228,6 +220,47 @@ def _format_size(size):
         value /= 1024
 
 
+def _nice_axis(max_value, target_ticks=4):
+    """차트 y축에 쓸 '보기 좋은'(1/2/5/10 단위) 눈금을 계산한다.
+
+    바이트 그대로 계산하면 100MB가 95.37MB처럼 어색하게 나오므로, 최댓값에 자연스러운
+    단위(KB/MB/GB/TB) 하나를 고른 뒤 그 단위 안에서 깔끔한 정수 간격을 만든다.
+    """
+    if max_value <= 0:
+        return {'max': 1, 'ticks': [{'value': 0, 'percent': 0, 'label': '0 B'}]}
+    units = [('B', 1), ('KB', 1024), ('MB', 1024 ** 2), ('GB', 1024 ** 3), ('TB', 1024 ** 4)]
+    unit_label, unit_size = units[-1]
+    for label, size in units:
+        if max_value / size < 1024:
+            unit_label, unit_size = label, size
+            break
+    scaled_max = max_value / unit_size
+    raw_step = scaled_max / target_ticks
+    magnitude = 10 ** math.floor(math.log10(raw_step)) if raw_step > 0 else 1
+    residual = raw_step / magnitude
+    if residual > 5:
+        nice_step = 10 * magnitude
+    elif residual > 2:
+        nice_step = 5 * magnitude
+    elif residual > 1:
+        nice_step = 2 * magnitude
+    else:
+        nice_step = magnitude
+    tick_count = max(1, math.ceil(scaled_max / nice_step))
+    axis_max_scaled = tick_count * nice_step
+    axis_max = axis_max_scaled * unit_size
+    ticks = []
+    for i in range(tick_count + 1):
+        value_scaled = i * nice_step
+        value_bytes = value_scaled * unit_size
+        ticks.append({
+            'value': value_bytes,
+            'percent': round((value_bytes / axis_max) * 100, 3) if axis_max else 0,
+            'label': f"{value_scaled:g} {unit_label}",
+        })
+    return {'max': axis_max, 'ticks': ticks}
+
+
 def _folder_size(path):
     total = 0
     count = 0
@@ -248,10 +281,97 @@ def _folder_size(path):
     return total, count
 
 
+def _folder_breakdown(path, limit=12):
+    """폴더 바로 아래 항목을 용량 기준 내림차순으로 정리해 상세 내역용으로 반환한다."""
+    entries = []
+    if not path or not os.path.isdir(path):
+        return entries
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return entries
+    for name in names:
+        full = os.path.join(path, name)
+        if os.path.islink(full) or _is_sensitive_storage_target(full):
+            continue
+        try:
+            if os.path.isdir(full):
+                size, count = _folder_size(full)
+                is_dir = True
+            else:
+                size = os.path.getsize(full)
+                count = 1
+                is_dir = False
+        except OSError:
+            continue
+        entries.append({'name': name, 'is_dir': is_dir, 'size': size, 'count': count})
+    entries.sort(key=lambda item: item['size'], reverse=True)
+    top = entries[:limit]
+    rest = entries[limit:]
+    result = [{**item, 'size_text': _format_size(item['size'])} for item in top]
+    if rest:
+        rest_size = sum(item['size'] for item in rest)
+        rest_count = sum(item['count'] for item in rest)
+        result.append({
+            'name': f'그 외 {len(rest)}개 항목', 'is_dir': None,
+            'size': rest_size, 'count': rest_count, 'size_text': _format_size(rest_size),
+        })
+    return result
+
+
+def _build_disk_roots(storage_roots, logical_usage):
+    roots = []
+    for item in storage_roots:
+        size, count = _folder_size(item['path'])
+        logical = logical_usage.get(item['key'], {})
+        db_size = int(logical.get('size') or 0)
+        db_count = int(logical.get('count') or 0)
+        row = dict(item)
+        row.update(
+            size=size + db_size,
+            physical_size=size,
+            db_size=db_size,
+            size_text=_format_size(size + db_size),
+            count=count + db_count,
+            file_count=count,
+            db_count=db_count,
+            exists=os.path.exists(item['path']),
+            browseable=True,
+        )
+        roots.append(row)
+
+    physical_keys = {item['key'] for item in roots}
+    for key, logical in logical_usage.items():
+        if key in physical_keys:
+            continue
+        roots.insert(-1, {
+            'key': key,
+            'label': logical['label'],
+            'icon': logical['icon'],
+            'path': None,
+            'size': logical['size'],
+            'physical_size': 0,
+            'db_size': logical['size'],
+            'size_text': _format_size(logical['size']),
+            'count': logical['count'],
+            'file_count': 0,
+            'db_count': logical['count'],
+            'exists': True,
+            'browseable': False,
+        })
+
+    for index, item in enumerate(roots):
+        if item['key'] == 'app':
+            roots.insert(0, roots.pop(index))
+            break
+    return roots
+
+
 def _storage_roots():
     data_root = str(DATA_ROOT)
     roots = [
-        {'key': 'approval_expense', 'label': '사내결재·지출결의', 'path': str(UPLOADS_ROOT), 'icon': 'fa-file-signature'},
+        {'key': 'approval', 'label': '사내결재', 'path': str(UPLOADS_ROOT), 'icon': 'fa-file-signature'},
+        {'key': 'expense', 'label': '지출결의', 'path': str(EXPENSE_UPLOADS), 'icon': 'fa-receipt'},
         {'key': 'board', 'label': '게시판·자료실·업무메뉴얼', 'path': str(BOARD_UPLOADS), 'icon': 'fa-clipboard-list'},
         {'key': 'messenger', 'label': '사내메신저', 'path': str(CHAT_UPLOADS), 'icon': 'fa-comments'},
         {'key': 'memo', 'label': '개인화이트보드', 'path': str(MEMO_UPLOADS), 'icon': 'fa-chalkboard'},
@@ -298,7 +418,8 @@ def _storage_roots():
 def _logical_storage_usage(conn):
     """DB 안에 직접 저장되는 메뉴 데이터와 소유자별 논리 용량을 집계한다."""
     features = {
-        'approval_expense': {'label': '사내결재·지출결의', 'icon': 'fa-file-signature'},
+        'approval': {'label': '사내결재', 'icon': 'fa-file-signature'},
+        'expense': {'label': '지출결의', 'icon': 'fa-receipt'},
         'messenger': {'label': '사내메신저', 'icon': 'fa-comments'},
         'memo': {'label': '개인화이트보드', 'icon': 'fa-chalkboard'},
         'board': {'label': '게시판·자료실·업무메뉴얼', 'icon': 'fa-clipboard-list'},
@@ -333,8 +454,10 @@ def _logical_storage_usage(conn):
 
     payload = lambda column: f"LENGTH(CAST(COALESCE({column}, '') AS BLOB))"
     queries = {
-        'approval_expense': [
+        'approval': [
             f"SELECT drafter owner, COUNT(*) item_count, SUM({payload('doc_data')}) size_bytes FROM approvals GROUP BY drafter",
+        ],
+        'expense': [
             """SELECT r.drafter owner, COUNT(i.id) item_count,
                       COALESCE(SUM(LENGTH(CAST(COALESCE(i.description, '') AS BLOB))
                                  + LENGTH(CAST(COALESCE(i.vendor, '') AS BLOB))
@@ -640,7 +763,7 @@ def _menu_usage_label(path):
 
 
 def _render(section, **context):
-    context.update(admin_tabs=ADMIN_TABS, active_section=section, active_theme=get_active_theme())
+    context.update(active_section=section, active_theme=get_active_theme())
     return render_template('admin_management.html', **context)
 
 
@@ -870,45 +993,7 @@ def disk():
     finally:
         conn.close()
 
-    roots = []
-    for item in storage_roots:
-        size, count = _folder_size(item['path'])
-        logical = logical_usage.get(item['key'], {})
-        db_size = int(logical.get('size') or 0)
-        db_count = int(logical.get('count') or 0)
-        row = dict(item)
-        row.update(
-            size=size + db_size,
-            physical_size=size,
-            db_size=db_size,
-            size_text=_format_size(size + db_size),
-            count=count + db_count,
-            file_count=count,
-            db_count=db_count,
-            exists=os.path.exists(item['path']),
-            browseable=True,
-        )
-        roots.append(row)
-
-    physical_keys = {item['key'] for item in roots}
-    for key, logical in logical_usage.items():
-        if key in physical_keys:
-            continue
-        roots.insert(-1, {
-            'key': key,
-            'label': logical['label'],
-            'icon': logical['icon'],
-            'path': None,
-            'size': logical['size'],
-            'physical_size': 0,
-            'db_size': logical['size'],
-            'size_text': _format_size(logical['size']),
-            'count': logical['count'],
-            'file_count': 0,
-            'db_count': logical['count'],
-            'exists': True,
-            'browseable': False,
-        })
+    roots = _build_disk_roots(storage_roots, logical_usage)
 
     files = []
     parent_path = None
@@ -925,7 +1010,9 @@ def disk():
                     'name': name,
                     'is_dir': is_dir,
                     'size': '-' if is_dir else _format_size(stat.st_size),
+                    'size_bytes': -1 if is_dir else int(stat.st_size),
                     'mtime': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M'),
+                    'mtime_sort': int(stat.st_mtime),
                     'rel_path': child_rel,
                 })
             except OSError:
@@ -940,6 +1027,7 @@ def disk():
         'used': _format_size(used),
         'free': _format_size(free),
         'percent': round((used / total) * 100, 1) if total else 0,
+        'free_percent': round((free / total) * 100, 1) if total else 0,
     }
     personal_totals = {
         'users': sum(1 for row in personal_usage if row['key'].startswith('emp:')),
@@ -948,6 +1036,10 @@ def disk():
         'shared': next((row['total_bytes'] for row in personal_usage if row['key'] == 'shared'), 0),
         'shared_text': _format_size(next((row['total_bytes'] for row in personal_usage if row['key'] == 'shared'), 0)),
     }
+    chart_roots = sorted(roots, key=lambda r: r['size'], reverse=True)
+    chart_axis = _nice_axis(max((r['size'] for r in chart_roots), default=0))
+    chart_axis_max = chart_axis['max']
+    chart_ticks = chart_axis['ticks']
     return _render(
         'disk',
         roots=roots,
@@ -959,7 +1051,46 @@ def disk():
         disk_stats=disk_stats,
         personal_usage=personal_usage,
         personal_totals=personal_totals,
+        chart_roots=chart_roots,
+        chart_axis_max=chart_axis_max,
+        chart_ticks=chart_ticks,
     )
+
+
+@admin_bp.route('/disk/detail')
+def disk_detail():
+    require_admin()
+    root_key = request.args.get('root', '')
+    storage_roots = _storage_roots()
+    conn = get_db()
+    try:
+        logical_usage = _logical_storage_usage(conn)
+    finally:
+        conn.close()
+    roots = _build_disk_roots(storage_roots, logical_usage)
+    root_info = next((item for item in roots if item['key'] == root_key), None)
+    if not root_info:
+        return jsonify({'status': 'error', 'message': '존재하지 않는 메뉴입니다.'}), 404
+
+    folders = _folder_breakdown(root_info.get('path')) if root_info.get('browseable') else []
+    logical = logical_usage.get(root_key)
+    owners = []
+    if logical and logical.get('owners'):
+        owners = sorted(
+            ({'owner': owner, 'size': values['size'], 'count': values['count'],
+              'size_text': _format_size(values['size'])}
+             for owner, values in logical['owners'].items()),
+            key=lambda item: item['size'], reverse=True,
+        )[:12]
+    return jsonify({
+        'status': 'success',
+        'label': root_info['label'],
+        'size_text': root_info['size_text'],
+        'physical_size_text': _format_size(root_info.get('physical_size') or 0),
+        'db_size_text': _format_size(root_info.get('db_size') or 0),
+        'folders': folders,
+        'owners': owners,
+    })
 
 
 @admin_bp.route('/disk/download')
@@ -1408,3 +1539,96 @@ def reset_admin_password():
     conn.commit()
     conn.close()
     return redirect(url_for('admin.settings'))
+
+
+def _render_ai_settings(**extra):
+    return _render(
+        'ai_settings',
+        preset_data=ai_settings.list_presets(),
+        provider_labels=ai_settings.PROVIDER_LABELS,
+        provider_models=ai_settings.PROVIDER_MODELS,
+        model_labels=ai_settings.MODEL_LABELS,
+        max_presets=ai_settings.MAX_PRESETS,
+        **extra,
+    )
+
+
+@admin_bp.route('/ai-settings')
+def ai_settings_page():
+    require_admin()
+    return _render_ai_settings()
+
+
+@admin_bp.route('/ai-settings/save', methods=['POST'])
+def save_ai_preset_route():
+    require_admin()
+    preset_id = (request.form.get('preset_id') or '').strip()
+    provider = (request.form.get('provider') or '').strip()
+    model = (request.form.get('model') or '').strip()
+    api_key = (request.form.get('api_key') or '').strip()
+    clear_key = request.form.get('clear_key') == '1'
+    actor = str(session.get('emp_no') or session.get('user_name') or 'admin')
+    try:
+        ai_settings.save_preset(preset_id, provider, model, api_key=api_key, clear_key=clear_key, actor=actor)
+    except ValueError as exc:
+        return _render_ai_settings(error=str(exc))
+    return redirect(url_for('admin.ai_settings_page'))
+
+
+@admin_bp.route('/ai-settings/activate', methods=['POST'])
+def activate_ai_preset_route():
+    require_admin()
+    preset_id = (request.form.get('preset_id') or '').strip()
+    actor = str(session.get('emp_no') or session.get('user_name') or 'admin')
+    try:
+        ai_settings.set_active_preset(preset_id, actor=actor)
+    except ValueError as exc:
+        return _render_ai_settings(error=str(exc))
+    return redirect(url_for('admin.ai_settings_page'))
+
+
+@admin_bp.route('/ai-settings/add-slot', methods=['POST'])
+def add_ai_preset_slot_route():
+    require_admin()
+    actor = str(session.get('emp_no') or session.get('user_name') or 'admin')
+    try:
+        ai_settings.add_preset_slot(actor=actor)
+    except ValueError as exc:
+        return _render_ai_settings(error=str(exc))
+    return redirect(url_for('admin.ai_settings_page'))
+
+
+@admin_bp.route('/ai-settings/test', methods=['POST'])
+def test_ai_preset_route():
+    require_admin()
+    data = request.get_json(silent=True) or {}
+    preset_id = str(data.get('preset_id') or '').strip()
+    provider = str(data.get('provider') or '').strip()
+    supplied_key = str(data.get('api_key') or '').strip()
+    model = str(data.get('model') or '').strip()
+    try:
+        provider = ai_settings.validate_provider(provider)
+        model = ai_settings.validate_model(provider, model)
+        if supplied_key:
+            api_key = supplied_key
+        else:
+            api_key = ai_settings.get_preset_api_key(preset_id) if preset_id else ''
+            if not api_key:
+                return jsonify({'status': 'error', 'message': '테스트할 API 키가 없습니다.'}), 400
+        verified_model = ai_settings.test_ai_connection(provider, api_key, model)
+        return jsonify({'status': 'success', 'message': f'{ai_settings.PROVIDER_LABELS.get(provider, provider)} 연결에 성공했습니다.', 'model': verified_model})
+    except ValueError as exc:
+        return jsonify({'status': 'error', 'message': str(exc)}), 400
+    except Exception as exc:
+        error_name = exc.__class__.__name__
+        if error_name in {'AuthenticationError', 'PermissionDeniedError'}:
+            message = 'API 키 인증에 실패했습니다.'
+        elif error_name in {'NotFoundError', 'BadRequestError'}:
+            message = '입력한 모델을 사용할 수 없습니다.'
+        elif error_name in {'APIConnectionError', 'APITimeoutError'}:
+            message = '서버에 연결할 수 없습니다. 네트워크 설정을 확인해주세요.'
+        elif error_name == 'RateLimitError':
+            message = '사용 한도 또는 크레딧을 확인해주세요.'
+        else:
+            message = '연결 테스트에 실패했습니다.'
+        return jsonify({'status': 'error', 'message': message}), 502

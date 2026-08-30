@@ -22,7 +22,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .database import get_db
 from .menu_access import INSTRUCTOR_EXPENSE_ACCESS_SESSION, menu_is_allowed
-from .storage import APP_ROOT, UPLOADS_ROOT
+from .storage import APP_ROOT, EXPENSE_UPLOADS
 from .security import is_admin_session
 from .secure_files import (
     decode_filename_token,
@@ -53,7 +53,7 @@ MAX_BULK_EMAIL_REPORTS = 50
 MAX_BULK_EMAIL_ZIP_SIZE = 17 * 1024 * 1024
 RECEIPT_IMAGE_MAX_SIZE = (1920, 1080)
 RECEIPT_IMAGE_QUALITY = 85
-UPLOAD_FOLDER = str(UPLOADS_ROOT)
+UPLOAD_FOLDER = str(EXPENSE_UPLOADS)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 MAIL_SETTINGS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'mail_settings.json'))
 EXPENSE_TEMPLATE_PATH = str(
@@ -822,9 +822,13 @@ def _send_expense_submission_email(report, items):
         return False, str(exc)
 
 
+def _split_csv(text):
+    return [item.strip() for item in (text or '').split(',') if item.strip()]
+
+
 def _delete_file_paths(path_text):
     deleted = 0
-    for path in [p.strip() for p in (path_text or '').split(',') if p.strip()]:
+    for path in _split_csv(path_text):
         if os.path.exists(path) and delete_file(path):
             deleted += 1
     return deleted
@@ -2161,7 +2165,12 @@ def delete_reports():
         raise
     finally:
         conn.close()
-    deleted_files = _delete_file_paths(','.join(file_paths_to_delete))
+    try:
+        deleted_files = _delete_file_paths(','.join(file_paths_to_delete))
+    except Exception:
+        # 결의서 행은 이미 삭제·커밋된 뒤이므로, 첨부파일이 디스크에서 수동으로
+        # 지워졌거나 다른 이유로 정리에 실패해도 삭제 자체는 성공으로 처리한다.
+        deleted_files = 0
     return jsonify({
         "status": "success",
         "message": f"{deleted_reports}건을 삭제했습니다. 첨부파일 {deleted_files}개도 함께 삭제했습니다."

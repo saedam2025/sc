@@ -717,6 +717,25 @@ def init_db():
         last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')
 
+    # AI에이전트 좌측 대화 기록(회원별 최대 10개 자동보관, 고정핀은 예외)과
+    # 질문별 크레딧(토큰) 사용 로그를 함께 저장한다.
+    c.execute('''CREATE TABLE IF NOT EXISTS ai_agent_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        emp_no TEXT NOT NULL,
+        question TEXT NOT NULL,
+        answer_text TEXT,
+        answer_payload TEXT,
+        model TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        total_tokens INTEGER NOT NULL DEFAULT 0,
+        estimated_cost_usd REAL NOT NULL DEFAULT 0,
+        pinned INTEGER NOT NULL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_ai_agent_history_emp
+                 ON ai_agent_history(emp_no, pinned, created_at)''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS admin_settings (
         key TEXT PRIMARY KEY,
         value TEXT,

@@ -7,7 +7,7 @@ from .database import get_db
 
 SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
 SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
-SCHOOL_DIRECTOR_MODE_EXTRA_MENUS = {'memo_main'}
+SCHOOL_DIRECTOR_MODE_EXTRA_MENUS = {'memo_main', 'ai_agent_main'}
 INSTRUCTOR_EXPENSE_ACCESS_SESSION = 'expense_instructor_access_granted'
 SCHOOL_CENTER_BOARD_MENU = 'school_center_boards'
 SCHOOL_CENTER_SHARED_MENU = 'school_center_shared'
@@ -33,6 +33,12 @@ SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS = {
     'team_review': SCHOOL_CENTER_BOARD_MENU,
 }
 SCHOOL_WORKSPACE_CATEGORY_MENUS = frozenset(SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS.values())
+
+# board_config.name_en -> 상단메뉴(업무공간)에 실제로 표시되는 이름.
+# board_config.name_kr은 관리자가 게시판을 만들 때 자유롭게 입력하는 값이라 상단메뉴 이름과 어긋날 수 있어,
+# 화면 제목·검색 등 "메뉴 이름"이 필요한 곳은 DB 값 대신 이 상수를 기준으로 삼는다.
+# ('manual'은 board_config에 남아있는 미사용 게시판으로, 상단메뉴 '업무메뉴얼'은 routes/manual.py를 가리키므로 포함하지 않는다.)
+BOARD_TOP_MENU_LABELS = {'noti': '사내 게시판', 'archive': '사내 자료실'}
 
 MENU_GROUPS = (
     {
@@ -79,10 +85,12 @@ MENU_GROUPS = (
         'default_max_level': 14,
         'children': (
             ('payroll_main', '스마트 명세서 발송', 'fa-envelope-open-text', 14),
+            ('smart_document_main', '스마트 공문발송', 'fa-file-circle-check', 14),
             ('ai_mail_main', '스마트 메일 발송', 'fa-wand-magic-sparkles', 14),
             ('excel_generator', '입금용 엑셀 생성기', 'fa-file-excel', 14),
             ('ebook_library', 'e리플렛', 'fa-book-open-reader', 14),
             ('parent_notifications', '학부모알림전송', 'fa-bell', 7),
+            ('ai_agent_main', 'AI에이전트', 'fa-robot', 14),
         ),
     },
     {
@@ -121,6 +129,7 @@ MENU_GROUPS = (
             ('admin_disk', '디스크관리', 'fa-hard-drive', 2),
             ('admin_themes', '테마관리', 'fa-palette', 2),
             ('admin_stats', '이용통계', 'fa-chart-line', 2),
+            ('admin_ai_settings', 'AI api설정', 'fa-robot', 2),
             ('admin_settings', 'Admin설정', 'fa-user-shield', 2),
         ),
     },
@@ -387,8 +396,12 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return None
     if path.startswith('/payroll'):
         return 'payroll_main'
+    if path.startswith('/smart-document'):
+        return 'smart_document_main'
     if path.startswith('/ai-mail'):
         return 'ai_mail_main'
+    if path.startswith('/ai-agent'):
+        return 'ai_agent_main'
     if path.startswith('/excel-generator'):
         return 'excel_generator'
     if path.startswith('/attendance') or path.startswith('/api/attendance'):

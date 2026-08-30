@@ -133,7 +133,7 @@ AGREEMENTS = (
     {
         "key": "identity",
         "title": "본인 확인",
-        "text": "본인은 계약서에 표시된 계약 당사자 본인이며 타인에게 인증번호와 계약 링크를 제공하지 않았습니다.",
+        "text": "본인은 계약서에 표시 및 개인정보를 입력한 계약 당사자 본인이며 타인에게 인증번호와 계약 링크를 제공하지 않았습니다.",
     },
     {
         "key": "privacy",
@@ -816,6 +816,8 @@ def _row_for_view(row) -> dict:
         "completed": "계약완료",
         "revoked": "취소",
         "expired": "기간만료",
+        "voided": "폐기",
+        "superseded": "변경계약",
     }
     item["status_label"] = status_map.get(item.get("status"), item.get("status"))
     return item
@@ -853,6 +855,20 @@ def _invitation_html(row, invitation_url: str) -> str:
       </p>
       <p style="font-size:13px;color:#64748b">유효기간: {escape(_format_kst(row['invitation_expires_at']))}<br>
       본인이 요청한 계약이 아니라면 링크를 열지 말고 새담 담당자에게 알려주세요.</p>
+    </div>
+    """
+
+
+def _void_notice_html(row, reason_label: str) -> str:
+    return f"""
+    <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7;color:#1f2937">
+      <h2 style="color:#a82d2d">계약 {escape(reason_label)} 안내</h2>
+      <p><b>{escape(row['signer_name'])}</b>님, 아래 계약 건이 <b>{escape(reason_label)}</b> 처리되었습니다.</p>
+      <p style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:14px">{escape(row['title_snapshot'])}<br>
+      계약구분: {escape(row['contract_type'])} · 수탁학교: {escape(row['school_name'] or '-')} · 부서: {escape(row['department'] or '-')}</p>
+      <p><b>본 안내 이후로 위 계약서는 더 이상 법적 효력이 없습니다.</b><br>
+      동일한 내용으로 다시 계약이 필요한 경우 새담 담당자로부터 별도의 계약 요청 메일을 받게 됩니다.</p>
+      <p style="font-size:13px;color:#64748b">문의사항은 새담 계약 담당자에게 연락해 주세요.</p>
     </div>
     """
 
@@ -945,6 +961,24 @@ def admin_page():
         )
         params.extend([f"%{query}%"] * 4)
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    sort_columns = {
+        "id": "id",
+        "year": "COALESCE(signed_at, created_at)",
+        "category": "contract_type",
+        "school": "school_name",
+        "dept": "department",
+        "name": "signer_name",
+        "email": "signer_email",
+        "status": "status",
+        "created": "created_at",
+        "signed": "signed_at",
+    }
+    sort_key = request.args.get("sort", "")
+    if sort_key not in sort_columns:
+        sort_key = "id"
+    sort_dir = "asc" if request.args.get("dir") == "asc" else "desc"
+    sort_column = sort_columns[sort_key]
+    sort_dir_sql = "ASC" if sort_dir == "asc" else "DESC"
     conn = get_db()
     try:
         now_text = _iso()
@@ -985,10 +1019,27 @@ def admin_page():
             f"""
             SELECT * FROM verified_contracts
             {where_sql}
-            ORDER BY id DESC LIMIT ? OFFSET ?
+            ORDER BY {sort_column} {sort_dir_sql}, id DESC LIMIT ? OFFSET ?
             """,
             [*params, per_page, (page - 1) * per_page],
         ).fetchall()
+        dup_counts = {
+            (
+                dup_row["signer_name"],
+                dup_row["contract_type"],
+                dup_row["school_name"],
+                dup_row["department"],
+            ): dup_row["cnt"]
+            for dup_row in conn.execute(
+                """
+                SELECT signer_name, contract_type, school_name, department, COUNT(*) AS cnt
+                FROM verified_contracts
+                WHERE status NOT IN ('voided','superseded','revoked')
+                GROUP BY signer_name, contract_type, school_name, department
+                HAVING COUNT(*) > 1
+                """
+            ).fetchall()
+        }
     finally:
         conn.close()
     total_pages = max(1, (total + per_page - 1) // per_page)
@@ -999,11 +1050,20 @@ def admin_page():
     years = sorted({row["year"] for row in filter_values if row["year"]}, reverse=True)
     schools = sorted({row["school_name"] for row in filter_values if row["school_name"]})
     departments = sorted({row["department"] for row in filter_values if row["department"]})
+    items = []
+    for row in rows:
+        item = _row_for_view(row)
+        key = (item["signer_name"], item["contract_type"], item["school_name"], item["department"])
+        item["is_duplicate"] = (
+            dup_counts.get(key, 0) > 1
+            and item["status"] not in ("voided", "superseded", "revoked")
+        )
+        items.append(item)
     companies = _company_settings()
     mail_store = _mail_account_store()
     return render_template(
         "verified_contract/admin.html",
-        items=[_row_for_view(row) for row in rows],
+        items=items,
         counts=counts,
         total_count=all_total,
         completed_count=completed_count,
@@ -1023,6 +1083,8 @@ def admin_page():
         mail_accounts=_mail_accounts_for_view(mail_store),
         active_mail_account_id=mail_store["active_account_id"],
         csrf_token=_csrf_token(),
+        sort_key=sort_key,
+        sort_dir=sort_dir,
         current_page=page,
         start_page=max(1, ((page - 1) // 20) * 20 + 1),
         end_page=min(total_pages, ((page - 1) // 20) * 20 + 20),
@@ -1123,6 +1185,25 @@ def create_contract():
     ):
         contract_data[key] = str(data.get(key, "")).strip()
 
+    conn = get_db()
+    try:
+        duplicate_rows = conn.execute(
+            """
+            SELECT id FROM verified_contracts
+            WHERE signer_name=? AND contract_type=? AND school_name=? AND department=?
+              AND status NOT IN ('voided','superseded','revoked')
+            """,
+            (
+                signer_name,
+                contract_type,
+                contract_data["수탁학교명"],
+                contract_data["부서명"],
+            ),
+        ).fetchall()
+    finally:
+        conn.close()
+    duplicate_ids = [int(r["id"]) for r in duplicate_rows]
+
     token = secrets.token_urlsafe(32)
     expires_days = min(30, max(1, int(data.get("expires_days") or 7)))
     expires_at = _iso(_now() + timedelta(days=expires_days))
@@ -1190,12 +1271,19 @@ def create_contract():
     message = "계약을 등록하고 인증 링크를 이메일로 발송했습니다."
     if mail_status == "failed":
         message = f"계약은 등록했지만 메일 발송에 실패했습니다: {mail_error}"
+    if duplicate_ids:
+        message += (
+            f"\n\n⚠ 동일 인물·계약구분·학교·부서 조합의 기존 계약이 {len(duplicate_ids)}건 있습니다."
+            " 목록에서 기존 계약을 확인하고 [폐기] 또는 [변경계약] 처리해 주세요."
+        )
     return jsonify(
         {
             "status": "success" if mail_status == "sent" else "warning",
             "message": message,
             "contract_id": contract_id,
             "invitation_url": invitation_url,
+            "duplicate_ids": duplicate_ids,
+            "duplicate_name": signer_name if duplicate_ids else "",
         }
     )
 
@@ -1344,6 +1432,7 @@ def upload_excel():
 
         inserted = 0
         skipped = 0
+        duplicated = 0
         errors = []
         seen_keys = set()
         terms_cache: dict[str, tuple[str, str]] = {}
@@ -1367,12 +1456,16 @@ def upload_excel():
                 profile = None
                 row_errors.append(str(exc))
             key = (contract_type, signer_name, signer_email, school_name, department)
-            if key in existing_keys or key in seen_keys:
-                row_errors.append("같은 계약자가 서명대기 또는 등록대기 상태로 이미 존재")
+            # 같은 파일 안에서의 완전 중복 행만 막고, 이미 등록된 서명대기/등록대기 건은
+            # 재계약(폐기·변경계약) 시나리오일 수 있으므로 차단하지 않고 등록 후 안내한다.
+            if key in seen_keys:
+                row_errors.append("업로드한 엑셀 파일 안에서 같은 행이 중복됨")
             if row_errors:
                 skipped += 1
                 errors.append({"row": excel_row, "name": signer_name or "-", "reason": ", ".join(row_errors)})
                 continue
+            if key in existing_keys:
+                duplicated += 1
             terms1, terms2 = terms_cache.setdefault(contract_type, _read_terms(contract_type))
             if not terms1.strip():
                 skipped += 1
@@ -1447,12 +1540,19 @@ def upload_excel():
                 "errors": errors[:50],
             }
         ), 400
+    message = f"{inserted}명 등록 완료" + (f", {skipped}명 제외" if skipped else "")
+    if duplicated:
+        message += (
+            f"\n\n⚠ {duplicated}명은 기존 서명대기/등록대기 계약과 동일한 조합(성명·계약구분·학교·부서)입니다."
+            " 목록에서 기존 계약을 확인하고 [폐기] 또는 [변경계약] 처리해 주세요."
+        )
     return jsonify(
         {
-            "status": "warning" if skipped else "success",
-            "message": f"{inserted}명 등록 완료" + (f", {skipped}명 제외" if skipped else ""),
+            "status": "warning" if (skipped or duplicated) else "success",
+            "message": message,
             "inserted": inserted,
             "skipped": skipped,
+            "duplicated": duplicated,
             "errors": errors[:50],
         }
     )
@@ -1617,6 +1717,107 @@ def bulk_revoke():
     finally:
         conn.close()
     return jsonify({"status": "success", "message": f"{changed}건의 계약 링크를 취소했습니다."})
+
+
+@verified_contract_bp.route("/admin/bulk-delete", methods=["POST"])
+@menu_permission_required("verified_contract_admin")
+@_csrf_required
+def bulk_delete():
+    try:
+        ids = sorted({int(value) for value in (request.get_json(silent=True) or {}).get("ids", [])})
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "선택 항목을 확인해 주세요."}), 400
+    if not ids:
+        return jsonify({"status": "error", "message": "삭제할 계약을 선택해 주세요."}), 400
+    placeholders = ",".join("?" for _ in ids)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            f"SELECT id, pdf_filename, signature_filename FROM verified_contracts WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        for row in rows:
+            delete_file(VERIFIED_CONTRACTS_ROOT / os.path.basename(row["pdf_filename"] or ""))
+            delete_file(VERIFIED_SIGNATURE_ROOT / os.path.basename(row["signature_filename"] or ""))
+        conn.execute(f"DELETE FROM verified_contract_events WHERE contract_id IN ({placeholders})", ids)
+        conn.execute(f"DELETE FROM verified_contracts WHERE id IN ({placeholders})", ids)
+        conn.commit()
+        deleted = len(rows)
+    finally:
+        conn.close()
+    return jsonify({"status": "success", "message": f"{deleted}건의 계약 등록정보와 계약서 파일을 완전히 삭제했습니다."})
+
+
+@verified_contract_bp.route("/admin/bulk-void", methods=["POST"])
+@menu_permission_required("verified_contract_admin")
+@_csrf_required
+def bulk_void():
+    data = request.get_json(silent=True) or {}
+    action = str(data.get("action", "")).strip()
+    if action not in ("discard", "amend"):
+        return jsonify({"status": "error", "message": "처리 방식을 확인해 주세요."}), 400
+    notify = bool(data.get("notify"))
+    try:
+        ids = sorted({int(value) for value in data.get("ids", [])})
+    except (TypeError, ValueError):
+        return jsonify({"status": "error", "message": "선택 항목을 확인해 주세요."}), 400
+    if not ids:
+        return jsonify({"status": "error", "message": "처리할 계약을 선택해 주세요."}), 400
+    new_status = "voided" if action == "discard" else "superseded"
+    reason_label = "폐기" if action == "discard" else "변경계약"
+    placeholders = ",".join("?" for _ in ids)
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            f"SELECT * FROM verified_contracts WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        processed = 0
+        mail_sent = 0
+        mail_failed = []
+        for row in rows:
+            # 상태만 변경하며, 계약 정보나 계약서·서명 파일은 그대로 보존한다.
+            if row["status"] in ("voided", "superseded"):
+                continue
+            update_verified_contract(conn, row["id"], {"status": new_status})
+            _record_event(
+                conn,
+                row,
+                "VOIDED" if action == "discard" else "SUPERSEDED",
+                {"reason": reason_label, "notify": notify},
+            )
+            processed += 1
+            if not notify:
+                continue
+            try:
+                pdf_filename = str(row["pdf_filename"] or "")
+                if pdf_filename:
+                    pdf_path = VERIFIED_CONTRACTS_ROOT / os.path.basename(pdf_filename)
+                    with temporary_decrypted_path(pdf_path, pdf_path.name) as mail_pdf_path:
+                        _send_mail(
+                            row["signer_email"],
+                            f"[전자계약 {reason_label} 안내] {row['title_snapshot']}",
+                            _void_notice_html(row, reason_label),
+                            attachments=mail_pdf_path,
+                        )
+                else:
+                    _send_mail(
+                        row["signer_email"],
+                        f"[전자계약 {reason_label} 안내] {row['title_snapshot']}",
+                        _void_notice_html(row, reason_label),
+                    )
+                mail_sent += 1
+            except Exception as exc:
+                mail_failed.append({"name": row["signer_name"], "reason": str(exc)[:200]})
+        conn.commit()
+    finally:
+        conn.close()
+    message = f"{processed}건을 {reason_label} 처리했습니다. (계약 정보·파일은 삭제되지 않았습니다)"
+    if notify:
+        message += f" 안내메일 {mail_sent}건 발송."
+    if mail_failed:
+        message += f" (안내메일 발송 실패 {len(mail_failed)}건)"
+    return jsonify({"status": "success", "message": message, "failed": mail_failed})
 
 
 @verified_contract_bp.route("/admin/download-selected")
@@ -2413,12 +2614,13 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
     .info th{{width:110px}}
     .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
     .terms th,.terms td{{border:1px solid #333;padding:7px}}
-    .terms p{{margin:0 0 8px;white-space:pre-wrap}}
+    .terms p{{margin:0 0 8px}}
     .sign{{margin-top:35px;min-height:170px;page-break-inside:avoid}}
     .party{{width:48%;display:inline-block;vertical-align:top;position:relative}}
     .evidence{{border:1px solid #9fb3c8;background:#f5f8fb;padding:14px;margin-top:25px;font-size:12px}}
     .evidence li{{margin:5px 0}}
     </style></head><body>
+      <div style="text-align:center;margin-bottom:14px"><img src="https://www.saedam.org/img/logo01.gif" style="max-width:112px"></div>
       <h1>{escape(row['title_snapshot'])}</h1>
       <table class="info">
         <tr><th>학교/부서</th><td>{values.get('수탁학교명','')} / {values.get('부서명','')}</td><th>계약자</th><td>{escape(row['signer_name'])}</td></tr>

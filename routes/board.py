@@ -177,13 +177,25 @@ def init_board_db():
     
     try:
         conn.execute('''
-            INSERT OR IGNORE INTO board_config 
+            INSERT OR IGNORE INTO board_config
             (name_en, name_kr, desc_text, lvl_access, lvl_read, lvl_write, lvl_delete, lvl_comment)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', ('news', '새담소식', 'News & Notice', 10, 10, 2, 2, 10)) 
+        ''', ('news', '새담소식', 'News & Notice', 10, 10, 2, 2, 10))
         conn.commit()
     except Exception as e:
         print(f"기본 게시판 생성 중 오류 발생: {e}")
+
+    try:
+        # 상단메뉴(업무공간)에 보이는 이름과 게시판 페이지 제목이 어긋나지 않도록 동기화한다.
+        from .menu_access import BOARD_TOP_MENU_LABELS
+        for name_en, name_kr in BOARD_TOP_MENU_LABELS.items():
+            conn.execute(
+                "UPDATE board_config SET name_kr=? WHERE name_en=? AND name_kr<>?",
+                (name_kr, name_en, name_kr),
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"게시판 이름 동기화 중 오류 발생: {e}")
     finally:
         conn.close()
 

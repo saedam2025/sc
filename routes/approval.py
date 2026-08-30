@@ -226,10 +226,17 @@ def index():
 
     draft_rows = conn.execute('''
         SELECT * FROM approvals
-        WHERE drafter = ? AND status != '완료'
+        WHERE drafter = ? AND status NOT IN ('완료', '반려')
         ORDER BY created_at DESC
     ''', (current_user,)).fetchall()
     my_drafts = rows_to_dicts(draft_rows)
+
+    rejected_rows = conn.execute('''
+        SELECT * FROM approvals
+        WHERE drafter = ? AND status = '반려'
+        ORDER BY updated_at DESC
+    ''', (current_user,)).fetchall()
+    rejected_docs = rows_to_dicts(rejected_rows)
 
     completed_rows = conn.execute('''
         SELECT * FROM approvals
@@ -272,9 +279,10 @@ def index():
 
     return render_template('approval.html', 
                            current_user=current_user, 
-                           pending_docs=pending_docs, 
-                           my_drafts=my_drafts, 
-                           completed_docs=completed_docs, 
+                           pending_docs=pending_docs,
+                           my_drafts=my_drafts,
+                           rejected_docs=rejected_docs,
+                           completed_docs=completed_docs,
                            reference_docs=reference_docs,
                            archive_docs=archive_docs,
                            approver_users=approver_users,
@@ -457,8 +465,15 @@ def approval_action(doc_id):
     today_str = datetime.now().strftime('%Y-%m-%d')
 
     if action == 'reject':
+        reason = str(request.json.get('reason', '') or '').strip()
+        if not reason:
+            conn.close()
+            return jsonify({"status": "error", "message": "반려 사유를 입력해주세요."}), 400
         new_status = '반려'
-        msg_content = f"결재가 반려되었습니다: [{doc['doc_type']}] {doc['title']} (반려자: {current_user})"
+        doc_data_dict['reject_reason'] = reason
+        doc_data_dict['rejected_by'] = current_user
+        doc_data_dict['rejected_at'] = today_str
+        msg_content = f"결재가 반려되었습니다: [{doc['doc_type']}] {doc['title']} (반려자: {current_user}) · 사유: {reason}"
         msg_receivers.append(doc['drafter'])
         if current_user == doc['approver_2'] and doc['approver_1'] != '전결':
             msg_receivers.append(doc['approver_1'])

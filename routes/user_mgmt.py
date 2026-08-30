@@ -1222,6 +1222,9 @@ def update_user():
         custom_department = str(data.get('custom_department') or '').strip()[:100]
         custom_team = str(data.get('custom_team') or '').strip()[:100]
         
+        remove_profile_image = str(data.get('remove_profile_image', '')).strip().lower() in ('1', 'true', 'on')
+        old_profile = None
+
         if profile_file and profile_file.filename != '':
             os.makedirs(PROFILE_ROOT, exist_ok=True)
             display_name = original_filename(profile_file.filename, 'profile-image')
@@ -1233,6 +1236,11 @@ def update_user():
                 "SELECT profile_path FROM users WHERE id=?", (user_id,)
             ).fetchone()
             conn.execute("UPDATE users SET profile_path=? WHERE id=?", (profile_path, user_id))
+        elif remove_profile_image:
+            old_profile = conn.execute(
+                "SELECT profile_path FROM users WHERE id=?", (user_id,)
+            ).fetchone()
+            conn.execute("UPDATE users SET profile_path=NULL WHERE id=?", (user_id,))
 
         # 새로 입력받은 비밀번호 (앞뒤 공백 제거)
         new_password = data.get('password', '').strip()
@@ -1267,7 +1275,7 @@ def update_user():
             ))
         
         conn.commit()
-        if profile_file and profile_file.filename != '' and old_profile:
+        if (profile_file and profile_file.filename != '' or remove_profile_image) and old_profile:
             delete_file(_profile_disk_path(old_profile['profile_path']))
         conn.close()
         upload_path = None

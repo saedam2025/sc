@@ -390,7 +390,7 @@ def _load_center_contacts(conn, positions=None):
     location_expr = "office_location" if 'office_location' in school_cols else "''"
     second_director_expr = "center_director_id_2" if 'center_director_id_2' in school_cols else "''"
     query = f"""
-        SELECT center_director_id, {second_director_expr} AS center_director_id_2,
+        SELECT id, center_director_id, {second_director_expr} AS center_director_id_2,
                school_name, {location_expr} AS office_location
         FROM schools
         WHERE (COALESCE(center_director_id, '') <> ''
@@ -407,14 +407,16 @@ def _load_center_contacts(conn, positions=None):
         if not school_name:
             continue
         for emp_no in {row['center_director_id'], row['center_director_id_2']} - {None, ''}:
-            bucket = assignments.setdefault(emp_no, {'schools': [], 'locations': []})
+            bucket = assignments.setdefault(emp_no, {'schools': [], 'locations': [], 'school_ids': []})
             bucket['schools'].append(school_name)
             bucket['locations'].append(f"{school_name}: {office_location if office_location else '-'}")
+            bucket['school_ids'].append(row['id'])
 
     for contact in contacts:
         assignment = assignments.get(contact['emp_no'], {})
         contact['assigned_schools'] = _dash(', '.join(assignment.get('schools', [])))
         contact['office_locations'] = _dash(', '.join(assignment.get('locations', [])))
+        contact['assigned_school_ids'] = assignment.get('school_ids', [])
         contact['team_no'] = team_map.get(contact['emp_no'])
         contact['team_name'] = f"{contact['team_no']}팀" if contact['team_no'] else '미지정'
         contact['is_team_leader'] = contact['position'] in ('센터장(팀장)', '센터장 팀장')
@@ -516,6 +518,16 @@ def _builder_contact_records(manual_groups, headquarters, centers, schools, cust
     return records
 
 
+def _school_options(conn):
+    """센터장 담당학교 배정 모달에서 고를 수 있는 학교 목록(id, 이름)."""
+    school_cols = _columns(conn, 'schools')
+    query = "SELECT id, school_name FROM schools"
+    if 'is_active' in school_cols:
+        query += " WHERE COALESCE(is_active, 1) = 1"
+    query += " ORDER BY school_name ASC"
+    return [dict(row) for row in conn.execute(query).fetchall()]
+
+
 def _load_school_contacts(conn):
     school_cols = _columns(conn, 'schools')
     has_is_active = 'is_active' in school_cols
@@ -565,7 +577,7 @@ def _load_school_contacts(conn):
     """
     if has_is_active:
         query += " WHERE COALESCE(s.is_active, 1) = 1"
-    query += " ORDER BY s.year DESC, s.school_name ASC"
+    query += " ORDER BY s.school_name ASC, s.year DESC"
 
     rows = conn.execute(query).fetchall()
     contacts = []
@@ -637,10 +649,12 @@ def contact_list():
     _init_saved_directory_table(conn)
 
     manual_contact_groups = _load_manual_contact_groups(conn)
+    partner_manual_groups = [g for g in manual_contact_groups if g['key'] == 'partner']
     headquarters_positions, center_positions = _load_contact_position_groups(conn)
     headquarters_contacts = _load_user_contacts(conn, headquarters_positions)
     center_contacts = _load_center_contacts(conn, center_positions)
     school_contacts = _load_school_contacts(conn)
+    school_options = _school_options(conn)
     custom_contacts = _load_custom_contacts(conn)
     center_contact_groups = _group_center_contacts(center_contacts)
     contact_builder_records = _builder_contact_records(
@@ -662,12 +676,12 @@ def contact_list():
 
     return render_template(
         'contacts.html',
-        manual_contact_groups=manual_contact_groups,
-        manual_contact_group_options=MANUAL_CONTACT_GROUPS,
+        partner_manual_groups=partner_manual_groups,
         headquarters_contacts=headquarters_contacts,
         center_contacts=center_contacts,
         center_contact_groups=center_contact_groups,
         school_contacts=school_contacts,
+        school_options=school_options,
         contact_builder_records=contact_builder_records,
         custom_department_options=sorted({item['custom_department'] for item in custom_contacts if item['custom_department']}),
         custom_team_options=sorted({item['custom_team'] for item in custom_contacts if item['custom_team']}),
@@ -770,16 +784,86 @@ def saved_directory_detail_api(directory_id):
         conn.close()
 
 
-@contacts_bp.route('/contacts/center-team', methods=['POST'])
-def save_center_team():
+def _apply_center_team(conn, emp_no, raw_team_no):
+    """emp_no의 팀 지정을 갱신한다. 값이 비어있으면 지정을 해제한다."""
+    if raw_team_no in (None, '', 0, '0'):
+        conn.execute("DELETE FROM contact_center_teams WHERE emp_no = ?", (emp_no,))
+        return None
+    team_no = int(raw_team_no)
+    if team_no < 1 or team_no > 20:
+        raise ValueError('팀 번호는 1팀부터 20팀까지 지정할 수 있습니다.')
+    conn.execute("""
+        INSERT INTO contact_center_teams (emp_no, team_no, updated_at)
+        VALUES (?, ?, datetime('now', 'localtime'))
+        ON CONFLICT(emp_no) DO UPDATE SET
+            team_no = excluded.team_no,
+            updated_at = excluded.updated_at
+    """, (emp_no, team_no))
+    return team_no
+
+
+def _apply_center_school_assignment(conn, emp_no, school_ids):
+    """emp_no가 담당하는 학교 목록을 school_ids(학교 id 집합)에 맞춰 갱신한다.
+
+    schools 테이블은 학교마다 center_director_id(주)/center_director_id_2(부) 두 자리만
+    있으므로, 이미 다른 센터장이 두 자리를 모두 채운 학교는 배정하지 못하고 건너뛴다.
+    """
+    school_cols = _columns(conn, 'schools')
+    has_second = 'center_director_id_2' in school_cols
+
+    if has_second:
+        current_rows = conn.execute(
+            "SELECT id, center_director_id, center_director_id_2 FROM schools "
+            "WHERE center_director_id=? OR center_director_id_2=?",
+            (emp_no, emp_no)
+        ).fetchall()
+    else:
+        current_rows = conn.execute(
+            "SELECT id, center_director_id FROM schools WHERE center_director_id=?",
+            (emp_no,)
+        ).fetchall()
+    current_ids = {row['id'] for row in current_rows}
+
+    for school_id in current_ids - school_ids:
+        row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+        if not row:
+            continue
+        if row['center_director_id'] == emp_no:
+            conn.execute("UPDATE schools SET center_director_id=NULL WHERE id=?", (school_id,))
+        elif has_second and row['center_director_id_2'] == emp_no:
+            conn.execute("UPDATE schools SET center_director_id_2=NULL WHERE id=?", (school_id,))
+
+    skipped = 0
+    for school_id in school_ids - current_ids:
+        row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+        if not row:
+            continue
+        if not row['center_director_id']:
+            conn.execute("UPDATE schools SET center_director_id=? WHERE id=?", (emp_no, school_id))
+        elif has_second and not row['center_director_id_2']:
+            conn.execute("UPDATE schools SET center_director_id_2=? WHERE id=?", (emp_no, school_id))
+        else:
+            skipped += 1
+    return skipped
+
+
+@contacts_bp.route('/contacts/center-assign', methods=['POST'])
+def save_center_assign():
     if not _is_contact_admin():
         abort(403)
 
     data = request.get_json(silent=True) or {}
     emp_no = _clean_text(data.get('emp_no'))
-    raw_team_no = data.get('team_no')
     if not emp_no:
         return jsonify({'success': False, 'error': '센터장 정보가 없습니다.'}), 400
+
+    school_ids = data.get('school_ids')
+    if not isinstance(school_ids, list):
+        return jsonify({'success': False, 'error': '담당학교 목록이 올바르지 않습니다.'}), 400
+    try:
+        school_ids = {int(value) for value in school_ids}
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': '담당학교 목록이 올바르지 않습니다.'}), 400
 
     conn = get_db()
     _init_center_team_table(conn)
@@ -791,31 +875,42 @@ def save_center_team():
     ).fetchone()
     if not user:
         conn.close()
-        return jsonify({'success': False, 'error': '팀을 지정할 센터장을 찾을 수 없습니다.'}), 404
+        return jsonify({'success': False, 'error': '배정할 센터장을 찾을 수 없습니다.'}), 404
 
-    if raw_team_no in (None, '', 0, '0'):
-        conn.execute("DELETE FROM contact_center_teams WHERE emp_no = ?", (emp_no,))
-        message = '팀 지정을 해제했습니다.'
-    else:
-        try:
-            team_no = int(raw_team_no)
-        except (TypeError, ValueError):
-            conn.close()
-            return jsonify({'success': False, 'error': '팀 번호가 올바르지 않습니다.'}), 400
-        if team_no < 1 or team_no > 20:
-            conn.close()
-            return jsonify({'success': False, 'error': '팀 번호는 1팀부터 20팀까지 지정할 수 있습니다.'}), 400
-        conn.execute("""
-            INSERT INTO contact_center_teams (emp_no, team_no, updated_at)
-            VALUES (?, ?, datetime('now', 'localtime'))
-            ON CONFLICT(emp_no) DO UPDATE SET
-                team_no = excluded.team_no,
-                updated_at = excluded.updated_at
-        """, (emp_no, team_no))
-        message = f'{team_no}팀으로 지정했습니다.'
+    try:
+        _apply_center_team(conn, emp_no, data.get('team_no'))
+    except ValueError as exc:
+        conn.close()
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
+    skipped = _apply_center_school_assignment(conn, emp_no, school_ids)
     conn.commit()
     conn.close()
+
+    message = '담당학교·팀 배정을 저장했습니다.'
+    if skipped:
+        message += f' (이미 센터장 정원이 찬 {skipped}개 학교는 배정하지 못했습니다.)'
     return jsonify({'success': True, 'message': message})
+
+
+@contacts_bp.route('/contacts/center-assign/clear', methods=['POST'])
+def clear_center_assign():
+    if not _is_contact_admin():
+        abort(403)
+
+    data = request.get_json(silent=True) or {}
+    emp_no = _clean_text(data.get('emp_no'))
+    if not emp_no:
+        return jsonify({'success': False, 'error': '센터장 정보가 없습니다.'}), 400
+
+    conn = get_db()
+    school_cols = _columns(conn, 'schools')
+    conn.execute("UPDATE schools SET center_director_id=NULL WHERE center_director_id=?", (emp_no,))
+    if 'center_director_id_2' in school_cols:
+        conn.execute("UPDATE schools SET center_director_id_2=NULL WHERE center_director_id_2=?", (emp_no,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': '담당학교 배정을 해제했습니다.'})
 
 
 @contacts_bp.route('/contacts/card')

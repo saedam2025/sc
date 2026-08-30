@@ -65,6 +65,7 @@ MAIN_DB_FILE = DATA_ROOT / "saedam.db"
 LEGACY_CONTRACT_DB_FILE = DATA_ROOT / "contracts.db"
 
 UPLOADS_ROOT = DATA_ROOT / "uploads"
+EXPENSE_UPLOADS = DATA_ROOT / "expense_uploads"
 BOARD_UPLOADS = DATA_ROOT / "board_uploads"
 CHAT_UPLOADS = DATA_ROOT / "chat_uploads"
 MEMO_UPLOADS = DATA_ROOT / "memo_uploads"
@@ -97,6 +98,7 @@ LEGACY_BOOTSTRAP_MARKER = SECURITY_ROOT / ".legacy_files_bootstrapped"
 PERSISTENT_DIRECTORIES = (
     DATA_ROOT,
     UPLOADS_ROOT,
+    EXPENSE_UPLOADS,
     BOARD_UPLOADS,
     CHAT_UPLOADS,
     MEMO_UPLOADS,
