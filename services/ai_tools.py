@@ -723,6 +723,7 @@ def search_school_data(arguments: dict[str, Any], context: dict[str, Any]) -> To
         rows = conn.execute(
             f"""
             SELECT s.school_name, s.year, s.contract_subject, s.office_location, s.access_key,
+                   s.office_phone, s.school_address, s.school_phone, s.school_email,
                    u.name AS director_name, u2.name AS director_name_2
             FROM schools s
             LEFT JOIN users u ON u.emp_no=s.center_director_id
@@ -735,12 +736,16 @@ def search_school_data(arguments: dict[str, Any], context: dict[str, Any]) -> To
     schools = [{"school": row["school_name"], "year": row["year"],
                 "director": ", ".join(filter(None, [row["director_name"], row["director_name_2"]])) or "미지정",
                 "subject": row["contract_subject"] or "", "office": row["office_location"] or "",
+                "address": row["school_address"] or "", "phone": row["school_phone"] or "",
+                "office_phone": row["office_phone"] or "", "email": row["school_email"] or "",
                 "link": f"/school/{quote(str(row['access_key'] or ''))}" if row["access_key"] else "/school"}
                for row in rows]
     display = _table(
         "학교 정보", f"조건에 맞는 학교 {len(schools)}곳입니다.",
-        [("school", "학교"), ("year", "연도"), ("director", "센터장"),
-         ("subject", "계약과목"), ("office", "지원실")], schools,
+        [("school", "학교"), ("year", "연도"), ("director", "센터장"), ("subject", "계약과목"),
+         ("office", "지원실"), ("address", "학교주소"), ("phone", "학교전화"),
+         ("office_phone", "지원실전화"), ("email", "이메일")],
+        schools,
         [{"label": "학교업무공간으로 이동", "url": "/school", "style": "primary"}],
     )
     model_schools = [{key: value for key, value in row.items() if key != "link"} for row in schools]
@@ -1103,6 +1108,104 @@ def get_school_task_status(arguments: dict[str, Any], context: dict[str, Any]) -
     )
     return ToolExecution({"period": period_label, "count": len(items), "tasks": items,
                           "status_counts": counts}, display)
+
+
+_WEEKLY_TASK_CATEGORY_COLUMNS = {
+    "회의": ("cat_meeting_title", "cat_meeting_time"),
+    "면접": ("cat_interview_title", "cat_interview_time"),
+    "미팅": ("cat_miting_title", "cat_miting_time"),
+    "외근": ("cat_out_title", "cat_out_time"),
+    "기타": ("cat_etc_title", "cat_etc_time"),
+}
+
+
+def get_weekly_schedule_overview(arguments: dict[str, Any], context: dict[str, Any]) -> ToolExecution:
+    """메인 화면의 '나의 주간업무 요약'(로그인 사용자, 오늘~+6일)과
+    '주간 자원관리 현황'(전체 직원, 이번 주 월~일)을 동일한 기준으로 조회한다."""
+    current_user = str(context.get("user_name") or "")
+    today = date.today()
+    anchor_text = _clean(arguments.get("start_date"), 10)
+    anchor = _iso_date(arguments.get("start_date"), today) if anchor_text else today
+    week_start = anchor - timedelta(days=anchor.weekday())
+    week_end = week_start + timedelta(days=6)
+    rolling_start = today
+    rolling_end = today + timedelta(days=6)
+    query_start = min(week_start, rolling_start)
+    query_end = max(week_end, rolling_end)
+
+    conn = get_db()
+    try:
+        task_rows = conn.execute(
+            "SELECT * FROM tasks WHERE date BETWEEN ? AND ?",
+            (query_start.isoformat(), query_end.isoformat()),
+        ).fetchall()
+        attendance_rows = conn.execute(
+            "SELECT * FROM attendance WHERE status='승인' AND start_date <= ? AND end_date >= ?",
+            (query_end.isoformat(), query_start.isoformat()),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    events: list[dict[str, Any]] = []
+    for row in task_rows:
+        try:
+            day = datetime.strptime(str(row["date"])[:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        for cat, (title_col, time_col) in _WEEKLY_TASK_CATEGORY_COLUMNS.items():
+            title = row[title_col]
+            if title:
+                events.append({"owner": str(row["owner"] or ""), "category": cat, "title": str(title),
+                               "time": str(row[time_col] or ""), "start": day, "end": day})
+
+    for row in attendance_rows:
+        try:
+            start_day = datetime.strptime(str(row["start_date"])[:10], "%Y-%m-%d").date()
+            end_day = datetime.strptime(str(row["end_date"])[:10], "%Y-%m-%d").date() - timedelta(days=1)
+        except ValueError:
+            continue
+        if end_day < start_day:
+            end_day = start_day
+        events.append({"owner": str(row["owner"] or ""), "category": "근태/휴가",
+                       "title": str(row["type"] or "근태/휴가"), "time": "", "start": start_day, "end": end_day})
+
+    def _overlaps(event: dict[str, Any], window_start: date, window_end: date) -> bool:
+        return event["start"] <= window_end and event["end"] >= window_start
+
+    def _format(event: dict[str, Any]) -> dict[str, Any]:
+        period = event["start"].isoformat() if event["start"] == event["end"] \
+            else f'{event["start"].isoformat()}~{event["end"].isoformat()}'
+        return {"owner": event["owner"], "category": event["category"], "title": event["title"],
+                "time": event["time"], "period": period}
+
+    my_items = [_format(e) for e in sorted(
+        (e for e in events if e["owner"] == current_user and _overlaps(e, rolling_start, rolling_end)),
+        key=lambda e: (e["start"], e["end"]))]
+    all_items = [_format(e) for e in sorted(
+        (e for e in events if _overlaps(e, week_start, week_end)),
+        key=lambda e: (e["start"], e["end"], e["owner"]))]
+
+    my_range = f"{rolling_start.isoformat()}~{rolling_end.isoformat()}"
+    all_range = f"{week_start.isoformat()}~{week_end.isoformat()}"
+    my_message = f"{current_user or '알 수 없음'}님의 나의 주간업무 요약({my_range}) {len(my_items)}건입니다."
+    all_message = f"주간 자원관리 현황({all_range}) 전체 {len(all_items)}건입니다."
+
+    display = {
+        "type": "sections", "title": "주간일정", "message": f"{my_message} {all_message}",
+        "sections": [
+            _table("나의 주간업무 요약", my_message,
+                   [("period", "일자"), ("category", "구분"), ("title", "제목"), ("time", "시간")], my_items),
+            _table("주간 자원관리 현황", all_message,
+                   [("period", "일자"), ("owner", "담당자"), ("category", "구분"), ("title", "제목"), ("time", "시간")],
+                   all_items),
+        ],
+        "actions": [],
+    }
+    return ToolExecution(
+        {"my_week": {"range": my_range, "count": len(my_items), "items": my_items},
+         "all_week": {"range": all_range, "count": len(all_items), "items": all_items}},
+        display,
+    )
 
 
 def get_payroll_campaign_summary(arguments: dict[str, Any], context: dict[str, Any]) -> ToolExecution:
@@ -1554,7 +1657,8 @@ TOOL_DEFINITIONS = [
           "연락처·이메일은 본사연락망 메뉴에 공개된 정보이므로 함께 제공한다. 주소·주민번호·계좌번호 등은 반환하지 않는다.",
           {"keyword": _nullable_string("이름·소속·학교 검색어. 전체면 null"),
            "position": _nullable_string("직급 필터. 없으면 null"), "limit": _nullable_integer("최대 20")}),
-    _tool("search_school_data", "학교명, 센터장, 계약과목으로 학교 기본정보를 검색한다.",
+    _tool("search_school_data", "학교명, 센터장, 계약과목으로 학교 기본정보를 검색한다. 학교주소, 학교전화, 지원실전화, "
+          "이메일 등 연락처 정보도 함께 반환하므로 학교 연락처·주소를 물으면 이 도구를 쓴다.",
           {"keyword": _nullable_string("학교명·센터장·과목 검색어. 전체면 null"), "limit": _nullable_integer("최대 20")}),
     _tool("search_board_posts", "읽기 권한이 있는 사내 게시판(상단메뉴 '업무공간'의 게시판, 게시판마다 별도 메뉴)의 게시물을 "
           "검색하거나 특정 게시판의 최근 게시물을 조회한다. 업무메뉴얼은 이 도구가 아니라 search_manuals를 쓴다.",
@@ -1579,13 +1683,21 @@ TOOL_DEFINITIONS = [
            "status": _nullable_string("상태 필터(대기/발급완료 등). 없으면 null"),
            **DATE_PROPERTIES, "limit": _nullable_integer("최대 20")}),
     _tool("get_school_task_status", "학교업무처리와 센터장 게시판(비품신청·청구·설문 등)의 상태를 학교·분류·상태별로 조회한다. "
-          "특정 학교(그 학교 센터장이 올린 게시물 포함)의 전체 게시물을 볼 때는 keyword에 학교명을 넣어 이 도구를 쓴다. 첨부파일 유무는 무관하다.",
+          "특정 학교(그 학교 센터장이 올린 게시물 포함)의 전체 게시물을 볼 때는 keyword에 학교명을 넣어 이 도구를 쓴다. 첨부파일 유무는 무관하다. "
+          "'주간일정'처럼 개인/전사 캘린더 일정을 물으면 이 도구가 아니라 get_weekly_schedule_overview를 사용한다.",
           {"category": _nullable_string(
               "community, notice, weekly_report, open_class, expense, item_request, work_schedule, "
               "billing, survey, reference, director_resources, team_review 중 하나. 전체면 null"),
            "status": _nullable_string("상태 필터. 없으면 null"),
            "keyword": _nullable_string("학교명 검색어. 없으면 null"),
            **DATE_PROPERTIES, "limit": _nullable_integer("최대 20")}),
+    _tool("get_weekly_schedule_overview",
+          "'주간일정', '이번주 일정', '내 일정 알려줘'처럼 캘린더성 주간 일정을 물으면 이 도구를 쓴다. "
+          "메인 화면 위젯과 동일하게 (1) 로그인한 사용자의 '나의 주간업무 요약'(오늘부터 7일간 개인 일정: 회의/면접/미팅/외근/기타/근태·휴가)과 "
+          "(2) '주간 자원관리 현황'(이번 주 월~일 전체 직원의 동일한 일정)을 함께 반환한다. "
+          "학교의 근무표 게시판이나 학교업무처리 현황과는 다른 기능이며, 그건 get_school_task_status를 쓴다.",
+          {"start_date": _nullable_string(
+              "주간 자원관리 현황 기준 주(월~일)에 포함할 임의의 날짜(YYYY-MM-DD). '이번 주'면 null로 두면 오늘 기준 이번 주를 조회한다.")}),
     _tool("get_payroll_campaign_summary", "전체 직원의 스마트 명세서 발송 캠페인 건수·발송·실패 현황을 발송자별로 집계한다. 계좌번호·급여액은 반환하지 않는다.",
           {**DATE_PROPERTIES, "limit": _nullable_integer("최대 20")}),
     _tool("get_mail_campaign_summary", "전체 직원의 스마트 메일 발송 캠페인 건수·발송·실패 현황을 발송자별로 집계한다.",
@@ -1629,6 +1741,7 @@ TOOL_HANDLERS: dict[str, Callable[[dict[str, Any], dict[str, Any]], ToolExecutio
     "search_documents": search_documents,
     "search_certificate_requests": search_certificate_requests,
     "get_school_task_status": get_school_task_status,
+    "get_weekly_schedule_overview": get_weekly_schedule_overview,
     "get_payroll_campaign_summary": get_payroll_campaign_summary,
     "get_mail_campaign_summary": get_mail_campaign_summary,
     "get_smart_document_summary": get_smart_document_summary,
