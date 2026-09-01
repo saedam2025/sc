@@ -26,6 +26,7 @@ from routes.ai_agent import ai_agent_bp
 from routes.smart_document import ensure_smart_document_schema, smart_document_bp
 from routes.memo import memo_bp
 from routes.attendance import attendance_bp
+from routes.interview import ensure_interview_schema, interview_bp
 from routes.excel_generator import excel_bp
 from routes.explorer import explorer_bp
 from routes.notifications import emit_notification_refresh, noti_bp
@@ -92,6 +93,7 @@ with app.app_context():
         init_manual_schema()
         ensure_parent_notification_schema()
         ensure_smart_document_schema()
+        ensure_interview_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -162,6 +164,8 @@ EXEMPT_ROUTES = [
     'parent_notifications.parent_push_worker',
     # 강사 전용 링크의 안내 화면만 공개하고 출결·발송 API는 로그인을 요구한다.
     'parent_notifications.instructor_page',
+    # 면접자가 인트라넷 계정 없이 링크로 여는 사전질문지.
+    'interview.questionnaire',
 ]
 
 @app.before_request
@@ -911,7 +915,8 @@ app.register_blueprint(ai_mail_bp, url_prefix='/ai-mail')
 app.register_blueprint(ai_agent_bp)
 app.register_blueprint(smart_document_bp, url_prefix='/smart-document')
 app.register_blueprint(memo_bp, url_prefix='/memo')  
-app.register_blueprint(attendance_bp)  
+app.register_blueprint(attendance_bp)
+app.register_blueprint(interview_bp)
 app.register_blueprint(excel_bp)       
 app.register_blueprint(explorer_bp, url_prefix='/explorer')
 app.register_blueprint(noti_bp)  

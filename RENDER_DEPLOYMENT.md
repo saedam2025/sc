@@ -14,6 +14,9 @@ Blueprint로 기존 서비스를 갱신할 때는 `render.yaml`의 `name` 값을
 다음 자료가 함께 유지됩니다.
 
 - `saedam.db`: 스마트명세서 작업그룹·광고이미지·자동적용 구분 문구·메일계정·발송이력, 증명서 회사·작업그룹·발급/발송 상태
+- `saedam.db`: 스마트공문발송 회사정보·직인, 공문 템플릿, 수신자 목록, 발송 사용기록(첨부파일 포함), API 사용량(토큰 집계)도 같은 DB의
+  `smart_document_companies`/`smart_document_templates`/`smart_document_recipients`/`smart_document_history`/`smart_document_deliveries`/`smart_document_attachments`
+  테이블에 저장되므로, 동일한 Persistent Disk를 유지하는 일반 재배포에서는 등록·수정·삭제 내용이 함께 유지됩니다.
 - `verified_contract/`: 인증전자계약 회사설정·메일계정·계약 제목/분류·약관·도장·서명·완료 PDF
 - `security/`: 세션, 계정 비밀번호, 업로드 파일 암호화 키
 
