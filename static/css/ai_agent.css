@@ -867,3 +867,42 @@
     .ai-agent-suggestions { grid-template-columns: 1fr; }
     .ai-agent-welcome > p { margin-bottom: 17px; }
 }
+
+/* ai_agent_mobile.html 전용: 상단 데스크톱 내비게이션을 감추고 채팅 화면이 화면 전체를 차지하게 한다. */
+.ai-agent-back-home {
+    display: none;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-gray, #596579);
+    border: 1px solid var(--card-border, #dbe2ea);
+    border-radius: 9px;
+    background: var(--widget-bg, #fff);
+    font-size: .95rem;
+    text-decoration: none;
+}
+
+.ai-agent-back-home:hover { color: var(--ai-primary); border-color: var(--ai-primary); }
+
+.ai-agent-mobile-body .navbar { display: none !important; }
+.ai-agent-mobile-body .content-container { padding: 0 !important; max-width: none !important; }
+.ai-agent-mobile-body .main-content { padding-top: 0 !important; }
+
+.ai-agent-mobile-body .ai-agent-back-home { display: flex; }
+
+.ai-agent-mobile-body .ai-agent-shell {
+    height: 100dvh;
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+}
+
+.ai-agent-mobile-body .ai-agent-header {
+    padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.ai-agent-mobile-body .ai-agent-sidebar {
+    padding-top: env(safe-area-inset-top);
+}

@@ -20,8 +20,10 @@
     const managementModal = byId('managementModal');
     const editDocumentModal = byId('editDocumentModal');
     const emailDocumentModal = byId('emailDocumentModal');
+    // 상단 메뉴바가 만드는 별도 stacking context(.navbar z-index:1000)에 눌리지 않도록
+    // 모달을 .content-container 밖으로 꺼내 body 바로 아래에 둔다.
+    [managementModal, editDocumentModal, emailDocumentModal].forEach((modal) => { if (modal) document.body.appendChild(modal); });
     const managementFeedback = byId('managementFeedback');
-    const openAiStatusPill = byId('openAiStatusPill');
     const openAiStatusText = byId('openAiStatusText');
     const composeCompany = byId('composeCompany');
     const composeTemplate = byId('composeTemplate');
@@ -30,10 +32,11 @@
     let selectedFiles = [];
     let selectedDeliveryFiles = [];
     let settingsState = { csrfToken: '', settings: null };
-    let workspaceState = { companies: [], templates: [], recipients: [], senders: [], history: [], usage: {} };
+    let workspaceState = { companies: [], templates: [], recipients: [], senders: [], history: [] };
     let currentDocument = null;
     let currentHistoryId = null;
     let currentPreviewMode = 'draft';
+    const TEMPLATE_ITEM_COUNT = 7;
     const allowedExtensions = new Set(['pdf', 'hwp', 'hwpx', 'doc', 'docx']);
     const allowedDeliveryExtensions = new Set(['pdf', 'hwp', 'hwpx', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'webp', 'zip']);
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
@@ -103,8 +106,13 @@
     }
     function applyOpenAiStatus(settings) {
         const connected = settings && settings.source !== 'none';
-        if (openAiStatusText) openAiStatusText.textContent = settings ? settings.status_text : '설정 조회 실패';
-        if (openAiStatusPill) openAiStatusPill.classList.toggle('is-connected', connected);
+        if (openAiStatusText) {
+            openAiStatusText.textContent = !settings
+                ? '설정 조회 실패'
+                : connected
+                    ? `SaeDam AI Preset ${settings.preset_id} - ${settings.model_short_name}.`
+                    : 'SaeDam AI Preset 미설정';
+        }
     }
     async function loadAiSettings() {
         try {
@@ -126,10 +134,19 @@
         if (workspaceState.recipients.some((item) => String(item.id) === previous.recipient)) composeRecipient.value = previous.recipient;
     }
     function renderCompanyList() {
-        byId('companyList').innerHTML = workspaceState.companies.length ? workspaceState.companies.map((item) => `<article class="sd-resource-card"><div><h4>${escapeHtml(item.name)} ${item.is_default ? '<em>기본</em>' : ''}</h4><p>대표 ${escapeHtml(item.representative)} · 문서번호 ${escapeHtml(item.document_prefix)}-연도-순번<br>${item.has_seal ? '직인 등록 완료' : '직인 미등록'}</p></div><div class="sd-resource-actions"><button data-edit-company="${item.id}">수정</button><button class="danger" data-delete-company="${item.id}">삭제</button></div></article>`).join('') : '<div class="sd-empty-list">발송 회사를 먼저 등록해주세요.</div>';
+        byId('companyList').innerHTML = workspaceState.companies.length ? workspaceState.companies.map((item) => {
+            const sealThumb = item.has_seal
+                ? `<img class="sd-company-seal-thumb" src="${escapeHtml(item.seal_url)}?v=${encodeURIComponent(item.updated_at || '')}" alt="${escapeHtml(item.name)} 직인">`
+                : '<span class="sd-company-seal-thumb is-empty">직인<br>미등록</span>';
+            return `<article class="sd-resource-card has-seal">${sealThumb}<div><h4>${escapeHtml(item.name)} ${item.is_default ? '<em>기본</em>' : ''}</h4><p>대표 ${escapeHtml(item.representative)} · 문서번호 ${escapeHtml(item.document_prefix)}-연도-순번<br>${item.has_seal ? '직인 등록 완료' : '직인 미등록'}</p></div><div class="sd-resource-actions"><button data-edit-company="${item.id}">수정</button><button class="danger" data-delete-company="${item.id}">삭제</button></div></article>`;
+        }).join('') : '<div class="sd-empty-list">발송 회사를 먼저 등록해주세요.</div>';
     }
     function renderTemplateList() {
-        byId('templateList').innerHTML = workspaceState.templates.length ? workspaceState.templates.map((item) => `<article class="sd-resource-card"><div><h4>${escapeHtml(item.name)} ${item.is_default ? '<em>기본</em>' : ''}</h4><p>${escapeHtml(item.instruction || '별도 작성 지침 없음')}</p></div><div class="sd-resource-actions"><button data-edit-template="${item.id}">수정</button><button class="danger" data-delete-template="${item.id}">삭제</button></div></article>`).join('') : '<div class="sd-empty-list">등록된 템플릿이 없습니다.</div>';
+        byId('templateList').innerHTML = workspaceState.templates.length ? workspaceState.templates.map((item) => {
+            const enabledCount = (item.items || []).filter((entry) => entry.enabled).length;
+            const summary = `입력내용 ${enabledCount}개 사용${item.greeting_enabled ? ' · 인사말' : ''}${item.closing_enabled ? ' · 맺음말' : ''}`;
+            return `<article class="sd-resource-card"><div><h4>${escapeHtml(item.name)} ${item.is_default ? '<em>기본</em>' : ''}</h4><p>${escapeHtml(item.instruction || '별도 작성 지침 없음')}<br><small>${escapeHtml(summary)}</small></p></div><div class="sd-resource-actions"><button data-edit-template="${item.id}">수정</button><button class="danger" data-delete-template="${item.id}">삭제</button></div></article>`;
+        }).join('') : '<div class="sd-empty-list">등록된 템플릿이 없습니다.</div>';
     }
     function renderRecipientList() {
         byId('recipientList').innerHTML = workspaceState.recipients.length ? workspaceState.recipients.map((item) => `<article class="sd-resource-card"><div><h4>${escapeHtml(item.organization)}</h4><p>${escapeHtml(item.name || '담당자 미지정')} · ${escapeHtml(item.email)}</p></div><div class="sd-resource-actions"><button data-edit-recipient="${item.id}">수정</button><button class="danger" data-delete-recipient="${item.id}">삭제</button></div></article>`).join('') : '<div class="sd-empty-list">공문 발송용 수신자를 등록해주세요.</div>';
@@ -143,16 +160,11 @@
             return `<article class="sd-history-row"><div><h4>${escapeHtml(item.document_number)} · ${escapeHtml(item.subject)}</h4><p>${sent ? `이메일 발송 ${formatNumber(item.sent_count)}회` : '초안 저장'} · 수신 ${escapeHtml(item.recipient)} · 발송일 ${escapeHtml(item.dispatch_date || item.issue_date)} · ${formatNumber(item.total_tokens)} tokens</p></div><div class="sd-resource-actions">${viewButton}<button class="danger" data-delete-history="${item.id}">기록 삭제</button></div></article>`;
         }).join('') : '<div class="sd-empty-list">아직 작성한 공문 기록이 없습니다.</div>';
     }
-    function renderUsage() {
-        const usage = workspaceState.usage || {};
-        byId('usageSummary').innerHTML = [['API 요청', `${formatNumber(usage.requests)}회`], ['입력 토큰', formatNumber(usage.input_tokens)], ['출력 토큰', formatNumber(usage.output_tokens)], ['전체 토큰', formatNumber(usage.total_tokens)]].map(([label, value]) => `<article class="sd-usage-card"><strong>${value}</strong><span>${label}</span></article>`).join('');
-        byId('usageMonthly').innerHTML = (usage.monthly || []).length ? usage.monthly.map((item) => `<article class="sd-history-row"><div><h4>${escapeHtml(item.month)}</h4><p>${formatNumber(item.requests)}회 요청</p></div><strong>${formatNumber(item.total_tokens)} tokens</strong></article>`).join('') : '<div class="sd-empty-list">집계할 API 사용량이 없습니다.</div>';
-    }
-    function renderWorkspace() { renderComposeSelects(); renderCompanyList(); renderTemplateList(); renderRecipientList(); renderHistoryList(); renderUsage(); }
+    function renderWorkspace() { renderComposeSelects(); renderCompanyList(); renderTemplateList(); renderRecipientList(); renderHistoryList(); }
     async function loadWorkspace() {
         try {
             const data = await apiRequest('workspace');
-            workspaceState = { companies: data.companies || [], templates: data.templates || [], recipients: data.recipients || [], senders: data.senders || [], history: data.history || [], usage: data.usage || {} };
+            workspaceState = { companies: data.companies || [], templates: data.templates || [], recipients: data.recipients || [], senders: data.senders || [], history: data.history || [] };
             renderWorkspace();
         } catch (error) { setManagementFeedback(error.message, 'error'); }
     }
@@ -160,13 +172,70 @@
     function activateManagementTab(tab) {
         document.querySelectorAll('[data-management-tab]').forEach((button) => button.classList.toggle('active', button.dataset.managementTab === tab));
         document.querySelectorAll('[data-panel]').forEach((panel) => { panel.hidden = panel.dataset.panel !== tab; });
-        const labels = { companies: '회사 정보', templates: '공문 템플릿', recipients: '수신자 목록', history: '사용 기록', usage: 'API 사용량' };
+        const labels = { companies: '회사 정보', templates: '공문 템플릿', recipients: '수신자 목록', history: '사용 기록' };
         byId('managementTitle').textContent = labels[tab] || '스마트 공문 관리';
     }
     function openManagement(tab = 'companies', message = '') { activateManagementTab(tab); setManagementFeedback(message, message ? 'error' : ''); managementModal.hidden = false; document.body.classList.add('sd-modal-open'); }
     function closeManagement() { managementModal.hidden = true; syncModalOpenState(); }
     function resetCompanyForm() { byId('companyForm').reset(); byId('companyId').value = ''; byId('companyDocumentPrefix').value = '새담'; }
-    function resetTemplateForm() { byId('templateForm').reset(); byId('templateId').value = ''; byId('templateClosing').value = '끝.'; }
+    function renderTemplateItemRows() {
+        const container = byId('templateItems');
+        container.innerHTML = Array.from({ length: TEMPLATE_ITEM_COUNT }, (_, index) => `
+            <div class="sd-template-item-row" data-item-index="${index}">
+                <span class="sd-template-item-no">${index + 1}</span>
+                <input type="text" class="sd-template-item-label" placeholder="예) 파견 사유 및 강사 세부사항">
+                <label class="sd-inline-check"><input type="checkbox" class="sd-template-item-enabled"> 입력사용</label>
+                <label class="sd-inline-check"><input type="checkbox" class="sd-template-item-ai" disabled> Ai 가 제목내용 작성</label>
+            </div>
+        `).join('');
+    }
+    function templateItemRows() { return Array.from(byId('templateItems').querySelectorAll('.sd-template-item-row')); }
+    function getTemplateItems() {
+        return templateItemRows().map((row) => ({
+            label: row.querySelector('.sd-template-item-label').value.trim(),
+            enabled: row.querySelector('.sd-template-item-enabled').checked,
+            ai_generate: row.querySelector('.sd-template-item-ai').checked,
+        }));
+    }
+    function setTemplateItems(items) {
+        const list = Array.isArray(items) ? items : [];
+        templateItemRows().forEach((row, index) => {
+            const item = list[index] || {};
+            row.querySelector('.sd-template-item-label').value = item.label || '';
+            row.querySelector('.sd-template-item-enabled').checked = Boolean(item.enabled);
+            const aiCheckbox = row.querySelector('.sd-template-item-ai');
+            aiCheckbox.checked = Boolean(item.ai_generate);
+            aiCheckbox.disabled = !item.enabled;
+            row.classList.toggle('is-locked', !item.enabled);
+        });
+    }
+    function enforceTemplateItemOrder(changedRow) {
+        const rows = templateItemRows();
+        const changedIndex = Number(changedRow.dataset.itemIndex);
+        const enabledCheckbox = changedRow.querySelector('.sd-template-item-enabled');
+        if (enabledCheckbox.checked) {
+            const previousAllEnabled = rows.slice(0, changedIndex).every((row) => row.querySelector('.sd-template-item-enabled').checked);
+            if (!previousAllEnabled) {
+                enabledCheckbox.checked = false;
+                setManagementFeedback(`${changedIndex}번을 먼저 체크해야 ${changedIndex + 1}번을 체크할 수 있습니다.`, 'error');
+                return;
+            }
+        } else {
+            rows.slice(changedIndex).forEach((row) => { row.querySelector('.sd-template-item-enabled').checked = false; });
+        }
+        rows.forEach((row) => {
+            const enabled = row.querySelector('.sd-template-item-enabled').checked;
+            const aiCheckbox = row.querySelector('.sd-template-item-ai');
+            aiCheckbox.disabled = !enabled;
+            if (!enabled) aiCheckbox.checked = false;
+            row.classList.toggle('is-locked', !enabled);
+        });
+    }
+    function resetTemplateForm() {
+        byId('templateForm').reset(); byId('templateId').value = ''; byId('templateClosing').value = '끝.';
+        byId('templateGreetingEnabled').checked = true; byId('templateClosingEnabled').checked = true;
+        setTemplateItems([]);
+    }
     function resetRecipientForm() { byId('recipientForm').reset(); byId('recipientId').value = ''; }
 
     async function saveCompany(event) {
@@ -181,7 +250,13 @@
     }
     async function saveTemplate(event) {
         event.preventDefault(); const id = byId('templateId').value;
-        const payload = { name: byId('templateName').value.trim(), instruction: byId('templateInstruction').value.trim(), greeting: byId('templateGreeting').value.trim(), closing: byId('templateClosing').value.trim(), is_default: byId('templateDefault').checked };
+        const payload = {
+            name: byId('templateName').value.trim(), instruction: byId('templateInstruction').value.trim(),
+            subject: byId('templateSubject').value.trim(), recipient: byId('templateRecipient').value.trim(),
+            greeting: byId('templateGreeting').value.trim(), closing: byId('templateClosing').value.trim(),
+            greeting_enabled: byId('templateGreetingEnabled').checked, closing_enabled: byId('templateClosingEnabled').checked,
+            items: getTemplateItems(), is_default: byId('templateDefault').checked,
+        };
         try { const data = await apiRequest(id ? `templates/${id}` : 'templates', { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) }); await loadWorkspace(); resetTemplateForm(); setManagementFeedback(data.message, 'success'); }
         catch (error) { setManagementFeedback(error.message, 'error'); }
     }
@@ -213,7 +288,9 @@
         });
         return `<section class="sd-doc-table-block">${title ? `<h4>${escapeHtml(title)}</h4>` : ''}<div class="sd-doc-table-wrap"><table class="sd-doc-table"><thead><tr>${safeHeaders.map((item) => `<th>${escapeHtml(item)}</th>`).join('')}</tr></thead><tbody>${safeRows.map((row) => `<tr>${row.map((item) => `<td>${escapeHtml(item)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
     }
-    function renderDocumentBody(paragraphs) {
+    function renderDocumentBody(paragraphs, bodyTables = {}) {
+        const attachedTables = bodyTables && typeof bodyTables === 'object' ? bodyTables : {};
+        const renderedTables = new Set();
         let mainNumber = 0;
         const items = (paragraphs || []).flatMap((value) => {
             const lines = String(value || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -257,7 +334,15 @@
                 marker = `${mainNumber}.`;
                 content = paragraph;
             }
-            output.push(`<p class="${className}"><span>${escapeHtml(marker)}</span><span>${escapeHtml(content)}</span></p>`);
+            output.push(`<p class="${className}"><span>${escapeHtml(marker)}</span><span>${escapeHtml(content).replace(/\n/g, '<br>')}</span></p>`);
+            if (numbered) {
+                const itemKey = numbered[1];
+                const attached = attachedTables[itemKey];
+                if (attached && !renderedTables.has(itemKey)) {
+                    renderedTables.add(itemKey);
+                    output.push(renderDocumentTable(attached.title || '', attached.headers || [], attached.rows || []));
+                }
+            }
         }
         return output.join('');
     }
@@ -268,14 +353,14 @@
         currentDocument = { ...docData, body: [...(docData.body || [])] };
         currentHistoryId = historyId ? Number(historyId) : null;
         currentPreviewMode = viewMode === 'sent' ? 'sent' : 'draft';
-        const body = renderDocumentBody(docData.body);
+        const body = renderDocumentBody(docData.body, docData.body_tables);
         const tables = renderStructuredTables(docData.tables);
         const deliveryAttachments = Array.isArray(docData.delivery_attachments) ? docData.delivery_attachments : [];
         const attachments = deliveryAttachments.length ? `<section class="sd-doc-attachments"><strong>붙임</strong><ol>${deliveryAttachments.map((item) => `<li>${escapeHtml(item.filename || item)}</li>`).join('')}</ol></section>` : '';
         const seal = docData.seal_url ? `<img class="sd-doc-seal" src="${escapeHtml(docData.seal_url)}?v=${Date.now()}" alt="회사 직인">` : '<span class="sd-seal-missing">(직인 미등록)</span>';
         const fallbackHtml = `<article class="sd-official-document">
             <header class="sd-doc-header"><span>SAEDAM OFFICIAL DOCUMENT</span><h3>${escapeHtml(docData.title || '공 문')}</h3></header>
-            <table class="sd-doc-meta"><tbody><tr><th>문서번호</th><td>${escapeHtml(docData.document_number || '확인 필요')}</td><th>발송일</th><td>${escapeHtml(docData.dispatch_date || docData.issue_date || docData.date || '확인 필요')}</td></tr><tr><th>수&nbsp;&nbsp;&nbsp;&nbsp;신</th><td colspan="3">${escapeHtml(docData.recipient || '확인 필요')}</td></tr><tr><th>발&nbsp;&nbsp;&nbsp;&nbsp;신</th><td colspan="3">${escapeHtml(docData.sender_company || docData.sender || '확인 필요')} · 대표 ${escapeHtml(docData.representative || '확인 필요')}</td></tr><tr class="sd-doc-subject"><th>제&nbsp;&nbsp;&nbsp;&nbsp;목</th><td colspan="3">${escapeHtml(docData.subject || '')}</td></tr></tbody></table>
+            <table class="sd-doc-meta"><tbody><tr><th>문서번호</th><td>${escapeHtml(docData.document_number || '확인 필요')}</td><th>발송일</th><td>${escapeHtml(docData.dispatch_date || docData.issue_date || docData.date || '확인 필요')}</td></tr><tr><th>수&nbsp;&nbsp;&nbsp;&nbsp;신</th><td colspan="3">${escapeHtml(docData.recipient || '확인 필요')}</td></tr><tr><th>발&nbsp;&nbsp;&nbsp;&nbsp;신</th><td colspan="3">${escapeHtml(docData.sender_company || docData.sender || '확인 필요')}</td></tr><tr class="sd-doc-subject"><th>제&nbsp;&nbsp;&nbsp;&nbsp;목</th><td colspan="3">${escapeHtml(docData.subject || '')}</td></tr></tbody></table>
             <section class="sd-doc-content">${body}${tables}${attachments}${docData.closing ? `<p class="sd-doc-closing">${escapeHtml(docData.closing)}</p>` : ''}</section>
             <div class="sd-doc-signature"><strong>${escapeHtml(docData.sender_company || docData.sender || '')} 대표 ${escapeHtml(docData.representative || '')}</strong>${seal}</div>
             <footer class="sd-doc-footer"><span>${escapeHtml(docData.company_address || '')}<br>담당 연락처 · ${escapeHtml(docData.contact || '확인 필요')}</span></footer></article>`;
@@ -426,7 +511,7 @@
             byId('companyId').value = item.id; byId('companyName').value = item.name; byId('companyRepresentative').value = item.representative; byId('companyBusinessNumber').value = item.business_number; byId('companyAddress').value = item.address; byId('companyPhone').value = item.phone; byId('companyEmail').value = item.email; byId('companyDocumentPrefix').value = item.document_prefix; byId('companyDefault').checked = item.is_default; byId('companyName').focus();
         } else if (button.dataset.editTemplate) {
             const item = find(workspaceState.templates, button.dataset.editTemplate); if (!item) return;
-            byId('templateId').value = item.id; byId('templateName').value = item.name; byId('templateInstruction').value = item.instruction; byId('templateGreeting').value = item.greeting; byId('templateClosing').value = item.closing; byId('templateDefault').checked = item.is_default; byId('templateName').focus();
+            byId('templateId').value = item.id; byId('templateName').value = item.name; byId('templateInstruction').value = item.instruction; byId('templateSubject').value = item.subject || ''; byId('templateRecipient').value = item.recipient || ''; byId('templateGreeting').value = item.greeting; byId('templateClosing').value = item.closing; byId('templateGreetingEnabled').checked = item.greeting_enabled; byId('templateClosingEnabled').checked = item.closing_enabled; setTemplateItems(item.items); byId('templateDefault').checked = item.is_default; byId('templateName').focus();
         } else if (button.dataset.editRecipient) {
             const item = find(workspaceState.recipients, button.dataset.editRecipient); if (!item) return;
             byId('recipientId').value = item.id; byId('recipientOrganization').value = item.organization; byId('recipientName').value = item.name; byId('recipientEmail').value = item.email; byId('recipientMemo').value = item.memo; byId('recipientOrganization').focus();
@@ -469,6 +554,7 @@
     byId('companyForm').addEventListener('submit', saveCompany); byId('templateForm').addEventListener('submit', saveTemplate); byId('recipientForm').addEventListener('submit', saveRecipient);
     byId('resetCompanyForm').addEventListener('click', resetCompanyForm); byId('resetTemplateForm').addEventListener('click', resetTemplateForm); byId('resetRecipientForm').addEventListener('click', resetRecipientForm);
     byId('companyList').addEventListener('click', handleManagementAction); byId('templateList').addEventListener('click', handleManagementAction); byId('recipientList').addEventListener('click', handleManagementAction); byId('historyList').addEventListener('click', handleManagementAction);
+    byId('templateItems').addEventListener('change', (event) => { const row = event.target.closest('.sd-template-item-row'); if (row && event.target.classList.contains('sd-template-item-enabled')) enforceTemplateItemOrder(row); });
     byId('editDocumentButton').addEventListener('click', openEditDocument); byId('closeEditDocument').addEventListener('click', closeEditDocument); byId('cancelEditDocument').addEventListener('click', closeEditDocument); byId('saveEditedDocument').addEventListener('click', saveEditedDocument);
     byId('pdfDocumentButton').addEventListener('click', downloadDocumentPdf);
     byId('emailDocumentButton').addEventListener('click', openEmailDocument); byId('closeEmailDocument').addEventListener('click', closeEmailDocument); byId('cancelEmailDocument').addEventListener('click', closeEmailDocument); byId('emailSavedRecipient').addEventListener('change', applySavedRecipient); byId('sendDocumentEmail').addEventListener('click', sendDocumentEmail);
@@ -478,5 +564,5 @@
         await loadWorkspace();
     }
 
-    syncCounter(); setWorkflow('request'); initializeSmartDocument();
+    renderTemplateItemRows(); syncCounter(); setWorkflow('request'); initializeSmartDocument();
 })();
