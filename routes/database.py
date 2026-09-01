@@ -1314,6 +1314,7 @@ def init_db():
         "ALTER TABLE school_posts ADD COLUMN team_reviewer TEXT DEFAULT ''",
         "ALTER TABLE school_posts ADD COLUMN team_reviewed_at DATETIME",
         "ALTER TABLE school_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE school_tasks ADD COLUMN custom_school_name TEXT",
         "ALTER TABLE gall2 ADD COLUMN post_id INTEGER",
         "ALTER TABLE usage_logs ADD COLUMN session_id TEXT",
         "ALTER TABLE usage_user_totals ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0",

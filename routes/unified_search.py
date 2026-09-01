@@ -320,11 +320,18 @@ def _search_school(conn, like, access):
     if access.get("school_tasks", False) and _table_exists(conn, "school_tasks") and len(output) < PER_SOURCE_LIMIT:
         tasks = conn.execute(
             """
-            SELECT t.*, s.school_name, s.access_key FROM school_tasks t JOIN schools s ON s.id=t.school_id
-            WHERE t.title LIKE ? ESCAPE '\\' OR t.note LIKE ? ESCAPE '\\' OR t.owner LIKE ? ESCAPE '\\'
+            SELECT t.*,
+                   COALESCE(NULLIF(t.custom_school_name, ''), s.school_name, '미지정') AS school_name,
+                   s.access_key
+            FROM school_tasks t
+            LEFT JOIN schools s ON s.id=t.school_id
+            WHERE t.title LIKE ? ESCAPE '\\'
+               OR t.note LIKE ? ESCAPE '\\'
+               OR t.owner LIKE ? ESCAPE '\\'
+               OR t.custom_school_name LIKE ? ESCAPE '\\'
             ORDER BY t.start_date DESC, t.id DESC LIMIT 40
             """,
-            (like, like, like),
+            (like, like, like, like),
         ).fetchall()
         for row in tasks:
             if not can_access_school(conn, row["school_id"]):

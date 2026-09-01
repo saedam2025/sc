@@ -16,6 +16,7 @@ import json
 import secrets
 import sqlite3
 import urllib.parse
+import holidays as holiday_calendar
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import quote, unquote
@@ -64,6 +65,64 @@ REFERENCE_POST_MAX_TOTAL_SIZE = POST_MAX_FILES * REFERENCE_POST_MAX_FILE_SIZE
 WEBLINK_FILE_MAX_SIZE = 5 * 1024 * 1024
 FILENAME_ENCODING_PREFIX = '~e~'
 INLINE_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'}
+
+SOLAR_TERM_NAMES = (
+    '소한', '대한', '입춘', '우수', '경칩', '춘분',
+    '청명', '곡우', '입하', '소만', '망종', '하지',
+    '소서', '대서', '입추', '처서', '백로', '추분',
+    '한로', '상강', '입동', '소설', '대설', '동지',
+)
+# 한국천문연구원 월력요항의 한국표준시 기준 날짜.
+SOLAR_TERM_DATES = {
+    2024: (
+        '01-06', '01-20', '02-04', '02-19', '03-05', '03-20',
+        '04-04', '04-19', '05-05', '05-20', '06-05', '06-21',
+        '07-06', '07-22', '08-07', '08-22', '09-07', '09-22',
+        '10-08', '10-23', '11-07', '11-22', '12-07', '12-21',
+    ),
+    2025: (
+        '01-05', '01-20', '02-03', '02-18', '03-05', '03-20',
+        '04-04', '04-20', '05-05', '05-21', '06-05', '06-21',
+        '07-07', '07-22', '08-07', '08-23', '09-07', '09-23',
+        '10-08', '10-23', '11-07', '11-22', '12-07', '12-22',
+    ),
+    2026: (
+        '01-05', '01-20', '02-04', '02-19', '03-05', '03-20',
+        '04-05', '04-20', '05-05', '05-21', '06-06', '06-21',
+        '07-07', '07-23', '08-07', '08-23', '09-07', '09-23',
+        '10-08', '10-23', '11-07', '11-22', '12-07', '12-22',
+    ),
+    2027: (
+        '01-05', '01-20', '02-04', '02-19', '03-06', '03-21',
+        '04-05', '04-20', '05-06', '05-21', '06-06', '06-21',
+        '07-07', '07-23', '08-08', '08-23', '09-08', '09-23',
+        '10-08', '10-24', '11-08', '11-22', '12-07', '12-22',
+    ),
+    2028: (
+        '01-06', '01-20', '02-04', '02-19', '03-05', '03-20',
+        '04-04', '04-19', '05-05', '05-20', '06-05', '06-21',
+        '07-06', '07-22', '08-07', '08-22', '09-07', '09-22',
+        '10-08', '10-23', '11-07', '11-22', '12-06', '12-21',
+    ),
+}
+
+
+def build_school_calendar_annotations(years=None):
+    """전사 달력에 표시할 한국 공휴일과 24절기 명칭을 만든다."""
+    target_years = sorted(set(years or SOLAR_TERM_DATES.keys()))
+    public_holidays = {}
+    for holiday_date, name in holiday_calendar.KR(
+        years=target_years,
+        language='ko',
+    ).items():
+        public_holidays[holiday_date.isoformat()] = str(name).replace('; ', ' · ')
+
+    solar_terms = {}
+    for year in target_years:
+        dates = SOLAR_TERM_DATES.get(year, ())
+        for name, month_day in zip(SOLAR_TERM_NAMES, dates):
+            solar_terms[f'{year}-{month_day}'] = name
+    return public_holidays, solar_terms
 
 def can_access_school_category(category, max_levels=None):
     category_id = SCHOOL_CATEGORY_ALIASES.get(str(category or '').strip(), str(category or '').strip())
@@ -151,6 +210,31 @@ def can_access_school(conn, school_id):
     if not school_director_scope_enabled(conn):
         return True
     return False
+
+
+def get_assigned_school(conn, emp_no=None):
+    """현재 회원에게 지정된 활성 학교를 반환한다."""
+    employee_number = str(emp_no or session.get('emp_no') or '').strip()
+    if not employee_number:
+        return None
+    return conn.execute(
+        """
+        SELECT id, school_name
+        FROM schools
+        WHERE ? IN (center_director_id, center_director_id_2)
+          AND COALESCE(is_active, 1) = 1
+        ORDER BY COALESCE(year, 0) DESC, id DESC
+        LIMIT 1
+        """,
+        (employee_number,),
+    ).fetchone()
+
+
+def can_access_school_task(conn, school_id):
+    """학교 일정과 관리자가 만든 비학교 일정의 접근 권한을 판정한다."""
+    if str(school_id) == '0':
+        return can_manage_schools()
+    return can_access_school(conn, school_id)
 
 
 def can_access_post(conn, school_id, category, post=None):
@@ -421,9 +505,13 @@ def init_school_comment_table(conn):
             end_time TEXT,
             note TEXT,
             owner TEXT,
+            custom_school_name TEXT,
             created_at TEXT DEFAULT (datetime('now', 'localtime'))
         )
     """)
+    task_columns = [row[1] for row in conn.execute("PRAGMA table_info(school_tasks)").fetchall()]
+    if 'custom_school_name' not in task_columns:
+        conn.execute("ALTER TABLE school_tasks ADD COLUMN custom_school_name TEXT")
 
     # 센터장 업무공간의 Web / File Link는 메인 화면 링크와 데이터 및
     # 사용자별 정렬 상태를 완전히 분리해서 관리한다.
@@ -1287,8 +1375,9 @@ def serve_school_file(stored_name):
 # 🚀 [신규 API] 학교 전용 일정을 저장하는 완전히 분리된 라우터
 @school_bp.route('/save_task', methods=['POST'])
 def save_school_task():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     school_id = data.get('school_id')
+    school_name = str(data.get('school_name') or '').strip()
     title = data.get('title')
     start_date = data.get('start_date')
     end_date = data.get('end_date')
@@ -1296,13 +1385,52 @@ def save_school_task():
     end_time = data.get('end_time')
     note = data.get('note')
     owner = session.get('user_name')
-
-    if not title or not start_date or not school_id:
-        return jsonify({'ok': False, 'message': '필수 값이 누락되었습니다.'}), 400
+    custom_school_name = None
 
     conn = get_db()
     init_school_comment_table(conn)
-    if not can_access_school(conn, school_id):
+    assigned_school = get_assigned_school(conn)
+    if assigned_school is not None and not can_manage_schools():
+        # 센터장 전용 화면에서는 클라이언트가 보낸 학교값과 관계없이
+        # 서버에 지정된 담당 학교로만 일정을 등록한다.
+        school_id = assigned_school['id']
+    elif school_name:
+        # 센터장이 아닌 사용자는 셀렉트 박스 대신 입력한 학교명을
+        # 활성 학교 기본정보와 대조하여 실제 학교 ID로 연결한다.
+        typed_school = conn.execute(
+            """
+            SELECT id
+            FROM schools
+            WHERE TRIM(school_name) = ?
+              AND COALESCE(is_active, 1) = 1
+            ORDER BY COALESCE(year, 0) DESC, id DESC
+            LIMIT 1
+            """,
+            (school_name,),
+        ).fetchone()
+        if typed_school is not None:
+            school_id = typed_school['id']
+        elif can_manage_schools():
+            # 관리자는 학교뿐 아니라 본사 행사·회의 등 임의 명칭도
+            # 전사 달력에 등록할 수 있다. 0은 특정 학교에 속하지 않음을 뜻한다.
+            school_id = 0
+            custom_school_name = school_name
+        else:
+            conn.close()
+            return jsonify({
+                'ok': False,
+                'message': '등록된 학교명을 정확히 입력해주세요.'
+            }), 400
+
+    if not title or not start_date or school_id is None or school_id == '':
+        conn.close()
+        return jsonify({'ok': False, 'message': '필수 값이 누락되었습니다.'}), 400
+
+    if custom_school_name is not None:
+        has_school_access = can_manage_schools()
+    else:
+        has_school_access = can_access_school(conn, school_id)
+    if not has_school_access:
         conn.close()
         return jsonify({
             'ok': False,
@@ -1310,9 +1438,15 @@ def save_school_task():
         }), 403
     try:
         conn.execute('''
-            INSERT INTO school_tasks (school_id, title, start_date, start_time, end_date, end_time, note, owner)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (school_id, title, start_date, start_time, end_date, end_time, note, owner))
+            INSERT INTO school_tasks (
+                school_id, title, start_date, start_time, end_date, end_time,
+                note, owner, custom_school_name
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            school_id, title, start_date, start_time, end_date, end_time,
+            note, owner, custom_school_name
+        ))
         conn.commit()
         return jsonify({'ok': True})
     except Exception as e:
@@ -1972,7 +2106,7 @@ def edit_task(task_id):
     # 본인이 등록한 일정이거나, 센터장보다 높은 권한(7 이하)인 경우에만 수정 가능
     if (
         not task
-        or not can_access_school(conn, task['school_id'])
+        or not can_access_school_task(conn, task['school_id'])
         or (task['owner'] != user_name and user_level > 7)
     ):
         conn.close()
@@ -2001,7 +2135,7 @@ def delete_task(task_id):
     
     if (
         not task
-        or not can_access_school(conn, task['school_id'])
+        or not can_access_school_task(conn, task['school_id'])
         or (task['owner'] != user_name and user_level > 7)
     ):
         conn.close()
@@ -2025,9 +2159,10 @@ def full_calendar():
     user_name = session.get('user_name')
     
     query = """
-        SELECT t.*, s.school_name 
+        SELECT t.*,
+               COALESCE(NULLIF(t.custom_school_name, ''), s.school_name, '미지정') AS school_name
         FROM school_tasks t
-        JOIN schools s ON t.school_id = s.id
+        LEFT JOIN schools s ON t.school_id = s.id
     """
     params = []
     
@@ -2040,7 +2175,20 @@ def full_calendar():
     query += " ORDER BY t.start_date ASC, t.start_time ASC"
     
     tasks_db = conn.execute(query, params).fetchall()
+    assigned_school_row = get_assigned_school(conn)
+    assigned_school = (
+        dict(assigned_school_row)
+        if assigned_school_row is not None and not can_manage_schools()
+        else None
+    )
+    public_holidays, solar_terms = build_school_calendar_annotations()
     conn.close()
     
     all_tasks = [dict(t) for t in tasks_db]
-    return render_template('school_calendar.html', all_tasks=all_tasks)
+    return render_template(
+        'school_calendar.html',
+        all_tasks=all_tasks,
+        assigned_school=assigned_school,
+        public_holidays=public_holidays,
+        solar_terms=solar_terms,
+    )
