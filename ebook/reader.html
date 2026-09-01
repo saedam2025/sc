@@ -1,0 +1,294 @@
+{% extends 'ebook/public_base.html' %}
+{% block title %}{{ book.title }}{% endblock %}
+{% block body_class %}leaflet-reader-body{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+
+<style>
+/* =========================================================
+   PC e리플렛 뷰어
+   - 서로 다른 가로/세로 비율의 2페이지를 같은 높이로 정렬
+   - 원본 비율 유지(찌그러짐/잘림 없음)
+   - 페이지 번호 원형 배지 정상화
+   ========================================================= */
+@media (min-width: 769px) {
+  .leaflet-reader {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .leaflet-reader-stage {
+    width: 100% !important;
+    padding: 6px 18px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .leaflet-book {
+    width: min(96vw, 1800px) !important;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 auto !important;
+  }
+
+  .leaflet-spread {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+
+  .leaflet-sheet {
+    flex: none !important;
+    width: auto;
+    height: auto;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+  }
+
+  .leaflet-sheet img {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    object-fit: contain !important;
+    object-position: top center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 기존 left/right 위치 규칙이 동시에 적용되어 길게 늘어나는 현상 방지 */
+  .leaflet-sheet figcaption {
+    position: absolute !important;
+    inset: auto !important;
+    bottom: 10px !important;
+    width: 24px !important;
+    min-width: 24px !important;
+    max-width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    border-radius: 50% !important;
+    z-index: 3 !important;
+  }
+
+  .leaflet-sheet.left figcaption,
+  .leaflet-sheet.single figcaption {
+    left: 10px !important;
+    right: auto !important;
+  }
+
+  .leaflet-sheet.right figcaption {
+    left: auto !important;
+    right: 10px !important;
+  }
+}
+</style>
+
+<main class="leaflet-reader" id="leafletReader">
+  <header class="leaflet-reader-header">
+    {% if can_manage %}
+    <a class="leaflet-reader-back" href="{{ url_for('ebook.library') }}" aria-label="리플렛 서재로"><i class="fa-solid fa-chevron-left"></i><span>서재</span></a>
+    {% else %}
+    <a class="leaflet-reader-back" href="#" id="closeReader" aria-label="리플렛 닫기"><i class="fa-solid fa-xmark"></i><span>닫기</span></a>
+    {% endif %}
+
+    <div class="leaflet-reader-title"><span>e리플렛</span><h1>{{ book.title }}</h1></div>
+
+    <div class="leaflet-reader-head-actions">
+      {% if can_manage %}
+      <a href="{{ url_for('ebook.edit_book', ebook_id=book.id) }}" title="리플렛 수정"><i class="fa-solid fa-pen"></i><span>수정</span></a>
+      <button type="button" id="copyShare" data-copy-url="{{ public_url }}" title="공유 링크 복사"><i class="fa-solid fa-arrow-up-from-bracket"></i><span>공유</span></button>
+      {% endif %}
+      <button type="button" id="fullscreenToggle" title="전체화면"><i class="fa-solid fa-expand"></i><span>전체화면</span></button>
+    </div>
+  </header>
+
+  <section class="leaflet-reader-stage" id="readerStage" aria-label="{{ book.title }} e리플렛">
+    <div class="leaflet-reader-glow" aria-hidden="true"></div>
+    <button class="leaflet-turn-control prev" id="prevPage" type="button" aria-label="이전 페이지"><i class="fa-solid fa-chevron-left"></i></button>
+    <div class="leaflet-book" id="leafletBook" aria-live="polite"></div>
+    <button class="leaflet-turn-control next" id="nextPage" type="button" aria-label="다음 페이지"><i class="fa-solid fa-chevron-right"></i></button>
+  </section>
+
+  <footer class="leaflet-reader-controls">
+    <button type="button" id="footerPrev"><i class="fa-solid fa-chevron-left"></i><span>이전</span></button>
+    <div class="leaflet-reader-progress-wrap">
+      <input id="pageRange" type="range" min="1" max="{{ pages|length or 1 }}" value="1" aria-label="페이지 이동">
+      <div class="leaflet-reader-progress"><span id="progressBar"></span></div>
+    </div>
+    <div class="leaflet-page-status"><strong id="currentPage">1</strong><span>/</span><span>{{ pages|length }}</span></div>
+    <button type="button" id="footerNext"><span>다음</span><i class="fa-solid fa-chevron-right"></i></button>
+  </footer>
+</main>
+<div class="leaflet-toast" id="leafletToast" role="status" aria-live="polite"></div>
+<script id="leafletPageData" type="application/json">[
+{% for page in pages %}{{ {'number': page.page_no, 'url': url_for('ebook.serve_page_image', ebook_id=book.id, page_id=page.id), 'name': page.image_filename}|tojson }}{% if not loop.last %},{% endif %}{% endfor %}
+]</script>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const pages = JSON.parse(document.getElementById('leafletPageData').textContent || '[]');
+  const reader = document.getElementById('leafletReader'), stage = document.getElementById('readerStage');
+  const book = document.getElementById('leafletBook'), range = document.getElementById('pageRange');
+  const current = document.getElementById('currentPage'), progress = document.getElementById('progressBar');
+  const desktop = matchMedia('(min-width: 769px)');
+  let start = 0, touchStartX = null, locked = false;
+
+  function spreadSize() { return desktop.matches ? 2 : 1; }
+  function normalizedStart(value) {
+    const step = spreadSize(), maximum = Math.max(0, pages.length - 1);
+    value = Math.max(0, Math.min(value, maximum));
+    return step === 2 ? Math.floor(value / 2) * 2 : value;
+  }
+  function makePage(page, side) {
+    const figure = document.createElement('figure');
+    figure.className = `leaflet-sheet ${side}`;
+    const img = document.createElement('img'); img.src = page.url; img.alt = `${page.number}페이지 ${page.name || ''}`; img.draggable = false;
+    const label = document.createElement('figcaption'); label.textContent = page.number;
+    figure.append(img, label); return figure;
+  }
+
+  function fitDesktopSpread(spread) {
+    if (!desktop.matches || !spread) return;
+
+    const sheets = [...spread.querySelectorAll('.leaflet-sheet')];
+    const images = sheets.map(sheet => sheet.querySelector('img')).filter(Boolean);
+    if (!images.length) return;
+
+    const applyFit = () => {
+      if (images.some(img => !img.naturalWidth || !img.naturalHeight)) return;
+
+      const header = reader.querySelector('.leaflet-reader-header');
+      const controls = reader.querySelector('.leaflet-reader-controls');
+
+      const headerH = header ? header.offsetHeight : 0;
+      const controlsH = controls ? controls.offsetHeight : 0;
+
+      /* 화면에서 제목/하단조작부를 제외한 실제 사용 가능 높이 */
+      const maxHeight = Math.max(320, window.innerHeight - headerH - controlsH - 24);
+
+      /* 좌우 여백을 조금만 남기고 최대한 넓게 사용 */
+      const maxWidth = Math.max(600, Math.min(stage.clientWidth - 36, 1800));
+
+      const ratios = images.map(img => img.naturalWidth / img.naturalHeight);
+      const ratioSum = ratios.reduce((sum, ratio) => sum + ratio, 0);
+
+      /* 두 페이지가 같은 높이가 되도록 공통 높이를 계산 */
+      const commonHeight = Math.floor(Math.min(maxHeight, maxWidth / ratioSum));
+
+      sheets.forEach((sheet, index) => {
+        const width = Math.floor(commonHeight * ratios[index]);
+        sheet.style.width = `${width}px`;
+        sheet.style.height = `${commonHeight}px`;
+      });
+
+      spread.style.height = `${commonHeight}px`;
+      book.style.height = `${commonHeight}px`;
+    };
+
+    images.forEach(img => {
+      if (!img.complete) img.addEventListener('load', applyFit, { once: true });
+    });
+    applyFit();
+  }
+
+  function render(next, direction = 0, animate = true) {
+    if (!pages.length || locked) return;
+    start = normalizedStart(next); locked = animate;
+    const oldSheets = [...book.children];
+    const incoming = document.createElement('div'); incoming.className = 'leaflet-spread';
+    incoming.appendChild(makePage(pages[start], desktop.matches ? 'left' : 'single'));
+    if (desktop.matches && pages[start + 1]) incoming.appendChild(makePage(pages[start + 1], 'right'));
+    if (animate && direction) incoming.classList.add(direction > 0 ? 'turning-next' : 'turning-prev');
+    book.replaceChildren(incoming);
+    fitDesktopSpread(incoming);
+    if (oldSheets.length) oldSheets.forEach(node => node.remove());
+    const shownEnd = Math.min(start + spreadSize(), pages.length);
+    current.textContent = desktop.matches && shownEnd > start + 1 ? `${start + 1}–${shownEnd}` : String(start + 1);
+    range.value = start + 1;
+    progress.style.width = `${shownEnd / pages.length * 100}%`;
+    const atStart = start === 0, atEnd = shownEnd >= pages.length;
+    [document.getElementById('prevPage'),document.getElementById('footerPrev')].forEach(button => button.disabled = atStart);
+    [document.getElementById('nextPage'),document.getElementById('footerNext')].forEach(button => button.disabled = atEnd);
+    setTimeout(() => locked = false, animate && direction ? 520 : 0);
+  }
+  function move(direction) { render(start + direction * spreadSize(), direction, true); }
+  document.getElementById('prevPage').onclick = document.getElementById('footerPrev').onclick = () => move(-1);
+  document.getElementById('nextPage').onclick = document.getElementById('footerNext').onclick = () => move(1);
+  range.oninput = () => render(+range.value - 1, (+range.value - 1) >= start ? 1 : -1, false);
+  document.addEventListener('keydown', event => {
+    if (event.target.matches('input,button,a,textarea,select')) return;
+    if (event.key === 'ArrowLeft') move(-1);
+    if (event.key === 'ArrowRight' || event.key === ' ') { event.preventDefault(); move(1); }
+  });
+  stage.addEventListener('touchstart', event => touchStartX = event.changedTouches[0].clientX, {passive:true});
+  stage.addEventListener('touchend', event => {
+    if (touchStartX === null) return;
+    const delta = event.changedTouches[0].clientX - touchStartX; touchStartX = null;
+    if (Math.abs(delta) > 45) move(delta < 0 ? 1 : -1);
+  }, {passive:true});
+  desktop.addEventListener('change', () => render(start, 0, false));
+  window.addEventListener('resize', () => {
+    if (!desktop.matches) return;
+    fitDesktopSpread(book.querySelector('.leaflet-spread'));
+  });
+
+  const toast = document.getElementById('leafletToast'); let toastTimer;
+  function notify(message) { clearTimeout(toastTimer); toast.textContent=message;toast.classList.add('show');toastTimer=setTimeout(()=>toast.classList.remove('show'),1900); }
+
+  const copyShare = document.getElementById('copyShare');
+  if (copyShare) {
+    copyShare.onclick = async function() {
+      try { await navigator.clipboard.writeText(this.dataset.copyUrl); }
+      catch (_) { const area=document.createElement('textarea');area.value=this.dataset.copyUrl;document.body.appendChild(area);area.select();document.execCommand('copy');area.remove(); }
+      notify('공유 링크를 복사했습니다.');
+    };
+  }
+
+  const closeReader = document.getElementById('closeReader');
+  if (closeReader) {
+    closeReader.onclick = (event) => {
+      event.preventDefault();
+
+      /* 새 창/팝업으로 열린 경우에는 실제 창 닫기 */
+      if (window.opener) {
+        window.close();
+        return;
+      }
+
+      /* 문자·카카오톡 등의 링크로 브라우저가 열린 경우 이전 화면으로 */
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
+
+      /* 브라우저 정책상 직접 열린 탭은 window.close()가 제한될 수 있음 */
+      window.close();
+    };
+  }
+
+  document.getElementById('fullscreenToggle').onclick = () => document.fullscreenElement ? document.exitFullscreen() : reader.requestFullscreen();
+  document.addEventListener('fullscreenchange', () => document.getElementById('fullscreenToggle').innerHTML = document.fullscreenElement ? '<i class="fa-solid fa-compress"></i><span>나가기</span>' : '<i class="fa-solid fa-expand"></i><span>전체화면</span>');
+  render(0, 0, false);
+})();
+</script>
+{% endblock %}
