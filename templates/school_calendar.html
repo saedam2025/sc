@@ -13,6 +13,8 @@
         --cal-gray: var(--text-gray, #64748b);
         --cal-card-bg: var(--card-bg, #ffffff);
         --cal-input-bg: var(--input-bg, #ffffff);
+        --cal-accent: #0ea5e9;
+        --cal-purple: #7c3aed;
     }
 
     /* 1) 캘린더 컨테이너 테마 적용 및 유리효과 X */
@@ -26,22 +28,59 @@
         border-radius: 20px; 
         box-shadow: var(--card-shadow, 0 4px 20px rgba(0,0,0,0.03)); 
         font-family: 'Pretendard', sans-serif; box-sizing: border-box;
-        position: relative; z-index: 2;
+        position: relative; z-index: 2; overflow: hidden;
     }
-    
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    
+    .calendar-container::before {
+        content: ''; position: absolute; width: 360px; height: 360px; right: -170px; top: -190px;
+        border-radius: 50%; background: radial-gradient(circle, rgba(14,165,233,.14), rgba(14,165,233,0) 68%);
+        pointer-events: none;
+    }
+    .calendar-container > * { position: relative; z-index: 1; }
+
+    .page-header {
+        display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 20px;
+        padding: 20px 22px; border: 1px solid rgba(59,130,246,.16); border-radius: 18px;
+        background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(14,165,233,.055) 58%, rgba(124,58,237,.06));
+        overflow: hidden; box-sizing: border-box;
+    }
+    .calendar-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+    .calendar-brand-icon {
+        width: 52px; height: 52px; flex: 0 0 52px; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.45rem;
+        background: linear-gradient(145deg, var(--cal-blue), var(--cal-accent));
+        box-shadow: 0 10px 22px rgba(0,78,162,.22), inset 0 1px 0 rgba(255,255,255,.3);
+    }
+    .calendar-brand-copy { min-width: 0; }
+    .calendar-eyebrow { color: var(--cal-blue); font-size: .7rem; font-weight: 800; letter-spacing: .14em; margin-bottom: 3px; }
+    .calendar-brand h1 { margin: 0; color: var(--cal-text); font-size: 1.65rem; line-height: 1.2; }
+    .calendar-subtitle { margin-top: 5px; color: var(--cal-gray); font-size: .82rem; }
+    .calendar-back-btn {
+        display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 10px 15px;
+        border-radius: 11px; border: 1px solid rgba(0,78,162,.22); background: var(--cal-input-bg);
+        color: var(--cal-blue); font-weight: 750; cursor: pointer; box-shadow: 0 5px 14px rgba(15,23,42,.06);
+        transition: transform .2s, box-shadow .2s, border-color .2s;
+    }
+    .calendar-back-btn:hover { transform: translateY(-1px); border-color: var(--cal-blue); box-shadow: 0 8px 18px rgba(0,78,162,.12); }
+
     /* 2) 달력 상단 여백 추가 */
-    .calendar-layout { display: flex; gap: 25px; align-items: flex-start; margin-top: 20px; }
+    .calendar-layout { display: flex; gap: 20px; align-items: flex-start; margin-top: 0; }
     
-    .big-cal-section { flex: 7; background: var(--cal-input-bg); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--cal-border); min-width: 0; }
-    .cal-header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .cal-nav-btn { background: var(--cal-soft); border: 1px solid var(--cal-border); padding: 8px 16px; border-radius: 8px; cursor: pointer; color: var(--cal-gray); font-weight: bold; transition: 0.2s; }
-    .cal-nav-btn:hover { background: var(--cal-blue-light); color: var(--cal-blue); border-color: var(--cal-blue); }
-    .cal-month-title { font-size: 1.8em; font-weight: 800; color: var(--cal-text); }
+    .big-cal-section {
+        flex: 7; background: var(--cal-input-bg); border-radius: 20px; padding: 22px;
+        box-shadow: 0 12px 30px rgba(15,23,42,.055); border: 1px solid var(--cal-border); min-width: 0;
+    }
+    .cal-header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 17px; }
+    .cal-nav-btn {
+        display: inline-flex; align-items: center; gap: 7px; background: var(--cal-soft); border: 1px solid var(--cal-border);
+        padding: 9px 13px; border-radius: 11px; cursor: pointer; color: var(--cal-gray); font-weight: 700; transition: .2s;
+    }
+    .cal-nav-btn:hover { background: var(--cal-blue-light); color: var(--cal-blue); border-color: var(--cal-blue); transform: translateY(-1px); }
+    .cal-month-heading { text-align: center; }
+    .cal-month-kicker { color: var(--cal-blue); font-size: .66rem; font-weight: 800; letter-spacing: .13em; margin-bottom: 2px; }
+    .cal-month-title { font-size: 1.75em; font-weight: 850; color: var(--cal-text); line-height: 1.15; }
     
     .side-nav-btn {
-        width: 100%; background: var(--cal-soft); border: 1px solid var(--cal-border); border-radius: 12px;
+        width: 100%; background: var(--cal-soft); border: 1px solid var(--cal-border); border-radius: 13px;
         color: var(--cal-gray); font-size: 1.4rem; cursor: pointer; transition: all 0.2s;
         display: flex; align-items: center; justify-content: center;
     }
@@ -51,10 +90,11 @@
     }
     .side-nav-btn-today:hover { background: var(--cal-blue-light); color: var(--cal-navy); border-color: var(--cal-navy); }
 
+    .calendar-table-frame { flex-grow: 1; overflow: hidden; border-radius: 15px; border: 1px solid var(--cal-border); box-sizing: border-box; min-width: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
     .big-cal-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0; }
-    .big-cal-table th { background: rgba(0,0,0,0.02); padding: 12px 0; border-bottom: 1px solid var(--cal-border); border-right: 1px solid var(--cal-border); font-weight: 700; text-align: center; font-size: 0.95rem; color: var(--cal-gray); }
+    .big-cal-table th { background: linear-gradient(180deg, rgba(59,130,246,.075), rgba(59,130,246,.025)); padding: 12px 0; border-bottom: 1px solid var(--cal-border); border-right: 1px solid var(--cal-border); font-weight: 750; text-align: center; font-size: 0.85rem; color: var(--cal-gray); letter-spacing: .06em; }
     .big-cal-table th:last-child { border-right: none; }
-    .color-holiday { color: #ef4444 !important; }
+    .color-holiday { color: #dc2626 !important; }
     
     .week-cell { padding: 0 !important; border-bottom: 1px solid var(--cal-border); }
     .week-container { position: relative; height: 220px; display: flex; flex-direction: column; }
@@ -62,10 +102,14 @@
     .week-bg { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     .day-col { flex: 1; border-right: 1px solid var(--cal-border); padding: 8px 5px; cursor: pointer; transition: background 0.2s; box-sizing: border-box; }
     .day-col:last-child { border-right: none; }
-    .day-col:hover { background: rgba(0,0,0,0.02); }
+    .day-col:hover { background: rgba(59,130,246,.045); }
     .day-col.other-month { background: rgba(0,0,0,0.05); opacity: 0.6; }
     .day-col.td-today { background: var(--cal-blue-light); }
-    .cal-date-num { font-weight: bold; color: var(--cal-text); margin-bottom: 8px; display: inline-block; padding: 0 5px; }
+    .cal-date-head { display: flex; align-items: center; gap: 5px; min-width: 0; height: 26px; }
+    .cal-date-num { flex: 0 0 auto; font-weight: bold; color: var(--cal-text); display: inline-block; padding: 0 5px; }
+    .cal-day-labels { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 0.72rem; font-weight: 400; }
+    .cal-holiday-name { color: #dc2626; overflow: hidden; text-overflow: ellipsis; }
+    .cal-solar-term-name { color: #b45309; flex: 0 0 auto; }
     .td-today .cal-date-num { background: var(--cal-blue); color: white; border-radius: 50%; width: 26px; height: 26px; text-align: center; line-height: 26px; padding: 0; }
     
     .week-events-scroll { 
@@ -86,12 +130,19 @@
         border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid var(--task-color);
     }
 
-    .weekly-section { flex: 3; background: var(--cal-input-bg); border-radius: 20px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid var(--cal-border); min-width: 320px; }
-    .weekly-title { font-size: 1.3em; font-weight: 800; color: var(--cal-text); margin-bottom: 15px; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; }
-    .weekly-list { max-height: 700px; overflow-y: auto; padding-right: 5px; }
+    .weekly-section { flex: 3; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; background: var(--cal-input-bg); border-radius: 20px; padding: 22px; box-shadow: 0 12px 30px rgba(15,23,42,.055); border: 1px solid var(--cal-border); min-width: 320px; }
+    .weekly-heading { display: flex; align-items: center; gap: 11px; padding-bottom: 14px; margin-bottom: 13px; border-bottom: 1px solid var(--cal-border); }
+    .weekly-heading-icon { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(145deg, var(--cal-purple), #a855f7); box-shadow: 0 7px 16px rgba(124,58,237,.2); }
+    .weekly-title { font-size: 1.08rem; font-weight: 800; color: var(--cal-text); line-height: 1.2; }
+    .weekly-subtitle { margin-top: 3px; color: var(--cal-gray); font-size: .72rem; }
+    .week-range-control { display: flex; justify-content: space-between; align-items: center; gap: 5px; margin-bottom: 15px; background: var(--cal-soft); padding: 6px; border: 1px solid var(--cal-border); border-radius: 11px; }
+    .week-range-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border-radius: 8px; background: var(--cal-input-bg); border: 1px solid var(--cal-border); color: var(--cal-gray); cursor: pointer; font-size: .76rem; }
+    .week-range-btn:hover { color: var(--cal-blue); border-color: var(--cal-blue); }
+    #weeklyDateRange { color: var(--cal-text); font-size: .78rem; font-weight: 700; text-align: center; flex-grow: 1; }
+    .weekly-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 5px; }
 
     .clean-weekly-card {
-        margin-bottom: 10px; padding: 14px 16px; background: var(--cal-soft); border-radius: 10px; 
+        margin-bottom: 10px; padding: 14px 16px; background: var(--cal-soft); border-radius: 13px; 
         border: 1px solid var(--cal-border); box-shadow: 0 2px 6px rgba(0,0,0,0.02);
         transition: 0.2s;
     }
@@ -107,6 +158,10 @@
     .cwc-time i { margin-right: 4px; color: var(--cal-gray); }
     .cwc-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; padding: 7px 9px; border-radius: 6px; background: rgba(0,0,0,0.035); color: var(--cal-gray); font-size: 0.8rem; font-weight: 500; line-height: 1.45; word-break: break-word; }
     .cwc-note i { margin-top: 3px; flex: 0 0 auto; color: var(--cal-gray); }
+    .calendar-empty { text-align: center; padding: 42px 12px; color: var(--cal-gray); }
+    .calendar-empty-icon { width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: var(--cal-blue); background: var(--cal-blue-light); border: 1px solid rgba(59,130,246,.14); }
+    .calendar-empty strong { display: block; color: var(--cal-text); font-size: .88rem; margin-bottom: 4px; }
+    .calendar-empty span { font-size: .76rem; }
     
     /* 버튼 테마 적용 */
     .btn-primary { background: var(--cal-blue); border-color: var(--cal-blue); color: #ffffff; }
@@ -136,25 +191,56 @@
         outline: none;
         border-color: var(--cal-blue);
     }
+
+    @media (max-width: 1100px) {
+        .calendar-layout { flex-direction: column; }
+        .big-cal-section, .weekly-section { width: 100%; box-sizing: border-box; }
+        .weekly-section { min-width: 0; height: auto !important; overflow: visible; }
+        .weekly-list { max-height: 700px; }
+    }
+    @media (max-width: 700px) {
+        .calendar-container { padding: 13px; border-radius: 15px; }
+        .page-header { align-items: flex-start; padding: 16px; }
+        .calendar-brand-icon { width: 44px; height: 44px; flex-basis: 44px; border-radius: 13px; }
+        .calendar-brand h1 { font-size: 1.25rem; }
+        .calendar-subtitle, .calendar-eyebrow { display: none; }
+        .calendar-back-btn span, .cal-nav-btn span { display: none; }
+        .calendar-back-btn, .cal-nav-btn { width: 40px; height: 40px; padding: 0; justify-content: center; }
+        .big-cal-section, .weekly-section { padding: 14px; border-radius: 15px; }
+        .cal-month-title { font-size: 1.35rem; }
+        .cal-month-kicker { display: none; }
+        .big-cal-table th { padding: 9px 0; }
+        .side-nav-btn { font-size: 1rem; }
+    }
 </style>
 
 <div class="calendar-container">
     <div class="page-header">
-        <h1 style="margin:0; color:var(--cal-text);"><i class="fas fa-calendar-alt" style="color:var(--cal-blue);"></i> 전사 통합 캘린더</h1>
-        <button class="btn btn-primary" style="padding: 10px 20px; border-radius:8px; cursor: pointer;" onclick="window.history.back()"><i class="fas fa-arrow-left"></i> 업무공간으로</button>
+        <div class="calendar-brand">
+            <div class="calendar-brand-icon"><i class="fa-regular fa-calendar-check"></i></div>
+            <div class="calendar-brand-copy">
+                <div class="calendar-eyebrow">SAEDAM COMPANY SCHEDULE</div>
+                <h1>전사 통합 캘린더</h1>
+                <div class="calendar-subtitle">학교와 본사의 주요 일정을 한눈에 확인하세요.</div>
+            </div>
+        </div>
+        <button class="calendar-back-btn" onclick="window.history.back()"><i class="fas fa-arrow-left"></i><span>업무공간으로</span></button>
     </div>
 
     <!-- 💡 calendar-layout의 top margin(여백)이 적용된 컨테이너 -->
     <div class="calendar-layout">
         <div class="big-cal-section">
             <div class="cal-header-controls">
-                <button class="cal-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i> 이전달</button>
-                <div class="cal-month-title" id="bigCalTitle"></div>
-                <button class="cal-nav-btn" onclick="changeMonth(1)">다음달 <i class="fas fa-chevron-right"></i></button>
+                <button class="cal-nav-btn" onclick="changeMonth(-1)" aria-label="이전 달"><i class="fas fa-chevron-left"></i><span>이전달</span></button>
+                <div class="cal-month-heading">
+                    <div class="cal-month-kicker"><i class="fa-regular fa-calendar"></i> MONTHLY VIEW</div>
+                    <div class="cal-month-title" id="bigCalTitle"></div>
+                </div>
+                <button class="cal-nav-btn" onclick="changeMonth(1)" aria-label="다음 달"><span>다음달</span><i class="fas fa-chevron-right"></i></button>
             </div>
             
             <div style="display: flex; align-items: stretch; gap: 15px;">
-                <div style="flex-grow: 1; overflow: hidden; border-radius: 12px; border: 1px solid var(--cal-border); box-sizing: border-box; min-width: 0;">
+                <div class="calendar-table-frame">
                     <table class="big-cal-table">
                         <thead>
                             <tr>
@@ -184,12 +270,18 @@
         </div>
 
         <div class="weekly-section">
-            <div class="weekly-title"><i class="fas fa-list-check" style="color:var(--cal-blue);"></i> 주간 스케줄 상세</div>
+            <div class="weekly-heading">
+                <div class="weekly-heading-icon"><i class="fas fa-list-check"></i></div>
+                <div>
+                    <div class="weekly-title">주간 스케줄 상세</div>
+                    <div class="weekly-subtitle">이번 주의 등록 일정을 확인하세요.</div>
+                </div>
+            </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: rgba(0,0,0,0.03); padding: 6px; border-radius: 8px;">
-                <button class="btn" style="padding: 4px 10px; font-size: 0.85rem; background: var(--cal-input-bg); border: 1px solid var(--cal-border); color: var(--cal-gray); cursor: pointer;" onclick="scrollWeeks(-1)"><i class="fas fa-chevron-left"></i> 전주</button>
-                <div id="weeklyDateRange" style="font-size: 0.9rem; color:var(--cal-gray); font-weight:700; text-align: center; flex-grow: 1;"></div>
-                <button class="btn" style="padding: 4px 10px; font-size: 0.85rem; background: var(--cal-input-bg); border: 1px solid var(--cal-border); color: var(--cal-gray); cursor: pointer;" onclick="scrollWeeks(1)">다음주 <i class="fas fa-chevron-right"></i></button>
+            <div class="week-range-control">
+                <button class="week-range-btn" onclick="scrollWeeks(-1)"><i class="fas fa-chevron-left"></i> 전주</button>
+                <div id="weeklyDateRange"></div>
+                <button class="week-range-btn" onclick="scrollWeeks(1)">다음주 <i class="fas fa-chevron-right"></i></button>
             </div>
             
             <div class="weekly-list" id="weeklyList"></div>
@@ -252,14 +344,14 @@
 
 <div id="addTaskModal" class="sd-modal">
     <div class="sd-modal-content">
-        <h2 style="margin-top: 0; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; color: var(--cal-navy); font-size:1.2rem;">일정 추가</h2>
+        <h2 id="addTaskModalTitle" style="margin-top: 0; border-bottom: 2px solid var(--cal-blue); padding-bottom: 10px; color: var(--cal-navy); font-size:1.2rem;">{% if assigned_school %}{{ assigned_school.school_name }} 일정 등록{% else %}학교 일정 등록{% endif %}</h2>
         <form id="addTaskForm">
+            {% if not assigned_school %}
             <div style="margin-bottom: 15px;">
-                <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">학교 선택</label>
-                <select id="addSchoolId" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;" required>
-                    </select>
-                <div style="font-size:0.75rem; color:var(--cal-gray); margin-top:4px;">* 기존 일정이 1건 이상 등록된 학교만 조회됩니다. 신규 학교 일정은 개별 업무공간에서 작성해 주세요.</div>
+                <label for="addSchoolName" style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">학교명</label>
+                <input type="text" id="addSchoolName" placeholder="학교명을 입력하세요" autocomplete="off" style="width:100%; padding:8px; border-radius:6px; margin-top:5px; box-sizing:border-box;" required>
             </div>
+            {% endif %}
             <div style="margin-bottom: 15px;">
                 <label style="font-size:0.85rem; font-weight:bold; color:var(--cal-gray);">일정 분류</label>
                 <select id="addTaskTitle" style="width:100%; padding:8px; border-radius:6px; margin-top:5px;" required>
@@ -300,12 +392,11 @@
 <script>
     const currentUser = "{{ session.get('user_name', '') }}";
     const currentUserLevel = parseInt("{{ session.get('user_level', 99) }}");
+    const assignedSchool = {{ assigned_school | tojson }};
 
     const rawTasks = {{ all_tasks | tojson | safe }};
-    const holidays = [
-        '2026-01-01', '2026-03-01', '2026-05-05', '2026-06-03', '2026-06-06', 
-        '2026-07-17', '2026-08-15', '2026-10-03', '2026-10-09', '2026-12-25'
-    ]; 
+    const publicHolidays = {{ public_holidays | tojson }};
+    const solarTerms = {{ solar_terms | tojson }};
     
     const tasks = rawTasks.map(t => {
         let shortName = t.school_name.replace('초등학교', '초').replace('중학교', '중').replace('고등학교', '고');
@@ -341,7 +432,21 @@
 
     document.addEventListener("DOMContentLoaded", function() {
         initBigCalendar();
+        requestAnimationFrame(syncCalendarPanelHeight);
     });
+
+    window.addEventListener('resize', syncCalendarPanelHeight);
+
+    function syncCalendarPanelHeight() {
+        const monthlyPanel = document.querySelector('.big-cal-section');
+        const weeklyPanel = document.querySelector('.weekly-section');
+        if(!monthlyPanel || !weeklyPanel) return;
+        if(window.innerWidth <= 1100) {
+            weeklyPanel.style.height = '';
+            return;
+        }
+        weeklyPanel.style.height = `${Math.round(monthlyPanel.getBoundingClientRect().height)}px`;
+    }
 
     function initBigCalendar() {
         renderCalendar(currentYear, currentMonth);
@@ -526,9 +631,25 @@
             let bgHtml = '';
             for(let j = 1; j <= 5; j++) {
                 let day = week[j];
-                let colorClass = holidays.includes(day.dateStr) ? 'color-holiday' : '';
+                const holidayName = publicHolidays[day.dateStr] || '';
+                const solarTermName = solarTerms[day.dateStr] || '';
+                const colorClass = holidayName ? 'color-holiday' : '';
+                const labelTitle = escapeCalendarHtml(
+                    [holidayName, solarTermName].filter(Boolean).join(' · ')
+                );
+                const labelsHtml = `
+                    ${holidayName ? `<span class="cal-holiday-name">${escapeCalendarHtml(holidayName)}</span>` : ''}
+                    ${solarTermName ? `<span class="cal-solar-term-name">${escapeCalendarHtml(solarTermName)}</span>` : ''}
+                `;
                 let classes = `day-col ${!day.isCurrent ? 'other-month' : ''} ${day.dateStr === todayStr ? 'td-today' : ''}`;
-                bgHtml += `<div class="${classes}" onclick="handleDayClick('${day.dateStr}')"><div class="cal-date-num ${colorClass}">${day.dateNum}</div></div>`;
+                bgHtml += `
+                    <div class="${classes}" onclick="handleDayClick('${day.dateStr}')" title="${labelTitle}">
+                        <div class="cal-date-head">
+                            <div class="cal-date-num ${colorClass}">${day.dateNum}</div>
+                            <div class="cal-day-labels">${labelsHtml}</div>
+                        </div>
+                    </div>
+                `;
             }
             
             let eventsHtml = '';
@@ -601,6 +722,7 @@
         }
 
         document.getElementById('bigCalBody').innerHTML = tbodyHtml;
+        requestAnimationFrame(syncCalendarPanelHeight);
     }
 
     function openDayModal(dateStr) {
@@ -612,7 +734,13 @@
         const listEl = document.getElementById('dayModalList');
         
         if(dayTasks.length === 0) {
-            listEl.innerHTML = '<div style="color:var(--cal-gray); padding:30px; text-align:center; background:var(--cal-soft); border-radius:10px; border:1px solid var(--cal-border);">해당 일자에 등록된 일정이 없습니다.</div>';
+            listEl.innerHTML = `
+                <div class="calendar-empty">
+                    <div class="calendar-empty-icon"><i class="fa-regular fa-calendar-xmark"></i></div>
+                    <strong>등록된 일정이 없습니다.</strong>
+                    <span>새 일정을 추가해 업무 일정을 공유해보세요.</span>
+                </div>
+            `;
         } else {
             let grouped = {};
             dayTasks.forEach(t => {
@@ -663,21 +791,8 @@
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     
     function openAddTask(dateStr) {
-        const uniqueSchools = [];
-        const schoolSet = new Set();
-        rawTasks.forEach(t => {
-            if(!schoolSet.has(t.school_id)) {
-                schoolSet.add(t.school_id);
-                uniqueSchools.push({id: t.school_id, name: t.school_name});
-            }
-        });
-        
-        const schoolSelect = document.getElementById('addSchoolId');
-        if(uniqueSchools.length > 0) {
-            schoolSelect.innerHTML = uniqueSchools.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-        } else {
-            schoolSelect.innerHTML = `<option value="">업무공간에서 먼저 일정을 등록해주세요.</option>`;
-        }
+        const schoolNameInput = document.getElementById('addSchoolName');
+        if(schoolNameInput) schoolNameInput.value = '';
 
         document.getElementById('addStartDate').value = dateStr;
         document.getElementById('addEndDate').value = dateStr;
@@ -691,15 +806,18 @@
     }
 
     async function submitAddTask() {
-        const schoolId = document.getElementById('addSchoolId').value;
+        const schoolNameInput = document.getElementById('addSchoolName');
+        const schoolId = assignedSchool ? assignedSchool.id : null;
+        const schoolName = assignedSchool ? assignedSchool.school_name : schoolNameInput.value.trim();
         const title = document.getElementById('addTaskTitle').value;
         const startDate = document.getElementById('addStartDate').value;
         
-        if(!schoolId) return alert("학교를 선택해주세요.");
+        if(!schoolName) return alert("학교명을 입력해주세요.");
         if(!title || !startDate) return alert("일정 분류와 시작일을 입력하세요.");
 
         const data = {
             school_id: schoolId,
+            school_name: schoolName,
             title: title,
             start_date: startDate,
             start_time: document.getElementById('addStartTime').value,
@@ -714,11 +832,12 @@
                 headers: {'Content-Type': 'application/json'}, 
                 body: JSON.stringify(data)
             });
+            const result = await res.json();
             if(res.ok) {
                 alert("일정이 성공적으로 추가되었습니다.");
                 location.reload();
             } else {
-                alert("권한이 없거나 등록에 실패했습니다.");
+                alert(result.message || "권한이 없거나 등록에 실패했습니다.");
             }
         } catch(e) { console.error(e); }
     }
@@ -808,7 +927,13 @@
         const weekTasks = tasks.filter(t => t.start <= endStr && t.end >= startStr);
         
         if(weekTasks.length === 0) {
-            weeklyListEl.innerHTML = '<div style="text-align:center; padding: 40px 0; color:var(--cal-gray);">이번 주에 등록된 일정이 없습니다.</div>';
+            weeklyListEl.innerHTML = `
+                <div class="calendar-empty">
+                    <div class="calendar-empty-icon"><i class="fa-regular fa-calendar-xmark"></i></div>
+                    <strong>이번 주 일정이 없습니다.</strong>
+                    <span>날짜를 선택해 새로운 일정을 등록할 수 있습니다.</span>
+                </div>
+            `;
             return;
         }
 
