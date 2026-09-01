@@ -114,6 +114,7 @@ MENU_GROUPS = (
         'children': (
             ('contacts_main', '본사연락망', 'fa-address-book', 14),
             ('attendance_main', '근태관리', 'fa-clock-rotate-left', 14),
+            ('interview_main', '면접진행', 'fa-user-check', 4),
             ('organization_invite', '가입초대메일발송', 'fa-paper-plane', 2),
         ),
     },
@@ -406,6 +407,11 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return 'excel_generator'
     if path.startswith('/attendance') or path.startswith('/api/attendance'):
         return 'attendance_main'
+    # 면접자 사전질문지는 로그인 없는 공개 링크이므로 메뉴 권한 검사에서 제외한다.
+    if path.startswith('/interview/q/'):
+        return None
+    if path.startswith('/interview'):
+        return 'interview_main'
     if path.startswith('/contacts'):
         return 'contacts_main'
     if path.startswith('/ebook'):

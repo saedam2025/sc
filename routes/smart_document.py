@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import functools
+import hashlib
 import hmac
 import html
 import io
@@ -27,6 +28,7 @@ from PyPDF2 import PdfReader
 from .database import get_db
 from . import openai_settings as ai_settings
 from .secure_files import original_filename
+from .security import load_file_secret
 
 
 smart_document_bp = Blueprint('smart_document', __name__)
@@ -44,6 +46,12 @@ MAX_DELIVERY_FILE_BYTES = 15 * 1024 * 1024
 MAX_DELIVERY_TOTAL_BYTES = 18 * 1024 * 1024
 MAX_EXTRACTED_CHARS_PER_FILE = 40_000
 MAX_EXTRACTED_CHARS_TOTAL = 90_000
+
+
+def _fernet() -> Fernet:
+    """붙임파일·직인 등 스마트 공문 첨부데이터를 암·복호화하는 데 쓰는 공용 Fernet 인스턴스."""
+    digest = hashlib.sha256(load_file_secret().encode('utf-8')).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
 
 
 def ensure_smart_document_schema(conn=None):
@@ -86,8 +94,13 @@ def ensure_smart_document_schema(conn=None):
                 owner_emp_no TEXT NOT NULL,
                 name TEXT NOT NULL,
                 instruction TEXT NOT NULL DEFAULT '',
+                subject TEXT NOT NULL DEFAULT '',
+                recipient TEXT NOT NULL DEFAULT '',
                 greeting TEXT NOT NULL DEFAULT '',
                 closing TEXT NOT NULL DEFAULT '끝.',
+                items_json TEXT NOT NULL DEFAULT '[]',
+                greeting_enabled INTEGER NOT NULL DEFAULT 1,
+                closing_enabled INTEGER NOT NULL DEFAULT 1,
                 is_default INTEGER NOT NULL DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -190,6 +203,19 @@ def ensure_smart_document_schema(conn=None):
         }.items():
             if column not in delivery_columns:
                 conn.execute(f'ALTER TABLE smart_document_deliveries ADD COLUMN {column} {definition}')
+        template_columns = {
+            row['name'] if hasattr(row, 'keys') else row[1]
+            for row in conn.execute('PRAGMA table_info(smart_document_templates)').fetchall()
+        }
+        for column, definition in {
+            'subject': "TEXT NOT NULL DEFAULT ''",
+            'recipient': "TEXT NOT NULL DEFAULT ''",
+            'items_json': "TEXT NOT NULL DEFAULT '[]'",
+            'greeting_enabled': 'INTEGER NOT NULL DEFAULT 1',
+            'closing_enabled': 'INTEGER NOT NULL DEFAULT 1',
+        }.items():
+            if column not in template_columns:
+                conn.execute(f'ALTER TABLE smart_document_templates ADD COLUMN {column} {definition}')
         default_template = conn.execute(
             'SELECT 1 FROM smart_document_templates WHERE owner_emp_no=? LIMIT 1',
             (_owner_emp_no(),),
@@ -264,6 +290,14 @@ def _text(value, limit=500):
     return str(value or '').strip()[:limit]
 
 
+def _row_get(row, key, default=None):
+    """마이그레이션 직후 등 컬럼이 아직 없을 수 있는 sqlite3.Row에서 안전하게 값을 읽는다."""
+    try:
+        return row[key]
+    except (IndexError, KeyError):
+        return default
+
+
 def _owned_row(conn, table, row_id):
     return conn.execute(
         f'SELECT * FROM {table} WHERE id=? AND owner_emp_no=?',
@@ -288,13 +322,54 @@ def _company_dict(row):
     }
 
 
+MAX_TEMPLATE_ITEMS = 7
+
+
+def _normalize_template_items(raw_items):
+    """입력내용 1~7번을 정리한다. 앞 번호가 꺼져 있으면 뒤 번호는 강제로 끈다(순서 체크 규칙)."""
+    source = raw_items if isinstance(raw_items, list) else []
+    items = []
+    for index in range(MAX_TEMPLATE_ITEMS):
+        raw = source[index] if index < len(source) and isinstance(source[index], dict) else {}
+        items.append({
+            'label': _text(raw.get('label'), 300),
+            'enabled': bool(raw.get('enabled')),
+            'ai_generate': bool(raw.get('ai_generate')),
+        })
+    broken = False
+    for item in items:
+        if broken or not item['enabled']:
+            broken = True
+            item['enabled'] = False
+            item['ai_generate'] = False
+    return items
+
+
+def _enabled_template_items(template):
+    """템플릿 row에서 입력사용 체크된 항목만 순서대로 뽑는다."""
+    try:
+        raw_items = json.loads(_row_get(template, 'items_json') or '[]')
+    except (TypeError, ValueError, KeyError, IndexError):
+        raw_items = []
+    return [item for item in _normalize_template_items(raw_items) if item['enabled'] and item['label']]
+
+
 def _template_dict(row):
+    try:
+        raw_items = json.loads(_row_get(row, 'items_json') or '[]')
+    except (TypeError, ValueError, KeyError, IndexError):
+        raw_items = []
     return {
         'id': row['id'],
         'name': row['name'],
         'instruction': row['instruction'],
+        'subject': _row_get(row, 'subject', ''),
+        'recipient': _row_get(row, 'recipient', ''),
         'greeting': row['greeting'],
         'closing': row['closing'],
+        'items': _normalize_template_items(raw_items),
+        'greeting_enabled': bool(_row_get(row, 'greeting_enabled', 1)),
+        'closing_enabled': bool(_row_get(row, 'closing_enabled', 1)),
         'is_default': bool(row['is_default']),
         'updated_at': str(row['updated_at'] or ''),
     }
@@ -424,6 +499,8 @@ def _valid_email(value):
 def _document_body_content(document):
     esc = lambda value: html.escape(str(value or ''))
     raw_body_items = document.get('body') if isinstance(document.get('body'), list) else []
+    body_tables = document.get('body_tables') if isinstance(document.get('body_tables'), dict) else {}
+    rendered_body_tables = set()
     body_html_items = []
     body_text_items = []
     main_number = 0
@@ -497,10 +574,21 @@ def _document_body_content(document):
             content = paragraph
         indent = 'margin-left:30px;' if is_sub_item else ''
         text_indent = '  ' if is_sub_item else ''
+        content_html = esc(content).replace('\n', '<br>')
         body_html_items.append(
-            f'<p style="margin:0 0 12px;{indent}line-height:1.75"><b>{esc(marker)}</b> {esc(content)}</p>'
+            f'<p style="margin:0 0 12px;{indent}line-height:1.75"><b>{esc(marker)}</b> {content_html}</p>'
         )
         body_text_items.append(f'{text_indent}{marker} {content}')
+        if numbered:
+            item_key = numbered.group(1)
+            attached = body_tables.get(item_key)
+            if isinstance(attached, dict) and item_key not in rendered_body_tables:
+                rendered_body_tables.add(item_key)
+                append_table(
+                    attached.get('title') or '',
+                    [item for item in (attached.get('headers') or [])[:8]],
+                    [row for row in (attached.get('rows') or [])[:50] if isinstance(row, list)],
+                )
 
     raw_tables = document.get('tables') if isinstance(document.get('tables'), list) else []
     for table in raw_tables[:5]:
@@ -521,7 +609,8 @@ def _official_document_markup(document, seal_src=''):
     representative = document.get('representative') or ''
     seal_html = (
         f'<img src="{html.escape(str(seal_src), quote=True)}" alt="회사 직인" '
-        'style="width:72px;height:72px;object-fit:contain;vertical-align:middle;margin-left:-8px">'
+        'style="position:relative;z-index:0;width:94px;height:94px;object-fit:contain;'
+        'vertical-align:middle;margin-left:-24px">'
         if seal_src else '<span style="margin-left:10px;color:#9b5e46;font-size:11px;font-weight:700">(직인 미등록)</span>'
     )
     delivery_files = document.get('delivery_attachments') if isinstance(document.get('delivery_attachments'), list) else []
@@ -536,7 +625,7 @@ def _official_document_markup(document, seal_src=''):
             'padding-top:13px;border-top:1px solid #d8dde2"><b>붙임</b><ol style="margin:0;padding-left:20px">'
             f'{items}</ol></div>'
         )
-    return f'''<article class="sd-sent-document" style="box-sizing:border-box;width:100%;max-width:760px;min-height:700px;margin:0 auto;padding:38px 44px;border:1px solid #cbd4dd;background:#fff;color:#202631;font-family:Arial,'Malgun Gothic',sans-serif;box-shadow:0 8px 24px rgba(31,41,55,.08)">
+    return f'''<article class="sd-sent-document" style="box-sizing:border-box;width:100%;max-width:760px;margin:0 auto;padding:38px 44px 26px;border:1px solid #cbd4dd;background:#fff;color:#202631;font-family:Arial,'Malgun Gothic',sans-serif;box-shadow:0 8px 24px rgba(31,41,55,.08)">
       <div style="padding-bottom:20px;border-bottom:3px double #29313c;text-align:center">
         <div style="font-size:11px;letter-spacing:2px;color:#697487">SAEDAM OFFICIAL DOCUMENT</div>
         <h1 style="margin:12px 0 0;font-size:26px">{esc(document.get('title') or '공 문')}</h1>
@@ -544,12 +633,12 @@ def _official_document_markup(document, seal_src=''):
       <table style="width:100%;margin-top:20px;border-collapse:collapse;font-size:14px">
         <tr><th style="width:90px;padding:9px;background:#f5f6f7;border-bottom:1px solid #ccd3da;text-align:left">문서번호</th><td style="padding:9px;border-bottom:1px solid #ccd3da">{esc(document.get('document_number'))}</td><th style="width:70px;padding:9px;background:#f5f6f7;border-bottom:1px solid #ccd3da;text-align:left">발송일</th><td style="padding:9px;border-bottom:1px solid #ccd3da">{esc(document.get('dispatch_date') or document.get('issue_date'))}</td></tr>
         <tr><th style="padding:9px;background:#f5f6f7;border-bottom:1px solid #ccd3da;text-align:left">수신</th><td colspan="3" style="padding:9px;border-bottom:1px solid #ccd3da">{esc(document.get('recipient'))}</td></tr>
-        <tr><th style="padding:9px;background:#f5f6f7;border-bottom:1px solid #ccd3da;text-align:left">발신</th><td colspan="3" style="padding:9px;border-bottom:1px solid #ccd3da">{esc(sender)} · 대표 {esc(representative)}</td></tr>
+        <tr><th style="padding:9px;background:#f5f6f7;border-bottom:1px solid #ccd3da;text-align:left">발신</th><td colspan="3" style="padding:9px;border-bottom:1px solid #ccd3da">{esc(sender)}</td></tr>
         <tr><th style="padding:9px;background:#f5f6f7;border-top:2px solid #4b5563;border-bottom:2px solid #4b5563;text-align:left">제목</th><td colspan="3" style="padding:9px;border-top:2px solid #4b5563;border-bottom:2px solid #4b5563;font-weight:bold">{esc(document.get('subject'))}</td></tr>
       </table>
-      <div style="min-height:260px;padding:28px 6px;font-size:14px;line-height:1.75">{body_html}{attachment_html}<p style="margin-top:25px;text-align:right;font-weight:bold">{esc(document.get('closing'))}</p></div>
-      <div style="display:flex;align-items:center;justify-content:flex-end;min-height:76px;margin-top:22px;text-align:right"><b style="font-size:17px">{esc(sender)} 대표 {esc(representative)}</b>{seal_html}</div>
-      <div style="padding-top:20px;border-top:2px solid #374151;color:#657082;font-size:12px;text-align:right">{esc(document.get('company_address'))}<br>담당 연락처 · {esc(document.get('contact'))}</div>
+      <div style="padding:24px 6px 0;font-size:14px;line-height:1.75">{f'<p style="margin:0 0 18px">{esc(document.get("greeting"))}</p>' if document.get('greeting') else ''}{body_html}{attachment_html}<p style="margin:16px 0 0;text-align:right;font-weight:bold">{esc(document.get('closing'))}</p></div>
+      <div style="display:flex;align-items:center;justify-content:center;margin-top:12px;text-align:center"><b style="position:relative;z-index:1;font-size:20px">{esc(sender)} 대표 {esc(representative)}</b>{seal_html}</div>
+      <div style="margin-top:12px;padding-top:14px;border-top:2px solid #374151;color:#657082;font-size:12px;text-align:right">{esc(document.get('company_address'))}<br>담당 연락처 · {esc(document.get('contact'))}</div>
     </article>'''
 
 
@@ -563,7 +652,7 @@ def _document_email_content(document, has_seal=False):
     text_body = (
         f"{document.get('title') or '공 문'}\n"
         f"문서번호: {document.get('document_number') or ''}\n발송일: {document.get('dispatch_date') or document.get('issue_date') or ''}\n"
-        f"수신: {document.get('recipient') or ''}\n발신: {sender} 대표 {representative}\n"
+        f"수신: {document.get('recipient') or ''}\n발신: {sender}\n"
         f"제목: {document.get('subject') or ''}\n\n{body_text}\n\n"
         f"{document.get('closing') or ''}\n{sender} 대표 {representative}"
     )
@@ -641,37 +730,12 @@ def _workspace_payload(conn):
         FROM smart_document_history h
         WHERE h.owner_emp_no=? ORDER BY h.created_at DESC, h.id DESC LIMIT 100
     ''', (_owner_emp_no(),)).fetchall()
-    usage = conn.execute('''
-        SELECT COUNT(*) AS requests,
-               COALESCE(SUM(input_tokens), 0) AS input_tokens,
-               COALESCE(SUM(output_tokens), 0) AS output_tokens,
-               COALESCE(SUM(total_tokens), 0) AS total_tokens,
-               MIN(created_at) AS first_used_at,
-               MAX(created_at) AS last_used_at
-        FROM smart_document_history WHERE owner_emp_no=?
-    ''', (_owner_emp_no(),)).fetchone()
-    monthly = conn.execute('''
-        SELECT SUBSTR(created_at, 1, 7) AS month,
-               COUNT(*) AS requests,
-               COALESCE(SUM(total_tokens), 0) AS total_tokens
-        FROM smart_document_history WHERE owner_emp_no=?
-        GROUP BY SUBSTR(created_at, 1, 7) ORDER BY month DESC LIMIT 12
-    ''', (_owner_emp_no(),)).fetchall()
     return {
         'companies': [_company_dict(row) for row in companies],
         'templates': [_template_dict(row) for row in templates],
         'recipients': [_recipient_dict(row) for row in recipients],
         'senders': [_sender_dict(row) for row in senders],
         'history': [_history_dict(row) for row in history],
-        'usage': {
-            'requests': int(usage['requests'] or 0),
-            'input_tokens': int(usage['input_tokens'] or 0),
-            'output_tokens': int(usage['output_tokens'] or 0),
-            'total_tokens': int(usage['total_tokens'] or 0),
-            'first_used_at': str(usage['first_used_at'] or ''),
-            'last_used_at': str(usage['last_used_at'] or ''),
-            'monthly': [dict(row) for row in monthly],
-        },
     }
 
 
@@ -897,6 +961,37 @@ def _document_prompt(user_prompt, attachments, company, template, recipient):
         '담당자': recipient['name'] if recipient else '',
         '이메일': recipient['email'] if recipient else '',
     }, ensure_ascii=False)
+    enabled_items = _enabled_template_items(template)
+    ai_item_count = sum(1 for item in enabled_items if item['ai_generate'])
+    if enabled_items:
+        item_lines = []
+        for index, item in enumerate(enabled_items, start=1):
+            if item['ai_generate']:
+                mode = f'AI 작성 항목 (제목: "{item["label"]}")'
+            else:
+                mode = f'고정 문구 (그대로 사용): {item["label"]}'
+            item_lines.append(f"{index}. [{mode}]")
+        items_block = '\n'.join(item_lines)
+        items_rule = (
+            f"번호와 제목은 서버가 이미 확정했습니다. body 배열은 빈 배열로 두고, 제목 문구를 다시 쓰지 마세요.\n"
+            f"\"AI 작성 항목\"으로 표시된 번호에 대해서만 item_contents 배열을 정확히 {ai_item_count}개, "
+            "AI 작성 항목이 나열된 순서 그대로 만드세요(\"고정 문구\" 항목은 넣지 않습니다).\n"
+            "item_contents의 각 원소는 {text, table} 형태입니다.\n"
+            "- 인적사항·학력·자격·경력·일정처럼 '구분/내용' 짝으로 정리되는 정보는 반드시 table.headers와 "
+            "table.rows를 채워 표로 만드세요. 줄글로 나열하지 마세요.\n"
+            "- table을 쓸 때 text는 빈 문자열로 두거나 표를 여는 한 문장만 쓰세요. 같은 사실을 text와 table에 "
+            "중복해서 쓰지 마세요.\n"
+            "- 표가 어울리지 않는 항목은 text에 문장을 쓰고 table.headers와 table.rows를 빈 배열로 두세요.\n"
+            "- 제목은 서버가 표 위에 이미 출력하므로 표 안에 제목을 반복하지 마세요.\n"
+            "- 표에는 그 번호 제목에 꼭 필요한 정보만 최소한의 행으로 넣으세요. 공문의 다른 곳에 이미 나온 정보"
+            "(수신 기관명, 공문 제목, 다른 번호의 고정 문구 내용)는 표에 다시 넣지 마세요.\n"
+            "- 특히 '일정' 성격의 항목은 날짜 정보(파견일·기간 등) 위주로 1~2행이면 충분합니다. 파견 학교·파견 "
+            "분야·파견 사유처럼 수신처나 앞 번호에서 이미 밝힌 내용을 일정 표에 반복하지 마세요.\n"
+            "최상위 tables 배열은 본문 끝에 중복 출력되므로 반드시 빈 배열로 두세요."
+        )
+    else:
+        items_block = '(지정된 본문 항목 없음 - 아래 작성 지침을 참고해 body에 공문 본문 문단을 순서대로 작성)'
+        items_rule = 'item_contents는 사용하지 않으니 빈 배열로 두세요.'
     return f'''[절대 기준 날짜]
 오늘 날짜(시행일·발송일): {today} ({today_iso})
 시행일과 발송일은 반드시 {today_iso}입니다. 파견일은 오늘과 혼동하지 말고 첨부자료나 사용자 요청에서 별도로 찾으세요.
@@ -910,8 +1005,12 @@ def _document_prompt(user_prompt, attachments, company, template, recipient):
 [적용 공문 템플릿]
 템플릿명: {template['name']}
 작성 지침: {template['instruction']}
-기본 인사말: {template['greeting']}
-기본 맺음말: {template['closing']}
+{f"공문 제목(고정): {_row_get(template, 'subject')} - subject 필드는 이 문구를 그대로 사용하세요." if _row_get(template, 'subject') else ''}
+{f"수신(고정): {_row_get(template, 'recipient')} - recipient 필드는 이 문구를 그대로 사용하세요." if _row_get(template, 'recipient') else ''}
+
+[본문 구성 항목 - 순서대로]
+{items_block}
+{items_rule}
 
 [사용자 작성 요청]
 {user_prompt}
@@ -988,6 +1087,33 @@ def _parse_document_output(output_text):
                 'rows': clean_rows,
             })
 
+    item_contents = []
+    raw_item_contents = payload.get('item_contents') or []
+    if isinstance(raw_item_contents, list):
+        for raw_entry in raw_item_contents[:MAX_TEMPLATE_ITEMS]:
+            if isinstance(raw_entry, str):
+                item_contents.append({'text': _text(raw_entry, 2000), 'headers': [], 'rows': []})
+                continue
+            if not isinstance(raw_entry, dict):
+                continue
+            raw_table = raw_entry.get('table') if isinstance(raw_entry.get('table'), dict) else {}
+            entry_headers = [_text(item, 200) for item in (raw_table.get('headers') or [])[:8]]
+            entry_headers = [item for item in entry_headers if item]
+            entry_rows = []
+            if entry_headers:
+                for row in (raw_table.get('rows') or [])[:50]:
+                    if not isinstance(row, list):
+                        continue
+                    cells = [_text(cell, 500) for cell in row[:len(entry_headers)]]
+                    cells.extend([''] * (len(entry_headers) - len(cells)))
+                    if any(cells):
+                        entry_rows.append(cells)
+            item_contents.append({
+                'text': _text(raw_entry.get('text'), 2000),
+                'headers': entry_headers if entry_rows else [],
+                'rows': entry_rows,
+            })
+
     document = {
         'title': text_field('title', 200) or '공 문',
         'recipient': text_field('recipient', 200) or '확인 필요',
@@ -1001,10 +1127,43 @@ def _parse_document_output(output_text):
         'assignment_end': text_field('assignment_end', 40) or '확인 필요',
         'source_facts': list_field('source_facts', 40),
         'attachment_references': list_field('attachment_references', 20),
+        'item_contents': item_contents,
         'tables': tables,
     }
-    if not document['body']:
+    if not document['body'] and not document['item_contents']:
         raise ValueError('AI가 공문 본문을 작성하지 못했습니다.')
+    return document
+
+
+def _apply_template_items_to_body(document, template):
+    """번호 제목은 서버가 그대로 넣고, AI 작성 항목은 그 번호 바로 아래에 세부내용·표를 붙인다.
+
+    표는 body_tables에 '번호' 문자열로 매달아 두어 해당 번호 문단 직후에만 렌더링한다.
+    AI가 만든 최상위 tables는 같은 내용이 본문 끝에 중복 출력되므로 비운다.
+    """
+    enabled_items = _enabled_template_items(template)
+    if not enabled_items:
+        document.pop('item_contents', None)
+        return document
+    ai_contents = iter(document.get('item_contents') or [])
+    body = []
+    body_tables = {}
+    for index, item in enumerate(enabled_items, start=1):
+        line = f"{index}. {item['label']}"
+        if item['ai_generate']:
+            entry = next(ai_contents, None) or {}
+            text = str(entry.get('text') or '').strip()
+            if text:
+                line += f"\n{text}"
+            headers = entry.get('headers') or []
+            rows = entry.get('rows') or []
+            if headers and rows:
+                body_tables[str(index)] = {'title': '', 'headers': headers, 'rows': rows}
+        body.append(line)
+    document['body'] = body
+    document['body_tables'] = body_tables
+    document['tables'] = []
+    document.pop('item_contents', None)
     return document
 
 
@@ -1024,6 +1183,29 @@ DOCUMENT_JSON_SCHEMA = {
         'assignment_end': {'type': 'string'},
         'source_facts': {'type': 'array', 'items': {'type': 'string'}},
         'attachment_references': {'type': 'array', 'items': {'type': 'string'}},
+        'item_contents': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'additionalProperties': False,
+                'properties': {
+                    'text': {'type': 'string'},
+                    'table': {
+                        'type': 'object',
+                        'additionalProperties': False,
+                        'properties': {
+                            'headers': {'type': 'array', 'items': {'type': 'string'}},
+                            'rows': {
+                                'type': 'array',
+                                'items': {'type': 'array', 'items': {'type': 'string'}},
+                            },
+                        },
+                        'required': ['headers', 'rows'],
+                    },
+                },
+                'required': ['text', 'table'],
+            },
+        },
         'tables': {
             'type': 'array',
             'items': {
@@ -1043,7 +1225,8 @@ DOCUMENT_JSON_SCHEMA = {
     },
     'required': [
         'title', 'recipient', 'subject', 'greeting', 'body', 'attachments', 'contact',
-        'closing', 'assignment_start', 'assignment_end', 'source_facts', 'attachment_references', 'tables',
+        'closing', 'assignment_start', 'assignment_end', 'source_facts', 'attachment_references',
+        'item_contents', 'tables',
     ],
 }
 
@@ -1078,6 +1261,7 @@ def _create_openai_document(api_key, model, user_prompt, attachments, company, t
         store=False,
     )
     document = _parse_document_output(getattr(response, 'output_text', ''))
+    document = _apply_template_items_to_body(document, template)
     usage = getattr(response, 'usage', None)
     usage_data = {
         'input_tokens': int(getattr(usage, 'input_tokens', 0) or 0),
@@ -1239,8 +1423,8 @@ def save_company_seal(company_id):
     if not uploaded or not uploaded.filename:
         return _error('회사 직인 이미지 파일을 선택해주세요.', 400, 'SEAL_REQUIRED')
     mime = str(uploaded.mimetype or mimetypes.guess_type(uploaded.filename)[0] or '').lower()
-    if mime not in {'image/png', 'image/jpeg', 'image/webp'}:
-        return _error('직인은 PNG, JPG, WEBP 이미지만 등록할 수 있습니다.', 400, 'SEAL_TYPE_INVALID')
+    if mime not in {'image/png', 'image/jpeg', 'image/webp', 'image/gif'}:
+        return _error('직인은 PNG, JPG, WEBP, GIF 이미지만 등록할 수 있습니다.', 400, 'SEAL_TYPE_INVALID')
     data = uploaded.read(2 * 1024 * 1024 + 1)
     if len(data) > 2 * 1024 * 1024:
         return _error('직인 이미지는 2MB 이하여야 합니다.', 400, 'SEAL_TOO_LARGE')
@@ -1287,12 +1471,21 @@ def create_template():
     try:
         ensure_smart_document_schema(conn)
         is_default = bool(data.get('is_default'))
+        items_json = json.dumps(_normalize_template_items(data.get('items')), ensure_ascii=False)
         if is_default:
             conn.execute('UPDATE smart_document_templates SET is_default=0 WHERE owner_emp_no=?', (_owner_emp_no(),))
         cursor = conn.execute('''
-            INSERT INTO smart_document_templates (owner_emp_no, name, instruction, greeting, closing, is_default)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (_owner_emp_no(), name, _text(data.get('instruction'), 3000), _text(data.get('greeting'), 1000), _text(data.get('closing'), 500) or '끝.', int(is_default)))
+            INSERT INTO smart_document_templates (
+                owner_emp_no, name, instruction, subject, recipient, greeting, closing, items_json,
+                greeting_enabled, closing_enabled, is_default
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            _owner_emp_no(), name, _text(data.get('instruction'), 3000), _text(data.get('subject'), 300),
+            _text(data.get('recipient'), 200),
+            _text(data.get('greeting'), 1000), _text(data.get('closing'), 500) or '끝.', items_json,
+            int(bool(data.get('greeting_enabled', True))), int(bool(data.get('closing_enabled', True))),
+            int(is_default),
+        ))
         conn.commit()
         return _success('공문 템플릿을 등록했습니다.', template=_template_dict(_owned_row(conn, 'smart_document_templates', cursor.lastrowid)))
     finally:
@@ -1316,12 +1509,20 @@ def modify_template(template_id):
         if not name:
             return _error('템플릿 이름을 입력해주세요.', 400, 'TEMPLATE_REQUIRED')
         is_default = bool(data.get('is_default'))
+        items_json = json.dumps(_normalize_template_items(data.get('items')), ensure_ascii=False)
         if is_default:
             conn.execute('UPDATE smart_document_templates SET is_default=0 WHERE owner_emp_no=?', (_owner_emp_no(),))
         conn.execute('''
-            UPDATE smart_document_templates SET name=?, instruction=?, greeting=?, closing=?,
-                is_default=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_emp_no=?
-        ''', (name, _text(data.get('instruction'), 3000), _text(data.get('greeting'), 1000), _text(data.get('closing'), 500) or '끝.', int(is_default), template_id, _owner_emp_no()))
+            UPDATE smart_document_templates SET name=?, instruction=?, subject=?, recipient=?, greeting=?, closing=?,
+                items_json=?, greeting_enabled=?, closing_enabled=?, is_default=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=? AND owner_emp_no=?
+        ''', (
+            name, _text(data.get('instruction'), 3000), _text(data.get('subject'), 300),
+            _text(data.get('recipient'), 200), _text(data.get('greeting'), 1000),
+            _text(data.get('closing'), 500) or '끝.', items_json,
+            int(bool(data.get('greeting_enabled', True))), int(bool(data.get('closing_enabled', True))),
+            int(is_default), template_id, _owner_emp_no(),
+        ))
         conn.commit()
         return _success('공문 템플릿을 수정했습니다.', template=_template_dict(_owned_row(conn, 'smart_document_templates', template_id)))
     finally:
@@ -1757,10 +1958,18 @@ def generate_document():
             ],
             'reference_files': [item['filename'] for item in attachments],
         })
+        document['greeting'] = template['greeting'] if _row_get(template, 'greeting_enabled', 1) else ''
+        document['closing'] = template['closing'] if _row_get(template, 'closing_enabled', 1) else ''
+        if _row_get(template, 'subject'):
+            document['subject'] = template['subject']
         document = _normalize_document_content(document)
         if recipient:
             document['recipient'] = recipient['organization'] + (f" {recipient['name']} 담당자" if recipient['name'] else '')
             document['recipient_email'] = recipient['email']
+        # 템플릿 '수신'에 값이 있으면 담당자 문구를 덧붙이지 않고 입력한 문구 그대로만 표시한다.
+        # (선택한 수신자의 이메일은 발송용으로 그대로 유지)
+        if _row_get(template, 'recipient'):
+            document['recipient'] = template['recipient']
         conn = get_db()
         try:
             conn.execute('BEGIN IMMEDIATE')

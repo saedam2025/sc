@@ -10,7 +10,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import os
 import re
 from datetime import datetime
 from typing import Any
@@ -47,11 +46,9 @@ MODEL_SHORT_NAMES = {
     'claude-haiku-4-5-20251001': 'Haiku 4.5',
 }
 DEFAULT_MODEL = {'openai': 'gpt-5.6-luna', 'claude': 'claude-sonnet-5'}
-PROVIDER_ENV_KEYS = {'openai': 'OPENAI_API_KEY', 'claude': 'ANTHROPIC_API_KEY'}
 
 SOURCE_LABELS = {
     'menu': '메뉴 등록 API 사용 중',
-    'environment': '서버 환경변수 API 사용 중',
     'none': 'API 미설정',
 }
 
@@ -103,11 +100,6 @@ def validate_preset_id(value: Any) -> str:
     if preset_id not in PRESET_IDS:
         raise ValueError('프리셋 번호는 1, 2, 3 중 하나여야 합니다.')
     return preset_id
-
-
-def _environment_api_key(provider: str) -> str:
-    env_key = PROVIDER_ENV_KEYS.get(provider, '')
-    return str(os.environ.get(env_key, '') or '').strip() if env_key else ''
 
 
 def _ensure_admin_settings_table(conn) -> None:
@@ -217,7 +209,6 @@ def list_presets(conn=None) -> dict[str, Any]:
         for preset_id, preset in store['presets'].items():
             key = str(preset.get('api_key_encrypted') or '').strip()
             provider = preset['provider']
-            environment_key = _environment_api_key(provider)
             has_key = bool(key)
             result[preset_id] = {
                 'preset_id': preset_id,
@@ -227,11 +218,10 @@ def list_presets(conn=None) -> dict[str, Any]:
                 'model': preset['model'],
                 'model_label': MODEL_LABELS.get(preset['model'], preset['model']),
                 'has_menu_key': has_key,
-                'has_environment_key': bool(environment_key),
                 'masked_key': f"••••••••{key[-4:]}" if has_key else '',
                 'updated_by': preset.get('updated_by') or '',
                 'updated_at': preset.get('updated_at') or '',
-                'configured': has_key or bool(environment_key),
+                'configured': has_key,
             }
         return {'active': store['active'], 'visible_count': store['visible_count'], 'presets': result}
     finally:
@@ -317,13 +307,9 @@ def get_ai_settings(conn=None) -> dict[str, Any]:
         preset = store['presets'][preset_id]
         provider = preset['provider']
         stored_token = str(preset.get('api_key_encrypted') or '').strip()
-        environment_key = _environment_api_key(provider)
         if stored_token:
             api_key = _decrypt_api_key(stored_token)
             source = 'menu'
-        elif environment_key:
-            api_key = environment_key
-            source = 'environment'
         else:
             api_key = ''
             source = 'none'
@@ -335,7 +321,6 @@ def get_ai_settings(conn=None) -> dict[str, Any]:
             'api_key': api_key,
             'source': source,
             'has_menu_key': bool(stored_token),
-            'has_environment_key': bool(environment_key),
             'updated_by': preset.get('updated_by') or '',
             'updated_at': preset.get('updated_at') or '',
         }
@@ -345,7 +330,7 @@ def get_ai_settings(conn=None) -> dict[str, Any]:
 
 
 def get_preset_api_key(preset_id: Any, conn=None) -> str:
-    """지정한 프리셋에 저장된 키(없으면 그 프리셋 provider의 서버 환경변수 키)를 복호화해 반환한다.
+    """지정한 프리셋에 저장된 키를 복호화해 반환한다(없으면 빈 문자열).
 
     연결 테스트처럼 서버 안에서만 잠깐 쓰고 화면에는 절대 노출하지 않는 용도로만 사용한다.
     """
@@ -357,9 +342,7 @@ def get_preset_api_key(preset_id: Any, conn=None) -> str:
         store = _load_store(conn)
         preset = store['presets'][preset_id]
         stored_token = str(preset.get('api_key_encrypted') or '').strip()
-        if stored_token:
-            return _decrypt_api_key(stored_token)
-        return _environment_api_key(preset['provider'])
+        return _decrypt_api_key(stored_token) if stored_token else ''
     finally:
         if owns_connection:
             conn.close()
@@ -392,7 +375,6 @@ def public_ai_settings(settings: dict[str, Any]) -> dict[str, Any]:
         'status_text': status_text,
         'masked_key': masked_key,
         'has_menu_key': bool(settings.get('has_menu_key')),
-        'has_environment_key': bool(settings.get('has_environment_key')),
         'updated_by': settings.get('updated_by') or '',
         'updated_at': settings.get('updated_at') or '',
     }
@@ -416,3 +398,76 @@ def test_ai_connection(provider: str, api_key: str, model: str) -> str:
     client = OpenAI(api_key=api_key, timeout=15.0, max_retries=0)
     result = client.models.retrieve(model)
     return str(getattr(result, 'id', '') or model)
+
+
+# 현재 이 프리셋을 사용하는 화면과, 각 화면이 호출 기록을 남기는 테이블.
+# 새 화면이 이 프리셋으로 AI API를 호출하게 되면 여기에 한 줄만 추가하면
+# API 사용량 집계에 자동으로 합산된다.
+USAGE_SOURCES = (
+    ('smart_document_history', '스마트공문발송'),
+    ('ai_agent_history', 'AI에이전트'),
+)
+
+
+def _table_exists(conn, name: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone() is not None
+
+
+def get_combined_usage_summary(conn=None) -> dict[str, Any]:
+    """여러 화면이 같은 프리셋으로 호출한 AI API 사용량을 한 곳에 합산해 보여준다."""
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
+    try:
+        sources = []
+        monthly_parts = []
+        for table, label in USAGE_SOURCES:
+            if not _table_exists(conn, table):
+                continue
+            row = conn.execute(f'''
+                SELECT COUNT(*) AS requests,
+                       COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                       COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                       COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                       MIN(created_at) AS first_used_at,
+                       MAX(created_at) AS last_used_at
+                FROM {table}
+            ''').fetchone()
+            sources.append({
+                'key': table,
+                'label': label,
+                'requests': int(row['requests'] or 0),
+                'input_tokens': int(row['input_tokens'] or 0),
+                'output_tokens': int(row['output_tokens'] or 0),
+                'total_tokens': int(row['total_tokens'] or 0),
+                'first_used_at': str(row['first_used_at'] or ''),
+                'last_used_at': str(row['last_used_at'] or ''),
+            })
+            monthly_parts.append(
+                f"SELECT SUBSTR(created_at, 1, 7) AS month, total_tokens FROM {table}"
+            )
+
+        totals = {
+            'requests': sum(item['requests'] for item in sources),
+            'input_tokens': sum(item['input_tokens'] for item in sources),
+            'output_tokens': sum(item['output_tokens'] for item in sources),
+            'total_tokens': sum(item['total_tokens'] for item in sources),
+        }
+
+        monthly = []
+        if monthly_parts:
+            union_sql = ' UNION ALL '.join(monthly_parts)
+            monthly = [
+                dict(row) for row in conn.execute(f'''
+                    SELECT month, COUNT(*) AS requests, COALESCE(SUM(total_tokens), 0) AS total_tokens
+                    FROM ({union_sql})
+                    GROUP BY month ORDER BY month DESC LIMIT 12
+                ''').fetchall()
+            ]
+
+        return {'sources': sources, 'totals': totals, 'monthly': monthly}
+    finally:
+        if owns_connection:
+            conn.close()

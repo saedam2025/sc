@@ -48,6 +48,25 @@ def _csrf_required(view):
     return wrapped
 
 
+def _is_mobile_request() -> bool:
+    """휴대폰 요청만 모바일 전용 화면으로 분리한다(메인 화면과 동일한 판별 기준)."""
+    requested_view = str(request.args.get("view") or "").strip().lower()
+    if requested_view == "desktop":
+        return False
+    if requested_view == "mobile":
+        return True
+
+    if str(request.headers.get("Sec-CH-UA-Mobile") or "").strip() == "?1":
+        return True
+
+    user_agent = str(request.headers.get("User-Agent") or "").lower()
+    mobile_tokens = (
+        "android", "iphone", "ipad", "ipod", "windows phone",
+        "iemobile", "opera mini", "mobile",
+    )
+    return any(token in user_agent for token in mobile_tokens)
+
+
 def _conversation_id() -> str:
     value = str(session.get("ai_agent_conversation_id") or "")
     if not value:
@@ -75,8 +94,9 @@ def _user_context() -> dict:
 @ai_agent_bp.route("/ai-agent", strict_slashes=False)
 def index():
     configuration = get_ai_agent_configuration(_user_context())
+    template_name = "ai_agent_mobile.html" if _is_mobile_request() else "ai_agent.html"
     return render_template(
-        "ai_agent.html",
+        template_name,
         ai_agent_csrf_token=_csrf_token(),
         ai_agent_configuration=configuration,
         ai_agent_model_configured=configuration["configured"],

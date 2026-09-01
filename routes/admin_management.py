@@ -1574,6 +1574,7 @@ def _render_ai_settings(**extra):
         provider_models=ai_settings.PROVIDER_MODELS,
         model_labels=ai_settings.MODEL_LABELS,
         max_presets=ai_settings.MAX_PRESETS,
+        usage_summary=ai_settings.get_combined_usage_summary(),
         **extra,
     )
 
@@ -1654,6 +1655,8 @@ def test_ai_preset_route():
             message = '서버에 연결할 수 없습니다. 네트워크 설정을 확인해주세요.'
         elif error_name == 'RateLimitError':
             message = '사용 한도 또는 크레딧을 확인해주세요.'
+        elif error_name == 'RuntimeError':
+            message = str(exc)
         else:
             message = '연결 테스트에 실패했습니다.'
         return jsonify({'status': 'error', 'message': message}), 502
