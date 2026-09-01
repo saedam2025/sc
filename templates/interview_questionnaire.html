@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>면접자 사전질문지</title>
+<style>
+    :root { --ink:#182231; --muted:#6b7889; --line:#e0e7ee; --brand:#19a887; --brand-dark:#0b7a63; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:26px 16px 60px; background:#eef2f5; color:var(--ink);
+           font-family:"Pretendard","Malgun Gothic",-apple-system,sans-serif; line-height:1.6; }
+    .sheet { width:100%; max-width:760px; margin:0 auto; border:1px solid #cfd8e1; border-radius:18px;
+             background:#fff; box-shadow:0 14px 40px rgba(24,34,49,.09); overflow:hidden; }
+    header { padding:30px 34px 24px; border-bottom:3px double #2b3542; text-align:center; }
+    header span { display:block; margin-bottom:10px; color:var(--brand-dark); font-size:.72rem;
+                  font-weight:800; letter-spacing:.18em; }
+    header h1 { margin:0; font-size:1.6rem; letter-spacing:-.02em; }
+    header p { margin:12px 0 0; color:var(--muted); font-size:.86rem; }
+    .who { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:16px; }
+    .who b { padding:6px 13px; border-radius:999px; background:#eef8f5; color:var(--brand-dark);
+             font-size:.76rem; font-weight:750; }
+    form { padding:26px 34px 34px; }
+    .field { margin-bottom:22px; }
+    .field label { display:block; margin-bottom:7px; font-size:.94rem; font-weight:800; }
+    .field small { display:block; margin-bottom:9px; color:var(--muted); font-size:.79rem; font-weight:400; }
+    textarea { width:100%; padding:12px 14px; border:1.5px solid #b6c3cf; border-radius:11px;
+               background:#fbfdfe; color:var(--ink); font:inherit; resize:vertical; outline:0; }
+    textarea:focus { border-color:var(--brand); background:#fff; box-shadow:0 0 0 3px rgba(25,168,135,.15); }
+    .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:28px;
+               padding-top:20px; border-top:1px solid var(--line); }
+    button { min-height:50px; padding:12px 30px; border:0; border-radius:13px;
+             background:linear-gradient(115deg,var(--brand),#3f8fd0); color:#fff;
+             font-size:1rem; font-weight:800; cursor:pointer; }
+    button:hover { filter:brightness(1.05); }
+    .note { margin:0 34px 22px; padding:13px 16px; border-radius:12px; background:#f4f8fb;
+            color:var(--muted); font-size:.8rem; }
+    .done { padding:56px 34px; text-align:center; }
+    .done .mark { width:74px; height:74px; display:grid; place-items:center; margin:0 auto 20px;
+                  border-radius:50%; background:#e6f7f2; color:var(--brand-dark); font-size:2.1rem; }
+    .done h2 { margin:0 0 10px; font-size:1.3rem; }
+    .done p { margin:0; color:var(--muted); font-size:.9rem; }
+    .done ul { max-width:520px; margin:26px auto 0; padding:18px 22px; border:1px solid var(--line);
+               border-radius:13px; background:#fbfdfe; text-align:left; font-size:.83rem; color:var(--muted); }
+    .done li { margin:0 0 7px; }
+    @media (max-width:560px) {
+        header, form { padding-left:20px; padding-right:20px; }
+        .note { margin-left:20px; margin-right:20px; }
+    }
+</style>
+</head>
+<body>
+<div class="sheet">
+{% if invalid %}
+    <div class="done">
+        <div class="mark">!</div>
+        <h2>사용할 수 없는 링크입니다</h2>
+        <p>링크가 만료되었거나 주소가 정확하지 않습니다.<br>담당자에게 다시 문의해주세요.</p>
+    </div>
+{% elif submitted %}
+    <div class="done">
+        <div class="mark">✓</div>
+        <h2>사전질문지가 전송되었습니다</h2>
+        <p>작성해주셔서 감사합니다. 면접 때 참고하겠습니다.</p>
+        <ul>
+            {% for key, title, hint, rows in fields %}
+            <li><b>{{ title }}</b> · {{ '작성함' if answers.get(key) else '미작성' }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% else %}
+    <header>
+        <span>SAEDAM INTERVIEW</span>
+        <h1>면접자 사전질문지</h1>
+        <p>면접 전 아래 항목을 작성해주세요. 작성하신 내용은 면접 참고자료로만 사용됩니다.</p>
+        <div class="who">
+            <b>{{ candidate['name'] }} 님</b>
+            {% if candidate['target_position'] %}<b>{{ candidate['target_position'] }}</b>{% endif %}
+            {% if candidate['target_school'] %}<b>{{ candidate['target_school'] }}</b>{% endif %}
+            {% if candidate['interview_at'] %}<b>면접 {{ candidate['interview_at'].replace('T', ' ') }}</b>{% endif %}
+        </div>
+    </header>
+    <div class="note">전송 후에도 이 링크로 다시 들어오면 내용을 수정해 다시 전송할 수 있습니다.</div>
+    <form method="post">
+        {% for key, title, hint, rows in fields %}
+        <div class="field">
+            <label for="{{ key }}">{{ loop.index }}. {{ title }}</label>
+            <small>{{ hint }}</small>
+            <textarea id="{{ key }}" name="{{ key }}" rows="{{ rows }}" maxlength="4000">{{ answers.get(key, '') }}</textarea>
+        </div>
+        {% endfor %}
+        <div class="actions">
+            <button type="submit">사전질문지 전송</button>
+        </div>
+    </form>
+{% endif %}
+</div>
+</body>
+</html>

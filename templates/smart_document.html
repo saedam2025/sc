@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/smart_document.css', v='20260829-18') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/smart_document.css', v='20260901-15') }}">
 
 <main class="sd-page">
     <section class="sd-hero" aria-labelledby="smartDocumentTitle">
@@ -13,9 +13,9 @@
                 <p>AI를 이용하여 공문을 쉽고 빠르게 작성할 수 있습니다.</p>
             </div>
         </div>
-        <div class="sd-api-status-pill {{ 'is-connected' if ai_status.source != 'none' else '' }}" id="openAiStatusPill" title="AI API 설정은 통합관리 > AI api설정에서 관리합니다.">
-            <i class="fa-solid {{ 'fa-circle-check' if ai_status.source != 'none' else 'fa-circle-info' }}"></i>
-            <span id="openAiStatusText">{{ ai_status.status_text }}</span>
+        <div class="sd-ai-brand" id="openAiStatusPill" title="AI API 설정은 통합관리 > AI api설정에서 관리합니다.">
+            <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="sd-ai-brand-logo">
+            <p class="sd-ai-brand-preset" id="openAiStatusText">{% if ai_status.source != 'none' %}SaeDam AI Preset {{ ai_status.preset_id }} - {{ ai_status.model_short_name }}.{% else %}SaeDam AI Preset 미설정{% endif %}</p>
         </div>
     </section>
 
@@ -114,7 +114,6 @@
                 <button type="button" data-management="templates"><i class="fa-solid fa-layer-group"></i><span><strong>공문 템플릿</strong><small>공문 작성 형식 관리</small></span><i class="fa-solid fa-chevron-right"></i></button>
                 <button type="button" data-management="recipients"><i class="fa-solid fa-address-book"></i><span><strong>수신자 목록</strong><small>기관·담당자·이메일 관리</small></span><i class="fa-solid fa-chevron-right"></i></button>
                 <button type="button" data-management="history"><i class="fa-solid fa-clock-rotate-left"></i><span><strong>사용 기록</strong><small>발송 공문 보기·기록 삭제</small></span><i class="fa-solid fa-chevron-right"></i></button>
-                <button type="button" data-management="usage"><i class="fa-solid fa-chart-simple"></i><span><strong>API 사용량</strong><small>요청·입출력 토큰 집계</small></span><i class="fa-solid fa-chevron-right"></i></button>
             </nav>
         </aside>
     </section>
@@ -185,20 +184,37 @@
     <section class="sd-modal sd-management-modal" role="dialog" aria-modal="true" aria-labelledby="managementTitle">
         <header><div><span class="sd-card-kicker">SMART DOCUMENT SETTINGS</span><h2 id="managementTitle">스마트 공문 관리</h2></div><button class="sd-icon-button" id="closeManagement" type="button" aria-label="관리창 닫기"><i class="fa-solid fa-xmark"></i></button></header>
         <div class="sd-management-tabs">
-            <button data-management-tab="companies">회사 정보</button><button data-management-tab="templates">템플릿</button><button data-management-tab="recipients">수신자</button><button data-management-tab="history">사용 기록</button><button data-management-tab="usage">API 사용량</button>
+            <button data-management-tab="companies">회사 정보</button><button data-management-tab="templates">템플릿</button><button data-management-tab="recipients">수신자</button><button data-management-tab="history">사용 기록</button>
         </div>
         <div class="sd-modal-body sd-management-body">
             <section class="sd-management-panel" data-panel="companies">
-                <div class="sd-panel-layout"><form id="companyForm" class="sd-manage-form"><input id="companyId" type="hidden"><div class="sd-form-grid"><div><label>회사명</label><input id="companyName" required></div><div><label>대표자명</label><input id="companyRepresentative" required></div><div><label>사업자번호</label><input id="companyBusinessNumber"></div><div><label>문서번호 앞자리</label><input id="companyDocumentPrefix" value="새담"></div><div class="full"><label>회사 주소</label><input id="companyAddress"></div><div><label>전화번호</label><input id="companyPhone"></div><div><label>이메일</label><input id="companyEmail" type="email"></div><div class="full"><label>회사 직인 <small>PNG·JPG·WEBP, 2MB 이하</small></label><input id="companySeal" type="file" accept="image/png,image/jpeg,image/webp"></div><label class="sd-inline-check full"><input id="companyDefault" type="checkbox"> 기본 발송 회사로 사용</label></div><div class="sd-form-actions"><button class="sd-button" id="resetCompanyForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 회사 저장</button></div></form><div class="sd-resource-list" id="companyList"></div></div>
+                <div class="sd-panel-layout"><form id="companyForm" class="sd-manage-form"><input id="companyId" type="hidden"><div class="sd-form-grid"><div><label>회사명</label><input id="companyName" required></div><div><label>대표자명</label><input id="companyRepresentative" required></div><div><label>사업자번호</label><input id="companyBusinessNumber"></div><div><label>문서번호 앞자리</label><input id="companyDocumentPrefix" value="새담"></div><div class="full"><label>회사 주소</label><input id="companyAddress"></div><div><label>전화번호</label><input id="companyPhone"></div><div><label>이메일</label><input id="companyEmail" type="email"></div><div class="full"><label>회사 직인 <small>PNG·JPG·WEBP·GIF, 2MB 이하</small></label><input id="companySeal" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div><label class="sd-inline-check full"><input id="companyDefault" type="checkbox"> 기본 발송 회사로 사용</label></div><div class="sd-form-actions"><button class="sd-button" id="resetCompanyForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> 회사 저장</button></div></form><div class="sd-resource-list" id="companyList"></div></div>
             </section>
             <section class="sd-management-panel" data-panel="templates" hidden>
-                <div class="sd-panel-layout"><form id="templateForm" class="sd-manage-form"><input id="templateId" type="hidden"><div class="sd-form-grid"><div class="full"><label>템플릿 이름</label><input id="templateName" required></div><div class="full"><label>작성 지침</label><textarea id="templateInstruction" rows="6" placeholder="공문 어조, 필수 항목, 문단 구성 등을 입력하세요."></textarea></div><div class="full"><label>기본 인사말</label><input id="templateGreeting"></div><div class="full"><label>기본 맺음말</label><input id="templateClosing" value="끝."></div><label class="sd-inline-check full"><input id="templateDefault" type="checkbox"> 기본 템플릿으로 사용</label></div><div class="sd-form-actions"><button class="sd-button" id="resetTemplateForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit">템플릿 저장</button></div></form><div class="sd-resource-list" id="templateList"></div></div>
+                <div class="sd-panel-layout"><form id="templateForm" class="sd-manage-form"><input id="templateId" type="hidden"><div class="sd-form-grid">
+                    <div class="full"><label>템플릿 이름</label><input id="templateName" required></div>
+                    <div class="full"><label>템플릿 작성 지침</label><textarea id="templateInstruction" rows="3" placeholder="공문 어조, 필수 항목, 문단 구성 등을 입력하세요."></textarea></div>
+                    <div class="full"><label>공문 제목</label><input id="templateSubject" placeholder="예) 방과후 영어강사 파견 안내 (비워두면 AI가 매번 작성)"></div>
+                    <div class="full"><label>수신</label><input id="templateRecipient" placeholder="예) ○○초등학교장 (비워두면 AI 또는 선택한 수신자로 작성)"></div>
+                    <div class="full">
+                        <label>입력내용</label>
+                        <div class="sd-template-items" id="templateItems"></div>
+                    </div>
+                    <div class="full sd-template-boundary">
+                        <label class="sd-inline-check"><input id="templateGreetingEnabled" type="checkbox"> 기본 인사말 <small>(내용 맨 상단에 입력됨)</small></label>
+                        <input id="templateGreeting" placeholder="예) 귀 기관의 무궁한 발전을 기원합니다.">
+                    </div>
+                    <div class="full">
+                        <label class="sd-inline-check"><input id="templateClosingEnabled" type="checkbox"> 기본 맺음말 <small>(내용 맨 하단에 입력됨)</small></label>
+                        <input id="templateClosing" value="끝.">
+                    </div>
+                    <label class="sd-inline-check full"><input id="templateDefault" type="checkbox"> 기본 템플릿으로 사용</label>
+                </div><div class="sd-form-actions"><button class="sd-button" id="resetTemplateForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit">템플릿 저장</button></div></form><div class="sd-resource-list" id="templateList"></div></div>
             </section>
             <section class="sd-management-panel" data-panel="recipients" hidden>
                 <div class="sd-panel-layout"><form id="recipientForm" class="sd-manage-form"><input id="recipientId" type="hidden"><div class="sd-form-grid"><div class="full"><label>기관명</label><input id="recipientOrganization" required></div><div><label>담당자명</label><input id="recipientName"></div><div><label>이메일</label><input id="recipientEmail" type="email" required></div><div class="full"><label>메모</label><textarea id="recipientMemo" rows="4"></textarea></div></div><div class="sd-form-actions"><button class="sd-button" id="resetRecipientForm" type="button">새로 입력</button><button class="sd-button sd-button-primary" type="submit">수신자 저장</button></div></form><div class="sd-resource-list" id="recipientList"></div></div>
             </section>
             <section class="sd-management-panel" data-panel="history" hidden><div class="sd-history-list" id="historyList"></div></section>
-            <section class="sd-management-panel" data-panel="usage" hidden><div class="sd-usage-summary" id="usageSummary"></div><div class="sd-history-list" id="usageMonthly"></div><p class="sd-usage-note">토큰 사용량은 실제 Responses API 응답 기준입니다. 금액은 모델별 가격 변동 때문에 표시하지 않습니다.</p></section>
         </div>
         <footer><span id="managementFeedback" role="status"></span><button class="sd-button" id="closeManagementFooter" type="button">닫기</button></footer>
     </section>
@@ -206,5 +222,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/smart_document.js', v='20260830-03') }}"></script>
+<script src="{{ url_for('static', filename='js/smart_document.js', v='20260901-10') }}"></script>
 {% endblock %}

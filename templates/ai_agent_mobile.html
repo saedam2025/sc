@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/ai_agent.css', v='20260831-22') }}">
 {% endblock %}
 
-{% block body_class %}ai-agent-body{% endblock %}
+{% block body_class %}ai-agent-body ai-agent-mobile-body{% endblock %}
 
 {% block content %}
 <section
@@ -36,6 +36,9 @@
     <div class="ai-agent-main">
         <header class="ai-agent-header">
             <div class="ai-agent-heading">
+                <a href="{{ url_for('main.index') }}" class="ai-agent-back-home" title="홈으로" aria-label="홈으로">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                </a>
                 <button id="aiAgentSidebarToggle" class="ai-agent-sidebar-toggle" type="button" title="대화 기록">
                     <i class="fa-solid fa-bars" aria-hidden="true"></i>
                 </button>
@@ -111,8 +114,6 @@
     <div class="ai-agent-row-divider ai-agent-row-divider-bottom" aria-hidden="true"></div>
     <div id="aiAgentSidebarBackdrop" class="ai-agent-sidebar-backdrop"></div>
 </section>
-
-<footer class="main-page-copyright">Copyright &copy; 2026 Saedam Youth Education &amp; Culture Center. All Rights Reserved.</footer>
 {% endblock %}
 
 {% block scripts %}

@@ -53,6 +53,22 @@
     .stat-value { margin-top: 8px; font-size: 22px; font-weight: 900; color: var(--primary-color, #4a90e2); }
     .stat-hint { margin-top: 5px; color: var(--text-gray, #64748b); font-size: 11px; font-weight: 700; }
     .stat-icon { float: right; color: var(--primary-color, #4a90e2); opacity: .72; font-size: 15px; }
+    .usage-mini-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .usage-mini-stat { display: inline-flex; align-items: baseline; gap: 5px; padding: 5px 13px; border-radius: 999px; background: var(--widget-bg, #f7f9fc); border: 1px solid var(--border-color, #dbe3ef); font-size: 12px; font-weight: 700; color: var(--text-gray, #64748b); white-space: nowrap; }
+    .usage-mini-stat strong { font-size: 14.5px; font-weight: 900; color: var(--primary-color, #4a90e2); }
+    .preset-current-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+    .preset-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 13px; border-radius: 999px; background: var(--widget-bg, #f7f9fc); border: 1px solid var(--border-color, #dbe3ef); font-size: 12.5px; font-weight: 800; color: var(--text-dark, #1e293b); }
+    .preset-chip-accent { background: color-mix(in srgb, var(--primary-color, #4a90e2) 14%, transparent); border-color: color-mix(in srgb, var(--primary-color, #4a90e2) 35%, transparent); color: var(--primary-color, #4a90e2); }
+    .preset-chip-warn { background: color-mix(in srgb, #c43d3d 12%, transparent); border-color: color-mix(in srgb, #c43d3d 30%, transparent); color: #c43d3d; }
+    .preset-meta-text { margin-top: 7px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 600; }
+    .preset-switch-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+    .preset-switch-btn { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; padding: 13px 16px; border-radius: 14px; border: 1px solid var(--border-color, #dbe3ef); background: var(--widget-bg, #f7f9fc); cursor: pointer; text-align: left; transition: border-color .15s, box-shadow .15s, background .15s; }
+    .preset-switch-btn:hover:not(:disabled) { border-color: var(--primary-color, #4a90e2); }
+    .preset-switch-btn:disabled { cursor: default; }
+    .preset-switch-btn.is-active { border-color: var(--primary-color, #4a90e2); background: color-mix(in srgb, var(--primary-color, #4a90e2) 10%, var(--card-bg, #fff)); box-shadow: 0 0 0 1px var(--primary-color, #4a90e2); }
+    .preset-switch-name { font-size: 14.5px; font-weight: 900; color: var(--text-dark, #1e293b); }
+    .preset-switch-meta { font-size: 11.5px; font-weight: 700; color: var(--text-gray, #64748b); }
+    .preset-switch-check { position: absolute; top: 12px; right: 14px; color: var(--primary-color, #4a90e2); font-size: 15px; }
     .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th, .data-table td { padding: 10px 9px; border-bottom: 1px solid var(--border-color, #e2e8f0); text-align: left; vertical-align: middle; }
     .data-table th { color: var(--text-gray, #64748b); font-size: 12px; font-weight: 900; background: rgba(248,250,252,.7); }
@@ -801,24 +817,69 @@
         {% if error %}<div class="empty-note" style="color:#c43d3d;border-color:#f0b8b8;background:#fdf3f3;">{{ error }}</div>{% endif %}
 
         <div class="panel">
-            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-plug-circle-bolt"></i> 현재 적용 프리셋</h2>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <h2 class="panel-title" style="margin:0;"><i class="fa-solid fa-chart-simple"></i> API 사용량</h2>
+                    <div class="usage-mini-row">
+                        <span class="usage-mini-stat"><strong>{{ "{:,}".format(usage_summary.totals.requests) }}</strong>회 전체 API 요청</span>
+                        <span class="usage-mini-stat">입력 토큰 <strong>{{ "{:,}".format(usage_summary.totals.input_tokens) }}</strong></span>
+                        <span class="usage-mini-stat">출력 토큰 <strong>{{ "{:,}".format(usage_summary.totals.output_tokens) }}</strong></span>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-ghost" id="toggleUsagePanel" aria-expanded="false">
+                    <span id="toggleUsageLabel">자세히 보기</span> <i class="fa-solid fa-chevron-down" id="toggleUsageIcon"></i>
+                </button>
+            </div>
+            <div id="usagePanelBody" hidden style="margin-top:16px;">
+                <p class="muted" style="margin-bottom:14px;">AI에이전트, 스마트공문발송 등 이 프리셋을 사용하는 모든 화면의 호출량을 합산한 값입니다. 화면이 늘어나도 이 표에 자동으로 합산됩니다.</p>
+                <div class="table-scroll">
+                    <table class="data-table"><thead><tr><th>화면</th><th>요청</th><th>전체 토큰</th><th>최근 사용</th></tr></thead><tbody>
+                        {% for source in usage_summary.sources %}
+                        <tr>
+                            <td>{{ source.label }}</td>
+                            <td>{{ "{:,}".format(source.requests) }}회</td>
+                            <td>{{ "{:,}".format(source.total_tokens) }}</td>
+                            <td>{{ source.last_used_at or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="empty-note">기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody></table>
+                </div>
+                <div class="table-scroll" style="margin-top:14px;">
+                    <table class="data-table"><thead><tr><th>월</th><th>요청</th><th>전체 토큰</th></tr></thead><tbody>
+                        {% for row in usage_summary.monthly %}
+                        <tr><td>{{ row.month }}</td><td>{{ "{:,}".format(row.requests) }}회</td><td>{{ "{:,}".format(row.total_tokens) }}</td></tr>
+                        {% else %}
+                        <tr><td colspan="3" class="empty-note">기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody></table>
+                </div>
+                <p class="muted" style="margin-top:10px; font-size:12px;">토큰 사용량은 실제 API 응답 기준입니다. 금액은 모델별 가격 변동 때문에 표시하지 않습니다.</p>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2 class="panel-title" style="margin-bottom: 14px;"><i class="fa-solid fa-plug-circle-bolt"></i> 현재 적용 프리셋</h2>
             {% set active_preset = preset_data.presets[preset_data.active] %}
-            <p class="muted" style="font-size:15px;">
-                <strong>{{ active_preset.label }} · {{ active_preset.provider_label }} {{ active_preset.model }}</strong>
-                {% if active_preset.has_menu_key %} · 등록 키 {{ active_preset.masked_key }}{% endif %}
-                {% if not active_preset.configured %} · <span style="color:#c43d3d;">API 미설정</span>{% endif %}
-                {% if active_preset.updated_by %} · {{ active_preset.updated_by }}님이 {{ active_preset.updated_at }}에 등록{% endif %}
-            </p>
-            <div class="form-row" style="margin-top:14px;">
+            <div class="preset-current-chips">
+                <span class="preset-chip preset-chip-accent"><i class="fa-solid fa-star"></i> {{ active_preset.label }}</span>
+                <span class="preset-chip">{{ active_preset.provider_label }} {{ active_preset.model }}</span>
+                {% if active_preset.has_menu_key %}<span class="preset-chip"><i class="fa-solid fa-key"></i> {{ active_preset.masked_key }}</span>{% endif %}
+                {% if not active_preset.configured %}<span class="preset-chip preset-chip-warn"><i class="fa-solid fa-triangle-exclamation"></i> API 미설정</span>{% endif %}
+            </div>
+            {% if active_preset.updated_by %}<div class="preset-meta-text">{{ active_preset.updated_by }}님이 {{ active_preset.updated_at }}에 등록</div>{% endif %}
+            <div class="preset-switch-row">
                 {% for i in range(1, preset_data.visible_count + 1) %}
                 {% set preset_id = i|string %}
                 {% set p = preset_data.presets[preset_id] %}
                 <form action="/admin/ai-settings/activate" method="post" style="display:contents;">
                     <input type="hidden" name="preset_id" value="{{ preset_id }}">
-                    <button class="btn {{ 'btn-primary' if preset_data.active == preset_id else 'btn-ghost' }}" type="submit"
+                    <button class="preset-switch-btn{% if preset_data.active == preset_id %} is-active{% endif %}" type="submit"
                             {% if preset_data.active == preset_id %}disabled{% endif %}>
-                        {% if preset_data.active == preset_id %}<i class="fa-solid fa-check"></i>{% endif %}
-                        {{ p.label }} ({{ p.provider_label }}{% if not p.configured %} · 미설정{% endif %})
+                        {% if preset_data.active == preset_id %}<i class="fa-solid fa-circle-check preset-switch-check"></i>{% endif %}
+                        <span class="preset-switch-name">{{ p.label }}</span>
+                        <span class="preset-switch-meta">{{ p.provider_label }}{% if not p.configured %} · 미설정{% endif %}</span>
                     </button>
                 </form>
                 {% endfor %}
@@ -850,7 +911,7 @@
                             <select name="model" class="ai-preset-model"></select>
                         </div>
                         <div class="form-field" style="margin-bottom:10px;">
-                            <label>API 키 {% if p.has_menu_key %}<small>(변경 시에만 입력, 현재 {{ p.masked_key }})</small>{% endif %}</label>
+                            <label>API 키 {% if p.has_menu_key %}<small>(변경 시에만 입력, 현재 {{ p.masked_key }})</small>{% else %}<small>(입력 키 없음)</small>{% endif %}</label>
                             <input type="password" name="api_key" class="ai-preset-key" autocomplete="new-password" placeholder="API 키 입력">
                         </div>
                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -870,7 +931,6 @@
                 <button class="btn btn-ghost" type="submit"><i class="fa-solid fa-plus"></i> 프리셋 추가 ({{ preset_data.visible_count }}/{{ max_presets }})</button>
             </form>
             {% endif %}
-            <p class="muted" style="margin-top:14px;">프리셋에 키를 등록하지 않으면 그 프리셋의 제공사에 맞는 서버 환경변수(OpenAI: OPENAI_API_KEY, Claude: ANTHROPIC_API_KEY)를 대신 사용합니다.</p>
         </div>
         {% endif %}
 
@@ -1011,6 +1071,21 @@ if (aiPresetForms.length) {
                 testBtn.innerHTML = '<i class="fa-solid fa-plug-circle-check"></i> 테스트';
             }
         });
+    });
+}
+
+const toggleUsageBtn = document.getElementById('toggleUsagePanel');
+if (toggleUsageBtn) {
+    toggleUsageBtn.addEventListener('click', function () {
+        const body = document.getElementById('usagePanelBody');
+        const icon = document.getElementById('toggleUsageIcon');
+        const label = document.getElementById('toggleUsageLabel');
+        const expanded = !body.hidden;
+        body.hidden = expanded;
+        toggleUsageBtn.setAttribute('aria-expanded', String(!expanded));
+        label.textContent = expanded ? '자세히 보기' : '접기';
+        icon.classList.toggle('fa-chevron-down', expanded);
+        icon.classList.toggle('fa-chevron-up', !expanded);
     });
 }
 {% endif %}

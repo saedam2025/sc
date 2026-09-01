@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260901-02') }}">
+
+<main class="iv-page">
+    <section class="iv-hero">
+        <div class="iv-hero-copy">
+            <span class="iv-hero-icon"><i class="fa-solid fa-user-check"></i></span>
+            <div>
+                <span class="iv-eyebrow">SAEDAM INTERVIEW</span>
+                <h1>면접진행</h1>
+                <p>면접 전에 면접자 정보와 이력서를 등록하고, 사전질문지·면접관 평가까지 한곳에서 관리합니다.</p>
+            </div>
+        </div>
+        <button class="iv-button iv-button-primary" id="openCreate" type="button">
+            <i class="fa-solid fa-user-plus"></i> 면접자 입력
+        </button>
+    </section>
+
+    <section class="iv-toolbar">
+        <div class="iv-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="searchInput" type="search" placeholder="이름·직급·학교로 찾기" autocomplete="off">
+        </div>
+        <span class="iv-count" id="candidateCount">불러오는 중…</span>
+    </section>
+
+    <section class="iv-list" id="candidateList"></section>
+</main>
+
+<!-- 면접자 등록/수정 -->
+<div class="iv-modal-backdrop" id="candidateModal" hidden>
+    <section class="iv-modal" role="dialog" aria-modal="true" aria-labelledby="candidateModalTitle">
+        <header>
+            <div><span class="iv-kicker">INTERVIEW CANDIDATE</span><h2 id="candidateModalTitle">면접자 입력</h2></div>
+            <button class="iv-icon-button" id="closeCandidateModal" type="button" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="iv-modal-body">
+            <form id="candidateForm">
+                <input id="candidateId" type="hidden">
+                <div class="iv-form-grid">
+                    <div><label for="fieldName">이름 <b>*</b></label><input id="fieldName" required maxlength="60"></div>
+                    <div>
+                        <label for="fieldPosition">대상 직급</label>
+                        <input id="fieldPosition" list="positionOptions" maxlength="60" placeholder="선택 또는 직접 입력">
+                        <datalist id="positionOptions">
+                            {% for item in positions %}<option value="{{ item }}"></option>{% endfor %}
+                        </datalist>
+                    </div>
+                    <div>
+                        <label for="fieldSchool">대상학교</label>
+                        <input id="fieldSchool" list="schoolOptions" maxlength="120" placeholder="선택 또는 직접 입력">
+                        <datalist id="schoolOptions">
+                            {% for item in schools %}<option value="{{ item }}"></option>{% endfor %}
+                        </datalist>
+                    </div>
+                    <div><label for="fieldInterviewAt">면접일시</label><input id="fieldInterviewAt" type="datetime-local"></div>
+                    <div class="full"><label for="fieldMemo">면접 준비 메모</label><textarea id="fieldMemo" rows="3" maxlength="2000" placeholder="확인할 사항, 질문 예정 내용 등"></textarea></div>
+                    <div class="full" id="createFileRow">
+                        <label for="fieldFiles">이력서 등 첨부하기 <small>이력서·자기소개서·경력증명서 · 파일당 20MB 이하, 최대 10개</small></label>
+                        <input id="fieldFiles" type="file" multiple>
+                    </div>
+                </div>
+                <div class="iv-modal-actions">
+                    <button class="iv-button" id="cancelCandidate" type="button">취소</button>
+                    <button class="iv-button iv-button-primary" type="submit" id="submitCandidate"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+                </div>
+                <p class="iv-feedback" id="candidateFeedback" role="status"></p>
+            </form>
+        </div>
+    </section>
+</div>
+
+<!-- 면접 상세 -->
+<div class="iv-modal-backdrop" id="detailModal" hidden>
+    <section class="iv-modal iv-modal-wide" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+        <header>
+            <div><span class="iv-kicker">INTERVIEW SHEET</span><h2 id="detailTitle">면접 진행표</h2></div>
+            <button class="iv-icon-button" id="closeDetailModal" type="button" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
+        </header>
+        <div class="iv-modal-body" id="detailBody"></div>
+        <footer>
+            <span class="iv-feedback" id="detailFeedback" role="status"></span>
+            <button class="iv-button" id="closeDetailFooter" type="button">닫기</button>
+        </footer>
+    </section>
+</div>
+
+<template id="questionnaireLabels">
+    {% for key, title, hint, rows in questionnaire_fields %}<i data-key="{{ key }}" data-title="{{ title }}"></i>{% endfor %}
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>window.IV_MAX_PANELISTS = {{ max_panelists }};</script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260901-02') }}"></script>
+{% endblock %}
