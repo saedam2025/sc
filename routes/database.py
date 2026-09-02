@@ -743,9 +743,11 @@ def init_db():
     )''')
 
     # 상단 주메뉴와 서브메뉴의 회원 레벨별 접근 기준.
+    # block_north_branch=1이면 소속부서가 북부지점인 회원에게만 메뉴를 숨긴다.
     c.execute('''CREATE TABLE IF NOT EXISTS menu_access_permissions (
         menu_key TEXT PRIMARY KEY,
         max_level INTEGER NOT NULL CHECK(max_level BETWEEN -1 AND 99),
+        block_north_branch INTEGER NOT NULL DEFAULT 0,
         updated_by TEXT,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )''')

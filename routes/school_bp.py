@@ -5,6 +5,8 @@ from routes.organization import classify_organization_group
 from routes.menu_access import (
     SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS,
     center_director_mode_active,
+    is_department_blocked_member,
+    load_menu_department_blocks,
     load_menu_max_levels,
     menu_is_allowed,
     shared_board_action_is_allowed,
@@ -124,10 +126,12 @@ def build_school_calendar_annotations(years=None):
             solar_terms[f'{year}-{month_day}'] = name
     return public_holidays, solar_terms
 
-def can_access_school_category(category, max_levels=None):
+def can_access_school_category(category, max_levels=None, department_blocks=None):
     category_id = SCHOOL_CATEGORY_ALIASES.get(str(category or '').strip(), str(category or '').strip())
     permission_key = SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS.get(category_id)
-    return not permission_key or menu_is_allowed(permission_key, max_levels=max_levels)
+    return not permission_key or menu_is_allowed(
+        permission_key, max_levels=max_levels, department_blocks=department_blocks
+    )
 
 
 def build_school_post_list_queries(school_id, category, category_name, search_query=''):
@@ -787,9 +791,16 @@ def school_detail(school_key):
         })
 
     menu_max_levels = load_menu_max_levels()
+    menu_department_blocks = (
+        load_menu_department_blocks() if is_department_blocked_member() else {}
+    )
     school_categories = [
         cat for cat in all_school_categories
-        if menu_is_allowed(cat['permission_key'], max_levels=menu_max_levels)
+        if menu_is_allowed(
+            cat['permission_key'],
+            max_levels=menu_max_levels,
+            department_blocks=menu_department_blocks,
+        )
     ]
     if not school_categories:
         conn.close()

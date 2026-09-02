@@ -28,10 +28,14 @@ from .storage import (
     delete_storage_target,
 )
 from .menu_access import (
+    DEPARTMENT_BLOCK_FIELD_PREFIX,
+    DEPARTMENT_BLOCK_LABEL,
+    DEPARTMENT_BLOCK_TARGET_LABEL,
     MENU_CATALOG,
     MENU_GROUPS,
     SCHOOL_DIRECTOR_SCOPE_SETTING,
     ensure_menu_access_schema,
+    load_menu_department_blocks,
     load_menu_max_levels,
     school_director_scope_enabled,
 )
@@ -806,17 +810,26 @@ def menu_permissions():
                     return f'잘못된 메뉴 권한 값입니다: {menu_key}', 400
                 if max_level < -1 or max_level > 99:
                     return f'메뉴 권한 레벨은 -1~99 범위여야 합니다: {menu_key}', 400
-                updates[menu_key] = max_level
+                # 체크된 메뉴(본부전용)만 소속부서가 북부지점인 회원에게 숨긴다.
+                block_north_branch = 1 if request.form.get(
+                    f'{DEPARTMENT_BLOCK_FIELD_PREFIX}{menu_key}'
+                ) == '1' else 0
+                updates[menu_key] = (max_level, block_north_branch)
 
             updated_by = str(session.get('emp_no') or session.get('user_name') or 'admin')
             conn.executemany('''
-                INSERT INTO menu_access_permissions (menu_key, max_level, updated_by, updated_at)
-                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO menu_access_permissions
+                    (menu_key, max_level, block_north_branch, updated_by, updated_at)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ON CONFLICT(menu_key) DO UPDATE SET
                     max_level=excluded.max_level,
+                    block_north_branch=excluded.block_north_branch,
                     updated_by=excluded.updated_by,
                     updated_at=CURRENT_TIMESTAMP
-            ''', ((key, value, updated_by) for key, value in updates.items()))
+            ''', (
+                (key, value[0], value[1], updated_by)
+                for key, value in updates.items()
+            ))
             director_scope_enabled = request.form.get('school_director_scope_enabled') == '1'
             conn.execute('''
                 INSERT INTO admin_settings (key, value, updated_at)
@@ -832,6 +845,7 @@ def menu_permissions():
             return redirect(url_for('admin.menu_permissions', saved=1))
 
         max_levels = load_menu_max_levels(conn)
+        department_blocks = load_menu_department_blocks(conn)
         position_rows = conn.execute('''
             SELECT p.level,
                    GROUP_CONCAT(p.name, ', ') AS position_names,
@@ -861,6 +875,10 @@ def menu_permissions():
             'menu_permissions',
             menu_groups=MENU_GROUPS,
             menu_max_levels=max_levels,
+            menu_department_blocks=department_blocks,
+            department_block_prefix=DEPARTMENT_BLOCK_FIELD_PREFIX,
+            department_block_label=DEPARTMENT_BLOCK_LABEL,
+            department_block_target_label=DEPARTMENT_BLOCK_TARGET_LABEL,
             level_numbers=level_numbers,
             positions_by_level=positions_by_level,
             school_director_scope=school_director_scope_enabled(conn),

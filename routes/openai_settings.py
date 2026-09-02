@@ -406,6 +406,7 @@ def test_ai_connection(provider: str, api_key: str, model: str) -> str:
 USAGE_SOURCES = (
     ('smart_document_history', '스마트공문발송'),
     ('ai_agent_history', 'AI에이전트'),
+    ('interview_resume_analysis_history', '면접 이력서 분석'),
 )
 
 

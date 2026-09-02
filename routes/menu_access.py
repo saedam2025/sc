@@ -3,9 +3,14 @@
 from flask import jsonify, redirect, request, session
 
 from .database import get_db
+from .organization import normalize_department
 
 
 SCHOOL_DIRECTOR_SCOPE_SETTING = 'school_director_scope_enabled'
+# '본부전용' 메뉴 설정: 소속부서가 북부지점인 회원에게만 메뉴를 숨긴다.
+DEPARTMENT_BLOCK_LABEL = '본부전용'
+DEPARTMENT_BLOCK_TARGET_LABEL = '북부지점'
+DEPARTMENT_BLOCK_FIELD_PREFIX = 'block_north_branch__'
 SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
 SCHOOL_DIRECTOR_MODE_EXTRA_MENUS = {'memo_main', 'ai_agent_main'}
 INSTRUCTOR_EXPENSE_ACCESS_SESSION = 'expense_instructor_access_granted'
@@ -114,7 +119,7 @@ MENU_GROUPS = (
         'children': (
             ('contacts_main', '본사연락망', 'fa-address-book', 14),
             ('attendance_main', '근태관리', 'fa-clock-rotate-left', 14),
-            ('interview_main', '면접진행', 'fa-user-check', 4),
+            ('interview_main', '면접관리', 'fa-user-check', 4),
             ('organization_invite', '가입초대메일발송', 'fa-paper-plane', 2),
         ),
     },
@@ -164,10 +169,22 @@ def ensure_menu_access_schema(conn):
         CREATE TABLE IF NOT EXISTS menu_access_permissions (
             menu_key TEXT PRIMARY KEY,
             max_level INTEGER NOT NULL CHECK(max_level BETWEEN -1 AND 99),
+            block_north_branch INTEGER NOT NULL DEFAULT 0,
             updated_by TEXT,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    # 기존 설치본에는 소속부서(북부지점) 차단 열이 없으므로 1회만 추가한다.
+    columns = {
+        row[1] for row in
+        conn.execute('PRAGMA table_info(menu_access_permissions)').fetchall()
+    }
+    if 'block_north_branch' not in columns:
+        conn.execute(
+            'ALTER TABLE menu_access_permissions '
+            'ADD COLUMN block_north_branch INTEGER NOT NULL DEFAULT 0'
+        )
+        conn.commit()
 
 
 def school_director_scope_enabled(conn=None):
@@ -251,6 +268,26 @@ def load_menu_max_levels(conn=None):
             conn.close()
 
 
+def load_menu_department_blocks(conn=None):
+    """메뉴별 '본부전용' 설정을 모든 메뉴 키에 대해 반환한다."""
+    owns_connection = conn is None
+    if owns_connection:
+        conn = get_db()
+    try:
+        ensure_menu_access_schema(conn)
+        values = {key: False for key in MENU_CATALOG}
+        rows = conn.execute(
+            'SELECT menu_key, block_north_branch FROM menu_access_permissions'
+        ).fetchall()
+        for row in rows:
+            if row['menu_key'] in values:
+                values[row['menu_key']] = int(row['block_north_branch'] or 0) == 1
+        return values
+    finally:
+        if owns_connection:
+            conn.close()
+
+
 def is_master_admin():
     return (
         str(session.get('emp_no') or '').lower() == 'admin'
@@ -258,13 +295,41 @@ def is_master_admin():
     )
 
 
-def menu_is_allowed(menu_key, user_level=None, max_levels=None):
+def is_department_blocked_member(department=None):
+    """현재 회원의 소속부서가 북부지점인지 확인한다(최고관리자는 제외)."""
+    if is_master_admin():
+        return False
+    value = session.get('department', '') if department is None else department
+    return normalize_department(value) == DEPARTMENT_BLOCK_TARGET_LABEL
+
+
+def menu_blocked_for_department(menu_key, department_blocks=None):
+    """본부전용으로 지정돼 북부지점 회원에게 숨기는 메뉴인지 반환한다.
+
+    주메뉴를 숨기면 하위 메뉴도 함께 숨긴다. 이 차단은 레벨 설정이나
+    센터장 전용 예외보다 우선한다.
+    """
+    item = MENU_CATALOG.get(menu_key)
+    if not item or not is_department_blocked_member():
+        return False
+    blocks = department_blocks if department_blocks is not None \
+        else load_menu_department_blocks()
+    if blocks.get(menu_key):
+        return True
+    parent_key = item['parent_key']
+    return bool(parent_key and blocks.get(parent_key))
+
+
+def menu_is_allowed(menu_key, user_level=None, max_levels=None, department_blocks=None):
     """하위 메뉴는 자신의 권한과 주메뉴 권한을 모두 만족해야 한다."""
     item = MENU_CATALOG.get(menu_key)
     if not item:
         return True
     if is_master_admin():
         return True
+    # 본부전용 설정은 레벨 설정과 센터장 예외보다 먼저 적용한다.
+    if menu_blocked_for_department(menu_key, department_blocks):
+        return False
     try:
         level = int(session.get('user_level', 99) if user_level is None else user_level)
     except (TypeError, ValueError):
@@ -286,13 +351,16 @@ def menu_is_allowed(menu_key, user_level=None, max_levels=None):
     return True
 
 
-def shared_board_action_is_allowed(action, user_level=None, max_levels=None):
+def shared_board_action_is_allowed(action, user_level=None, max_levels=None,
+                                   department_blocks=None):
     """본부공지사항·자료실의 동작별 레벨 권한을 주메뉴/전용모드보다 우선한다."""
     menu_key = SCHOOL_CENTER_SHARED_ACTION_MENUS.get(str(action or '').strip())
     if not menu_key:
         return False
     if is_master_admin():
         return True
+    if menu_blocked_for_department(menu_key, department_blocks):
+        return False
     try:
         level = int(session.get('user_level', 99) if user_level is None else user_level)
     except (TypeError, ValueError):
@@ -304,17 +372,22 @@ def shared_board_action_is_allowed(action, user_level=None, max_levels=None):
 
 def build_menu_access(user_level=None):
     levels = load_menu_max_levels()
+    blocks = load_menu_department_blocks() if is_department_blocked_member() else {}
     access = {
-        key: menu_is_allowed(key, user_level=user_level, max_levels=levels)
+        key: menu_is_allowed(
+            key, user_level=user_level, max_levels=levels, department_blocks=blocks
+        )
         for key in MENU_CATALOG
     }
     # 센터장 지정은 직급 레벨이나 로그인 당시 세션 값보다 우선한다.
     # 실제 담당 학교가 있으면 일반 메뉴 상한과 무관하게 업무공간과
-    # 학교일정표를 표시한다.
+    # 학교일정표를 표시한다. 다만 본부전용 설정은 그대로 지킨다.
     if has_active_school_assignment(user_level=user_level):
-        access['school_group'] = True
+        if not menu_blocked_for_department('school_group', blocks):
+            access['school_group'] = True
         for menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS:
-            access[menu_key] = True
+            if not menu_blocked_for_department(menu_key, blocks):
+                access[menu_key] = True
     return access
 
 
@@ -460,6 +533,13 @@ def enforce_request_menu_access():
                 and menu_is_allowed(SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['expense']):
             return None
     menu_key = resolve_request_menu(request.path or '', request.endpoint or '', request.view_args)
+    # 본부전용 메뉴는 센터장 전용모드 등 다른 예외보다 먼저 차단한다.
+    if menu_key and menu_blocked_for_department(menu_key):
+        message = '본부전용 메뉴로 지정되어 이용할 수 없습니다.'
+        if request.is_json or '/api/' in (request.path or '') \
+                or request.accept_mimetypes.best == 'application/json':
+            return jsonify({'status': 'error', 'message': message}), 403
+        return message, 403
     if menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS and has_active_school_assignment():
         return None
     if center_director_mode_active():
