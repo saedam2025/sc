@@ -876,6 +876,21 @@
 
         .glass-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 10px; box-sizing: border-box; background: var(--input-bg, #f8fafc); color: var(--text-dark); outline: none; transition: all 0.3s; font-family: inherit;}
         .glass-input:focus { border-color: var(--primary-color); background: var(--card-bg, #ffffff); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        /* 개인 근무시간(월~금) 설정 */
+        .worktime-note { display: flex; align-items: flex-start; gap: 6px; margin: -2px 0 10px; font-size: 0.78rem; font-weight: 600; line-height: 1.5; color: var(--text-gray); }
+        .worktime-note i { margin-top: 2px; color: var(--primary-color); }
+        .worktime-grid { display: flex; flex-direction: column; gap: 8px; }
+        .worktime-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 14px minmax(0, 1fr) 74px; gap: 8px; align-items: center; }
+        .worktime-day { font-weight: 800; font-size: 0.86rem; color: var(--text-dark); text-align: center; }
+        .worktime-sep { text-align: center; color: var(--text-gray); font-weight: 700; }
+        .worktime-row .glass-input { padding: 9px 10px; font-size: 0.85rem; }
+        .worktime-row .glass-input:disabled { opacity: .45; cursor: not-allowed; }
+        .worktime-off { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 700; color: var(--text-gray); white-space: nowrap; cursor: pointer; }
+        .worktime-off input { cursor: pointer; }
+        @media (max-width: 520px) {
+            .worktime-row { grid-template-columns: 28px minmax(0, 1fr) 10px minmax(0, 1fr) 62px; gap: 5px; }
+            .worktime-off { font-size: 0.72rem; }
+        }
 
         .btn-primary-glass { background: var(--primary-color); color: #fff; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; transition: all 0.3s; font-size: 0.95rem; width: 100%; }
         .btn-primary-glass:hover { background: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.2); }
@@ -1235,6 +1250,55 @@
             document.getElementById(inputId).value = emoji;
         }
 
+        // ── 개인 근무시간(월~금) 설정 ────────────────────────────────
+        const DEFAULT_WORK_START_TEXT = '09:00';
+        const DEFAULT_WORK_END_TEXT = '18:00';
+        const WORK_WEEKDAY_LABELS = [[1, '월'], [2, '화'], [3, '수'], [4, '목'], [5, '금']];
+
+        function renderWorkScheduleRows(schedule) {
+            const byWeekday = {};
+            (schedule || []).forEach(row => { byWeekday[Number(row.weekday)] = row; });
+
+            return WORK_WEEKDAY_LABELS.map(([weekday, label]) => {
+                const row = byWeekday[weekday] || {};
+                const isOff = !!row.is_off;
+                return `
+                    <div class="worktime-row" data-weekday="${weekday}">
+                        <span class="worktime-day">${label}</span>
+                        <input type="time" class="glass-input worktime-start" value="${row.start_time || ''}"
+                               placeholder="${DEFAULT_WORK_START_TEXT}" ${isOff ? 'disabled' : ''}>
+                        <span class="worktime-sep">~</span>
+                        <input type="time" class="glass-input worktime-end" value="${row.end_time || ''}"
+                               placeholder="${DEFAULT_WORK_END_TEXT}" ${isOff ? 'disabled' : ''}>
+                        <label class="worktime-off">
+                            <input type="checkbox" class="worktime-off-check" ${isOff ? 'checked' : ''}
+                                   onchange="toggleWorktimeOff(this)"> 휴무
+                        </label>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleWorktimeOff(checkbox) {
+            const row = checkbox.closest('.worktime-row');
+            const disabled = checkbox.checked;
+            row.querySelectorAll('.worktime-start, .worktime-end').forEach(input => {
+                input.disabled = disabled;
+                if (disabled) input.value = '';
+            });
+        }
+
+        function collectWorkSchedule() {
+            const rows = document.querySelectorAll('#myinfo_worktime .worktime-row');
+            if (!rows.length) return null;
+            return [...rows].map(row => ({
+                weekday: Number(row.dataset.weekday),
+                start_time: row.querySelector('.worktime-start').value,
+                end_time: row.querySelector('.worktime-end').value,
+                is_off: row.querySelector('.worktime-off-check').checked
+            }));
+        }
+
         async function openMyInfoModal() {
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
@@ -1336,6 +1400,18 @@ if (currentMyInfo) {
             <label>주소지</label>
             <input type="text" id="myinfo_address" value="${u.address || ''}" class="glass-input">
         </div>
+
+        <div class="modal-field full-width">
+            <label>근무시간 (월~금)</label>
+            <div class="worktime-note">
+                <i class="fa-solid fa-circle-info"></i>
+                여기에 설정한 출근시간을 기준으로 근태관리에서 지각을 판정합니다.
+                비워두면 기본값 ${DEFAULT_WORK_START_TEXT}~${DEFAULT_WORK_END_TEXT}이 적용됩니다.
+            </div>
+            <div id="myinfo_worktime" class="worktime-grid">
+                ${renderWorkScheduleRows(u.work_schedule)}
+            </div>
+        </div>
     `;
 
     grid.innerHTML = html;
@@ -1380,7 +1456,18 @@ if (currentMyInfo) {
             formData.append('email', email);
             formData.append('address', address);
             formData.append('profile_icon', profileIcon);
-            
+
+            const workSchedule = collectWorkSchedule();
+            if (workSchedule) {
+                const invalid = workSchedule.find(row =>
+                    !row.is_off && row.start_time && row.end_time && row.end_time <= row.start_time);
+                if (invalid) {
+                    const label = (WORK_WEEKDAY_LABELS.find(w => w[0] === invalid.weekday) || [, ''])[1];
+                    return alert(`${label}요일 퇴근시간이 출근시간보다 빠릅니다.`);
+                }
+                formData.append('work_schedule', JSON.stringify(workSchedule));
+            }
+
             formData.append('position', currentMyInfo.직급 || '미지정');
             formData.append('level', currentMyInfo.레벨 || 10);
             formData.append('department', currentMyInfo.소속 || '');

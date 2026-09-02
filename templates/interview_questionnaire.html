@@ -70,6 +70,8 @@
     .q-text { min-width:0; padding-top:1px; }
     .field label { display:block; margin-bottom:4px; font-size:.97rem; font-weight:800; letter-spacing:-.01em; }
     .field small { display:block; color:var(--muted); font-size:.79rem; font-weight:400; }
+    /* 안내문 뒤에 덧붙이는 강조 문구 */
+    .q-note { color:#1d6fd0; font-weight:600; }
 
     /* 입력창은 기품 있는 파선 테두리를 쓰고, 입력 중에는 실선으로 또렷해진다. */
     textarea { width:100%; padding:14px 16px; border:1.5px dashed #cbbb93; border-radius:13px;
@@ -80,7 +82,7 @@
     textarea:focus { border-style:solid; border-color:var(--brand); background:#fff;
                      box-shadow:0 0 0 3px rgba(25,168,135,.15); }
 
-    .actions { display:flex; justify-content:flex-end; align-items:center; gap:14px; margin-top:30px;
+    .actions { display:flex; justify-content:center; align-items:center; gap:14px; margin-top:30px;
                padding-top:22px; border-top:1px dashed var(--gold-soft); }
     button { min-height:50px; padding:12px 30px; border:0; border-radius:13px;
              background:linear-gradient(115deg,var(--brand),#3f8fd0); color:#fff;
@@ -90,9 +92,10 @@
     .again { color:var(--muted); font-size:.79rem; font-weight:600; text-decoration:underline;
              text-underline-offset:3px; cursor:pointer; }
     .again:hover { color:var(--brand-dark); }
-    .submit-state { display:flex; flex-direction:column; align-items:center; gap:9px; }
+    .submit-state { display:flex; flex-direction:column; align-items:center; gap:9px; margin:0 auto; }
     /* display:flex 가 hidden 속성을 이겨버리므로, 감출 때는 확실히 감춘다. */
     .submit-state[hidden] { display:none; }
+    .submit-feedback { margin:18px 0 0; color:#b42318; text-align:center; font-size:.87rem; }
     button.is-done { cursor:default; opacity:.95; }
     button.is-done:hover { filter:none; }
 
@@ -139,6 +142,8 @@
     'availability': 'fa-calendar-check',
     'other_notes': 'fa-comment-dots'
 } %}
+{# 완료 화면에서 다시 작성을 선택하면 전송 버튼을 즉시 표시한다. #}
+{% set show_submitted_state = already_submitted and request.args.get('rewrite') != '1' %}
 <div class="sheet-frame">
     <span class="corner tl" aria-hidden="true"></span>
     <span class="corner tr" aria-hidden="true"></span>
@@ -152,12 +157,12 @@
         <p>링크가 만료되었거나 주소가 정확하지 않습니다.<br>담당자에게 다시 문의해주세요.</p>
     </div>
 {% elif submitted %}
-    <div class="done">
+    <div class="done" id="questionnaireSubmitted">
         <img class="done-character" src="{{ url_for('static', filename='girl_ok.png') }}" alt="" aria-hidden="true">
         <h2>사전질문지가 전송되었습니다</h2>
         <p>작성해주셔서 감사합니다. 면접 때 참고하겠습니다.</p>
         <ul>
-            {% for key, title, hint, rows in fields %}
+            {% for key, title, hint, rows, note in fields %}
             <li>
                 {% if answers.get(key) %}<i class="fa-solid fa-circle-check"></i>{% else %}<i class="fa-regular fa-circle no"></i>{% endif %}
                 <b>{{ title }}</b> · {{ '작성함' if answers.get(key) else '미작성' }}
@@ -166,7 +171,7 @@
         </ul>
         <div class="done-actions">
             <button type="button" id="closeWindow">창 닫기</button>
-            <a class="again" href="{{ request.path }}">다시 작성</a>
+            <a class="again" href="{{ request.path }}?rewrite=1">다시 작성</a>
         </div>
         <p class="close-hint" id="closeHint" hidden>창이 자동으로 닫히지 않으면 브라우저 탭을 직접 닫아주세요.</p>
     </div>
@@ -179,8 +184,8 @@
         {% set when_text = ((when.year ~ ' ' if when.year else '') ~ (when.date if when.date else '')) | trim %}
         <p class="who"><b>{{ candidate['name'] }}님</b>{% if when_text %} {{ when_text }}{% endif %} 면접에 참여해주셔서 감사드립니다.</p>
     </header>
-    <form method="post">
-        {% for key, title, hint, rows in fields %}
+    <form id="questionnaireForm" method="post" action="{{ request.path }}" novalidate>
+        {% for key, title, hint, rows, note in fields %}
         <div class="field">
             <div class="q-head">
                 <span class="q-badge" aria-hidden="true">
@@ -189,7 +194,7 @@
                 </span>
                 <div class="q-text">
                     <label for="{{ key }}">{{ title }}</label>
-                    <small>{{ hint }}</small>
+                    <small>{{ hint }}{% if note %} <span class="q-note">{{ note }}</span>{% endif %}</small>
                 </div>
             </div>
             <textarea id="{{ key }}" name="{{ key }}" rows="{{ rows }}" maxlength="4000">{{ answers.get(key, '') }}</textarea>
@@ -198,14 +203,15 @@
         <input type="hidden" name="typing_cpm" id="typingCpm" value="0">
         <input type="hidden" name="typing_strokes" id="typingStrokes" value="0">
         <input type="hidden" name="typing_seconds" id="typingSeconds" value="0">
+        <p id="submitFeedback" class="submit-feedback" role="alert" hidden></p>
         <div class="actions">
-            {% if already_submitted %}
+            {% if show_submitted_state %}
             <div class="submit-state" id="submitState">
                 <button type="button" class="is-done" disabled>작성완료</button>
                 <span class="again" id="rewriteAgain" role="button" tabindex="0">다시 작성</span>
             </div>
             {% endif %}
-            <button type="submit" id="submitButton"{% if already_submitted %} hidden{% endif %}>사전질문지 전송</button>
+            <button type="submit" id="submitButton" formnovalidate{% if show_submitted_state %} hidden{% endif %}>사전질문지 전송</button>
         </div>
     </form>
 {% endif %}
@@ -218,8 +224,19 @@
 <script>
 (function () {
     // 면접자가 실제로 입력한 시간과 타수만 세어 분당 타자수를 구한다.
-    var form = document.querySelector('form');
+    var form = document.getElementById('questionnaireForm');
     if (!form) { return; }
+
+    // 모든 답변은 선택 사항이다. 혹시 남아 있는 필수입력 표시 때문에 브라우저가
+    // 전송을 막고 빈 칸으로 커서를 옮기는 일이 없도록 검사 자체를 끈다.
+    form.noValidate = true;
+    var optionalFields = form.querySelectorAll('textarea, input');
+    for (var f = 0; f < optionalFields.length; f += 1) {
+        optionalFields[f].required = false;
+        optionalFields[f].removeAttribute('required');
+        optionalFields[f].removeAttribute('minlength');
+        optionalFields[f].removeAttribute('pattern');
+    }
 
     var IDLE_LIMIT = 5000;   // 5초 넘게 멈춘 구간은 작성 시간에서 뺀다.
     var MIN_STROKES = 20;    // 너무 짧게 친 경우는 측정하지 않는다.
@@ -246,19 +263,106 @@
         strokes += 1;
     });
 
-    form.addEventListener('submit', function () {
-        var cpm = 0;
-        if (strokes >= MIN_STROKES && activeMs >= MIN_ACTIVE) {
-            cpm = Math.round(strokes / (activeMs / 60000));
+    var submitButton = document.getElementById('submitButton');
+    var feedback = document.getElementById('submitFeedback');
+    var submitting = false;
+    var alarmSoundUrl = {{ url_for('static', filename='alarm.mp3') | tojson }};
+    var completeSoundUrl = {{ url_for('static', filename='doc_complete.mp3') | tojson }};
+    var sound = null;
+    try {
+        sound = new Audio(alarmSoundUrl);
+        sound.preload = 'auto';
+        sound.loop = false;
+    } catch (error) {
+        // 음원을 지원하지 않는 환경에서도 질문지는 전송할 수 있다.
+    }
+
+    function showFeedback(message) {
+        feedback.textContent = message;
+        feedback.hidden = !message;
+    }
+
+    function playSoundOnce(url) {
+        return new Promise(function (resolve) {
+            if (!sound) { resolve(); return; }
+            function finish() {
+                if (sound.onended === finish) { sound.onended = null; }
+                if (sound.onerror === finish) { sound.onerror = null; }
+                resolve();
+            }
+            try {
+                sound.src = url;
+                sound.onended = finish;
+                sound.onerror = finish;
+                var playback = sound.play();
+                if (playback) { playback.catch(finish); }
+            } catch (error) {
+                finish();
+            }
+        });
+    }
+
+    async function submitQuestionnaire(event) {
+        event.preventDefault();
+        if (submitting) { return; }
+        showFeedback('');
+        // 모든 답변은 선택 사항이다. 자동 검사의 커서 이동 대신 길이 오류를 안내한다.
+        var fields = form.querySelectorAll('textarea[maxlength]');
+        for (var i = 0; i < fields.length; i += 1) {
+            if (fields[i].value.length > fields[i].maxLength) {
+                var label = fields[i].labels[0];
+                showFeedback((label ? label.textContent : '답변') + '은 ' + fields[i].maxLength + '자 이내로 작성해주세요.');
+                return;
+            }
         }
-        document.getElementById('typingCpm').value = cpm;
-        document.getElementById('typingStrokes').value = strokes;
-        document.getElementById('typingSeconds').value = Math.round(activeMs / 1000);
-    });
+        submitting = true;
+        var buttonText = submitButton.textContent;
+        submitButton.disabled = true;
+        submitButton.textContent = '전송 중…';
+        var alarmFinished;
+        try {
+            var cpm = 0;
+            if (strokes >= MIN_STROKES && activeMs >= MIN_ACTIVE) {
+                cpm = Math.round(strokes / (activeMs / 60000));
+            }
+            document.getElementById('typingCpm').value = cpm;
+            document.getElementById('typingStrokes').value = strokes;
+            document.getElementById('typingSeconds').value = Math.round(activeMs / 1000);
+            var formData = new FormData(form);
+            // 음원 재생과 별개로 저장 요청을 즉시 보낸다.
+            alarmFinished = playSoundOnce(alarmSoundUrl);
+            var response = await fetch(form.getAttribute('action'), {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            });
+            if (!response.ok) { throw new Error('submit failed'); }
+            var result = new DOMParser().parseFromString(await response.text(), 'text/html');
+            if (!result.getElementById('questionnaireSubmitted')) {
+                throw new Error('unexpected response');
+            }
+            document.querySelector('.sheet').innerHTML = result.querySelector('.sheet').innerHTML;
+            window.scrollTo(0, 0);
+        } catch (error) {
+            try { if (sound) { sound.pause(); } } catch (audioError) {}
+            submitting = false;
+            submitButton.disabled = false;
+            submitButton.textContent = buttonText;
+            showFeedback('사전질문지를 전송하지 못했습니다. 입력 내용은 유지되어 있으니 잠시 후 다시 전송해주세요.');
+            return;
+        }
+        // 저장 성공과 알림음 종료 후 완료 안내를 한 번 이어서 재생한다.
+        await alarmFinished;
+        await playSoundOnce(completeSoundUrl);
+    }
+
+    // 클릭과 키보드 전송을 같은 경로로 처리하고 중복 전송을 막는다.
+    submitButton.addEventListener('click', submitQuestionnaire);
+    form.addEventListener('submit', submitQuestionnaire);
 })();
 </script>
 {% endif %}
-{% if already_submitted %}
+{% if show_submitted_state %}
 <script>
 (function () {
     // '다시 작성'을 누르면 작성완료 표시를 감추고 전송 버튼을 다시 꺼낸다.
@@ -279,12 +383,11 @@
 })();
 </script>
 {% endif %}
-{% if submitted %}
 <script>
 (function () {
-    var button = document.getElementById('closeWindow');
-    if (!button) { return; }
-    button.addEventListener('click', function () {
+    // 비동기로 표시한 완료 화면에서도 창 닫기 버튼이 동작한다.
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('#closeWindow')) { return; }
         // 링크를 눌러 직접 연 탭은 브라우저가 스크립트로 닫는 것을 막는다.
         window.open('', '_self');
         window.close();
@@ -292,6 +395,5 @@
     });
 })();
 </script>
-{% endif %}
 </body>
 </html>

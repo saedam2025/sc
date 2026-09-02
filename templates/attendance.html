@@ -1,214 +1,376 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/attendance.css') }}">
 <style>
-    .btn-reset {
-        background-color: #f1f3f5;
-        color: #495057;
-        border: 1px solid #ced4da;
-        padding: 10px 20px;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        text-decoration: none;
-        transition: all 0.2s;
-        display: inline-block;
+    /* 이용통계(admin_management) 화면과 동일한 카드/패널 언어를 사용한다. */
+    .att-wrap { display: flex; flex-direction: column; gap: 14px; color: var(--text-dark); }
+    .att-header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 14px; flex-wrap: wrap;
+        background: var(--card-bg, #fff);
+        border: 1px solid var(--border-color, #dbe3ef);
+        border-radius: 18px; padding: 18px 20px;
+        box-shadow: var(--dashboard-card-shadow, 0 8px 28px rgba(15,23,42,.055));
     }
-    .btn-reset:hover {
-        background-color: #e9ecef;
-        color: #212529;
+    .att-title {
+        margin: 0; font-size: 1.42rem; font-weight: 900;
+        display: flex; align-items: center; gap: 10px; color: var(--text-dark);
     }
-    .position-title {
-        margin-top: 0;
-        margin-bottom: 15px;
-        color: #2c7be5;
-        font-size: 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+    .att-title > i:first-child {
+        width: 38px; height: 38px; border-radius: 11px; font-size: 17px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--primary-color, #4a90e2); color: #fff;
     }
-    /* 신규 삭제 버튼 스타일 */
-    .btn-delete-record {
-        background-color: transparent;
-        color: #adb5bd;
-        border: none;
-        padding: 6px;
-        border-radius: 4px;
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.2s;
-        margin-left: 10px;
-    }
-    .btn-delete-record:hover {
-        background-color: #fa5252;
-        color: white;
-    }
+    .att-subtitle { margin-top: 6px; color: var(--text-gray, #64748b); font-weight: 600; font-size: .92rem; line-height: 1.5; }
+    .att-note { display: flex; align-items: center; gap: 7px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 700; }
 
-    /* 공통 테마 호환 */
-    .attendance-container {
-        color: var(--text-dark);
+    .panel {
+        background: var(--card-bg, #fff);
+        border: 1px solid var(--border-color, #dbe3ef);
+        border-radius: 18px; padding: 18px;
+        box-shadow: var(--dashboard-card-shadow, 0 8px 28px rgba(15,23,42,.055));
     }
-    .attendance-card {
-        background: var(--card-bg, #ffffff);
-        border-color: var(--card-border, var(--border-color));
-        box-shadow: var(--card-shadow, 0 4px 15px rgba(0, 0, 0, 0.05));
-        backdrop-filter: var(--card-backdrop, none);
-        -webkit-backdrop-filter: var(--card-backdrop, none);
-    }
-    .attendance-header-area h2,
-    .attendance-table td {
-        color: var(--text-dark);
-    }
-    .attendance-header-area h2 i,
-    .position-title {
-        color: var(--primary-color);
-    }
-    .attendance-filters input[type="month"],
-    .attendance-filters select {
+    .panel-title { font-size: 1.02rem; font-weight: 900; margin: 0 0 16px; display: flex; gap: 8px; align-items: center; color: var(--text-dark); }
+    .panel-title i { color: var(--primary-color, #4a90e2); }
+
+    /* 요약 카드 8개를 한 행에 모두 넣고, 남는 세로 공간은 오늘 타임라인이 쓴다. */
+    .att-summary-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+    .stat-box { border: 1px solid var(--border-color, #dbe3ef); border-radius: 12px; padding: 10px 11px; background: var(--widget-bg, #f7f9fc); min-width: 0; }
+    .stat-label { color: var(--text-gray, #64748b); font-weight: 800; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-value { margin-top: 5px; font-size: 19px; font-weight: 900; color: var(--primary-color, #4a90e2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-hint { margin-top: 3px; color: var(--text-gray, #64748b); font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stat-icon { float: right; color: var(--primary-color, #4a90e2); opacity: .72; font-size: 13px; }
+
+    /* 오늘 출퇴근 타임라인 */
+    .att-tl-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-gray, #64748b); }
+    .att-tl { display: flex; flex-direction: column; gap: 5px; }
+    .att-tl-line { display: grid; grid-template-columns: 64px minmax(0, 1fr) 108px; gap: 5px; align-items: center; }
+    .att-tl-axis { position: relative; height: 16px; }
+    .att-tl-axis span { position: absolute; top: 0; transform: translateX(-50%); font-size: 10px; font-weight: 800; color: var(--text-gray, #94a3b8); white-space: nowrap; }
+    .att-tl-name { min-width: 0; }
+    .att-tl-name b { display: block; font-size: 12.5px; font-weight: 800; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .att-tl-name small { display: block; font-size: 10px; font-weight: 700; color: var(--text-gray, #94a3b8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .att-tl-track { position: relative; height: 21px; border-radius: 6px; background: var(--widget-bg, #eef2f7); border: 1px solid var(--border-color, #e2e8f0); overflow: hidden; }
+    .att-tl-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border-color, #e2e8f0); opacity: .8; }
+    .att-tl-now { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; opacity: .65; }
+    .att-tl-plan { position: absolute; top: 0; bottom: 0; background: rgba(148,163,184,.28); border-left: 1px dashed rgba(100,116,139,.55); border-right: 1px dashed rgba(100,116,139,.55); }
+    .att-tl-bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; min-width: 3px; }
+    .att-tl-bar-done { background: var(--primary-color, #4a90e2); }
+    .att-tl-bar-early { background: #f97316; }
+    .att-tl-bar-working { background: repeating-linear-gradient(135deg, #22c55e 0 7px, #4ade80 7px 14px); }
+    .att-tl-empty { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 10.5px; font-weight: 700; color: var(--text-gray, #94a3b8); }
+    .att-tl-time { font-size: 11px; font-weight: 700; color: var(--text-gray, #64748b); text-align: right; white-space: nowrap; }
+    .att-tl-scroll { padding-right: 2px; }
+
+    .att-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .att-filters input[type="month"], .att-filters select {
+        padding: 9px 12px; border-radius: 9px; font-size: 13px; font-weight: 600;
         background: var(--input-bg, #f8fafc);
-        border-color: var(--card-border, var(--border-color));
+        border: 1px solid var(--card-border, var(--border-color, #dbe3ef));
         color: var(--input-text, var(--text-dark));
     }
-    .attendance-filters input[type="month"]:focus,
-    .attendance-filters select:focus {
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 14%, transparent);
+    .att-filters input[type="month"]:focus, .att-filters select:focus {
+        outline: none; border-color: var(--primary-color, #4a90e2);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color, #4a90e2) 14%, transparent);
     }
-    .btn-search {
-        background: var(--primary-color);
+    .att-btn {
+        padding: 9px 16px; border-radius: 9px; font-size: 13px; font-weight: 800;
+        cursor: pointer; border: 1px solid transparent; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px; transition: all .18s ease;
     }
-    .btn-search:hover {
-        background: var(--primary-dark);
+    .att-btn-primary { background: var(--primary-color, #4a90e2); color: #fff; }
+    .att-btn-primary:hover { background: var(--primary-dark, #357abd); }
+    .att-btn-ghost {
+        background: var(--widget-bg, #f1f5f9); color: var(--text-gray, #64748b);
+        border-color: var(--widget-border, var(--card-border, var(--border-color, #dbe3ef)));
     }
-    .btn-reset {
-        background: var(--widget-bg, #f1f5f9);
-        color: var(--text-gray);
-        border-color: var(--widget-border, var(--card-border, var(--border-color)));
+    .att-btn-ghost:hover { background: var(--widget-hover, #e9ecef); color: var(--text-dark); }
+
+    /* 탭 (일별 / 월별 / 분기별) */
+    .att-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .att-tab {
+        padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 800; cursor: pointer;
+        background: var(--widget-bg, #f1f5f9); color: var(--text-gray, #64748b);
+        border: 1px solid var(--border-color, #dbe3ef); transition: all .18s ease;
+        display: inline-flex; align-items: center; gap: 7px;
     }
-    .btn-reset:hover {
-        background: var(--widget-hover, #e9ecef);
-        color: var(--text-dark);
+    .att-tab:hover { color: var(--text-dark); }
+    .att-tab.is-active { background: var(--primary-color, #4a90e2); color: #fff; border-color: transparent; }
+    .att-tab-panel[hidden] { display: none; }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th, .data-table td { padding: 10px 9px; border-bottom: 1px solid var(--border-color, #e2e8f0); text-align: left; vertical-align: middle; }
+    .data-table th { color: var(--text-gray, #64748b); font-size: 12px; font-weight: 900; background: rgba(248,250,252,.7); }
+    .data-table td { color: var(--text-dark); }
+    .table-scroll { overflow-x: auto; }
+    .att-table-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--border-color, #e2e8f0); border-radius: 8px; }
+    .att-table-wrap .data-table th { position: sticky; top: 0; z-index: 1; }
+
+    .att-click-row { cursor: pointer; transition: background .18s ease; }
+    .att-click-row:hover, .att-click-row:focus { background: rgba(74,144,226,.09); outline: none; }
+    .att-click-row[aria-expanded="true"] { background: rgba(74,144,226,.13); }
+    .expand-icon { display: inline-block; margin-right: 7px; color: var(--primary-color, #4a90e2); transition: transform .18s ease; }
+    .att-click-row[aria-expanded="true"] .expand-icon { transform: rotate(90deg); }
+    .att-detail-row[hidden] { display: none; }
+    /* 회색 배경 위에 흰 카드가 한 겹 더 얹히면 테두리·여백이 이중으로 보여 안쪽 카드는 두지 않는다. */
+    .att-detail-row > td { padding: 4px 10px 14px; background: rgba(248,250,252,.62); }
+    .att-detail-box { border: 0; border-radius: 0; padding: 0; background: transparent; }
+    .detail-title { margin: 0 0 11px; font-size: .95rem; font-weight: 900; display: flex; align-items: center; gap: 8px; color: var(--text-dark); }
+    .detail-title i { color: var(--primary-color, #4a90e2); }
+    .empty-note { padding: 34px; text-align: center; color: var(--text-gray, #64748b); font-weight: 700; }
+
+    /* 상태 뱃지 */
+    .att-badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .att-badge-work { background: rgba(34,197,94,.14); color: #15803d; }
+    .att-badge-out { background: rgba(100,116,139,.16); color: #475569; }
+    .att-badge-early { background: rgba(249,115,22,.16); color: #c2410c; }
+    .att-badge-late { background: rgba(239,68,68,.14); color: #b91c1c; }
+    .att-count { font-weight: 800; }
+    .att-count-zero { color: var(--text-gray, #94a3b8); font-weight: 600; }
+
+    /* 그래프 */
+    .att-chart { display: flex; align-items: flex-end; gap: 10px; min-height: 210px; padding: 12px 4px 0; overflow-x: auto; }
+    .att-chart-col { flex: 1 1 0; min-width: 46px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .att-chart-bars { width: 100%; height: 168px; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
+    .att-chart-bar { width: 46%; max-width: 26px; border-radius: 5px 5px 0 0; min-height: 2px; transition: height .25s ease; }
+    .att-chart-bar-in { background: var(--primary-color, #4a90e2); }
+    .att-chart-bar-out { background: color-mix(in srgb, var(--primary-color, #4a90e2) 40%, #94a3b8); }
+    .att-chart-value { font-size: 11px; font-weight: 800; color: var(--text-dark); }
+    .att-chart-label { font-size: 11px; font-weight: 700; color: var(--text-gray, #64748b); white-space: nowrap; }
+    .att-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+    .att-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-gray, #64748b); }
+    .att-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+    .att-bar-cell { display: flex; align-items: center; gap: 8px; min-width: 130px; }
+    .att-bar-track { flex: 1; height: 7px; border-radius: 999px; background: var(--widget-bg, #eef2f7); overflow: hidden; }
+    .att-bar-fill { height: 100%; border-radius: 999px; background: var(--primary-color, #4a90e2); }
+
+    .btn-mini {
+        padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 800;
+        cursor: pointer; border: 1px solid var(--primary-color, #4a90e2);
+        background: transparent; color: var(--primary-color, #4a90e2); transition: all .18s ease;
     }
-    .attendance-table {
-        background: transparent;
+    .btn-mini:hover { background: var(--primary-color, #4a90e2); color: #fff; }
+    .btn-mini-warn { border-color: #f97316; color: #f97316; }
+    .btn-mini-warn:hover { background: #f97316; color: #fff; }
+    .btn-mini-danger { border-color: transparent; color: #adb5bd; background: transparent; padding: 4px 7px; }
+    .btn-mini-danger:hover { background: #fa5252; color: #fff; }
+
+    @media (max-width: 1150px) {
+        .att-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
-    .attendance-table th {
-        background: var(--widget-bg, #f8fafc);
-        color: var(--text-gray);
-        border-bottom-color: var(--card-border, var(--border-color));
+    @media (max-width: 760px) {
+        .att-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .att-tl-line { grid-template-columns: 56px minmax(0, 1fr) 96px; }
     }
-    .attendance-table td {
-        border-bottom-color: var(--card-border, var(--border-color));
-    }
-    .attendance-table tr:hover td {
-        background: var(--widget-hover, #f8fafc);
-    }
-    .btn-clockout {
-        color: var(--primary-color);
-        border-color: var(--primary-color);
-    }
-    .btn-clockout:hover {
-        background: var(--primary-color);
-        color: #ffffff;
+    @media (max-width: 560px) {
+        .att-summary-grid { grid-template-columns: 1fr; }
+        .att-chart-col { min-width: 40px; }
+        .att-tl-line { grid-template-columns: 52px minmax(0, 1fr); }
+        .att-tl-time { display: none; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="attendance-container">
-    
-    <div class="attendance-card" style="margin-bottom: 30px; padding: 20px 30px;">
-        <div class="attendance-header-area" style="margin-bottom: 0;">
-            <h2><i class="fa-regular fa-calendar-check"></i> 출퇴근 명단</h2>
-            
-            <form method="GET" action="/attendance" class="attendance-filters">
-                <input type="month" name="month" value="{{ current_month }}">
-                
-                {% if user_level <= 3 %}
-                <select name="search_position">
-                    <option value="">전체 직급</option>
-                    {% for pos in all_positions %}
-                    <option value="{{ pos }}" {% if search_position == pos %}selected{% endif %}>{{ pos }}</option>
-                    {% endfor %}
-                </select>
+<div class="att-wrap"
+     data-current-emp-no="{{ current_emp_no }}"
+     data-user-level="{{ user_level }}"
+     data-search-emp-no="{{ search_emp_no }}"
+     data-search-position="{{ search_position }}">
 
-                <select name="search_emp_no">
-                    <option value="">전체 회원</option>
-                    {% for u in all_users %}
-                    <option value="{{ u.emp_no }}" {% if search_emp_no == u.emp_no|string %}selected{% endif %}>{{ u.name }}</option>
-                    {% endfor %}
-                </select>
-                {% endif %}
-                
-                <button type="submit" class="btn-search">조회</button>
-                <a href="/attendance" class="btn-reset"><i class="fa-solid fa-rotate-right"></i> 초기화</a>
-            </form>
+    <!-- 헤더 -->
+    <div class="att-header">
+        <div>
+            <h1 class="att-title"><i class="fa-solid fa-clock-rotate-left"></i> 근태관리</h1>
+            <div class="att-subtitle">출퇴근 기록을 날짜별로 집계하고 월별·분기별 근태 추이를 한 화면에서 확인합니다.</div>
+        </div>
+        <div class="att-note"><i class="fa-solid fa-circle-info"></i> 지각 기준: 개인정보 수정창의 요일별 근무시간 (미설정 시 {{ work_start_standard }})</div>
+    </div>
+
+    <!-- 조회 조건 -->
+    <div class="panel">
+        <form method="GET" action="/attendance" class="att-filters">
+            <input type="month" name="month" value="{{ current_month }}">
+
+            {% if user_level <= 3 %}
+            <select name="search_position">
+                <option value="">전체 직급</option>
+                {% for pos in all_positions %}
+                <option value="{{ pos }}" {% if search_position == pos %}selected{% endif %}>{{ pos }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="search_emp_no">
+                <option value="">전체 회원</option>
+                {% for u in all_users %}
+                <option value="{{ u.emp_no }}" {% if search_emp_no == u.emp_no|string %}selected{% endif %}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            <button type="submit" class="att-btn att-btn-primary"><i class="fa-solid fa-magnifying-glass"></i> 조회</button>
+            <a href="/attendance" class="att-btn att-btn-ghost"><i class="fa-solid fa-rotate-right"></i> 초기화</a>
+        </form>
+    </div>
+
+    <!-- 1) 근태 통계 써머리 -->
+    <div class="att-summary-grid">
+        {% for card in summary_cards %}
+        <div class="stat-box">
+            <i class="fa-solid {{ card.icon }} stat-icon"></i>
+            <div class="stat-label">{{ card.label }}</div>
+            <div class="stat-value">{% if card.is_text %}{{ card.value }}{% else %}{{ "{:,}".format(card.value or 0) }}{% endif %}</div>
+            <div class="stat-hint">{{ card.hint }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 오늘 조직원 전체 출퇴근 그래프 -->
+    <div class="panel">
+        <h2 class="panel-title" style="margin-bottom: 12px;">
+            <i class="fa-solid fa-timeline"></i> 오늘 출퇴근 현황 ({{ timeline.day }} {{ timeline.weekday }})
+            <span class="att-tl-meta">
+                <span>조직원 {{ timeline.total }}명</span>
+                <span>출근 {{ timeline.present }}명</span>
+                <span>미출근 {{ timeline.absent }}명</span>
+                <span>현재 {{ timeline.now_text }}</span>
+            </span>
+        </h2>
+        {% if timeline.rows %}
+        <div class="att-tl">
+            <div class="att-tl-line">
+                <div></div>
+                <div class="att-tl-axis">
+                    {% for tick in timeline.ticks %}<span style="left: {{ tick.left }}%;">{{ tick.label }}</span>{% endfor %}
+                </div>
+                <div></div>
+            </div>
+            <div class="att-tl-scroll">
+                {% for row in timeline.rows %}
+                <div class="att-tl-line" style="margin-bottom: 5px;">
+                    <div class="att-tl-name">
+                        <b>{{ row.name }}</b>
+                        <small>{{ row.position }}</small>
+                    </div>
+                    <div class="att-tl-track" title="{{ row.name }} · 기준 근무시간 {{ row.plan_text }}">
+                        {% for tick in timeline.ticks %}<i class="att-tl-tick" style="left: {{ tick.left }}%;"></i>{% endfor %}
+                        {% if row.plan_left is not none %}<i class="att-tl-plan" style="left: {{ row.plan_left }}%; width: {{ row.plan_width }}%;"></i>{% endif %}
+                        {% if timeline.now_left is not none %}<i class="att-tl-now" style="left: {{ timeline.now_left }}%;"></i>{% endif %}
+                        {% if row.state == 'absent' %}
+                        <span class="att-tl-empty">미출근</span>
+                        {% else %}
+                        <div class="att-tl-bar att-tl-bar-{{ row.state }}"
+                             style="left: {{ row.left }}%; width: {{ row.width }}%;"
+                             title="{{ row.name }} · {{ row.range_text }}"></div>
+                        {% endif %}
+                    </div>
+                    <div class="att-tl-time">{{ row.range_text }}{% if row.is_late %} <span class="att-badge att-badge-late">지각</span>{% endif %}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="att-legend" style="margin-top: 10px;">
+            <span><i style="background: var(--primary-color, #4a90e2);"></i> 퇴근 완료</span>
+            <span><i style="background: repeating-linear-gradient(135deg, #22c55e 0 4px, #4ade80 4px 8px);"></i> 근무중</span>
+            <span><i style="background: #f97316;"></i> 조퇴</span>
+            <span><i style="background: #ef4444;"></i> 현재 시각</span>
+            <span><i style="background: rgba(148,163,184,.38);"></i> 기준 근무시간(개인 설정)</span>
+        </div>
+        {% else %}
+        <div class="empty-note">표시할 조직원이 없습니다.</div>
+        {% endif %}
+    </div>
+
+    <!-- 탭 -->
+    <div class="panel" style="padding: 12px 18px;">
+        <div class="att-tabs">
+            <button type="button" class="att-tab is-active" data-tab="daily"><i class="fa-solid fa-calendar-day"></i> 일별 현황</button>
+            <button type="button" class="att-tab" data-tab="monthly"><i class="fa-solid fa-chart-column"></i> 월별 통계</button>
+            <button type="button" class="att-tab" data-tab="quarterly"><i class="fa-solid fa-chart-simple"></i> 분기별 통계</button>
         </div>
     </div>
 
-    {% if has_records %}
-        {% for position, items in grouped_records.items() %}
-        <div class="attendance-card" style="margin-bottom: 25px;">
-            <h3 class="position-title">
-                <i class="fa-solid fa-layer-group" style="color: #4a90e2;"></i> {{ position }}
-            </h3>
-            
-            <table class="attendance-table">
+    <!-- 2·3) 날짜별 현황 + 클릭 시 명단 펼침 -->
+    <div class="panel att-tab-panel" data-panel="daily">
+        <h2 class="panel-title"><i class="fa-solid fa-calendar-day"></i> {{ current_month }} 일별 근태 현황</h2>
+        <div class="att-table-wrap">
+            <table class="data-table">
                 <thead>
                     <tr>
-                        <th>날짜</th>
-                        <th>출근 순서</th>
-                        <th>이름</th>
-                        <th>출근 시간</th>
-                        <th>퇴근 시간</th>
-                        <th>상태</th>
-                        <th>사유</th>
-                        <th>관리</th>
+                        <th>일자</th><th>요일</th><th>출근</th><th>퇴근</th><th>조퇴</th>
+                        <th>근무중</th><th>지각</th><th>평균 출근</th><th>평균 근무</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in items %}
+                    {% for row in daily_rows %}
+                    <tr class="att-click-row js-daily-attendance" tabindex="0" role="button" aria-expanded="false" data-day="{{ row.day }}">
+                        <td><i class="fa-solid fa-chevron-right expand-icon"></i>{{ row.day }}</td>
+                        <td>{{ row.weekday }}</td>
+                        <td><span class="att-count">{{ row.total }}</span>명</td>
+                        <td>{% if row.checked_out %}<span class="att-count">{{ row.checked_out }}</span>명{% else %}<span class="att-count-zero">0명</span>{% endif %}</td>
+                        <td>{% if row.early %}<span class="att-badge att-badge-early">{{ row.early }}명</span>{% else %}<span class="att-count-zero">0명</span>{% endif %}</td>
+                        <td>{% if row.working %}<span class="att-badge att-badge-work">{{ row.working }}명</span>{% else %}<span class="att-count-zero">0명</span>{% endif %}</td>
+                        <td>{% if row.late %}<span class="att-badge att-badge-late">{{ row.late }}명</span>{% else %}<span class="att-count-zero">0명</span>{% endif %}</td>
+                        <td>{{ row.avg_in_text }}</td>
+                        <td>{{ row.avg_hours_text }}</td>
+                    </tr>
+                    <tr class="att-detail-row" hidden><td colspan="9"><div class="att-detail-box">불러오는 중...</div></td></tr>
+                    {% else %}
+                    <tr><td colspan="9" class="empty-note">해당 조건의 근무 기록이 없습니다.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="stat-hint" style="margin-top:10px;"><i class="fa-solid fa-hand-pointer"></i> 일자 행을 클릭하면 그날의 출퇴근자 명단과 퇴근·조퇴 처리 버튼이 표시됩니다.</div>
+    </div>
+
+    <!-- 4) 월별 통계 -->
+    <div class="panel att-tab-panel" data-panel="monthly" hidden>
+        <h2 class="panel-title"><i class="fa-solid fa-chart-column"></i> 월별 근퇴 현황 (최근 {{ monthly_stats|length }}개월)</h2>
+        {% if monthly_stats %}
+        {% set month_max = monthly_stats | map(attribute='total') | max %}
+        <div class="att-chart">
+            {% for row in monthly_stats | reverse %}
+            <div class="att-chart-col" title="{{ row.label }} · 출근 {{ row.total }}건 / 퇴근 {{ row.checked_out }}건">
+                <div class="att-chart-value">{{ row.total }}</div>
+                <div class="att-chart-bars">
+                    <div class="att-chart-bar att-chart-bar-in" style="height: {{ (row.total / month_max * 100) | round(1) if month_max else 0 }}%;"></div>
+                    <div class="att-chart-bar att-chart-bar-out" style="height: {{ (row.checked_out / month_max * 100) | round(1) if month_max else 0 }}%;"></div>
+                </div>
+                <div class="att-chart-label">{{ row.label[2:] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="att-legend">
+            <span><i style="background: var(--primary-color, #4a90e2);"></i> 출근 기록</span>
+            <span><i style="background: color-mix(in srgb, var(--primary-color, #4a90e2) 40%, #94a3b8);"></i> 퇴근 완료</span>
+        </div>
+        <div class="table-scroll" style="margin-top: 18px;">
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ row.date }}</td>
-                        
-                        <td style="font-weight: 600; color: #2c3e50;">
-                            {% if row.daily_rank == 1 %}🥇 1등
-                            {% elif row.daily_rank == 2 %}🥈 2등
-                            {% elif row.daily_rank == 3 %}🥉 3등
-                            {% else %}{{ row.daily_rank }}등{% endif %}
-                        </td>
-                        
-                        <td style="font-weight: 600;">{{ row.user_name }}</td>
-                        <td>{{ row.clock_in_time if row.clock_in_time else '-' }}</td>
-                        <td>{{ row.clock_out_time if row.clock_out_time else '-' }}</td>
-                        
+                        <th>월</th><th>근무일수</th><th>인원</th><th>출근</th><th>퇴근</th>
+                        <th>조퇴</th><th>미퇴근</th><th>지각</th><th>평균 출근</th><th>평균 근무</th><th>총 근무</th><th>출근 추이</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in monthly_stats %}
+                    <tr>
+                        <td style="font-weight: 800;">{{ row.label }}</td>
+                        <td>{{ row.work_days }}일</td>
+                        <td>{{ row.members }}명</td>
+                        <td>{{ row.total }}건</td>
+                        <td>{{ row.checked_out }}건</td>
+                        <td>{{ row.early }}건</td>
+                        <td>{{ row.working }}건</td>
+                        <td>{{ row.late }}건</td>
+                        <td>{{ row.avg_in_text }}</td>
+                        <td>{{ row.avg_hours_text }}</td>
+                        <td>{{ row.total_hours_text }}</td>
                         <td>
-                            <span class="status-badge 
-                                {% if row.status == '근무중' %}status-working
-                                {% elif row.status == '조퇴' %}status-early
-                                {% else %}status-out{% endif %}">
-                                {{ row.status }}
-                            </span>
-                        </td>
-
-                        <td style="color: #636e72; font-size: 0.9rem; max-width: 150px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="{{ row.reason if row.reason else '' }}">
-                            {{ row.reason if row.reason else '-' }}
-                        </td>
-                        
-                        <td>
-                            <div style="display: flex; align-items: center; justify-content: center;">
-                                {% if row.emp_no|string == current_emp_no|string and not row.clock_out_time %}
-                                <button onclick="handleClockOut({{ row.id }}, '퇴근')" class="btn-clockout">퇴근</button>
-                                <button onclick="handleClockOut({{ row.id }}, '조퇴')" class="btn-earlyleave">조퇴</button>
-                                {% elif not row.clock_out_time %}
-                                <span style="color: #adb5bd;">-</span>
-                                {% endif %}
-
-                                {% if user_level <= 2 %}
-                                <button onclick="deleteRecord({{ row.id }})" class="btn-delete-record" title="기록 삭제"><i class="fa-solid fa-trash-can"></i></button>
-                                {% endif %}
+                            <div class="att-bar-cell">
+                                <div class="att-bar-track"><div class="att-bar-fill" style="width: {{ (row.total / month_max * 100) | round(1) if month_max else 0 }}%;"></div></div>
                             </div>
                         </td>
                     </tr>
@@ -216,81 +378,239 @@
                 </tbody>
             </table>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="attendance-card">
-            <div style="padding: 60px 0; text-align: center; color: #636e72;">
-                <i class="fa-regular fa-folder-open" style="font-size: 3rem; margin-bottom: 15px; display: block; color: #cbd5e1;"></i>
-                <p style="font-size: 1.1rem; margin: 0;">해당 조건의 근무 기록이 없습니다.</p>
+        {% else %}
+        <div class="empty-note">최근 12개월 근무 기록이 없습니다.</div>
+        {% endif %}
+    </div>
+
+    <!-- 4) 분기별 통계 -->
+    <div class="panel att-tab-panel" data-panel="quarterly" hidden>
+        <h2 class="panel-title"><i class="fa-solid fa-chart-simple"></i> 분기별 근퇴 현황 (최근 {{ quarterly_stats|length }}분기)</h2>
+        {% if quarterly_stats %}
+        {% set quarter_max = quarterly_stats | map(attribute='total') | max %}
+        <div class="att-chart">
+            {% for row in quarterly_stats | reverse %}
+            <div class="att-chart-col" title="{{ row.label }} · 출근 {{ row.total }}건 / 퇴근 {{ row.checked_out }}건">
+                <div class="att-chart-value">{{ row.total }}</div>
+                <div class="att-chart-bars">
+                    <div class="att-chart-bar att-chart-bar-in" style="height: {{ (row.total / quarter_max * 100) | round(1) if quarter_max else 0 }}%;"></div>
+                    <div class="att-chart-bar att-chart-bar-out" style="height: {{ (row.checked_out / quarter_max * 100) | round(1) if quarter_max else 0 }}%;"></div>
+                </div>
+                <div class="att-chart-label">{{ row.period.replace('-', ' Q') }}</div>
             </div>
+            {% endfor %}
         </div>
-    {% endif %}
+        <div class="att-legend">
+            <span><i style="background: var(--primary-color, #4a90e2);"></i> 출근 기록</span>
+            <span><i style="background: color-mix(in srgb, var(--primary-color, #4a90e2) 40%, #94a3b8);"></i> 퇴근 완료</span>
+        </div>
+        <div class="table-scroll" style="margin-top: 18px;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>분기</th><th>근무일수</th><th>인원</th><th>출근</th><th>퇴근</th>
+                        <th>조퇴</th><th>미퇴근</th><th>지각</th><th>평균 출근</th><th>평균 근무</th><th>총 근무</th><th>출근 추이</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in quarterly_stats %}
+                    <tr>
+                        <td style="font-weight: 800;">{{ row.label }}</td>
+                        <td>{{ row.work_days }}일</td>
+                        <td>{{ row.members }}명</td>
+                        <td>{{ row.total }}건</td>
+                        <td>{{ row.checked_out }}건</td>
+                        <td>{{ row.early }}건</td>
+                        <td>{{ row.working }}건</td>
+                        <td>{{ row.late }}건</td>
+                        <td>{{ row.avg_in_text }}</td>
+                        <td>{{ row.avg_hours_text }}</td>
+                        <td>{{ row.total_hours_text }}</td>
+                        <td>
+                            <div class="att-bar-cell">
+                                <div class="att-bar-track"><div class="att-bar-fill" style="width: {{ (row.total / quarter_max * 100) | round(1) if quarter_max else 0 }}%;"></div></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-note">최근 8분기 근무 기록이 없습니다.</div>
+        {% endif %}
+    </div>
 
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
+const attWrap = document.querySelector('.att-wrap');
+const attCurrentEmpNo = attWrap.dataset.currentEmpNo || '';
+const attUserLevel = Number(attWrap.dataset.userLevel || 4);
+const attSearchEmpNo = attWrap.dataset.searchEmpNo || '';
+const attSearchPosition = attWrap.dataset.searchPosition || '';
+
+function escapeAttHtml(value) {
+    return String(value ?? '-').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    })[char]);
+}
+
+/* 탭 전환 */
+document.querySelectorAll('.att-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.att-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
+        document.querySelectorAll('.att-tab-panel').forEach((panel) => {
+            panel.hidden = panel.dataset.panel !== tab.dataset.tab;
+        });
+    });
+});
+
+/* 날짜 행 펼치기 (이용통계와 동일한 동작) */
+async function toggleAttDetail(row, loader) {
+    const detailRow = row.nextElementSibling;
+    if (!detailRow || !detailRow.classList.contains('att-detail-row')) return;
+    const opening = detailRow.hidden;
+    detailRow.hidden = !opening;
+    row.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    if (!opening || detailRow.dataset.loaded === 'true') return;
+
+    const box = detailRow.querySelector('.att-detail-box');
+    box.innerHTML = '<div class="empty-note"><i class="fa-solid fa-spinner fa-spin"></i> 기록을 불러오는 중입니다.</div>';
+    try {
+        box.innerHTML = await loader();
+        detailRow.dataset.loaded = 'true';
+    } catch (error) {
+        box.innerHTML = `<div class="empty-note">${escapeAttHtml(error.message || '기록을 불러오지 못했습니다.')}</div>`;
+    }
+}
+
+function bindExpandableAttRows(selector, loader) {
+    document.querySelectorAll(selector).forEach((row) => {
+        const open = () => toggleAttDetail(row, () => loader(row));
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+}
+
+function attStatusBadge(member) {
+    if (member.status === '조퇴') return '<span class="att-badge att-badge-early">조퇴</span>';
+    if (!member.clock_out_time) return '<span class="att-badge att-badge-work">근무중</span>';
+    return '<span class="att-badge att-badge-out">퇴근</span>';
+}
+
+function attRankLabel(rank) {
+    if (rank === 1) return '🥇 1등';
+    if (rank === 2) return '🥈 2등';
+    if (rank === 3) return '🥉 3등';
+    return `${rank}등`;
+}
+
+function attActionCell(member) {
+    const buttons = [];
+    if (String(member.emp_no) === String(attCurrentEmpNo) && !member.clock_out_time) {
+        buttons.push(`<button type="button" class="btn-mini" onclick="handleClockOut(${member.id}, '퇴근')">퇴근</button>`);
+        buttons.push(`<button type="button" class="btn-mini btn-mini-warn" onclick="handleClockOut(${member.id}, '조퇴')">조퇴</button>`);
+    }
+    if (attUserLevel <= 2) {
+        buttons.push(`<button type="button" class="btn-mini btn-mini-danger" title="기록 삭제" onclick="deleteRecord(${member.id})"><i class="fa-solid fa-trash-can"></i></button>`);
+    }
+    if (!buttons.length) return '<span style="color:#adb5bd;">-</span>';
+    return `<div style="display:flex; align-items:center; gap:6px;">${buttons.join('')}</div>`;
+}
+
+bindExpandableAttRows('.js-daily-attendance', async (row) => {
+    const day = row.dataset.day;
+    const params = new URLSearchParams({ day });
+    if (attSearchEmpNo) params.set('search_emp_no', attSearchEmpNo);
+    if (attSearchPosition) params.set('search_position', attSearchPosition);
+
+    const response = await fetch(`/attendance/daily-detail?${params.toString()}`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || '일별 기록을 불러오지 못했습니다.');
+    if (!result.members.length) return '<div class="empty-note">해당 일자의 출퇴근 기록이 없습니다.</div>';
+
+    const summary = result.summary;
+    return `
+        <h3 class="detail-title">
+            <i class="fa-solid fa-users"></i> ${escapeAttHtml(result.day)} (${escapeAttHtml(result.weekday)}) 출퇴근 명단
+            <span class="stat-hint" style="margin:0 0 0 4px;">
+                출근 ${summary.total}명 · 퇴근 ${summary.checked_out}명 · 조퇴 ${summary.early}명 ·
+                근무중 ${summary.working}명 · 지각 ${summary.late}명 · 평균 근무 ${escapeAttHtml(summary.avg_hours_text)}
+            </span>
+        </h3>
+        <div class="table-scroll"><table class="data-table">
+            <thead><tr>
+                <th>출근 순서</th><th>이름</th><th>직급</th><th>기준 근무시간</th><th>출근 시간</th><th>퇴근 시간</th>
+                <th>근무 시간</th><th>상태</th><th>사유</th><th>관리</th>
+            </tr></thead>
+            <tbody>${result.members.map((member) => `
+                <tr>
+                    <td style="font-weight:700;">${attRankLabel(member.daily_rank)}</td>
+                    <td style="font-weight:700;">${escapeAttHtml(member.user_name)}</td>
+                    <td>${escapeAttHtml(member.position)}</td>
+                    <td style="color: var(--text-gray, #64748b);">${escapeAttHtml(member.plan_text)}</td>
+                    <td>${escapeAttHtml(member.clock_in_time)}${member.is_late ? ' <span class="att-badge att-badge-late">지각</span>' : ''}</td>
+                    <td>${escapeAttHtml(member.clock_out_time || '-')}</td>
+                    <td>${escapeAttHtml(member.work_hours_text)}</td>
+                    <td>${attStatusBadge(member)}</td>
+                    <td style="color: var(--text-gray, #64748b); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeAttHtml(member.reason)}">${escapeAttHtml(member.reason)}</td>
+                    <td>${attActionCell(member)}</td>
+                </tr>
+            `).join('')}</tbody>
+        </table></div>
+    `;
+});
+
 function handleClockOut(recordId, type) {
     let reasonText = '';
 
     if (type === '조퇴') {
         reasonText = prompt('조퇴 사유를 간략하게 입력해주세요.\n(예: 병원 진료, 개인 사정 등)');
         if (reasonText === null) {
-            return; 
+            return;
         }
     } else {
-        if(!confirm(type + ' 처리 하시겠습니까? \n(한 번 기록되면 수정할 수 없습니다.)')) {
+        if (!confirm(type + ' 처리 하시겠습니까? \n(한 번 기록되면 수정할 수 없습니다.)')) {
             return;
         }
     }
 
     fetch('/attendance/clock_out', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            record_id: recordId,
-            type: type,
-            reason: reasonText
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId, type: type, reason: reasonText })
     })
     .then(response => response.json())
     .then(data => {
-        if(data.success) {
-            alert(data.message);
-            location.reload(); 
-        } else {
-            alert(data.message);
-        }
+        alert(data.message);
+        if (data.success) location.reload();
     })
     .catch(error => console.error('Error:', error));
 }
 
-// [신규 추가] 관리자 삭제 로직
+// [기존] 관리자 삭제 로직
 function deleteRecord(recordId) {
-    if(!confirm('이 기록을 정말 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다.)')) {
+    if (!confirm('이 기록을 정말 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다.)')) {
         return;
     }
 
     fetch('/attendance/delete', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            record_id: recordId
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
     })
     .then(response => response.json())
     .then(data => {
-        if(data.success) {
-            alert(data.message);
-            location.reload(); 
-        } else {
-            alert(data.message);
-        }
+        alert(data.message);
+        if (data.success) location.reload();
     })
     .catch(error => console.error('Error:', error));
 }

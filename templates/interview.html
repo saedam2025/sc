@@ -2,7 +2,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-27') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-31') }}">
 
 <main class="iv-page">
     <section class="iv-hero" aria-labelledby="interviewTitle">
@@ -20,39 +20,6 @@
         </div>
     </section>
 
-    <section class="iv-summary" aria-label="면접 진행 요약">
-        <div class="iv-summary-stats" id="summaryStats">
-            <button type="button" class="iv-summary-item is-scheduled" data-summary-filter="scheduled">
-                <span class="iv-summary-label">면접예정</span>
-                <span class="iv-summary-value"><strong id="sumScheduled">0</strong><small>명</small></span>
-            </button>
-            <button type="button" class="iv-summary-item is-ongoing" data-summary-filter="ongoing">
-                <span class="iv-summary-label">면접진행중</span>
-                <span class="iv-summary-value"><strong id="sumOngoing">0</strong><small>명</small></span>
-            </button>
-            <button type="button" class="iv-summary-item is-completed" data-summary-filter="completed">
-                <span class="iv-summary-label">면접완료</span>
-                <span class="iv-summary-value"><strong id="sumCompleted">0</strong><small>명</small></span>
-            </button>
-            <button type="button" class="iv-summary-item is-pass" data-summary-filter="pass">
-                <span class="iv-summary-label">합격자</span>
-                <span class="iv-summary-value"><strong id="sumPassed">0</strong><small id="sumTotal">/ 0명</small></span>
-            </button>
-            <div class="iv-summary-item is-score">
-                <span class="iv-summary-label">총평점</span>
-                <span class="iv-summary-value"><strong id="sumAverage">0.0</strong><small>/ 5.0</small></span>
-            </div>
-        </div>
-        <button class="iv-summary-cta" id="openCreate" type="button">
-            <span class="iv-summary-cta-icon" aria-hidden="true"><i class="fa-solid fa-user-plus"></i></span>
-            <span class="iv-summary-cta-copy">
-                <strong>면접자 입력</strong>
-                <small>이름 · 직급 · 학교 · 이력서 등록</small>
-            </span>
-            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-        </button>
-    </section>
-
     <section class="iv-workspace">
         <article class="iv-card iv-list-card">
             <div class="iv-toolbar" id="listToolbar">
@@ -61,12 +28,15 @@
                     <input id="searchInput" type="search" placeholder="이름·직급·학교로 찾기" autocomplete="off">
                 </div>
                 <div class="iv-filter-chips" id="filterChips" role="group" aria-label="면접 진행상태 필터">
-                    <button type="button" data-filter="all" class="is-active">전체</button>
-                    <button type="button" data-filter="scheduled">면접예정</button>
-                    <button type="button" data-filter="ongoing">면접진행중</button>
-                    <button type="button" data-filter="completed">면접완료</button>
-                    <button type="button" data-filter="pass">합격</button>
+                    <button type="button" data-filter="all" class="is-active">전체 <b id="cntAll">0</b>명</button>
+                    <button type="button" data-filter="scheduled">면접예정 <b id="cntScheduled">0</b>명</button>
+                    <button type="button" data-filter="ongoing">면접진행중 <b id="cntOngoing">0</b>명</button>
+                    <button type="button" data-filter="completed">면접완료 <b id="cntCompleted">0</b>명</button>
+                    <button type="button" data-filter="pass">합격 <b id="cntPass">0</b>명</button>
                 </div>
+                <button class="iv-toolbar-cta" id="openCreate" type="button">
+                    <i class="fa-solid fa-user-plus" aria-hidden="true"></i><span>면접자 입력</span>
+                </button>
             </div>
 
             <div class="iv-table-wrap">
@@ -176,5 +146,5 @@ window.IV_MAX_PANELISTS = {{ max_panelists }};
 window.IV_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IV_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview.js', v='20260902-27') }}"></script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260902-31') }}"></script>
 {% endblock %}
