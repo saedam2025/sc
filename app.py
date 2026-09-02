@@ -1,5 +1,6 @@
 from flask import Flask, session, redirect, url_for, request, render_template, jsonify, abort
 from datetime import datetime
+import json
 import os
 import re
 import secrets
@@ -551,6 +552,101 @@ def recover_login_account():
         if conn is not None:
             conn.close()
 
+# ── 개인 근무시간(월~금) 설정 ────────────────────────────────────────────────
+# weekday는 SQLite STRFTIME('%w')와 같은 규칙(1=월 ~ 5=금)을 쓴다.
+WORK_SCHEDULE_WEEKDAYS = ((1, '월'), (2, '화'), (3, '수'), (4, '목'), (5, '금'))
+DEFAULT_WORK_START = '09:00'
+DEFAULT_WORK_END = '18:00'
+
+
+def _normalize_hhmm(value):
+    """'9:5', '09:05:00' 같은 입력을 'HH:MM'으로 맞춘다. 잘못된 값은 None."""
+    text = str(value or '').strip()
+    if not text:
+        return None
+    match = re.fullmatch(r'(\d{1,2}):(\d{2})(?::\d{2})?', text)
+    if not match:
+        return None
+    hour, minute = int(match.group(1)), int(match.group(2))
+    if hour > 23 or minute > 59:
+        return None
+    return '%02d:%02d' % (hour, minute)
+
+
+def load_work_schedule(emp_no):
+    """월~금 5개 행을 항상 채워서 돌려준다(미설정 요일은 기본값 표시용 빈 값)."""
+    conn = get_db()
+    try:
+        rows = {
+            int(row['weekday']): row
+            for row in conn.execute(
+                'SELECT weekday, start_time, end_time, is_off '
+                'FROM user_work_schedule WHERE emp_no=?', (str(emp_no),)
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+
+    schedule = []
+    for weekday, label in WORK_SCHEDULE_WEEKDAYS:
+        row = rows.get(weekday)
+        schedule.append({
+            'weekday': weekday,
+            'label': label,
+            'start_time': (row['start_time'] if row else None) or '',
+            'end_time': (row['end_time'] if row else None) or '',
+            'is_off': bool(row['is_off']) if row else False,
+            'configured': row is not None,
+        })
+    return schedule
+
+
+def save_work_schedule(conn, emp_no, raw_payload):
+    """개인정보 수정창에서 넘어온 월~금 근무시간을 저장한다."""
+    try:
+        entries = json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+    except (TypeError, ValueError):
+        raise ValueError('근무시간 형식을 읽을 수 없습니다.')
+    if not isinstance(entries, list):
+        raise ValueError('근무시간 형식이 올바르지 않습니다.')
+
+    allowed = {weekday for weekday, _ in WORK_SCHEDULE_WEEKDAYS}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            weekday = int(entry.get('weekday'))
+        except (TypeError, ValueError):
+            continue
+        if weekday not in allowed:
+            continue
+
+        is_off = bool(entry.get('is_off'))
+        start_time = _normalize_hhmm(entry.get('start_time'))
+        end_time = _normalize_hhmm(entry.get('end_time'))
+
+        if not is_off and start_time and end_time and end_time <= start_time:
+            raise ValueError('%s요일 퇴근시간이 출근시간보다 빠릅니다.' % dict(WORK_SCHEDULE_WEEKDAYS)[weekday])
+
+        # 휴무도 아니고 시간도 비어 있으면 '미설정'으로 되돌린다.
+        if not is_off and not start_time and not end_time:
+            conn.execute(
+                'DELETE FROM user_work_schedule WHERE emp_no=? AND weekday=?',
+                (str(emp_no), weekday)
+            )
+            continue
+
+        conn.execute('''
+            INSERT INTO user_work_schedule (emp_no, weekday, start_time, end_time, is_off, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(emp_no, weekday) DO UPDATE SET
+                start_time=excluded.start_time,
+                end_time=excluded.end_time,
+                is_off=excluded.is_off,
+                updated_at=CURRENT_TIMESTAMP
+        ''', (str(emp_no), weekday, start_time, end_time, 1 if is_off else 0))
+
+
 @app.route('/user/my_info')
 def get_my_info():
     if 'emp_no' not in session:
@@ -567,7 +663,9 @@ def get_my_info():
         info_dict = dict(user_row)
         if 'password' in info_dict:
             del info_dict['password']
-            
+
+        info_dict['work_schedule'] = load_work_schedule(session['emp_no'])
+
         return jsonify({"status": "success", "data": info_dict})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -662,15 +760,25 @@ def update_my_info():
             update_fields.append("password=?")
             params.append(hash_password(new_password))
 
-        if not update_fields:
+        raw_schedule = data.get('work_schedule')
+
+        if not update_fields and raw_schedule is None:
             return jsonify({"status": "error", "message": "수정 가능한 항목이 없습니다."}), 400
 
-        params.append(session['emp_no'])
+        if update_fields:
+            params.append(session['emp_no'])
+            conn.execute(
+                f"UPDATE users SET {', '.join(update_fields)} WHERE emp_no=?",
+                params
+            )
 
-        conn.execute(
-            f"UPDATE users SET {', '.join(update_fields)} WHERE emp_no=?",
-            params
-        )
+        if raw_schedule is not None:
+            try:
+                save_work_schedule(conn, session['emp_no'], raw_schedule)
+            except ValueError as schedule_error:
+                conn.rollback()
+                return jsonify({"status": "error", "message": str(schedule_error)}), 400
+
         conn.commit()
         if old_profile_file_path and old_profile_file_path != new_profile_file_path:
             delete_file(old_profile_file_path)
