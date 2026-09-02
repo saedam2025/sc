@@ -91,6 +91,8 @@
              text-underline-offset:3px; cursor:pointer; }
     .again:hover { color:var(--brand-dark); }
     .submit-state { display:flex; flex-direction:column; align-items:center; gap:9px; }
+    /* display:flex 가 hidden 속성을 이겨버리므로, 감출 때는 확실히 감춘다. */
+    .submit-state[hidden] { display:none; }
     button.is-done { cursor:default; opacity:.95; }
     button.is-done:hover { filter:none; }
 
