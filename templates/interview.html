@@ -1,32 +1,101 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260901-02') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-16') }}">
 
 <main class="iv-page">
-    <section class="iv-hero">
+    <section class="iv-hero" aria-labelledby="interviewTitle">
         <div class="iv-hero-copy">
-            <span class="iv-hero-icon"><i class="fa-solid fa-user-check"></i></span>
+            <span class="iv-hero-icon" aria-hidden="true"><i class="fa-solid fa-user-check"></i></span>
             <div>
                 <span class="iv-eyebrow">SAEDAM INTERVIEW</span>
-                <h1>면접진행</h1>
-                <p>면접 전에 면접자 정보와 이력서를 등록하고, 사전질문지·면접관 평가까지 한곳에서 관리합니다.</p>
+                <h1 id="interviewTitle">면접관리</h1>
+                <p>면접자 정보와 이력서를 등록하고, 사전질문지·AI 이력서 요약·면접관 평가를 한곳에서 관리합니다.</p>
             </div>
         </div>
-        <button class="iv-button iv-button-primary" id="openCreate" type="button">
-            <i class="fa-solid fa-user-plus"></i> 면접자 입력
-        </button>
-    </section>
-
-    <section class="iv-toolbar">
-        <div class="iv-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="searchInput" type="search" placeholder="이름·직급·학교로 찾기" autocomplete="off">
+        <div class="iv-ai-brand" title="AI API 설정은 통합관리 > AI api설정에서 관리합니다.">
+            <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="iv-ai-brand-logo">
+            <p class="iv-ai-brand-preset">{% if ai_status.source != 'none' %}SaeDam AI Preset {{ ai_status.preset_id }} - {{ ai_status.model_short_name }}.{% else %}SaeDam AI Preset 미설정{% endif %}</p>
         </div>
-        <span class="iv-count" id="candidateCount">불러오는 중…</span>
     </section>
 
-    <section class="iv-list" id="candidateList"></section>
+    <section class="iv-workspace">
+        <article class="iv-card iv-list-card">
+            <header class="iv-card-head">
+                <div>
+                    <span class="iv-step">01</span>
+                    <h2>면접자 명단</h2>
+                    <p>면접 진행표를 열면 새 창에서 크게 보며 평가를 입력할 수 있습니다.</p>
+                </div>
+                <span class="iv-ready-badge"><i class="fa-solid fa-clipboard-list"></i> 면접 진행표</span>
+            </header>
+
+            <div class="iv-toolbar">
+                <div class="iv-search">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input id="searchInput" type="search" placeholder="이름·직급·학교로 찾기" autocomplete="off">
+                </div>
+                <div class="iv-filter-chips" id="filterChips" role="group" aria-label="면접 진행상태 필터">
+                    <button type="button" data-filter="all" class="is-active">전체</button>
+                    <button type="button" data-filter="scheduled">면접예정</button>
+                    <button type="button" data-filter="completed">면접완료</button>
+                    <button type="button" data-filter="pass">합격</button>
+                </div>
+            </div>
+            <p class="iv-count" id="candidateCount">불러오는 중…</p>
+
+            <div class="iv-table-wrap">
+                <table class="iv-table">
+                    <colgroup>
+                        <col class="iv-col-number">
+                        <col class="iv-col-candidate">
+                        <col class="iv-col-school">
+                        <col class="iv-col-when">
+                        <col class="iv-col-progress">
+                        <col class="iv-col-materials">
+                        <col class="iv-col-score">
+                        <col class="iv-col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">번호</th>
+                            <th>지원자</th>
+                            <th>대상학교</th>
+                            <th>면접일시</th>
+                            <th>진행 현황</th>
+                            <th>서류 · AI</th>
+                            <th>면접관 평가</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody id="candidateList"></tbody>
+                </table>
+            </div>
+            <ul class="iv-pagination" id="candidatePaging"></ul>
+        </article>
+
+        <aside class="iv-side-column">
+            <article class="iv-card iv-flow-card">
+                <span class="iv-card-kicker">INTERVIEW FLOW</span>
+                <h2>면접 진행 상황</h2>
+                <ol class="iv-flow-list" id="flowList">
+                    <li data-flow-step="register"><span>1</span><div><strong>면접자 등록</strong><small id="flowRegister">이력서·첨부자료 등록</small></div></li>
+                    <li data-flow-step="questionnaire"><span>2</span><div><strong>사전질문지</strong><small id="flowQuestionnaire">면접자 사전 작성</small></div></li>
+                    <li data-flow-step="evaluate"><span>3</span><div><strong>면접 평가</strong><small id="flowEvaluate">면접관 점수·의견 입력</small></div></li>
+                    <li data-flow-step="result"><span>4</span><div><strong>합격 판정</strong><small id="flowResult">합격·불합격·보류 확정</small></div></li>
+                </ol>
+            </article>
+
+            <button class="iv-card iv-create-cta" id="openCreate" type="button">
+                <span class="iv-create-icon" aria-hidden="true"><i class="fa-solid fa-user-plus"></i></span>
+                <span class="iv-create-copy">
+                    <strong>면접자 입력</strong>
+                    <small>이름 · 직급 · 학교 · 이력서 등록</small>
+                </span>
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </button>
+        </aside>
+    </section>
 </main>
 
 <!-- 면접자 등록/수정 -->
@@ -42,24 +111,29 @@
                 <div class="iv-form-grid">
                     <div><label for="fieldName">이름 <b>*</b></label><input id="fieldName" required maxlength="60"></div>
                     <div>
-                        <label for="fieldPosition">대상 직급</label>
-                        <input id="fieldPosition" list="positionOptions" maxlength="60" placeholder="선택 또는 직접 입력">
-                        <datalist id="positionOptions">
-                            {% for item in positions %}<option value="{{ item }}"></option>{% endfor %}
-                        </datalist>
+                        <label for="fieldPositionChoice">대상 직급</label>
+                        <select id="fieldPositionChoice">
+                            <option value="">직급 선택</option>
+                            {% for item in positions %}<option value="{{ item }}">{{ item }}</option>{% endfor %}
+                            <option value="__other__">기타 (직접 입력)</option>
+                        </select>
+                        <input id="fieldPositionOther" class="iv-other-position" maxlength="60" placeholder="대상 직급을 직접 입력" hidden>
                     </div>
                     <div>
-                        <label for="fieldSchool">대상학교</label>
-                        <input id="fieldSchool" list="schoolOptions" maxlength="120" placeholder="선택 또는 직접 입력">
-                        <datalist id="schoolOptions">
-                            {% for item in schools %}<option value="{{ item }}"></option>{% endfor %}
-                        </datalist>
+                        <label for="fieldSchool">대상학교명/본사채용</label>
+                        <input id="fieldSchool" maxlength="120" autocomplete="off" placeholder="예) 새담초등학교 또는 본사채용">
                     </div>
                     <div><label for="fieldInterviewAt">면접일시</label><input id="fieldInterviewAt" type="datetime-local"></div>
                     <div class="full"><label for="fieldMemo">면접 준비 메모</label><textarea id="fieldMemo" rows="3" maxlength="2000" placeholder="확인할 사항, 질문 예정 내용 등"></textarea></div>
                     <div class="full" id="createFileRow">
-                        <label for="fieldFiles">이력서 등 첨부하기 <small>이력서·자기소개서·경력증명서 · 파일당 20MB 이하, 최대 10개</small></label>
-                        <input id="fieldFiles" type="file" multiple>
+                        <label>이력서 등 첨부하기 <small>전체 30MB 이하 · 최대 20개</small></label>
+                        <input id="fieldFiles" class="iv-hidden-file" type="file" multiple tabindex="-1">
+                        <div class="iv-drop-zone" id="createDropZone" data-file-input="fieldFiles" data-file-list="createFileList" role="button" tabindex="0">
+                            <span class="iv-drop-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                            <strong>파일을 이곳에 끌어다 놓으세요</strong>
+                            <small>또는 이 영역을 눌러 첨부 · PDF, HWP, 문서, 이미지 등</small>
+                        </div>
+                        <div class="iv-selected-files" id="createFileList" aria-live="polite"></div>
                     </div>
                 </div>
                 <div class="iv-modal-actions">
@@ -71,28 +145,13 @@
         </div>
     </section>
 </div>
-
-<!-- 면접 상세 -->
-<div class="iv-modal-backdrop" id="detailModal" hidden>
-    <section class="iv-modal iv-modal-wide" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
-        <header>
-            <div><span class="iv-kicker">INTERVIEW SHEET</span><h2 id="detailTitle">면접 진행표</h2></div>
-            <button class="iv-icon-button" id="closeDetailModal" type="button" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
-        </header>
-        <div class="iv-modal-body" id="detailBody"></div>
-        <footer>
-            <span class="iv-feedback" id="detailFeedback" role="status"></span>
-            <button class="iv-button" id="closeDetailFooter" type="button">닫기</button>
-        </footer>
-    </section>
-</div>
-
-<template id="questionnaireLabels">
-    {% for key, title, hint, rows in questionnaire_fields %}<i data-key="{{ key }}" data-title="{{ title }}"></i>{% endfor %}
-</template>
 {% endblock %}
 
 {% block scripts %}
-<script>window.IV_MAX_PANELISTS = {{ max_panelists }};</script>
-<script src="{{ url_for('static', filename='js/interview.js', v='20260901-02') }}"></script>
+<script>
+window.IV_MAX_PANELISTS = {{ max_panelists }};
+window.IV_MAX_ATTACHMENTS = {{ max_attachments }};
+window.IV_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
+</script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260902-16') }}"></script>
 {% endblock %}

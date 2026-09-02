@@ -410,19 +410,19 @@
     .day-col.is-today .day-header-box { border-bottom: 2px solid #14b8a6; }
     .day-col.is-today .day-num, .day-col.is-today .day-name { color: #14b8a6; }
 
-    .day-events-list { display: flex; flex-direction: column; gap: 8px; padding: calc(5px + var(--weekly-range-space)) 4px 5px 0; flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+    .day-events-list { display: flex; flex-direction: column; gap: 5.44px; padding: calc(5px + var(--weekly-range-space)) 4px 5px 0; flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
     .day-events-list::-webkit-scrollbar { width: 4px; }
     .day-events-list::-webkit-scrollbar-track { background: transparent; }
     .day-events-list::-webkit-scrollbar-thumb { background: var(--widget-border-color); border-radius: 4px; }
     .day-events-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-    .weekly-event-item { font-size: 0.85rem; color: var(--text-sub); display: flex; align-items: center; line-height: 1.5; cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background 0.2s; position: relative; }
+    .weekly-event-item { font-size: 0.68rem; color: var(--text-sub); display: flex; align-items: center; line-height: 1.2; cursor: pointer; padding: 2.72px 6px; border-radius: 4px; transition: background 0.2s; position: relative; }
     .weekly-event-item:hover { background: var(--hover-bg); color: var(--text-main); }
     .weekly-event-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
     .weekly-range-layer { position: absolute; top: 64px; left: 0; right: 0; height: var(--weekly-range-space); z-index: 6; pointer-events: none; }
-    .weekly-range-bar { position: absolute; height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 5px; box-sizing: border-box; color: var(--text-main); pointer-events: auto; cursor: pointer; }
+    .weekly-range-bar { position: absolute; height: 17px; display: flex; align-items: center; gap: 6px; padding: 0 5px; box-sizing: border-box; color: var(--text-main); pointer-events: auto; cursor: pointer; }
     .weekly-range-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--event-color); flex: 0 0 auto; }
-    .weekly-range-title { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; font-weight: 800; color: var(--text-main); flex: 0 1 auto; }
+    .weekly-range-title { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.62rem; font-weight: 800; color: var(--text-main); flex: 0 1 auto; }
     .weekly-range-line { position: relative; height: 2px; min-width: 16px; flex: 1; background: var(--event-color); }
     .weekly-range-line::after { content: ''; position: absolute; right: -2px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--event-color); }
     
@@ -1306,7 +1306,7 @@ let currentWeeklyStart = getMonday(new Date());
     function renderWeeklySchedule() {
         const container = document.getElementById('weekly-schedule-container');
         if (!container) return;
-        let html = ''; const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+        let html = ''; const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
         const endDate = new Date(currentWeeklyStart); endDate.setDate(currentWeeklyStart.getDate() + 6);
         const startStr = `${currentWeeklyStart.getFullYear()}.${String(currentWeeklyStart.getMonth() + 1).padStart(2, '0')}.${String(currentWeeklyStart.getDate()).padStart(2, '0')}`;
@@ -1340,7 +1340,7 @@ let currentWeeklyStart = getMonday(new Date());
             item.slot = slot;
             slotEnds[slot] = item.endIndex;
         });
-        const rangeSpace = slotEnds.length ? (slotEnds.length * 28 + 2) : 0;
+        const rangeSpace = slotEnds.length ? (slotEnds.length * 19.2 + 2) : 0;
         container.style.setProperty('--weekly-range-space', `${rangeSpace}px`);
 
         const realToday = new Date();
@@ -1377,11 +1377,11 @@ let currentWeeklyStart = getMonday(new Date());
                     note: info.note
                 };
                 const encodedTooltipData = encodeURIComponent(JSON.stringify(tooltipData));
-                eventsHtml += `<div class="weekly-event-item" data-tooltip="${encodedTooltipData}"><span style="color:${info.color}; margin-right:6px; font-size:0.6rem; transform: translateY(3px);">●</span><span class="weekly-event-text">${escapeWeeklyTooltipHtml(info.title)}</span></div>`;
+                eventsHtml += `<div class="weekly-event-item" data-tooltip="${encodedTooltipData}"><span style="color:${info.color}; margin-right:6px; font-size:0.48rem; line-height:1; display:inline-flex; align-items:center;">●</span><span class="weekly-event-text">${escapeWeeklyTooltipHtml(info.title)}</span></div>`;
             });
 
             const hasRangeEvent = rangeItems.some(item => item.startIndex <= i && i <= item.endIndex);
-            const emptyHtml = hasRangeEvent ? '' : '<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding-top:15px;">일정 없음</div>';
+            const emptyHtml = hasRangeEvent ? '' : '<div style="font-size:0.6rem; color:var(--text-muted); text-align:center; padding-top:15px;">일정 없음</div>';
             html += `<div class="day-col ${isToday ? 'is-today' : ''}"><div class="day-header-box" style="flex-direction: column; align-items: stretch;"><div style="display: flex; justify-content: space-between; align-items: center;"><span class="day-num" style="${textColorStyle}">${dayNum}</span><span class="day-name" style="${nameColorStyle}">${dayName}</span></div>${holidayBadge}</div><div class="day-events-list">${eventsHtml || emptyHtml}</div></div>`;
         }
 
@@ -1401,7 +1401,7 @@ let currentWeeklyStart = getMonday(new Date());
                 const span = item.endIndex - item.startIndex + 1;
                 const left = `calc((100% / 7) * ${item.startIndex} + 9px)`;
                 const width = `calc((100% / 7) * ${span} - 18px)`;
-                html += `<div class="weekly-range-bar weekly-event-item" data-tooltip="${encodedTooltipData}" style="--event-color:${info.color}; top:${item.slot * 28}px; left:${left}; width:${width};">`
+                html += `<div class="weekly-range-bar weekly-event-item" data-tooltip="${encodedTooltipData}" style="--event-color:${info.color}; top:${item.slot * 19.2}px; left:${left}; width:${width};">`
                     + `<span class="weekly-range-dot"></span><span class="weekly-range-title">${escapeWeeklyTooltipHtml(info.title)}</span><span class="weekly-range-line"></span></div>`;
             });
             html += '</div>';

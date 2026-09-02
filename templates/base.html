@@ -1022,7 +1022,7 @@
                             <div class="dropdown-content">
                                 {% if menu_access.get('contacts_main', true) %}<a href="/contacts"><i class="fa-solid fa-address-book"></i>본사연락망</a>{% endif %}
                                 {% if menu_access.get('attendance_main', true) %}<a href="/attendance"><i class="fa-solid fa-clock-rotate-left"></i>근태관리</a>{% endif %}
-                                {% if menu_access.get('interview_main', false) %}<a href="/interview"><i class="fa-solid fa-user-check"></i>면접진행</a>{% endif %}
+                                {% if menu_access.get('interview_main', false) %}<a href="/interview"><i class="fa-solid fa-user-check"></i>면접관리</a>{% endif %}
                                 {% if menu_access.get('organization_invite', false) %}<a href="{{ url_for('user_mgmt.invite_sender_page') }}"><i class="fa-solid fa-paper-plane"></i>가입초대메일발송</a>{% endif %}
                             </div>
                         </li>

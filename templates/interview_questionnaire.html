@@ -32,8 +32,8 @@
              background:linear-gradient(115deg,var(--brand),#3f8fd0); color:#fff;
              font-size:1rem; font-weight:800; cursor:pointer; }
     button:hover { filter:brightness(1.05); }
-    .note { margin:0 34px 22px; padding:13px 16px; border-radius:12px; background:#f4f8fb;
-            color:var(--muted); font-size:.8rem; }
+    .brand { padding:16px 20px 20px; border-top:1px solid var(--line); background:#fbfdfe; text-align:center; }
+    .brand img { height:40px; width:auto; opacity:.85; }
     .done { padding:56px 34px; text-align:center; }
     .done .mark { width:74px; height:74px; display:grid; place-items:center; margin:0 auto 20px;
                   border-radius:50%; background:#e6f7f2; color:var(--brand-dark); font-size:2.1rem; }
@@ -42,9 +42,14 @@
     .done ul { max-width:520px; margin:26px auto 0; padding:18px 22px; border:1px solid var(--line);
                border-radius:13px; background:#fbfdfe; text-align:left; font-size:.83rem; color:var(--muted); }
     .done li { margin:0 0 7px; }
+    .done-actions { display:flex; flex-direction:column; align-items:center; gap:13px; margin-top:30px; }
+    .done-actions .again { color:var(--muted); font-size:.79rem; font-weight:600; text-decoration:underline;
+                           text-underline-offset:3px; cursor:pointer; }
+    .done-actions .again:hover { color:var(--brand-dark); }
+    .close-hint { margin:14px 0 0; color:var(--muted); font-size:.76rem; }
     @media (max-width:560px) {
         header, form { padding-left:20px; padding-right:20px; }
-        .note { margin-left:20px; margin-right:20px; }
+        .brand img { height:34px; }
     }
 </style>
 </head>
@@ -66,6 +71,11 @@
             <li><b>{{ title }}</b> · {{ '작성함' if answers.get(key) else '미작성' }}</li>
             {% endfor %}
         </ul>
+        <div class="done-actions">
+            <button type="button" id="closeWindow">창 닫기</button>
+            <a class="again" href="{{ request.path }}">다시 작성</a>
+        </div>
+        <p class="close-hint" id="closeHint" hidden>창이 자동으로 닫히지 않으면 브라우저 탭을 직접 닫아주세요.</p>
     </div>
 {% else %}
     <header>
@@ -74,12 +84,11 @@
         <p>면접 전 아래 항목을 작성해주세요. 작성하신 내용은 면접 참고자료로만 사용됩니다.</p>
         <div class="who">
             <b>{{ candidate['name'] }} 님</b>
-            {% if candidate['target_position'] %}<b>{{ candidate['target_position'] }}</b>{% endif %}
-            {% if candidate['target_school'] %}<b>{{ candidate['target_school'] }}</b>{% endif %}
-            {% if candidate['interview_at'] %}<b>면접 {{ candidate['interview_at'].replace('T', ' ') }}</b>{% endif %}
+            {% if when.year %}<b>면접 {{ when.year }}</b>{% endif %}
+            {% if when.date %}<b>{{ when.date }}</b>{% endif %}
+            {% if when.time %}<b>{{ when.time }}</b>{% endif %}
         </div>
     </header>
-    <div class="note">전송 후에도 이 링크로 다시 들어오면 내용을 수정해 다시 전송할 수 있습니다.</div>
     <form method="post">
         {% for key, title, hint, rows in fields %}
         <div class="field">
@@ -88,11 +97,75 @@
             <textarea id="{{ key }}" name="{{ key }}" rows="{{ rows }}" maxlength="4000">{{ answers.get(key, '') }}</textarea>
         </div>
         {% endfor %}
+        <input type="hidden" name="typing_cpm" id="typingCpm" value="0">
+        <input type="hidden" name="typing_strokes" id="typingStrokes" value="0">
+        <input type="hidden" name="typing_seconds" id="typingSeconds" value="0">
         <div class="actions">
             <button type="submit">사전질문지 전송</button>
         </div>
     </form>
 {% endif %}
+    <footer class="brand">
+        <img src="{{ url_for('static', filename='logo01.gif') }}" alt="사단법인 새담청소년교육문화원">
+    </footer>
 </div>
+{% if not submitted and not invalid %}
+<script>
+(function () {
+    // 면접자가 실제로 입력한 시간과 타수만 세어 분당 타자수를 구한다.
+    var form = document.querySelector('form');
+    if (!form) { return; }
+
+    var IDLE_LIMIT = 5000;   // 5초 넘게 멈춘 구간은 작성 시간에서 뺀다.
+    var MIN_STROKES = 20;    // 너무 짧게 친 경우는 측정하지 않는다.
+    var MIN_ACTIVE = 5000;
+    var strokes = 0;
+    var activeMs = 0;
+    var lastAt = 0;
+
+    function tick() {
+        var now = Date.now();
+        if (lastAt) {
+            var gap = now - lastAt;
+            activeMs += gap > IDLE_LIMIT ? IDLE_LIMIT : gap;
+        }
+        lastAt = now;
+    }
+
+    // input 이벤트는 한글 IME(자모 한 타마다 발생)와 모바일 자판까지 함께 잡아준다.
+    form.addEventListener('input', function (event) {
+        var type = event.inputType || '';
+        tick();
+        if (type.indexOf('delete') === 0 || type.indexOf('history') === 0) { return; }
+        if (type === 'insertFromPaste' || type === 'insertFromDrop') { return; }
+        strokes += 1;
+    });
+
+    form.addEventListener('submit', function () {
+        var cpm = 0;
+        if (strokes >= MIN_STROKES && activeMs >= MIN_ACTIVE) {
+            cpm = Math.round(strokes / (activeMs / 60000));
+        }
+        document.getElementById('typingCpm').value = cpm;
+        document.getElementById('typingStrokes').value = strokes;
+        document.getElementById('typingSeconds').value = Math.round(activeMs / 1000);
+    });
+})();
+</script>
+{% endif %}
+{% if submitted %}
+<script>
+(function () {
+    var button = document.getElementById('closeWindow');
+    if (!button) { return; }
+    button.addEventListener('click', function () {
+        // 링크를 눌러 직접 연 탭은 브라우저가 스크립트로 닫는 것을 막는다.
+        window.open('', '_self');
+        window.close();
+        setTimeout(function () { document.getElementById('closeHint').hidden = false; }, 400);
+    });
+})();
+</script>
+{% endif %}
 </body>
 </html>

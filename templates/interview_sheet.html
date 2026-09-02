@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ candidate_name }} 면접 진행표</title>
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview_sheet.css', v='20260902-05') }}">
+</head>
+<body class="ivs-body">
+
+<header class="ivs-topbar">
+    <div class="ivs-topbar-copy">
+        <span class="ivs-topbar-icon" aria-hidden="true"><i class="fa-solid fa-clipboard-list"></i></span>
+        <div>
+            <span class="ivs-kicker">INTERVIEW SHEET</span>
+            <h1 id="sheetTitle">{{ candidate_name }} 면접 진행표</h1>
+        </div>
+    </div>
+    <div class="ivs-topbar-actions">
+        <div class="ivs-zoom" role="group" aria-label="글자 크기">
+            <button type="button" id="zoomOut" aria-label="글자 작게">A<i class="fa-solid fa-minus"></i></button>
+            <span id="zoomLabel">100%</span>
+            <button type="button" id="zoomIn" aria-label="글자 크게">A<i class="fa-solid fa-plus"></i></button>
+        </div>
+        <button class="ivs-button" id="reloadSheet" type="button"><i class="fa-solid fa-rotate"></i> 새로고침</button>
+        <button class="ivs-button" id="printSheet" type="button"><i class="fa-solid fa-print"></i> 인쇄</button>
+        <button class="ivs-button" id="closeSheet" type="button"><i class="fa-solid fa-xmark"></i> 창 닫기</button>
+    </div>
+</header>
+
+<p class="ivs-feedback" id="sheetFeedback" role="status"></p>
+
+<main class="ivs-layout">
+    <div class="ivs-main" id="sheetMain">
+        <section class="ivs-card"><div class="ivs-loading"><span class="ivs-spinner"></span> 면접 정보를 불러오는 중입니다…</div></section>
+    </div>
+
+    <aside class="ivs-aside">
+        <article class="ivs-card ivs-ai-card">
+            <header class="ivs-card-head">
+                <div>
+                    <span class="ivs-card-kicker">AI RESUME SUMMARY</span>
+                    <h2>AI 이력서 요약</h2>
+                    <p>사진 · 학력 · 자격 · 경력</p>
+                </div>
+                <span class="ivs-ready-badge" id="aiBadge"><i class="fa-solid fa-sparkles"></i> 대기</span>
+            </header>
+
+            <section class="ivs-progress" id="aiProgress" aria-live="polite" hidden>
+                <div class="ivs-scanner" aria-hidden="true">
+                    <div class="ivs-scanner-doc">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <div class="ivs-scanner-beam"></div>
+                </div>
+                <div class="ivs-progress-head">
+                    <span class="ivs-progress-spinner" aria-hidden="true"></span>
+                    <div>
+                        <strong id="aiProgressTitle">이력서를 분석할 준비를 하고 있습니다.</strong>
+                        <p id="aiProgressMessage">첨부된 이력서를 확인하는 중입니다.</p>
+                    </div>
+                    <span id="aiProgressPercent">0%</span>
+                </div>
+                <div class="ivs-progress-track"><span id="aiProgressBar"></span></div>
+                <ol class="ivs-progress-log" id="aiProgressLog"></ol>
+            </section>
+
+            <div id="aiBody"></div>
+
+            <div class="ivs-resume-drop" id="resumeDropWrap" hidden>
+                <input class="ivs-hidden-file" type="file" id="resumeFiles" multiple tabindex="-1">
+                <div class="ivs-dropzone" id="resumeDropZone" role="button" tabindex="0">
+                    <span class="ivs-drop-icon"><i class="fa-solid fa-file-arrow-up"></i></span>
+                    <strong>이력서를 이곳에 끌어다 놓으세요</strong>
+                    <small>PDF · HWP · HWPX · DOCX · 이미지 · 전체 30MB 이하</small>
+                </div>
+                <div class="ivs-selected-files" id="resumeFileList" aria-live="polite"></div>
+                <label class="ivs-inline-check">
+                    <input type="checkbox" id="replaceResume" checked>
+                    기존 첨부를 지우고 새 이력서로 교체
+                </label>
+                <div class="ivs-drop-actions">
+                    <button class="ivs-button ivs-button-primary" id="uploadResume" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> 올리고 AI 분석</button>
+                    <button class="ivs-button" id="analyzeResume" type="button"><i class="fa-solid fa-rotate-right"></i> 현재 첨부로 재분석</button>
+                </div>
+            </div>
+        </article>
+    </aside>
+</main>
+
+<!-- 면접 집중 모드: 사전질문지와 AI 이력서 요약만 검은 배경으로 크게 보여준다. -->
+<div class="ivs-focus" id="focusMode" hidden>
+    <header class="ivs-focus-head">
+        <div class="ivs-focus-copy">
+            <span class="ivs-focus-kicker">INTERVIEW FOCUS</span>
+            <h2 id="focusTitle">면접 진행</h2>
+        </div>
+        <div class="ivs-focus-actions">
+            <div class="ivs-zoom is-dark" role="group" aria-label="글자 크기">
+                <button type="button" id="focusZoomOut" aria-label="글자 작게">A<i class="fa-solid fa-minus"></i></button>
+                <span id="focusZoomLabel">100%</span>
+                <button type="button" id="focusZoomIn" aria-label="글자 크게">A<i class="fa-solid fa-plus"></i></button>
+            </div>
+            <button class="ivs-focus-exit" id="exitFocus" type="button"><i class="fa-solid fa-right-from-bracket"></i> 나가기</button>
+        </div>
+    </header>
+    <div class="ivs-focus-body" id="focusBody"></div>
+</div>
+
+<template id="questionnaireLabels">
+    {% for key, title, hint, rows in questionnaire_fields %}<i data-key="{{ key }}" data-title="{{ title }}"></i>{% endfor %}
+</template>
+
+<script>
+window.IVS_CANDIDATE_ID = {{ candidate_id }};
+window.IVS_CSRF_TOKEN = {{ csrf_token|tojson }};
+window.IVS_MAX_PANELISTS = {{ max_panelists }};
+window.IVS_MAX_ATTACHMENTS = {{ max_attachments }};
+window.IVS_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
+</script>
+<script src="{{ url_for('static', filename='js/interview_sheet.js', v='20260902-05') }}"></script>
+</body>
+</html>

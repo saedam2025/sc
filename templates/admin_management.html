@@ -99,7 +99,7 @@
     .menu-permission-guide span { color:var(--text-gray); font-size:.84rem; line-height:1.5; }
     .menu-permission-groups { display:grid; gap:16px; }
     .menu-permission-group { border:1px solid var(--border-color); border-radius:14px; overflow:hidden; background:var(--card-bg, #fff); }
-    .menu-permission-row { display:grid; grid-template-columns:minmax(220px, 1fr) minmax(260px, 360px); gap:20px; align-items:center; padding:15px 18px; border-top:1px solid var(--border-color); }
+    .menu-permission-row { display:grid; grid-template-columns:minmax(200px, 1fr) minmax(240px, 340px) minmax(128px, 160px); gap:18px; align-items:center; padding:15px 18px; border-top:1px solid var(--border-color); }
     .menu-permission-row:first-child { border-top:0; }
     .menu-permission-row.parent { background:var(--widget-bg, #f8fafc); }
     .menu-permission-label { display:flex; align-items:center; gap:11px; min-width:0; }
@@ -108,6 +108,10 @@
     .menu-permission-label small { display:block; color:var(--text-gray); margin-top:3px; }
     .menu-permission-row.child .menu-permission-label { padding-left:30px; }
     .menu-permission-row select { width:100%; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px; background:var(--input-bg, #fff); color:var(--text-dark); font-weight:700; }
+    .menu-department-toggle { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border-color); border-radius:10px; background:var(--input-bg, #fff); color:var(--text-gray); font-size:.82rem; font-weight:800; cursor:pointer; white-space:nowrap; }
+    .menu-department-toggle input { width:18px; height:18px; accent-color:#dc2626; flex:0 0 auto; }
+    .menu-department-toggle:has(input:checked) { border-color:rgba(220,38,38,.45); background:rgba(220,38,38,.08); color:#b91c1c; }
+    .menu-department-head { text-align:center; color:var(--text-gray); font-size:.8rem; font-weight:900; }
     .menu-special-policy { margin:0 18px 16px 48px; padding:14px 16px; border:1px solid rgba(37,99,235,.24); border-radius:12px; background:rgba(37,99,235,.06); display:flex; justify-content:space-between; align-items:center; gap:18px; }
     .menu-special-policy strong { display:block; color:var(--text-dark); margin-bottom:5px; }
     .menu-special-policy span { display:block; color:var(--text-gray); font-size:.82rem; line-height:1.55; }
@@ -322,6 +326,7 @@
         .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
         .menu-permission-guide { grid-template-columns:1fr; }
         .menu-permission-row { grid-template-columns:1fr; gap:10px; }
+        .menu-department-toggle { justify-content:center; }
         .menu-permission-row.child .menu-permission-label { padding-left:12px; }
         .menu-special-policy { margin:0 12px 14px; align-items:flex-start; flex-direction:column; }
     }
@@ -350,6 +355,8 @@
                     {% endfor %}
                 </select>
                 <button class="btn btn-ghost" type="button" onclick="applyBulkMenuLevel()"><i class="fa-solid fa-wand-magic-sparkles"></i> 화면에 일괄 적용</button>
+                <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(true)"><i class="fa-solid fa-building-lock"></i> {{ department_block_label }} 전체 지정</button>
+                <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(false)"><i class="fa-solid fa-building-circle-check"></i> {{ department_block_label }} 전체 해제</button>
             </div>
         </div>
 
@@ -361,6 +368,7 @@
             <div><strong><i class="fa-solid fa-arrow-down-1-9"></i> 레벨 기준</strong><span>숫자가 작을수록 높은 권한입니다. 예: 레벨 5 이상은 권한 등급상 5 이상인 숫자 0~5 회원에게 허용됩니다.</span></div>
             <div><strong><i class="fa-solid fa-diagram-project"></i> 주메뉴 우선</strong><span>일반 서브메뉴는 주메뉴가 차단되면 함께 차단됩니다. 실제 담당 센터장의 센터장용 메뉴는 아래의 전용 권한값을 우선합니다.</span></div>
             <div><strong><i class="fa-solid fa-clipboard-list"></i> 센터 공용게시판 권한</strong><span>본부공지사항·자료실은 접근·읽기·쓰기·삭제·댓글을 각각 설정하며, 이 설정은 레벨 7·8 센터장 전용모드보다 우선합니다.</span></div>
+            <div><strong><i class="fa-solid fa-building-lock"></i> {{ department_block_label }} 메뉴</strong><span>체크한 메뉴는 소속부서가 {{ department_block_target_label }}인 회원에게만 상단 메뉴에서 사라지고 직접 URL 접근도 막힙니다. 레벨 설정과 센터장 전용 예외보다 우선하며, 주메뉴를 체크하면 하위 메뉴도 함께 적용됩니다. 최고관리자(admin)는 제외됩니다.</span></div>
         </div>
 
         <form method="post" id="menuPermissionForm">
@@ -378,6 +386,10 @@
                             <option value="{{ level }}" {% if menu_max_levels[group.key] == level %}selected{% endif %}>레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }} / 일반회원 {{ positions_by_level[level].user_count }}명{% endif %}</option>
                             {% endfor %}
                         </select>
+                        <label class="menu-department-toggle" title="{{ department_block_label }}으로 지정하면 소속부서가 {{ department_block_target_label }}인 회원에게 이 주메뉴와 하위 메뉴가 보이지 않습니다.">
+                            <input type="checkbox" name="{{ department_block_prefix }}{{ group.key }}" value="1" data-department-block {% if menu_department_blocks.get(group.key) %}checked{% endif %} aria-label="{{ group.label }} {{ department_block_label }} 지정">
+                            {{ department_block_label }}
+                        </label>
                     </div>
                     {% for child in group.children %}
                     <div class="menu-permission-row child">
@@ -391,6 +403,10 @@
                             <option value="{{ level }}" {% if menu_max_levels[child[0]] == level %}selected{% endif %}>레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }} / 일반회원 {{ positions_by_level[level].user_count }}명{% endif %}</option>
                             {% endfor %}
                         </select>
+                        <label class="menu-department-toggle" title="{{ department_block_label }}으로 지정하면 소속부서가 {{ department_block_target_label }}인 회원에게 이 메뉴가 보이지 않습니다.">
+                            <input type="checkbox" name="{{ department_block_prefix }}{{ child[0] }}" value="1" data-department-block {% if menu_department_blocks.get(child[0]) %}checked{% endif %} aria-label="{{ child[1] }} {{ department_block_label }} 지정">
+                            {{ department_block_label }}
+                        </label>
                     </div>
                     {% endfor %}
                     {% if group.key == 'school_group' %}
@@ -1271,6 +1287,12 @@ function applyBulkMenuLevel() {
     }
     document.querySelectorAll('[data-permission-select]').forEach((select) => {
         select.value = picker.value;
+    });
+}
+
+function toggleAllDepartmentBlocks(checked) {
+    document.querySelectorAll('[data-department-block]').forEach((box) => {
+        box.checked = checked;
     });
 }
 
