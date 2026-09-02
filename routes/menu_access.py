@@ -14,6 +14,7 @@ DEPARTMENT_BLOCK_FIELD_PREFIX = 'block_north_branch__'
 SCHOOL_DIRECTOR_ALLOWED_MENUS = {'school_workspace', 'school_calendar'}
 SCHOOL_DIRECTOR_MODE_EXTRA_MENUS = {'memo_main', 'ai_agent_main'}
 INSTRUCTOR_EXPENSE_ACCESS_SESSION = 'expense_instructor_access_granted'
+UNIFIED_SEARCH_MENU = 'unified_search'
 SCHOOL_CENTER_BOARD_MENU = 'school_center_boards'
 SCHOOL_CENTER_SHARED_MENU = 'school_center_shared'
 SCHOOL_CENTER_SHARED_ACTION_MENUS = {
@@ -50,6 +51,13 @@ MENU_GROUPS = (
         'key': 'main_home',
         'label': '메인메뉴',
         'icon': 'fa-calendar-days',
+        'default_max_level': 14,
+        'children': (),
+    },
+    {
+        'key': 'unified_search',
+        'label': '통합검색창',
+        'icon': 'fa-magnifying-glass',
         'default_max_level': 14,
         'children': (),
     },
@@ -419,6 +427,8 @@ def resolve_request_menu(path, endpoint='', view_args=None):
             or path == '/parent/push-sw.js' \
             or path.startswith('/parent-notifications/instructor/'):
         return None
+    if path.startswith('/api/unified-search'):
+        return UNIFIED_SEARCH_MENU
     if path.startswith('/parent-notifications'):
         return 'parent_notifications'
     if path.startswith('/admin'):
@@ -540,6 +550,14 @@ def enforce_request_menu_access():
                 or request.accept_mimetypes.best == 'application/json':
             return jsonify({'status': 'error', 'message': message}), 403
         return message, 403
+    # 상단 통합검색창은 센터장 전용모드와 무관하게 자체 메뉴 권한만 따른다.
+    if menu_key == UNIFIED_SEARCH_MENU:
+        if menu_is_allowed(menu_key):
+            return None
+        return jsonify({
+            'status': 'error',
+            'message': '통합검색을 이용할 권한이 없습니다.',
+        }), 403
     if menu_key in SCHOOL_DIRECTOR_ALLOWED_MENUS and has_active_school_assignment():
         return None
     if center_director_mode_active():

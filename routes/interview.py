@@ -301,6 +301,13 @@ def _row_get(row, key, default=None):
 
 
 RESULT_LABELS = {'pass': '합격', 'fail': '불합격', 'hold': '보류'}
+# 진행현황은 DB의 status(scheduled·completed)에 사전질문지 제출 여부를 더해
+# 예정 → 진행중 → 완료 3단계로 보여준다.
+PROGRESS_LABELS = {
+    'scheduled': '면접예정',
+    'ongoing': '면접진행중',
+    'completed': '면접완료',
+}
 
 
 def _json_list(value):
@@ -334,10 +341,16 @@ def _analysis_dict(row):
 def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=None):
     scores = [int(item['score']) for item in panelists if item['score'] is not None]
     result = str(_row_get(row, 'result', '') or '')
+    is_completed = str(_row_get(row, 'status', '') or '') == 'completed'
+    has_answers = bool(row['questionnaire_submitted_at'])
+    # 면접자가 사전질문지를 등록한 시점부터 '면접진행중'으로 본다.
+    progress_state = 'completed' if is_completed else ('ongoing' if has_answers else 'scheduled')
     return {
         'id': row['id'],
         'status': str(_row_get(row, 'status', 'scheduled') or 'scheduled'),
-        'is_completed': str(_row_get(row, 'status', '') or '') == 'completed',
+        'is_completed': is_completed,
+        'progress_state': progress_state,
+        'progress_label': PROGRESS_LABELS[progress_state],
         'result': result,
         'result_label': RESULT_LABELS.get(result, ''),
         'completed_at': str(_row_get(row, 'completed_at', '') or ''),
@@ -348,7 +361,7 @@ def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=No
         'memo': row['memo'],
         'questionnaire_url': url_for('interview.questionnaire', token=row['questionnaire_token']),
         'questionnaire_submitted_at': str(row['questionnaire_submitted_at'] or ''),
-        'has_answers': bool(row['questionnaire_submitted_at']),
+        'has_answers': has_answers,
         'typing_cpm': int((answers or {}).get('typing_cpm') or 0),
         'created_by': row['created_by'],
         'created_by_name': row['created_by_name'],
@@ -1158,6 +1171,8 @@ def questionnaire(token):
             when=_interview_when(candidate['interview_at']),
             submitted=False,
             invalid=False,
+            # 이미 제출한 질문지를 다시 열면 전송 버튼 대신 '작성완료'를 보여준다.
+            already_submitted=bool(candidate['questionnaire_submitted_at']),
         )
     finally:
         conn.close()
