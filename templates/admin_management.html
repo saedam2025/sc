@@ -378,7 +378,7 @@
                     <div class="menu-permission-row parent">
                         <div class="menu-permission-label">
                             <i class="fa-solid {{ group.icon }}"></i>
-                            <div><strong>{{ group.label }}</strong><small>주메뉴 권한{% if group.children %} · 하위 {{ group.children|length }}개 메뉴{% endif %}</small></div>
+                            <div><strong>{{ group.label }}</strong><small>{% if group.key == 'unified_search' %}상단 검색창 표시 권한 · 결과는 각 메뉴 권한대로 필터링{% else %}주메뉴 권한{% if group.children %} · 하위 {{ group.children|length }}개 메뉴{% endif %}{% endif %}</small></div>
                         </div>
                         <select name="{{ group.key }}" data-permission-select required aria-label="{{ group.label }} 주메뉴 권한">
                             <option value="-1" {% if menu_max_levels[group.key] == -1 %}selected{% endif %}>차단 (최고관리자 제외)</option>

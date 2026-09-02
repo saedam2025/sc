@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-16') }}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-27') }}">
 
 <main class="iv-page">
     <section class="iv-hero" aria-labelledby="interviewTitle">
@@ -19,18 +20,42 @@
         </div>
     </section>
 
+    <section class="iv-summary" aria-label="면접 진행 요약">
+        <div class="iv-summary-stats" id="summaryStats">
+            <button type="button" class="iv-summary-item is-scheduled" data-summary-filter="scheduled">
+                <span class="iv-summary-label">면접예정</span>
+                <span class="iv-summary-value"><strong id="sumScheduled">0</strong><small>명</small></span>
+            </button>
+            <button type="button" class="iv-summary-item is-ongoing" data-summary-filter="ongoing">
+                <span class="iv-summary-label">면접진행중</span>
+                <span class="iv-summary-value"><strong id="sumOngoing">0</strong><small>명</small></span>
+            </button>
+            <button type="button" class="iv-summary-item is-completed" data-summary-filter="completed">
+                <span class="iv-summary-label">면접완료</span>
+                <span class="iv-summary-value"><strong id="sumCompleted">0</strong><small>명</small></span>
+            </button>
+            <button type="button" class="iv-summary-item is-pass" data-summary-filter="pass">
+                <span class="iv-summary-label">합격자</span>
+                <span class="iv-summary-value"><strong id="sumPassed">0</strong><small id="sumTotal">/ 0명</small></span>
+            </button>
+            <div class="iv-summary-item is-score">
+                <span class="iv-summary-label">총평점</span>
+                <span class="iv-summary-value"><strong id="sumAverage">0.0</strong><small>/ 5.0</small></span>
+            </div>
+        </div>
+        <button class="iv-summary-cta" id="openCreate" type="button">
+            <span class="iv-summary-cta-icon" aria-hidden="true"><i class="fa-solid fa-user-plus"></i></span>
+            <span class="iv-summary-cta-copy">
+                <strong>면접자 입력</strong>
+                <small>이름 · 직급 · 학교 · 이력서 등록</small>
+            </span>
+            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </button>
+    </section>
+
     <section class="iv-workspace">
         <article class="iv-card iv-list-card">
-            <header class="iv-card-head">
-                <div>
-                    <span class="iv-step">01</span>
-                    <h2>면접자 명단</h2>
-                    <p>면접 진행표를 열면 새 창에서 크게 보며 평가를 입력할 수 있습니다.</p>
-                </div>
-                <span class="iv-ready-badge"><i class="fa-solid fa-clipboard-list"></i> 면접 진행표</span>
-            </header>
-
-            <div class="iv-toolbar">
+            <div class="iv-toolbar" id="listToolbar">
                 <div class="iv-search">
                     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                     <input id="searchInput" type="search" placeholder="이름·직급·학교로 찾기" autocomplete="off">
@@ -38,63 +63,61 @@
                 <div class="iv-filter-chips" id="filterChips" role="group" aria-label="면접 진행상태 필터">
                     <button type="button" data-filter="all" class="is-active">전체</button>
                     <button type="button" data-filter="scheduled">면접예정</button>
+                    <button type="button" data-filter="ongoing">면접진행중</button>
                     <button type="button" data-filter="completed">면접완료</button>
                     <button type="button" data-filter="pass">합격</button>
                 </div>
             </div>
-            <p class="iv-count" id="candidateCount">불러오는 중…</p>
 
             <div class="iv-table-wrap">
                 <table class="iv-table">
                     <colgroup>
+                        <col class="iv-col-select">
                         <col class="iv-col-number">
                         <col class="iv-col-candidate">
                         <col class="iv-col-school">
                         <col class="iv-col-when">
-                        <col class="iv-col-progress">
                         <col class="iv-col-materials">
+                        <col class="iv-col-questionnaire">
+                        <col class="iv-col-progress">
                         <col class="iv-col-score">
+                        <col class="iv-col-result">
                         <col class="iv-col-actions">
                     </colgroup>
                     <thead>
                         <tr>
+                            <th scope="col" class="iv-th-select">
+                                <input type="checkbox" id="selectAllRows" class="iv-select-box" aria-label="이 페이지 전체 선택">
+                            </th>
                             <th scope="col">번호</th>
                             <th>지원자</th>
                             <th>대상학교</th>
                             <th>면접일시</th>
-                            <th>진행 현황</th>
                             <th>서류 · AI</th>
+                            <th>사전질문지</th>
+                            <th>진행 현황</th>
                             <th>면접관 평가</th>
+                            <th>최종결과</th>
                             <th>관리</th>
                         </tr>
                     </thead>
                     <tbody id="candidateList"></tbody>
                 </table>
             </div>
+            <div class="iv-bulk-bar">
+                <span class="iv-bulk-count" id="bulkCount">선택한 면접자 없음</span>
+                <div class="iv-bulk-actions">
+                    <button class="iv-button" id="bulkEdit" type="button" disabled>
+                        <i class="fa-regular fa-pen-to-square"></i> 선택 수정
+                    </button>
+                    <button class="iv-button iv-button-danger" id="bulkDelete" type="button" disabled>
+                        <i class="fa-regular fa-trash-can"></i> 선택 삭제
+                    </button>
+                </div>
+            </div>
+
             <ul class="iv-pagination" id="candidatePaging"></ul>
         </article>
-
-        <aside class="iv-side-column">
-            <article class="iv-card iv-flow-card">
-                <span class="iv-card-kicker">INTERVIEW FLOW</span>
-                <h2>면접 진행 상황</h2>
-                <ol class="iv-flow-list" id="flowList">
-                    <li data-flow-step="register"><span>1</span><div><strong>면접자 등록</strong><small id="flowRegister">이력서·첨부자료 등록</small></div></li>
-                    <li data-flow-step="questionnaire"><span>2</span><div><strong>사전질문지</strong><small id="flowQuestionnaire">면접자 사전 작성</small></div></li>
-                    <li data-flow-step="evaluate"><span>3</span><div><strong>면접 평가</strong><small id="flowEvaluate">면접관 점수·의견 입력</small></div></li>
-                    <li data-flow-step="result"><span>4</span><div><strong>합격 판정</strong><small id="flowResult">합격·불합격·보류 확정</small></div></li>
-                </ol>
-            </article>
-
-            <button class="iv-card iv-create-cta" id="openCreate" type="button">
-                <span class="iv-create-icon" aria-hidden="true"><i class="fa-solid fa-user-plus"></i></span>
-                <span class="iv-create-copy">
-                    <strong>면접자 입력</strong>
-                    <small>이름 · 직급 · 학교 · 이력서 등록</small>
-                </span>
-                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-            </button>
-        </aside>
     </section>
 </main>
 
@@ -153,5 +176,5 @@ window.IV_MAX_PANELISTS = {{ max_panelists }};
 window.IV_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IV_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview.js', v='20260902-16') }}"></script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260902-27') }}"></script>
 {% endblock %}

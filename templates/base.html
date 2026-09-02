@@ -1056,6 +1056,7 @@
                         <i class="fa-solid fa-chalkboard"></i>
                     </a>{% endif %}
 
+                    {% if menu_access.get('unified_search', true) %}
                     <div class="global-search" id="globalSearch" data-search-url="{{ url_for('unified_search.unified_search') }}">
                         <label class="global-search-box" for="globalSearchInput">
                             <i class="fa-solid fa-magnifying-glass global-search-leading" aria-hidden="true"></i>
@@ -1073,6 +1074,7 @@
                             <div class="global-search-results" id="globalSearchResults" role="listbox"></div>
                         </section>
                     </div>
+                    {% endif %}
                     <a href="{{ url_for('logout') }}" class="btn-logout" title="로그아웃">
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </a>

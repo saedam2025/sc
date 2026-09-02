@@ -4,56 +4,144 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>면접자 사전질문지</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-    :root { --ink:#182231; --muted:#6b7889; --line:#e0e7ee; --brand:#19a887; --brand-dark:#0b7a63; }
+    :root { --ink:#182231; --muted:#6b7889; --line:#e0e7ee; --brand:#19a887; --brand-dark:#0b7a63;
+            --gold:#b99a55; --gold-soft:#e3d3a8; --paper:#fffdf6; }
     * { box-sizing:border-box; }
-    body { margin:0; padding:26px 16px 60px; background:#eef2f5; color:var(--ink);
-           font-family:"Pretendard","Malgun Gothic",-apple-system,sans-serif; line-height:1.6; }
-    .sheet { width:100%; max-width:760px; margin:0 auto; border:1px solid #cfd8e1; border-radius:18px;
-             background:#fff; box-shadow:0 14px 40px rgba(24,34,49,.09); overflow:hidden; }
-    header { padding:30px 34px 24px; border-bottom:3px double #2b3542; text-align:center; }
-    header span { display:block; margin-bottom:10px; color:var(--brand-dark); font-size:.72rem;
-                  font-weight:800; letter-spacing:.18em; }
-    header h1 { margin:0; font-size:1.6rem; letter-spacing:-.02em; }
-    header p { margin:12px 0 0; color:var(--muted); font-size:.86rem; }
-    .who { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:16px; }
-    .who b { padding:6px 13px; border-radius:999px; background:#eef8f5; color:var(--brand-dark);
-             font-size:.76rem; font-weight:750; }
-    form { padding:26px 34px 34px; }
-    .field { margin-bottom:22px; }
-    .field label { display:block; margin-bottom:7px; font-size:.94rem; font-weight:800; }
-    .field small { display:block; margin-bottom:9px; color:var(--muted); font-size:.79rem; font-weight:400; }
-    textarea { width:100%; padding:12px 14px; border:1.5px solid #b6c3cf; border-radius:11px;
-               background:#fbfdfe; color:var(--ink); font:inherit; resize:vertical; outline:0; }
-    textarea:focus { border-color:var(--brand); background:#fff; box-shadow:0 0 0 3px rgba(25,168,135,.15); }
-    .actions { display:flex; justify-content:flex-end; gap:10px; margin-top:28px;
-               padding-top:20px; border-top:1px solid var(--line); }
+    /* 바탕은 은은한 종이결, 본문 카드는 밝은 한지 느낌으로 둔다. */
+    body { margin:0; padding:34px 16px 64px; color:var(--ink);
+           font-family:"Pretendard","Malgun Gothic",-apple-system,sans-serif; line-height:1.6;
+           background-color:#eceff2;
+           background-image:
+               radial-gradient(circle at 18% 12%, rgba(185,154,85,.06), transparent 38%),
+               radial-gradient(circle at 82% 88%, rgba(25,168,135,.06), transparent 40%),
+               url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 30h60M30 0v60' stroke='%23000' stroke-opacity='.018'/%3E%3C/svg%3E"); }
+
+    /* ---------------------------------------------------------------- 문양 테두리 */
+    .sheet-frame { position:relative; width:100%; max-width:790px; margin:0 auto; padding:13px;
+                   border-radius:22px; background:linear-gradient(150deg,#f7f1e2,#fffdf7 45%,#f3ecdc);
+                   box-shadow:0 20px 52px rgba(24,34,49,.16); }
+    .sheet-frame::before { content:""; position:absolute; inset:6px; border-radius:16px;
+                           border:1px solid var(--gold-soft); pointer-events:none; }
+    .corner { position:absolute; width:38px; height:38px; pointer-events:none;
+              background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cg fill='none' stroke='%23b99a55' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M3 37V16C3 8.8 8.8 3 16 3h21'/%3E%3Cpath d='M9 37V19c0-5.5 4.5-10 10-10h18' stroke-opacity='.5'/%3E%3Cpath d='M13 13c2.6-2.6 6.8-2.6 9.4 0'/%3E%3C/g%3E%3Ccircle cx='13' cy='13' r='2' fill='%23b99a55'/%3E%3C/svg%3E");
+              background-size:100% 100%; background-repeat:no-repeat; }
+    .corner.tl { top:9px; left:9px; transform:rotate(90deg); }
+    .corner.tr { top:9px; right:9px; transform:rotate(180deg); }
+    .corner.br { bottom:9px; right:9px; transform:rotate(270deg); }
+    .corner.bl { bottom:9px; left:9px; }
+
+    /* ---------------------------------------------------------------- 본문 종이 */
+    .sheet { position:relative; border:1px solid #ddd2b6; border-radius:14px; overflow:hidden;
+             background-color:var(--paper);
+             background-image:
+                 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cg fill='%23b99a55' fill-opacity='.05'%3E%3Ccircle cx='12' cy='18' r='1.1'/%3E%3Ccircle cx='64' cy='40' r='1'/%3E%3Ccircle cx='96' cy='12' r='1.2'/%3E%3Ccircle cx='34' cy='86' r='1'/%3E%3Ccircle cx='104' cy='96' r='1.1'/%3E%3Ccircle cx='76' cy='70' r='.9'/%3E%3C/g%3E%3Cpath d='M0 60h120M60 0v120' stroke='%23b99a55' stroke-opacity='.03'/%3E%3C/svg%3E");
+             box-shadow:inset 0 0 0 1px #fff; }
+
+    header { position:relative; padding:34px 36px 26px; text-align:center;
+             background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,253,246,0)); }
+    header::after { content:""; position:absolute; left:36px; right:36px; bottom:0; height:5px;
+                    border-top:1px solid var(--gold-soft); border-bottom:1px solid var(--gold-soft); }
+    .crest { width:52px; height:52px; display:grid; place-items:center; margin:0 auto 14px;
+             border-radius:50%; border:1px solid var(--gold-soft); background:#fff;
+             color:var(--gold); font-size:1.15rem; box-shadow:0 6px 16px rgba(185,154,85,.18); }
+    header span.eyebrow { display:block; margin-bottom:9px; color:var(--brand-dark); font-size:.72rem;
+                          font-weight:800; letter-spacing:.2em; }
+    header h1 { margin:0; font-size:1.62rem; font-weight:800; letter-spacing:-.02em; }
+    header p { margin:12px auto 0; max-width:520px; color:var(--muted); font-size:.86rem; }
+    .who { display:inline-block; max-width:100%; margin:17px auto 0; padding:10px 22px; border-radius:11px;
+           background:#eef8f5; color:var(--brand-dark); font-size:.87rem; font-weight:700;
+           letter-spacing:-.01em; text-align:center; word-break:keep-all; }
+    .who b { font-weight:850; }
+
+    form { padding:28px 36px 36px; }
+    .field { margin-bottom:24px; }
+    .q-head { display:flex; align-items:flex-start; gap:12px; margin-bottom:10px; }
+    /* 번호마다 문항 성격에 맞는 아이콘을 붙여 딱딱함을 덜어준다. */
+    .q-badge { position:relative; width:38px; height:38px; flex:0 0 38px; display:grid; place-items:center;
+               border-radius:13px; border:1px solid var(--gold-soft);
+               background:linear-gradient(150deg,#fffdf6,#f6efdf); color:var(--gold);
+               font-size:.95rem; box-shadow:0 4px 10px rgba(185,154,85,.16); }
+    .q-badge b { position:absolute; top:-7px; left:-7px; width:20px; height:20px; display:grid;
+                 place-items:center; border-radius:50%; background:var(--brand-dark); color:#fff;
+                 font-size:.63rem; font-weight:800; box-shadow:0 3px 7px rgba(11,122,99,.3); }
+    .q-text { min-width:0; padding-top:1px; }
+    .field label { display:block; margin-bottom:4px; font-size:.97rem; font-weight:800; letter-spacing:-.01em; }
+    .field small { display:block; color:var(--muted); font-size:.79rem; font-weight:400; }
+
+    /* 입력창은 기품 있는 파선 테두리를 쓰고, 입력 중에는 실선으로 또렷해진다. */
+    textarea { width:100%; padding:14px 16px; border:1.5px dashed #cbbb93; border-radius:13px;
+               background:rgba(255,255,255,.92); color:var(--ink); font:inherit; resize:vertical; outline:0;
+               transition:border-color .16s ease, box-shadow .16s ease, background .16s ease; }
+    textarea::placeholder { color:#b3bdc8; }
+    textarea:hover { border-color:var(--gold); }
+    textarea:focus { border-style:solid; border-color:var(--brand); background:#fff;
+                     box-shadow:0 0 0 3px rgba(25,168,135,.15); }
+
+    .actions { display:flex; justify-content:flex-end; align-items:center; gap:14px; margin-top:30px;
+               padding-top:22px; border-top:1px dashed var(--gold-soft); }
     button { min-height:50px; padding:12px 30px; border:0; border-radius:13px;
              background:linear-gradient(115deg,var(--brand),#3f8fd0); color:#fff;
-             font-size:1rem; font-weight:800; cursor:pointer; }
+             font-size:1rem; font-weight:800; cursor:pointer;
+             box-shadow:0 10px 22px rgba(25,168,135,.22); }
     button:hover { filter:brightness(1.05); }
-    .brand { padding:16px 20px 20px; border-top:1px solid var(--line); background:#fbfdfe; text-align:center; }
+    .again { color:var(--muted); font-size:.79rem; font-weight:600; text-decoration:underline;
+             text-underline-offset:3px; cursor:pointer; }
+    .again:hover { color:var(--brand-dark); }
+    .submit-state { display:flex; flex-direction:column; align-items:center; gap:9px; }
+    button.is-done { cursor:default; opacity:.95; }
+    button.is-done:hover { filter:none; }
+
+    .brand { padding:18px 20px 22px; border-top:1px solid var(--gold-soft);
+             background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.75)); text-align:center; }
     .brand img { height:40px; width:auto; opacity:.85; }
-    .done { padding:56px 34px; text-align:center; }
+
+    /* ---------------------------------------------------------------- 완료·오류 화면 */
+    .done { padding:44px 34px 52px; text-align:center; }
+    .done-character { width:min(230px,62%); height:auto; margin:0 auto 6px; display:block;
+                      filter:drop-shadow(0 12px 22px rgba(24,34,49,.16)); }
     .done .mark { width:74px; height:74px; display:grid; place-items:center; margin:0 auto 20px;
                   border-radius:50%; background:#e6f7f2; color:var(--brand-dark); font-size:2.1rem; }
-    .done h2 { margin:0 0 10px; font-size:1.3rem; }
+    .done h2 { margin:0 0 10px; font-size:1.34rem; font-weight:800; }
     .done p { margin:0; color:var(--muted); font-size:.9rem; }
-    .done ul { max-width:520px; margin:26px auto 0; padding:18px 22px; border:1px solid var(--line);
-               border-radius:13px; background:#fbfdfe; text-align:left; font-size:.83rem; color:var(--muted); }
-    .done li { margin:0 0 7px; }
+    .done ul { max-width:520px; margin:26px auto 0; padding:18px 22px; border:1px dashed var(--gold-soft);
+               border-radius:13px; background:rgba(255,255,255,.7); text-align:left;
+               font-size:.83rem; color:var(--muted); list-style:none; }
+    .done li { display:flex; align-items:center; gap:8px; margin:0 0 8px; }
+    .done li:last-child { margin-bottom:0; }
+    .done li i { width:14px; color:var(--brand); font-size:.72rem; }
+    .done li i.no { color:#c4ccd6; }
     .done-actions { display:flex; flex-direction:column; align-items:center; gap:13px; margin-top:30px; }
-    .done-actions .again { color:var(--muted); font-size:.79rem; font-weight:600; text-decoration:underline;
-                           text-underline-offset:3px; cursor:pointer; }
-    .done-actions .again:hover { color:var(--brand-dark); }
     .close-hint { margin:14px 0 0; color:var(--muted); font-size:.76rem; }
+
     @media (max-width:560px) {
+        body { padding:18px 10px 40px; }
+        .sheet-frame { padding:9px; }
+        .corner { width:28px; height:28px; }
         header, form { padding-left:20px; padding-right:20px; }
+        header::after { left:20px; right:20px; }
+        .q-badge { width:34px; height:34px; flex-basis:34px; font-size:.86rem; }
         .brand img { height:34px; }
     }
 </style>
 </head>
 <body>
+{# 문항별 아이콘. 새 문항이 늘어도 기본 아이콘으로 안전하게 표시된다. #}
+{% set field_icons = {
+    'motivation': 'fa-seedling',
+    'job_understanding': 'fa-lightbulb',
+    'related_experience': 'fa-briefcase',
+    'commute': 'fa-route',
+    'availability': 'fa-calendar-check',
+    'other_notes': 'fa-comment-dots'
+} %}
+<div class="sheet-frame">
+    <span class="corner tl" aria-hidden="true"></span>
+    <span class="corner tr" aria-hidden="true"></span>
+    <span class="corner bl" aria-hidden="true"></span>
+    <span class="corner br" aria-hidden="true"></span>
 <div class="sheet">
 {% if invalid %}
     <div class="done">
@@ -63,12 +151,15 @@
     </div>
 {% elif submitted %}
     <div class="done">
-        <div class="mark">✓</div>
+        <img class="done-character" src="{{ url_for('static', filename='girl_ok.png') }}" alt="" aria-hidden="true">
         <h2>사전질문지가 전송되었습니다</h2>
         <p>작성해주셔서 감사합니다. 면접 때 참고하겠습니다.</p>
         <ul>
             {% for key, title, hint, rows in fields %}
-            <li><b>{{ title }}</b> · {{ '작성함' if answers.get(key) else '미작성' }}</li>
+            <li>
+                {% if answers.get(key) %}<i class="fa-solid fa-circle-check"></i>{% else %}<i class="fa-regular fa-circle no"></i>{% endif %}
+                <b>{{ title }}</b> · {{ '작성함' if answers.get(key) else '미작성' }}
+            </li>
             {% endfor %}
         </ul>
         <div class="done-actions">
@@ -79,21 +170,26 @@
     </div>
 {% else %}
     <header>
-        <span>SAEDAM INTERVIEW</span>
+        <span class="crest" aria-hidden="true"><i class="fa-solid fa-feather-pointed"></i></span>
+        <span class="eyebrow">SAEDAM INTERVIEW</span>
         <h1>면접자 사전질문지</h1>
         <p>면접 전 아래 항목을 작성해주세요. 작성하신 내용은 면접 참고자료로만 사용됩니다.</p>
-        <div class="who">
-            <b>{{ candidate['name'] }} 님</b>
-            {% if when.year %}<b>면접 {{ when.year }}</b>{% endif %}
-            {% if when.date %}<b>{{ when.date }}</b>{% endif %}
-            {% if when.time %}<b>{{ when.time }}</b>{% endif %}
-        </div>
+        {% set when_text = ((when.year ~ ' ' if when.year else '') ~ (when.date if when.date else '')) | trim %}
+        <p class="who"><b>{{ candidate['name'] }}님</b>{% if when_text %} {{ when_text }}{% endif %} 면접에 참여해주셔서 감사드립니다.</p>
     </header>
     <form method="post">
         {% for key, title, hint, rows in fields %}
         <div class="field">
-            <label for="{{ key }}">{{ loop.index }}. {{ title }}</label>
-            <small>{{ hint }}</small>
+            <div class="q-head">
+                <span class="q-badge" aria-hidden="true">
+                    <b>{{ loop.index }}</b>
+                    <i class="fa-solid {{ field_icons.get(key, 'fa-pen-to-square') }}"></i>
+                </span>
+                <div class="q-text">
+                    <label for="{{ key }}">{{ title }}</label>
+                    <small>{{ hint }}</small>
+                </div>
+            </div>
             <textarea id="{{ key }}" name="{{ key }}" rows="{{ rows }}" maxlength="4000">{{ answers.get(key, '') }}</textarea>
         </div>
         {% endfor %}
@@ -101,13 +197,20 @@
         <input type="hidden" name="typing_strokes" id="typingStrokes" value="0">
         <input type="hidden" name="typing_seconds" id="typingSeconds" value="0">
         <div class="actions">
-            <button type="submit">사전질문지 전송</button>
+            {% if already_submitted %}
+            <div class="submit-state" id="submitState">
+                <button type="button" class="is-done" disabled>작성완료</button>
+                <span class="again" id="rewriteAgain" role="button" tabindex="0">다시 작성</span>
+            </div>
+            {% endif %}
+            <button type="submit" id="submitButton"{% if already_submitted %} hidden{% endif %}>사전질문지 전송</button>
         </div>
     </form>
 {% endif %}
     <footer class="brand">
         <img src="{{ url_for('static', filename='logo01.gif') }}" alt="사단법인 새담청소년교육문화원">
     </footer>
+</div>
 </div>
 {% if not submitted and not invalid %}
 <script>
@@ -149,6 +252,27 @@
         document.getElementById('typingCpm').value = cpm;
         document.getElementById('typingStrokes').value = strokes;
         document.getElementById('typingSeconds').value = Math.round(activeMs / 1000);
+    });
+})();
+</script>
+{% endif %}
+{% if already_submitted %}
+<script>
+(function () {
+    // '다시 작성'을 누르면 작성완료 표시를 감추고 전송 버튼을 다시 꺼낸다.
+    var again = document.getElementById('rewriteAgain');
+    var state = document.getElementById('submitState');
+    var submit = document.getElementById('submitButton');
+    if (!again || !state || !submit) { return; }
+    function rewrite() {
+        state.hidden = true;
+        submit.hidden = false;
+        var first = document.querySelector('form textarea');
+        if (first) { first.focus(); }
+    }
+    again.addEventListener('click', rewrite);
+    again.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); rewrite(); }
     });
 })();
 </script>
