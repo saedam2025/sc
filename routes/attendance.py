@@ -1,99 +1,623 @@
 from flask import Blueprint, render_template, request, session, jsonify
 from datetime import datetime
-import sqlite3
+import re
 
 # app.py에서 사용하는 데이터베이스 연결 함수 가져오기
 from routes.database import get_db
 
 attendance_bp = Blueprint('attendance', __name__)
 
+# 지각/정시퇴근 판단 기준 시각
+WORK_START_STANDARD = '09:00:00'
+WORK_END_STANDARD = '18:00:00'
+
+# 통계 패널에서 보여줄 기간 수
+MONTHLY_PERIODS = 12
+QUARTERLY_PERIODS = 8
+
+WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+
+# 근무시간(시간 단위) 계산용 SQL 조각. 퇴근기록이 없거나 역전된 값은 제외한다.
+WORK_HOURS_SQL = """
+    CASE WHEN a.clock_out_time IS NOT NULL AND a.clock_out_time > a.clock_in_time
+         THEN (STRFTIME('%s', a.date || ' ' || a.clock_out_time)
+               - STRFTIME('%s', a.date || ' ' || a.clock_in_time)) / 3600.0
+    END
+"""
+
+BASE_SELECT = """
+    SELECT a.id,
+           CAST(a.emp_no AS TEXT) AS emp_no,
+           a.date,
+           a.clock_in_time,
+           a.clock_out_time,
+           a.status,
+           a.reason,
+           COALESCE(NULLIF(a.position, ''), u.position, '미지정') AS position,
+           COALESCE(u.name, CAST(a.emp_no AS TEXT)) AS user_name
+    FROM daily_attendance a
+    LEFT JOIN users u ON CAST(u.emp_no AS TEXT) = CAST(a.emp_no AS TEXT)
+"""
+
+STATS_FROM = """
+    FROM daily_attendance a
+    LEFT JOIN users u ON CAST(u.emp_no AS TEXT) = CAST(a.emp_no AS TEXT)
+    LEFT JOIN user_work_schedule ws
+           ON ws.emp_no = CAST(a.emp_no AS TEXT)
+          AND ws.weekday = CAST(STRFTIME('%w', a.date) AS INTEGER)
+"""
+
+# 지각 판정: 개인정보 수정창의 요일별 출근시각 기준, 미설정이면 기본값(파라미터).
+# 토·일과 휴무로 지정한 요일은 판정에서 제외한다.
+LATE_SQL = """
+    CASE
+        WHEN CAST(STRFTIME('%w', a.date) AS INTEGER) NOT BETWEEN 1 AND 5 THEN 0
+        WHEN COALESCE(ws.is_off, 0) = 1 THEN 0
+        WHEN a.clock_in_time > COALESCE(ws.start_time || ':00', ?) THEN 1
+        ELSE 0
+    END
+"""
+
+
+def _scope_clause(user_level, emp_no, search_emp_no='', search_position=''):
+    """권한과 검색조건에 맞는 WHERE 조각과 파라미터를 만든다."""
+    clauses = []
+    params = []
+
+    # 레벨 4 이상(숫자가 큰 일반회원)은 본인 기록만 볼 수 있다.
+    if int(user_level or 4) >= 4:
+        clauses.append('CAST(a.emp_no AS TEXT) = ?')
+        params.append(str(emp_no))
+    else:
+        if search_emp_no:
+            clauses.append('CAST(a.emp_no AS TEXT) = ?')
+            params.append(str(search_emp_no))
+        if search_position:
+            clauses.append("COALESCE(NULLIF(a.position, ''), u.position, '미지정') = ?")
+            params.append(search_position)
+
+    return (' AND ' + ' AND '.join(clauses)) if clauses else '', params
+
+
+def _shift_month(year, month, delta):
+    index = year * 12 + (month - 1) + delta
+    return index // 12, index % 12 + 1
+
+
+def _normalize_month(value):
+    if value and re.fullmatch(r'\d{4}-\d{2}', value):
+        return value
+    return datetime.now().strftime('%Y-%m')
+
+
+def _seconds_of(time_text):
+    if not time_text:
+        return None
+    parts = str(time_text).split(':')
+    try:
+        hour = int(parts[0])
+        minute = int(parts[1]) if len(parts) > 1 else 0
+        second = int(parts[2]) if len(parts) > 2 else 0
+    except (TypeError, ValueError):
+        return None
+    return hour * 3600 + minute * 60 + second
+
+
+def _format_clock(seconds):
+    if seconds is None:
+        return '-'
+    seconds = int(round(seconds))
+    return '%02d:%02d' % (seconds // 3600, (seconds % 3600) // 60)
+
+
+def _format_hours(hours):
+    if hours is None:
+        return '-'
+    total_minutes = int(round(float(hours) * 60))
+    return '%d시간 %d분' % (total_minutes // 60, total_minutes % 60)
+
+
+def _work_hours(row):
+    start = _seconds_of(row.get('clock_in_time'))
+    end = _seconds_of(row.get('clock_out_time'))
+    if start is None or end is None or end <= start:
+        return None
+    return (end - start) / 3600.0
+
+
+def _weekday_label(date_text):
+    try:
+        return WEEKDAY_LABELS[datetime.strptime(date_text, '%Y-%m-%d').weekday()]
+    except (TypeError, ValueError):
+        return '-'
+
+
+def _weekday_key(date_text):
+    """개인정보 수정창의 근무시간과 같은 규칙(1=월 ~ 5=금, 토·일은 None)."""
+    try:
+        index = datetime.strptime(date_text, '%Y-%m-%d').weekday()
+    except (TypeError, ValueError):
+        return None
+    return index + 1 if index <= 4 else None
+
+
+def load_work_schedules(conn):
+    """{(사번, 요일): {start, end, is_off}} 형태로 전 직원 근무시간을 한 번에 읽는다."""
+    schedules = {}
+    for row in conn.execute(
+        'SELECT emp_no, weekday, start_time, end_time, is_off FROM user_work_schedule'
+    ).fetchall():
+        schedules[(str(row['emp_no']), int(row['weekday']))] = {
+            'start': row['start_time'] or None,
+            'end': row['end_time'] or None,
+            'is_off': bool(row['is_off']),
+        }
+    return schedules
+
+
+def _schedule_of(schedules, row):
+    weekday = _weekday_key(row.get('date'))
+    if weekday is None:
+        return None
+    return (schedules or {}).get((str(row.get('emp_no')), weekday))
+
+
+def _expected_start(schedules, row):
+    """그 사람의 그 요일 기준 출근시각. 휴무이거나 주말이면 None(지각 판정 제외)."""
+    weekday = _weekday_key(row.get('date'))
+    if weekday is None:
+        return None
+    plan = _schedule_of(schedules, row)
+    if plan is None:
+        return WORK_START_STANDARD
+    if plan['is_off']:
+        return None
+    return (plan['start'] + ':00') if plan['start'] else WORK_START_STANDARD
+
+
+def _plan_text(schedules, row):
+    """상세 명단에 보여줄 '09:00~18:00' 형태의 기준 근무시간."""
+    weekday = _weekday_key(row.get('date'))
+    if weekday is None:
+        return '주말'
+    plan = _schedule_of(schedules, row)
+    if plan is None:
+        return '%s~%s (기본)' % (WORK_START_STANDARD[:5], WORK_END_STANDARD[:5])
+    if plan['is_off']:
+        return '휴무'
+    return '%s~%s' % (plan['start'] or WORK_START_STANDARD[:5], plan['end'] or WORK_END_STANDARD[:5])
+
+
+def _is_late(row, schedules=None):
+    start = _seconds_of(row.get('clock_in_time'))
+    expected = _expected_start(schedules, row)
+    if start is None or expected is None:
+        return False
+    return start > _seconds_of(expected)
+
+
+def _is_early_leave(row):
+    return (row.get('status') or '') == '조퇴'
+
+
+def _is_checked_out(row):
+    return bool(row.get('clock_out_time')) and not _is_early_leave(row)
+
+
+def _summarize_rows(rows, schedules=None):
+    """공통 집계: 인원수 / 지각 / 평균 출근시각 / 평균 근무시간."""
+    checked_out = sum(1 for r in rows if _is_checked_out(r))
+    early = sum(1 for r in rows if _is_early_leave(r))
+    working = sum(1 for r in rows if not r.get('clock_out_time'))
+    late = sum(1 for r in rows if _is_late(r, schedules))
+
+    in_seconds = [_seconds_of(r.get('clock_in_time')) for r in rows]
+    in_seconds = [s for s in in_seconds if s is not None]
+    avg_in = sum(in_seconds) / len(in_seconds) if in_seconds else None
+
+    hours = [_work_hours(r) for r in rows]
+    hours = [h for h in hours if h is not None]
+    avg_hours = sum(hours) / len(hours) if hours else None
+
+    return {
+        'total': len(rows),
+        'checked_out': checked_out,
+        'early': early,
+        'working': working,
+        'late': late,
+        'members': len(set(r.get('emp_no') for r in rows)),
+        'avg_in_text': _format_clock(avg_in),
+        'avg_hours': avg_hours,
+        'avg_hours_text': _format_hours(avg_hours),
+        'total_hours': sum(hours) if hours else 0.0,
+    }
+
+
+def _period_stats(conn, scope_sql, scope_params, period_expr, since_date, limit):
+    """월별/분기별 공통 집계 쿼리."""
+    rows = conn.execute('''
+        SELECT %s AS period,
+               COUNT(*) AS total,
+               COUNT(DISTINCT a.date) AS work_days,
+               COUNT(DISTINCT CAST(a.emp_no AS TEXT)) AS members,
+               SUM(CASE WHEN a.clock_out_time IS NOT NULL AND a.status <> '조퇴' THEN 1 ELSE 0 END) AS checked_out,
+               SUM(CASE WHEN a.status = '조퇴' THEN 1 ELSE 0 END) AS early,
+               SUM(CASE WHEN a.clock_out_time IS NULL THEN 1 ELSE 0 END) AS working,
+               SUM(%s) AS late,
+               AVG(STRFTIME('%%s', '2000-01-01 ' || a.clock_in_time)
+                   - STRFTIME('%%s', '2000-01-01 00:00:00')) AS avg_in_seconds,
+               AVG(%s) AS avg_hours,
+               COALESCE(SUM(%s), 0) AS total_hours
+        %s
+        WHERE a.date >= ? %s
+        GROUP BY period
+        ORDER BY period DESC
+        LIMIT ?
+    ''' % (period_expr, LATE_SQL, WORK_HOURS_SQL, WORK_HOURS_SQL, STATS_FROM, scope_sql),
+        [WORK_START_STANDARD, since_date] + scope_params + [limit]).fetchall()
+
+    result = []
+    for row in rows:
+        item = dict(row)
+        item['avg_in_text'] = _format_clock(item.pop('avg_in_seconds', None))
+        item['avg_hours_text'] = _format_hours(item.get('avg_hours'))
+        item['total_hours_text'] = _format_hours(item.get('total_hours'))
+        result.append(item)
+    return result
+
+
+def _empty_period(period):
+    """기록이 없는 기간도 그래프/표에서 빠지지 않도록 0으로 채운다."""
+    return {
+        'period': period, 'total': 0, 'work_days': 0, 'members': 0,
+        'checked_out': 0, 'early': 0, 'working': 0, 'late': 0,
+        'avg_in_text': '-', 'avg_hours': None, 'avg_hours_text': '-',
+        'total_hours': 0, 'total_hours_text': '-',
+    }
+
+
+def _fill_periods(stats, period_keys):
+    """조회된 집계를 기간 순서(최신순)에 맞춰 빠짐없이 채운다."""
+    found = {item['period']: item for item in stats}
+    return [found.get(key) or _empty_period(key) for key in reversed(period_keys)]
+
+
+def _today_timeline(conn, user_level, emp_no, search_emp_no, search_position, today, today_rows, schedules):
+    """오늘 조직원 전체의 출근~퇴근 구간을 시간축 위에 올린 그래프 데이터를 만든다."""
+    where = ["status = '승인'", "emp_no IS NOT NULL", "emp_no != 'admin'"]
+    params = []
+    if int(user_level or 4) >= 4:
+        where.append('CAST(emp_no AS TEXT) = ?')
+        params.append(str(emp_no))
+    else:
+        if search_emp_no:
+            where.append('CAST(emp_no AS TEXT) = ?')
+            params.append(str(search_emp_no))
+        if search_position:
+            where.append("COALESCE(NULLIF(position, ''), '미지정') = ?")
+            params.append(search_position)
+
+    members = conn.execute('''
+        SELECT CAST(emp_no AS TEXT) AS emp_no,
+               COALESCE(name, CAST(emp_no AS TEXT)) AS name,
+               COALESCE(NULLIF(position, ''), '미지정') AS position,
+               COALESCE(level, 999) AS level
+        FROM users
+        WHERE %s
+        ORDER BY COALESCE(level, 999) ASC, name ASC
+    ''' % ' AND '.join(where), params).fetchall()
+
+    # 한 사람이 같은 날 여러 건이면 가장 이른 출근 기록을 대표로 쓴다.
+    record_by_emp = {}
+    for row in sorted(today_rows, key=lambda r: r.get('clock_in_time') or ''):
+        record_by_emp.setdefault(str(row['emp_no']), row)
+
+    now_seconds = _seconds_of(datetime.now().strftime('%H:%M:%S'))
+
+    # 시간축은 실제 기록을 감싸되 최소 08~19시는 항상 보이게 잡는다.
+    today_weekday = _weekday_key(today)
+    marks = [now_seconds]
+    for row in record_by_emp.values():
+        for key in ('clock_in_time', 'clock_out_time'):
+            value = _seconds_of(row.get(key))
+            if value is not None:
+                marks.append(value)
+    if today_weekday is not None:
+        for member in members:
+            plan = (schedules or {}).get((member['emp_no'], today_weekday))
+            if plan and not plan['is_off']:
+                for key in ('start', 'end'):
+                    value = _seconds_of(plan[key])
+                    if value is not None:
+                        marks.append(value)
+    start_hour = max(0, min(8, min(marks) // 3600))
+    end_hour = min(24, max(19, -(-max(marks) // 3600) + 1))
+    if end_hour <= start_hour:
+        end_hour = min(24, start_hour + 1)
+    axis_start, axis_span = start_hour * 3600, (end_hour - start_hour) * 3600
+
+    def percent(seconds):
+        return round(max(0.0, min(100.0, (seconds - axis_start) / axis_span * 100)), 3)
+
+    rows = []
+    present = 0
+    for member in members:
+        record = record_by_emp.get(member['emp_no'])
+        item = {
+            'emp_no': member['emp_no'],
+            'name': member['name'],
+            'position': member['position'],
+            'state': 'absent',
+            'in_text': '-',
+            'out_text': '-',
+            'range_text': '미출근',
+            'left': 0,
+            'width': 0,
+            'plan_left': None,
+            'plan_width': 0,
+            'plan_text': '미설정',
+            'is_late': False,
+        }
+
+        # 개인정보 수정창에서 설정한 오늘 요일의 기준 근무시간을 옅은 구간으로 깔아준다.
+        plan = (schedules or {}).get((member['emp_no'], today_weekday)) if today_weekday else None
+        if today_weekday is None:
+            item['plan_text'] = '주말'
+        elif plan is None:
+            item['plan_text'] = '%s~%s (기본)' % (WORK_START_STANDARD[:5], WORK_END_STANDARD[:5])
+            plan = {'start': WORK_START_STANDARD[:5], 'end': WORK_END_STANDARD[:5], 'is_off': False}
+        elif plan['is_off']:
+            item['plan_text'] = '휴무'
+        else:
+            item['plan_text'] = '%s~%s' % (plan['start'] or WORK_START_STANDARD[:5],
+                                           plan['end'] or WORK_END_STANDARD[:5])
+        if plan and not plan['is_off']:
+            plan_start = _seconds_of(plan['start'] or WORK_START_STANDARD)
+            plan_end = _seconds_of(plan['end'] or WORK_END_STANDARD)
+            if plan_start is not None and plan_end is not None and plan_end > plan_start:
+                item['plan_left'] = percent(plan_start)
+                item['plan_width'] = max(1.2, percent(plan_end) - percent(plan_start))
+
+        start = _seconds_of(record.get('clock_in_time')) if record else None
+        if start is not None:
+            present += 1
+            item['is_late'] = _is_late(record, schedules)
+            end = _seconds_of(record.get('clock_out_time'))
+            if (record.get('status') or '') == '조퇴':
+                item['state'] = 'early'
+            elif end is None:
+                item['state'] = 'working'
+            else:
+                item['state'] = 'done'
+            close = end if end is not None else max(now_seconds, start)
+            item['in_text'] = str(record.get('clock_in_time'))[:5]
+            item['out_text'] = str(record.get('clock_out_time'))[:5] if end is not None else '근무중'
+            item['range_text'] = '%s ~ %s' % (item['in_text'], item['out_text'])
+            item['left'] = percent(start)
+            # 기록 간격이 짧아도 막대가 사라지지 않도록 최소 폭을 준다.
+            item['width'] = max(1.2, percent(close) - percent(start))
+        rows.append(item)
+
+    ticks = []
+    hour = start_hour
+    while hour <= end_hour:
+        ticks.append({'label': '%02d시' % hour, 'left': percent(hour * 3600)})
+        hour += 2
+
+    return {
+        'day': today,
+        'weekday': _weekday_label(today),
+        'rows': rows,
+        'ticks': ticks,
+        'now_left': percent(now_seconds) if axis_start <= now_seconds <= axis_start + axis_span else None,
+        'now_text': _format_clock(now_seconds),
+        'total': len(rows),
+        'present': present,
+        'absent': len(rows) - present,
+    }
+
+
+def _quarter_label(period):
+    """'2026-3' 형태를 '2026년 3분기'로 바꾼다."""
+    try:
+        year, quarter = str(period).split('-')
+        return '%s년 %d분기' % (year, int(quarter))
+    except (ValueError, AttributeError):
+        return str(period)
+
+
 @attendance_bp.route('/attendance')
 def attendance_list():
-    # 1. 로그인 정보 및 권한 확인 (세션 기준)
     emp_no = session.get('emp_no')
-    user_level = session.get('user_level', 4) # 기본값 4
-    
-    # 파라미터 받기
-    target_month = request.args.get('month', datetime.now().strftime('%Y-%m'))
-    search_emp_no = request.args.get('search_emp_no', '')
-    search_position = request.args.get('search_position', '') # [신규] 직급 검색 파라미터
+    user_level = session.get('user_level', 4)
+
+    target_month = _normalize_month(request.args.get('month'))
+    search_emp_no = (request.args.get('search_emp_no') or '').strip()
+    search_position = (request.args.get('search_position') or '').strip()
 
     conn = get_db()
-    
-    # 2 & 4. 권한에 따른 쿼리 조건 설정
-    query = """
-        SELECT a.id, a.emp_no, a.date, a.clock_in_time, a.clock_out_time, a.status, a.reason, a.position, u.name as user_name
-        FROM daily_attendance a
-        JOIN users u ON a.emp_no = u.emp_no
-        WHERE a.date LIKE ?
-    """
-    params = [f"{target_month}-%"]
+    scope_sql, scope_params = _scope_clause(user_level, emp_no, search_emp_no, search_position)
+    # 지각 판정 기준은 개인정보 수정창에서 각자 설정한 요일별 근무시간이다.
+    schedules = load_work_schedules(conn)
 
-    # [신규] 직급 검색이 있는 경우 조건 추가
-    if search_position:
-        query += " AND a.position = ?"
-        params.append(search_position)
+    # ── 선택한 달의 원본 기록 (일별 현황 집계용)
+    month_rows = [dict(r) for r in conn.execute(
+        BASE_SELECT + ' WHERE a.date LIKE ? ' + scope_sql + ' ORDER BY a.date DESC, a.clock_in_time ASC',
+        [target_month + '-%'] + scope_params
+    ).fetchall()]
 
-    # 레벨 4 이하는 본인 것만 보기
-    if user_level >= 4:
-        query += " AND a.emp_no = ?"
-        params.append(str(emp_no))
-    # 관리자가 특정 회원을 검색한 경우
-    elif search_emp_no:
-        query += " AND a.emp_no = ?"
-        params.append(str(search_emp_no))
+    # ── 오늘 기록 (요약 카드용)
+    today = datetime.now().strftime('%Y-%m-%d')
+    today_rows = [dict(r) for r in conn.execute(
+        BASE_SELECT + ' WHERE a.date = ? ' + scope_sql,
+        [today] + scope_params
+    ).fetchall()]
 
-    # 날짜 내림차순, 출근시간 오름차순 정렬
-    query += " ORDER BY a.date DESC, a.clock_in_time ASC"
+    today_summary = _summarize_rows(today_rows, schedules)
+    month_summary = _summarize_rows(month_rows, schedules)
+    month_summary['work_days'] = len(set(r['date'] for r in month_rows))
 
-    raw_records = conn.execute(query, params).fetchall()
+    # ── 일별 현황 (직급별이 아닌 날짜별 집계)
+    daily_map = {}
+    for row in month_rows:
+        daily_map.setdefault(row['date'], []).append(row)
 
-    # 일별 출근 등수 계산 로직
-    records = []
-    daily_ranks = {}
-    
-    for row in raw_records:
-        record = dict(row) # sqlite3.Row 객체를 수정 가능한 딕셔너리로 변환
-        date_str = record['date']
-        
-        if date_str not in daily_ranks:
-            daily_ranks[date_str] = 1
-            
-        record['daily_rank'] = daily_ranks[date_str]
-        daily_ranks[date_str] += 1
-        records.append(record)
+    daily_rows = []
+    for day in sorted(daily_map.keys(), reverse=True):
+        summary = _summarize_rows(daily_map[day], schedules)
+        summary['day'] = day
+        summary['weekday'] = _weekday_label(day)
+        daily_rows.append(summary)
 
-    # a.position 값을 기준으로 그룹화합니다.
-    grouped_records = {}
-    for r in records:
-        pos = r.get('position') or '미지정'
-            
-        if pos not in grouped_records:
-            grouped_records[pos] = []
-        grouped_records[pos].append(r)
+    # ── 월별 통계 (최근 12개월)
+    now = datetime.now()
+    m_year, m_month = _shift_month(now.year, now.month, -(MONTHLY_PERIODS - 1))
+    monthly_stats = _period_stats(
+        conn, scope_sql, scope_params,
+        "STRFTIME('%Y-%m', a.date)",
+        '%04d-%02d-01' % (m_year, m_month),
+        MONTHLY_PERIODS,
+    )
+    month_keys = []
+    for offset in range(MONTHLY_PERIODS):
+        y, m = _shift_month(m_year, m_month, offset)
+        month_keys.append('%04d-%02d' % (y, m))
+    monthly_stats = _fill_periods(monthly_stats, month_keys)
+    for item in monthly_stats:
+        item['label'] = item['period']
+
+    # ── 분기별 통계 (최근 8분기)
+    current_quarter = (now.month + 2) // 3
+    q_index = now.year * 4 + (current_quarter - 1) - (QUARTERLY_PERIODS - 1)
+    q_year, q_quarter = q_index // 4, q_index % 4 + 1
+    quarterly_stats = _period_stats(
+        conn, scope_sql, scope_params,
+        "STRFTIME('%Y', a.date) || '-' || ((CAST(STRFTIME('%m', a.date) AS INTEGER) + 2) / 3)",
+        '%04d-%02d-01' % (q_year, (q_quarter - 1) * 3 + 1),
+        QUARTERLY_PERIODS,
+    )
+    quarter_keys = []
+    for offset in range(QUARTERLY_PERIODS):
+        index = q_index + offset
+        quarter_keys.append('%d-%d' % (index // 4, index % 4 + 1))
+    quarterly_stats = _fill_periods(quarterly_stats, quarter_keys)
+    for item in quarterly_stats:
+        item['label'] = _quarter_label(item['period'])
+
+    # ── 오늘 조직원 전체 출퇴근 타임라인
+    timeline = _today_timeline(
+        conn, user_level, emp_no, search_emp_no, search_position, today, today_rows, schedules
+    )
+
+    # ── 요약 카드 (8개를 한 행에 모두 배치하므로 라벨은 짧게 유지한다)
+    month_tag = '%d월' % int(target_month[5:7])
+    summary_cards = [
+        {'label': '오늘 출근', 'value': today_summary['total'],
+         'hint': '근무중 %d명' % today_summary['working'], 'icon': 'fa-door-open'},
+        {'label': '오늘 퇴근', 'value': today_summary['checked_out'],
+         'hint': '조퇴 %d명' % today_summary['early'], 'icon': 'fa-door-closed'},
+        {'label': '오늘 지각', 'value': today_summary['late'],
+         'hint': '개인 근무시간 기준', 'icon': 'fa-hourglass-half'},
+        {'label': '오늘 평균 출근', 'value': today_summary['avg_in_text'], 'is_text': True,
+         'hint': '평균 근무 %s' % today_summary['avg_hours_text'], 'icon': 'fa-clock'},
+        {'label': month_tag + ' 근무일수', 'value': month_summary['work_days'],
+         'hint': '기록 %d건' % month_summary['total'], 'icon': 'fa-calendar-check'},
+        {'label': month_tag + ' 출근 인원', 'value': month_summary['members'],
+         'hint': '연인원 %d명' % month_summary['total'], 'icon': 'fa-users'},
+        {'label': month_tag + ' 평균 근무', 'value': month_summary['avg_hours_text'], 'is_text': True,
+         'hint': '총 ' + _format_hours(month_summary['total_hours']), 'icon': 'fa-business-time'},
+        {'label': month_tag + ' 지각·조퇴', 'value': month_summary['late'] + month_summary['early'],
+         'hint': '지각 %d · 조퇴 %d' % (month_summary['late'], month_summary['early']),
+         'icon': 'fa-triangle-exclamation'},
+    ]
 
     # 관리자용 회원 및 직급 목록 (셀렉트 박스용)
     all_users = []
     all_positions = []
-    if user_level <= 3:
-        all_users = [dict(u) for u in conn.execute("SELECT emp_no, name FROM users ORDER BY name").fetchall()]
-        # [신규] DB에 존재하는 직급 목록 추출
-        all_positions = [row['position'] for row in conn.execute("SELECT DISTINCT position FROM users WHERE position IS NOT NULL AND position != '' ORDER BY position").fetchall()]
+    if int(user_level or 4) <= 3:
+        all_users = [dict(u) for u in conn.execute(
+            'SELECT emp_no, name FROM users ORDER BY name'
+        ).fetchall()]
+        # 직급은 가나다순이 아니라 직급이 높은 순(레벨 숫자가 작을수록 상위)으로 정렬한다.
+        all_positions = [row['position'] for row in conn.execute('''
+            SELECT position, MIN(COALESCE(level, 999)) AS rank_level
+            FROM users
+            WHERE position IS NOT NULL AND position != ''
+            GROUP BY position
+            ORDER BY rank_level ASC, position ASC
+        ''').fetchall()]
 
     conn.close()
 
     return render_template(
-        'attendance.html', 
-        grouped_records=grouped_records,
-        has_records=bool(records),
+        'attendance.html',
+        daily_rows=daily_rows,
+        summary_cards=summary_cards,
+        timeline=timeline,
+        month_summary=month_summary,
+        monthly_stats=monthly_stats,
+        quarterly_stats=quarterly_stats,
+        has_records=bool(month_rows),
         current_month=target_month,
         all_users=all_users,
-        all_positions=all_positions, # [신규] 템플릿 전달
+        all_positions=all_positions,
         user_level=user_level,
         search_emp_no=search_emp_no,
-        search_position=search_position, # [신규] 템플릿 전달
-        current_emp_no=emp_no
+        search_position=search_position,
+        current_emp_no=emp_no,
+        work_start_standard=WORK_START_STANDARD[:5],
     )
+
+
+@attendance_bp.route('/attendance/daily-detail')
+def daily_detail():
+    """날짜별 현황 행을 펼쳤을 때 보여줄 그날의 출퇴근 명단."""
+    day = (request.args.get('day') or '').strip()
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        return jsonify({'status': 'error', 'message': '올바른 일자를 입력해 주세요.'}), 400
+
+    emp_no = session.get('emp_no')
+    if not emp_no:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    user_level = session.get('user_level', 4)
+    search_emp_no = (request.args.get('search_emp_no') or '').strip()
+    search_position = (request.args.get('search_position') or '').strip()
+    scope_sql, scope_params = _scope_clause(user_level, emp_no, search_emp_no, search_position)
+
+    conn = get_db()
+    schedules = load_work_schedules(conn)
+    rows = [dict(r) for r in conn.execute(
+        BASE_SELECT + ' WHERE a.date = ? ' + scope_sql + ' ORDER BY a.clock_in_time ASC, a.id ASC',
+        [day] + scope_params
+    ).fetchall()]
+    conn.close()
+
+    members = []
+    for index, row in enumerate(rows, start=1):
+        members.append({
+            'id': row['id'],
+            'emp_no': row['emp_no'],
+            'user_name': row['user_name'],
+            'position': row['position'],
+            'daily_rank': index,
+            'clock_in_time': row['clock_in_time'] or '-',
+            'clock_out_time': row['clock_out_time'] or '',
+            'status': row['status'] or '-',
+            'reason': row['reason'] or '-',
+            'is_late': _is_late(row, schedules),
+            'plan_text': _plan_text(schedules, row),
+            'work_hours_text': _format_hours(_work_hours(row)),
+        })
+
+    return jsonify({
+        'status': 'success',
+        'day': day,
+        'weekday': _weekday_label(day),
+        'summary': _summarize_rows(rows, schedules),
+        'members': members,
+    })
+
 
 @attendance_bp.route('/attendance/clock_out', methods=['POST'])
 def clock_out():
@@ -101,36 +625,37 @@ def clock_out():
     emp_no = session.get('emp_no')
     data = request.json
     record_id = data.get('record_id')
-    action_type = data.get('type') # '퇴근' 또는 '조퇴'
+    action_type = data.get('type')  # '퇴근' 또는 '조퇴'
     reason = data.get('reason', '')
 
     conn = get_db()
     record = conn.execute("SELECT * FROM daily_attendance WHERE id = ?", (record_id,)).fetchone()
-    
+
     if not record or str(record['emp_no']) != str(emp_no):
         conn.close()
         return jsonify({"success": False, "message": "권한이 없거나 잘못된 요청입니다."}), 403
-    
+
     if record['clock_out_time']:
         conn.close()
         return jsonify({"success": False, "message": "이미 퇴근 처리가 완료되었습니다."}), 400
 
     current_time = datetime.now().strftime('%H:%M:%S')
-    
+
     conn.execute(
         "UPDATE daily_attendance SET clock_out_time = ?, status = ?, reason = ? WHERE id = ?",
         (current_time, action_type, reason, record_id)
     )
     conn.commit()
     conn.close()
-    
+
     return jsonify({"success": True, "message": f"{action_type} 처리가 완료되었습니다."})
+
 
 # [기존] 기록 삭제 처리 API
 @attendance_bp.route('/attendance/delete', methods=['POST'])
 def delete_record():
     user_level = session.get('user_level', 4)
-    
+
     # [권한 체크] 권한 레벨 1, 2인 관리자만 삭제 가능
     if user_level > 2:
         return jsonify({"success": False, "message": "삭제 권한이 없습니다. (레벨 2 이상 전용)"}), 403
@@ -142,7 +667,7 @@ def delete_record():
     conn.execute("DELETE FROM daily_attendance WHERE id = ?", (record_id,))
     conn.commit()
     conn.close()
-    
+
     return jsonify({"success": True, "message": "기록이 정상적으로 삭제되었습니다."})
 
 
@@ -151,22 +676,22 @@ def delete_record():
 def record_attendance(action_type):
     if 'emp_no' not in session:
         return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
-    
+
     emp_no = session.get('emp_no')
     current_date = datetime.now().strftime('%Y-%m-%d')
     now_time = datetime.now().strftime('%H:%M:%S')
-    
+
     conn = get_db()
     # 오늘 날짜의 출퇴근 기록 확인
     record = conn.execute("SELECT * FROM daily_attendance WHERE emp_no = ? AND date = ?", (emp_no, current_date)).fetchone()
-    
+
     if action_type == 'in':
         if record and record['clock_in_time']:
             conn.close()
             return jsonify({'status': 'error', 'message': '이미 오늘의 출근 처리가 완료되었습니다.'})
-        
+
         position = session.get('position', '미지정')
-        
+
         if not record:
             conn.execute(
                 "INSERT INTO daily_attendance (emp_no, date, clock_in_time, status, position) VALUES (?, ?, ?, ?, ?)",
@@ -177,25 +702,25 @@ def record_attendance(action_type):
                 "UPDATE daily_attendance SET clock_in_time = ?, status = '출근' WHERE id = ?",
                 (now_time, record['id'])
             )
-        
+
         conn.commit()
         conn.close()
         return jsonify({'status': 'success', 'message': f'{now_time} 출근 처리되었습니다.'})
-        
+
     elif action_type == 'out':
         if not record or not record['clock_in_time']:
             conn.close()
             return jsonify({'status': 'error', 'message': '출근 기록이 없습니다. 먼저 출근 처리를 해주세요.'})
-        
+
         if record['clock_out_time']:
             conn.close()
             return jsonify({'status': 'error', 'message': '이미 퇴근 처리가 완료되었습니다.'})
-        
+
         # 근무시간 계산 로직 (시:분:초 -> 시간 단위)
         fmt = '%H:%M:%S'
         tdelta = datetime.strptime(now_time, fmt) - datetime.strptime(record['clock_in_time'], fmt)
         hours = round(tdelta.total_seconds() / 3600, 1)
-        
+
         conn.execute(
             "UPDATE daily_attendance SET clock_out_time = ?, status = '퇴근', reason = ? WHERE id = ?",
             (now_time, f"{hours}시간 근무", record['id'])
@@ -203,6 +728,6 @@ def record_attendance(action_type):
         conn.commit()
         conn.close()
         return jsonify({'status': 'success', 'message': f'{now_time} 퇴근 처리되었습니다.'})
-    
+
     conn.close()
     return jsonify({'status': 'error', 'message': '잘못된 요청입니다.'})

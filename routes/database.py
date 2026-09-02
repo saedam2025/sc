@@ -553,9 +553,21 @@ def init_db():
         position TEXT
     )''')
     
+    # 개인정보 수정창에서 설정하는 월~금 근무시간. 근태관리의 지각 판정 기준으로 쓴다.
+    # weekday는 STRFTIME('%w')와 같은 규칙(1=월 ~ 5=금)을 쓴다.
+    c.execute('''CREATE TABLE IF NOT EXISTS user_work_schedule (
+        emp_no TEXT NOT NULL,
+        weekday INTEGER NOT NULL,
+        start_time TEXT,
+        end_time TEXT,
+        is_off INTEGER NOT NULL DEFAULT 0,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (emp_no, weekday)
+    )''')
+
     c.execute('''CREATE TABLE IF NOT EXISTS board (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT, content TEXT, author TEXT, 
+        title TEXT, content TEXT, author TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         filename TEXT, filepath TEXT
     )''')

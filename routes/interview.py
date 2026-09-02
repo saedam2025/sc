@@ -15,6 +15,7 @@ from flask import (
     abort,
     current_app,
     jsonify,
+    make_response,
     render_template,
     request,
     session,
@@ -49,14 +50,15 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {
     '.ppt', '.pptx', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.zip',
 }
 
-# 사전질문지 문항. (필드명, 화면 제목, 안내문, 입력줄수)
+# 사전질문지 문항. (필드명, 화면 제목, 안내문, 입력줄수, 파란색 덧붙임말)
 QUESTIONNAIRE_FIELDS = (
-    ('motivation', '지원동기', '우리 기관에 지원하신 이유를 자유롭게 적어주세요.', 5),
-    ('job_understanding', '지원 업무에 대한 지식 및 이해도', '지원하신 업무를 어떻게 이해하고 계신지 적어주세요.', 5),
-    ('related_experience', '관련 경험', '지원 업무와 관련된 경험을 적어주세요.', 5),
-    ('commute', '출퇴근 방법 및 예상 소요시간', '예) 자가용 30분 / 지하철 + 버스 50분', 3),
-    ('availability', '근무 가능일시 여부', '근무 시작 가능일과 가능한 요일·시간을 적어주세요.', 3),
-    ('other_notes', '기타 면접 전 확인사항', '면접 전에 알려주실 내용이 있으면 적어주세요.', 4),
+    ('motivation', '지원동기', '우리 기관에 지원하신 이유를 자유롭게 적어주세요.', 5, ''),
+    ('job_understanding', '지원 업무에 대한 지식 및 이해도', '지원하신 업무를 어떻게 이해하고 계신지 적어주세요.', 5, ''),
+    ('related_experience', '관련 경험', '지원 업무와 관련된 경험을 적어주세요.', 5, ''),
+    ('commute', '출퇴근 방법 및 예상 소요시간', '예) 자가용 30분 / 지하철 + 버스 50분', 3, ''),
+    ('availability', '근무 가능일시 여부', '근무 시작 가능일과 가능한 요일·시간을 적어주세요.', 3, ''),
+    ('other_notes', '기타 면접 전 확인사항', '면접 전에 알려주실 내용이 있으면 적어주세요.', 4,
+     '(차량을 주차하셨다면 차량번호를 적어주세요.)'),
 )
 QUESTIONNAIRE_KEYS = tuple(field[0] for field in QUESTIONNAIRE_FIELDS)
 # 사전질문지 작성 중 측정한 타자 기록. (분당 타자수, 총 타수, 실제 입력 시간)
@@ -112,6 +114,9 @@ def ensure_interview_schema(conn=None):
                 status TEXT NOT NULL DEFAULT 'scheduled',
                 result TEXT NOT NULL DEFAULT '',
                 completed_at DATETIME,
+                completed_by TEXT NOT NULL DEFAULT '',
+                completed_by_name TEXT NOT NULL DEFAULT '',
+                completed_by_position TEXT NOT NULL DEFAULT '',
                 created_by TEXT NOT NULL DEFAULT '',
                 created_by_name TEXT NOT NULL DEFAULT '',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -151,6 +156,7 @@ def ensure_interview_schema(conn=None):
                 candidate_id INTEGER PRIMARY KEY,
                 status TEXT NOT NULL DEFAULT 'pending',
                 summary TEXT NOT NULL DEFAULT '',
+                profile_json TEXT NOT NULL DEFAULT '{}',
                 education_json TEXT NOT NULL DEFAULT '[]',
                 qualifications_json TEXT NOT NULL DEFAULT '[]',
                 career_json TEXT NOT NULL DEFAULT '[]',
@@ -204,9 +210,19 @@ def ensure_interview_schema(conn=None):
             'status': "TEXT NOT NULL DEFAULT 'scheduled'",
             'result': "TEXT NOT NULL DEFAULT ''",
             'completed_at': 'DATETIME',
+            'completed_by': "TEXT NOT NULL DEFAULT ''",
+            'completed_by_name': "TEXT NOT NULL DEFAULT ''",
+            'completed_by_position': "TEXT NOT NULL DEFAULT ''",
         }.items():
             if column not in candidate_columns:
                 conn.execute(f'ALTER TABLE interview_candidates ADD COLUMN {column} {definition}')
+        # 이력서 요약의 지원자 기본정보(생년월일·거주지·연락처·이메일)도 뒤늦게 추가한다.
+        analysis_columns = {
+            row['name'] if hasattr(row, 'keys') else row[1]
+            for row in conn.execute('PRAGMA table_info(interview_resume_analyses)').fetchall()
+        }
+        if 'profile_json' not in analysis_columns:
+            conn.execute("ALTER TABLE interview_resume_analyses ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}'")
         # 사전질문지 분당 타자수도 기존 설치본에 뒤늦게 추가한다.
         answer_columns = {
             row['name'] if hasattr(row, 'keys') else row[1]
@@ -318,6 +334,14 @@ def _json_list(value):
         return []
 
 
+def _json_dict(value):
+    try:
+        parsed = json.loads(str(value or '{}'))
+        return parsed if isinstance(parsed, dict) else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+
+
 def _analysis_dict(row):
     if not row:
         return None
@@ -326,6 +350,7 @@ def _analysis_dict(row):
         'status': status,
         'is_ready': status == 'ready',
         'summary': str(row['summary'] or ''),
+        'profile': _json_dict(_row_get(row, 'profile_json', '{}')),
         'education': _json_list(row['education_json']),
         'qualifications': _json_list(row['qualifications_json']),
         'career': _json_list(row['career_json']),
@@ -354,6 +379,12 @@ def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=No
         'result': result,
         'result_label': RESULT_LABELS.get(result, ''),
         'completed_at': str(_row_get(row, 'completed_at', '') or ''),
+        'completed_by_name': str(_row_get(row, 'completed_by_name', '') or ''),
+        'completed_by_position': str(_row_get(row, 'completed_by_position', '') or ''),
+        'completed_by_label': ' '.join(part for part in (
+            str(_row_get(row, 'completed_by_name', '') or ''),
+            str(_row_get(row, 'completed_by_position', '') or ''),
+        ) if part),
         'name': row['name'],
         'target_position': row['target_position'],
         'target_school': row['target_school'],
@@ -477,7 +508,7 @@ def _reset_resume_analysis(conn, candidate_id):
         INSERT INTO interview_resume_analyses (candidate_id, status, error_message, updated_at)
         VALUES (?, 'pending', '', CURRENT_TIMESTAMP)
         ON CONFLICT(candidate_id) DO UPDATE SET
-            status='pending', summary='', education_json='[]', qualifications_json='[]',
+            status='pending', summary='', profile_json='{}', education_json='[]', qualifications_json='[]',
             career_json='[]', source_files_json='[]', photo_stored_name='', photo_mime='',
             error_message='', analyzed_at=NULL, updated_at=CURRENT_TIMESTAMP
     ''', (candidate_id,))
@@ -713,13 +744,31 @@ def update_candidate_status(candidate_id):
         if status != 'completed':
             result = ''
 
-        conn.execute('''
-            UPDATE interview_candidates
-            SET status=?, result=?,
-                completed_at=CASE WHEN ?='completed' THEN COALESCE(completed_at, CURRENT_TIMESTAMP) ELSE NULL END,
-                updated_at=CURRENT_TIMESTAMP
-            WHERE id=?
-        ''', (status, result, status, candidate_id))
+        # 완료 시각과 담당자는 처음 완료 처리한 값을 함께 유지하고, 되돌리면 같이 지운다.
+        if status != 'completed':
+            conn.execute('''
+                UPDATE interview_candidates
+                SET status=?, result='', completed_at=NULL, completed_by='',
+                    completed_by_name='', completed_by_position='', updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (status, candidate_id))
+        elif _row_get(row, 'completed_at', ''):
+            conn.execute('''
+                UPDATE interview_candidates
+                SET status=?, result=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (status, result, candidate_id))
+        else:
+            conn.execute('''
+                UPDATE interview_candidates
+                SET status=?, result=?, completed_at=CURRENT_TIMESTAMP, completed_by=?,
+                    completed_by_name=?, completed_by_position=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=?
+            ''', (
+                status, result, _emp_no(),
+                _text(session.get('user_name'), 60), _text(session.get('position'), 60),
+                candidate_id,
+            ))
         conn.commit()
 
         row = _load_candidate(conn, candidate_id)
@@ -938,13 +987,14 @@ def analyze_resume(candidate_id):
             summary = ' · '.join(warnings[:2])
         conn.execute('''
             INSERT INTO interview_resume_analyses (
-                candidate_id, status, summary, education_json, qualifications_json,
+                candidate_id, status, summary, profile_json, education_json, qualifications_json,
                 career_json, source_files_json, photo_stored_name, photo_mime, model,
                 error_message, input_tokens, output_tokens, total_tokens,
                 analyzed_at, updated_at
-            ) VALUES (?, 'ready', ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ) VALUES (?, 'ready', ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT(candidate_id) DO UPDATE SET
-                status='ready', summary=excluded.summary, education_json=excluded.education_json,
+                status='ready', summary=excluded.summary, profile_json=excluded.profile_json,
+                education_json=excluded.education_json,
                 qualifications_json=excluded.qualifications_json, career_json=excluded.career_json,
                 source_files_json=excluded.source_files_json,
                 photo_stored_name=excluded.photo_stored_name, photo_mime=excluded.photo_mime,
@@ -953,6 +1003,7 @@ def analyze_resume(candidate_id):
                 analyzed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
         ''', (
             candidate_id, summary,
+            json.dumps(result.get('profile') or {}, ensure_ascii=False),
             json.dumps(result['education'], ensure_ascii=False),
             json.dumps(result['qualifications'], ensure_ascii=False),
             json.dumps(result['career'], ensure_ascii=False),
@@ -1097,6 +1148,23 @@ def modify_panelist(panelist_id):
 
 # ---------------------------------------------------------------- 사전질문지(면접자 공개 화면)
 
+def _questionnaire_page(status=200, **context):
+    """사전질문지 화면은 브라우저가 절대 캐시하지 못하게 한다.
+
+    면접자는 같은 주소를 여러 번 열고, 담당자도 같은 링크로 확인한다.
+    캐시된 옛 화면이 남으면 지금 서버에 있는 것과 다른 폼(예: 예전 필수입력
+    표시가 붙은 폼)이 그대로 떠서, 전송이 막히고 빈 칸으로 커서가 튀는
+    현상이 생긴다. 항상 최신 화면을 받도록 no-store를 붙인다.
+    """
+    response = make_response(render_template(
+        'interview_questionnaire.html', fields=QUESTIONNAIRE_FIELDS, **context
+    ), status)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+
 @interview_bp.route('/interview/q/<token>', methods=['GET', 'POST'])
 def questionnaire(token):
     """면접자가 로그인 없이 여는 사전질문지. 링크 토큰 자체가 열쇠다."""
@@ -1108,15 +1176,9 @@ def questionnaire(token):
             'SELECT * FROM interview_candidates WHERE questionnaire_token=?', (token,)
         ).fetchone()
         if not candidate:
-            return render_template(
-                'interview_questionnaire.html',
-                fields=QUESTIONNAIRE_FIELDS,
-                candidate=None,
-                answers={},
-                when={},
-                submitted=False,
-                invalid=True,
-            ), 404
+            return _questionnaire_page(
+                404, candidate=None, answers={}, when={}, submitted=False, invalid=True,
+            )
 
         if request.method == 'POST':
             values = {
@@ -1149,9 +1211,7 @@ def questionnaire(token):
                 (candidate['id'],),
             )
             conn.commit()
-            return render_template(
-                'interview_questionnaire.html',
-                fields=QUESTIONNAIRE_FIELDS,
+            return _questionnaire_page(
                 candidate=candidate,
                 answers=values,
                 when=_interview_when(candidate['interview_at']),
@@ -1163,9 +1223,7 @@ def questionnaire(token):
             'SELECT * FROM interview_answers WHERE candidate_id=?', (candidate['id'],)
         ).fetchone()
         answers = {key: (stored[key] if stored else '') for key in QUESTIONNAIRE_KEYS}
-        return render_template(
-            'interview_questionnaire.html',
-            fields=QUESTIONNAIRE_FIELDS,
+        return _questionnaire_page(
             candidate=candidate,
             answers=answers,
             when=_interview_when(candidate['interview_at']),
