@@ -14,7 +14,10 @@
     const PAGE_SIZE = 10;
     const LIST_STAR_COUNT = 5;
     const LIST_STAR_GLYPHS = '<i class="fa-solid fa-star"></i>'.repeat(LIST_STAR_COUNT);
-    let state = { csrfToken: '', candidates: [], filter: 'all', page: 1 };
+    let state = {
+        csrfToken: '', candidates: [], filter: 'all', page: 1,
+        selected: new Set(), pageManageableIds: [],
+    };
 
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]
@@ -120,6 +123,24 @@
         return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
     }
 
+
+    // 면접일시는 '2026-09-03 (오후02:30)' 형태로 보여준다. 다른 일시(완료 처리 등)는
+    // 기존 24시간 표기를 그대로 쓰므로 이 함수는 면접일시에만 사용한다.
+    function interviewWhen(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const parsed = new Date(raw.replace(' ', 'T'));
+        if (Number.isNaN(parsed.getTime())) return { day: raw, time: '' };
+        const pad = (n) => String(n).padStart(2, '0');
+        const hours = parsed.getHours();
+        const meridiem = hours < 12 ? '오전' : '오후';
+        const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+        return {
+            day: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+            time: `(${meridiem}${pad(hour12)}:${pad(parsed.getMinutes())})`,
+        };
+    }
+
     async function apiRequest(path, options = {}) {
         const method = options.method || 'GET';
         const isFormData = options.body instanceof FormData;
@@ -145,65 +166,89 @@
         node.classList.toggle('is-success', type === 'success');
     }
 
-    // ------------------------------------------------------------ 면접 진행 상황
+    // ------------------------------------------------------------ 상단 요약판
 
-    function renderFlow() {
+    function renderSummary() {
         const rows = state.candidates;
         const total = rows.length;
-        const answered = rows.filter((item) => item.has_answers).length;
-        const evaluated = rows.filter((item) => item.evaluated_count > 0).length;
-        const completed = rows.filter((item) => item.is_completed).length;
-        const decided = rows.filter((item) => item.result).length;
+        const counts = { scheduled: 0, ongoing: 0, completed: 0 };
+        rows.forEach((item) => { counts[progressState(item)] += 1; });
         const passed = rows.filter((item) => item.result === 'pass').length;
+        // 총평점은 평가가 입력된 면접자의 별점(점수÷20) 평균이다.
+        const scores = rows.filter((item) => item.average_score !== null)
+            .map((item) => Number(item.average_score) / 20);
+        const average = scores.length
+            ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0;
 
-        byId('flowRegister').textContent = total ? `면접자 ${total}명 등록` : '이력서·첨부자료 등록';
-        byId('flowQuestionnaire').textContent = total ? `제출 ${answered}명 · 미제출 ${total - answered}명` : '면접자 사전 작성';
-        byId('flowEvaluate').textContent = total ? `평가 입력 ${evaluated}명 · 완료 ${completed}명` : '면접관 점수·의견 입력';
-        byId('flowResult').textContent = total ? `판정 ${decided}명 · 합격 ${passed}명` : '합격·불합격·보류 확정';
+        byId('sumScheduled').textContent = counts.scheduled;
+        byId('sumOngoing').textContent = counts.ongoing;
+        byId('sumCompleted').textContent = counts.completed;
+        byId('sumPassed').textContent = passed;
+        byId('sumTotal').textContent = `/ ${total}명`;
+        byId('sumAverage').textContent = average.toFixed(1);
+        byId('sumAverage').classList.toggle('is-empty', !scores.length);
+        syncSummaryActive();
+    }
 
-        // 앞 단계가 끝나야 다음 단계도 끝난 것으로 본다.
-        const reached = [total > 0, answered === total, completed === total, decided === completed && completed > 0];
-        const done = reached.map((value, index) => total > 0 && reached.slice(0, index + 1).every(Boolean));
-        const steps = Array.from(byId('flowList').children);
-        const currentIndex = done.findIndex((value) => !value);
-        steps.forEach((node, index) => {
-            node.classList.toggle('is-complete', done[index]);
-            node.classList.toggle('is-current', index === (currentIndex < 0 ? steps.length - 1 : currentIndex));
+    function syncSummaryActive() {
+        Array.from(document.querySelectorAll('[data-summary-filter]')).forEach((node) => {
+            node.classList.toggle('is-active', node.dataset.summaryFilter === state.filter);
         });
     }
 
     // ------------------------------------------------------------ 목록
 
+    function progressState(item) {
+        // 서버가 내려주는 값을 우선 사용하고, 옛 응답은 제출 여부로 판단한다.
+        if (item.progress_state) return item.progress_state;
+        if (item.is_completed) return 'completed';
+        return item.has_answers ? 'ongoing' : 'scheduled';
+    }
+
     function matchesFilter(item) {
-        if (state.filter === 'scheduled') return !item.is_completed;
+        if (state.filter === 'scheduled') return progressState(item) === 'scheduled';
+        if (state.filter === 'ongoing') return progressState(item) === 'ongoing';
         if (state.filter === 'completed') return item.is_completed;
         if (state.filter === 'pass') return item.result === 'pass';
         return true;
     }
 
     function whenCell(item) {
-        const text = formatDateTime(item.interview_at);
-        if (!text) return '<span class="iv-dash">미정</span>';
-        const [day, time] = text.split(' ');
-        return `${escapeHtml(day)}<small>${escapeHtml(time || '')}</small>`;
+        const when = interviewWhen(item.interview_at);
+        if (!when) return '<span class="iv-dash">미정</span>';
+        return `${escapeHtml(when.day)}<small>${escapeHtml(when.time)}</small>`;
     }
 
     function statusCell(item) {
-        const progress = item.is_completed
-            ? '<span class="iv-tag is-complete">면접완료</span>'
-            : '<span class="iv-tag is-progress">면접예정</span>';
-        const decided = item.result_label
-            ? `<span class="iv-tag ${item.result === 'pass' ? 'is-pass' : item.result === 'fail' ? 'is-fail' : 'is-hold'}">${escapeHtml(item.result_label)}</span>`
-            : '';
-        return `${progress}${decided}`;
+        const state_ = progressState(item);
+        const progressClass = { scheduled: 'is-progress', ongoing: 'is-ongoing', completed: 'is-complete' }[state_];
+        const progressText = item.progress_label
+            || { scheduled: '면접예정', ongoing: '면접진행중', completed: '면접완료' }[state_];
+        return `<span class="iv-tag ${progressClass}">${escapeHtml(progressText)}</span>`;
+    }
+
+    // 최종결과는 글자 대신 아이콘으로 보여준다(합격 하트 · 불합격 깨진 하트 · 보류 모래시계).
+    const RESULT_ICONS = { pass: 'fa-heart', fail: 'fa-heart-crack', hold: 'fa-hourglass-half' };
+
+    function resultCell(item) {
+        if (!item.result_label) return '<span class="iv-dash">-</span>';
+        const tone = item.result === 'pass' ? 'is-pass' : item.result === 'fail' ? 'is-fail' : 'is-hold';
+        const icon = RESULT_ICONS[item.result] || RESULT_ICONS.hold;
+        const label = escapeHtml(item.result_label);
+        return `<span class="iv-result-icon ${tone}" role="img" title="${label}" aria-label="${label}"><i class="fa-solid ${icon}"></i></span>`;
     }
 
     function questionnaireCell(item) {
+        // 글자를 눌러도 관리 열의 [사전질문지] 버튼과 같은 창이 열린다.
+        let note;
         if (!item.has_answers) {
-            return '<span class="iv-progress-note is-wait"><i class="fa-regular fa-clipboard"></i> 미작성</span>';
+            note = '<span class="iv-progress-note is-wait"><i class="fa-regular fa-clipboard"></i> 미작성</span>';
+        } else {
+            const typing = item.typing_cpm ? `<small>(${item.typing_cpm}타/분)</small>` : '';
+            note = `<span class="iv-progress-note is-done"><i class="fa-solid fa-check"></i> 작성완료 ${typing}</span>`;
         }
-        const typing = item.typing_cpm ? `<small>${item.typing_cpm}타/분</small>` : '';
-        return `<span class="iv-progress-note is-done"><i class="fa-solid fa-check"></i> 작성완료 ${typing}</span>`;
+        return `<button type="button" class="iv-questionnaire-open" data-open-question="${item.id}"
+            title="사전질문지 열기" aria-label="${escapeHtml(item.name)} 사전질문지 열기">${note}</button>`;
     }
 
     function materialCell(item) {
@@ -237,17 +282,15 @@
             item.name, item.target_position, item.target_school,
         ].some((value) => String(value || '').toLowerCase().includes(keyword))));
 
-        const filterLabel = { all: '전체', scheduled: '면접예정', completed: '면접완료', pass: '합격' }[state.filter];
-        byId('candidateCount').textContent = `${filterLabel} ${rows.length}건${
-            keyword ? ` · "${keyword}" 검색` : ''} · 등록 ${state.candidates.length}건`;
-
         if (!rows.length) {
             state.page = 1;
-            candidateList.innerHTML = `<tr><td class="iv-empty-cell" colspan="8">${
+            state.pageManageableIds = [];
+            candidateList.innerHTML = `<tr><td class="iv-empty-cell" colspan="11">${
                 state.candidates.length ? '조건에 맞는 면접 기록이 없습니다.'
-                    : '등록된 면접자가 없습니다. 오른쪽 <b>면접자 입력</b> 버튼으로 시작해주세요.'
+                    : '등록된 면접자가 없습니다. 위쪽 <b>면접자 입력</b> 버튼으로 시작해주세요.'
             }</td></tr>`;
             renderPaging(1);
+            renderSelection();
             return;
         }
 
@@ -255,8 +298,14 @@
         if (state.page > totalPages) state.page = totalPages;
         const offset = (state.page - 1) * PAGE_SIZE;
 
-        candidateList.innerHTML = rows.slice(offset, offset + PAGE_SIZE).map((item, index) => `
+        const pageRows = rows.slice(offset, offset + PAGE_SIZE);
+        state.pageManageableIds = pageRows.filter((item) => item.can_manage).map((item) => item.id);
+        candidateList.innerHTML = pageRows.map((item, index) => `
             <tr class="iv-row${item.is_completed ? ' is-completed' : ''}">
+                <td class="iv-cell-select" data-label="선택">${item.can_manage ? `<label class="iv-select-label">
+                    <input type="checkbox" class="iv-select-box" data-select="${item.id}" aria-label="${escapeHtml(item.name)} 선택">
+                    <span>선택</span>
+                </label>` : ''}</td>
                 <td class="iv-cell-number" data-label="번호">${rows.length - offset - index}</td>
                 <td class="iv-cell-candidate" data-label="지원자">
                     <div class="iv-candidate-layout">
@@ -269,20 +318,76 @@
                 <td class="iv-cell-school" data-label="대상학교" title="${escapeHtml(item.target_school || '')}">${
                     item.target_school ? `<i class="fa-solid fa-school" aria-hidden="true"></i><span>${escapeHtml(item.target_school)}</span>` : '<span class="iv-dash">미정</span>'}</td>
                 <td class="iv-cell-when" data-label="면접일시">${whenCell(item)}</td>
-                <td class="iv-cell-progress" data-label="진행 현황"><div class="iv-cell-stack"><div class="iv-status-line">${statusCell(item)}</div>${questionnaireCell(item)}</div></td>
                 <td class="iv-cell-materials" data-label="서류 · AI"><div class="iv-cell-stack">${materialCell(item)}</div></td>
+                <td class="iv-cell-questionnaire" data-label="사전질문지"><div class="iv-cell-stack">${questionnaireCell(item)}</div></td>
+                <td class="iv-cell-progress" data-label="진행 현황"><div class="iv-status-line">${statusCell(item)}</div></td>
                 <td class="iv-cell-score" data-label="면접관 평가">${scoreCell(item)}</td>
+                <td class="iv-cell-result" data-label="최종결과"><div class="iv-status-line">${resultCell(item)}</div></td>
                 <td class="iv-cell-actions" data-label="관리">
                     <div class="iv-actions-layout">
-                        <button class="primary iv-action-main" data-open-detail="${item.id}"><i class="fa-solid fa-arrow-up-right-from-square"></i><span>면접진행</span></button>
                         <span class="iv-action-sub">
-                            <button data-open-question="${item.id}" title="면접자 사전질문지 열기" aria-label="면접자 사전질문지 열기"><i class="fa-regular fa-clipboard"></i><span>면접자 질문지</span></button>
-                            ${item.can_manage ? `<button data-edit="${item.id}" title="면접자 정보 수정" aria-label="면접자 정보 수정"><i class="fa-regular fa-pen-to-square"></i><span>수정</span></button><button class="danger" data-delete="${item.id}" title="면접 기록 삭제" aria-label="면접 기록 삭제"><i class="fa-regular fa-trash-can"></i><span>삭제</span></button>` : ''}
+                            <button data-open-question="${item.id}" title="사전질문지 열기" aria-label="사전질문지 열기"><i class="fa-regular fa-clipboard"></i><span>사전질문지</span></button>
                         </span>
+                        <button class="primary iv-action-main" data-open-detail="${item.id}"><i class="fa-solid fa-arrow-up-right-from-square"></i><span>면접진행</span></button>
                     </div>
                 </td>
             </tr>`).join('');
         renderPaging(totalPages);
+        renderSelection();
+    }
+
+    // ------------------------------------------------------------ 선택 · 일괄처리
+
+    function renderSelection() {
+        // 목록에서 사라졌거나 권한이 없어진 항목은 선택에서 뺀다.
+        const manageable = new Set(
+            state.candidates.filter((item) => item.can_manage).map((item) => item.id)
+        );
+        Array.from(state.selected).forEach((id) => {
+            if (!manageable.has(id)) state.selected.delete(id);
+        });
+
+        Array.from(candidateList.querySelectorAll('[data-select]')).forEach((box) => {
+            box.checked = state.selected.has(Number(box.dataset.select));
+            box.closest('tr').classList.toggle('is-selected', box.checked);
+        });
+
+        const pageIds = state.pageManageableIds;
+        const pickedOnPage = pageIds.filter((id) => state.selected.has(id)).length;
+        const selectAll = byId('selectAllRows');
+        selectAll.checked = pageIds.length > 0 && pickedOnPage === pageIds.length;
+        selectAll.indeterminate = pickedOnPage > 0 && pickedOnPage < pageIds.length;
+        selectAll.disabled = !pageIds.length;
+
+        const picked = state.selected.size;
+        byId('bulkCount').textContent = picked ? `선택 ${picked}건` : '선택한 면접자 없음';
+        byId('bulkEdit').disabled = picked !== 1;
+        byId('bulkEdit').title = picked === 1 ? '' : '수정은 한 명만 선택했을 때 사용할 수 있습니다.';
+        byId('bulkDelete').disabled = picked === 0;
+    }
+
+    function selectedCandidates() {
+        return state.candidates.filter((item) => state.selected.has(item.id));
+    }
+
+    async function deleteSelected() {
+        const picked = selectedCandidates();
+        if (!picked.length) return;
+        const names = picked.slice(0, 5).map((item) => item.name).join(', ');
+        const more = picked.length > 5 ? ` 외 ${picked.length - 5}명` : '';
+        if (!window.confirm(
+            `${names}${more} · 총 ${picked.length}명의 면접 기록과 첨부파일을 모두 삭제하시겠습니까?`
+        )) return;
+        try {
+            for (const item of picked) {
+                await apiRequest(`candidates/${item.id}`, { method: 'DELETE' });
+            }
+            state.selected.clear();
+            await loadCandidates();
+        } catch (error) {
+            window.alert(error.message);
+            await loadCandidates();
+        }
     }
 
     function renderPaging(totalPages) {
@@ -316,7 +421,7 @@
             state.csrfToken = data.csrf_token;
             state.candidates = data.candidates || [];
             renderList();
-            renderFlow();
+            renderSummary();
         } catch (error) {
             candidateList.innerHTML = `<tr><td class="iv-empty-cell" colspan="8">${escapeHtml(error.message)}</td></tr>`;
         }
@@ -426,19 +531,6 @@
         if (!button) return;
         if (button.dataset.openDetail) return openSheet(button.dataset.openDetail);
         if (button.dataset.openQuestion) return openQuestionnaire(button.dataset.openQuestion);
-        if (button.dataset.edit) {
-            const item = state.candidates.find((row) => row.id === Number(button.dataset.edit));
-            return openCandidateModal(item);
-        }
-        if (button.dataset.delete) {
-            if (!window.confirm('이 면접 기록과 첨부파일을 모두 삭제하시겠습니까?')) return;
-            try {
-                await apiRequest(`candidates/${button.dataset.delete}`, { method: 'DELETE' });
-                await loadCandidates();
-            } catch (error) {
-                window.alert(error.message);
-            }
-        }
     }
 
     function applyFilter(value) {
@@ -447,12 +539,21 @@
         Array.from(byId('filterChips').children).forEach((node) => {
             node.classList.toggle('is-active', node.dataset.filter === value);
         });
+        syncSummaryActive();
         renderList();
     }
 
     byId('filterChips').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-filter]');
         if (button) applyFilter(button.dataset.filter);
+    });
+
+    // 요약판을 눌러도 같은 필터가 걸리고, 한 번 더 누르면 전체로 돌아온다.
+    byId('summaryStats').addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-summary-filter]');
+        if (!button) return;
+        const value = button.dataset.summaryFilter;
+        applyFilter(state.filter === value ? 'all' : value);
     });
 
     byId('openCreate').addEventListener('click', () => openCandidateModal());
@@ -462,13 +563,32 @@
     byId('candidateForm').addEventListener('submit', submitCandidate);
     byId('fieldPositionChoice').addEventListener('change', syncOtherPosition);
     candidateList.addEventListener('click', handleListClick);
+    candidateList.addEventListener('change', (event) => {
+        const box = event.target.closest('[data-select]');
+        if (!box) return;
+        const id = Number(box.dataset.select);
+        if (box.checked) state.selected.add(id); else state.selected.delete(id);
+        renderSelection();
+    });
+    byId('selectAllRows').addEventListener('change', (event) => {
+        state.pageManageableIds.forEach((id) => {
+            if (event.target.checked) state.selected.add(id); else state.selected.delete(id);
+        });
+        renderSelection();
+    });
+    byId('bulkEdit').addEventListener('click', () => {
+        const picked = selectedCandidates();
+        if (picked.length !== 1) return;
+        openCandidateModal(picked[0]);
+    });
+    byId('bulkDelete').addEventListener('click', deleteSelected);
     searchInput.addEventListener('input', () => { state.page = 1; renderList(); });
     byId('candidatePaging').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-page]');
         if (!button) return;
         state.page = Number(button.dataset.page) || 1;
         renderList();
-        byId('candidateCount').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        byId('listToolbar').scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     document.addEventListener('click', (event) => {
         const clear = event.target.closest('[data-clear-input]');

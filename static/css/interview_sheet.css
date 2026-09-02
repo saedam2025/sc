@@ -82,6 +82,7 @@ button, input, textarea, select { font: inherit; }
 .ivs-status-badge { padding:7px 15px; border-radius:999px; font-size:.8rem; font-weight:850; }
 .ivs-status-badge.is-complete { background:#e6f4ff; color:#1d5fa8; }
 .ivs-status-badge.is-progress { background:#f3f0ff; color:#5b46b8; }
+.ivs-status-badge.is-ongoing { background:#fff1e0; color:#b45c09; }
 .ivs-status-score { display:flex; align-items:baseline; gap:8px; color:var(--ivs-ink); font-size:1.05rem; font-weight:850; }
 .ivs-status-score small { color:var(--ivs-muted); font-size:.7rem; font-weight:650; }
 .ivs-status-result { margin-left:auto; padding:7px 16px; border-radius:11px; font-size:.9rem; font-weight:850; }
@@ -399,3 +400,68 @@ body.ivs-focus-open { overflow:hidden; }
     .ivs-layout { grid-template-columns:1fr; }
     .ivs-card { break-inside:avoid; box-shadow:none; }
 }
+
+
+/* ------------------------------------------------------------------------
+   본문 글자 체계는 증명서 발급 관리 화면(templates/certificate/admin.html)과
+   같은 기준을 쓴다. 본문 .85rem, 라벨 .75rem/700, 배지 .75rem/700(글자 크기 조절이 먹도록 rem),
+   버튼 .85rem/600, 카드 제목 1.1rem, 화면 제목 1.3rem.
+   (면접장 투사용 집중모드 .ivs-focus-* 는 크게 보여야 하므로 그대로 둔다.)
+   ------------------------------------------------------------------------ */
+.ivs-topbar h1 { font-size:1.3rem; font-weight:700; letter-spacing:normal; }
+.ivs-kicker, .ivs-card-kicker { font-size:.75rem; font-weight:700; letter-spacing:.08em; }
+.ivs-step { font-size:.75rem; font-weight:700; letter-spacing:.08em; }
+.ivs-card-head h2 { font-size:1.1rem; font-weight:700; letter-spacing:normal; }
+.ivs-card-head p { font-size:.85rem; }
+.ivs-ready-badge { font-size:.75rem; font-weight:700; }
+.ivs-zoom button { font-size:.8rem; font-weight:600; }
+.ivs-zoom span { font-size:.8rem; font-weight:600; }
+.ivs-button { font-size:.85rem; font-weight:600; }
+.ivs-feedback { font-size:.8rem; font-weight:600; }
+.ivs-loading { font-size:.85rem; }
+.ivs-hint { font-size:.8rem; }
+
+.ivs-status-badge { font-size:.85rem; font-weight:700; }
+.ivs-status-score { font-size:1.1rem; font-weight:700; }
+.ivs-status-score small { font-size:.8rem; font-weight:600; }
+.ivs-status-result { font-size:.9rem; font-weight:700; }
+.ivs-result-row > span { font-size:.8rem; font-weight:700; }
+.ivs-result-button { font-size:.85rem; font-weight:600; }
+
+.ivs-info-grid dt { font-size:.75rem; font-weight:700; }
+.ivs-info-grid dd { font-size:.85rem; }
+.ivs-answer h4 { font-size:.85rem; font-weight:700; }
+.ivs-answer p { font-size:.85rem; }
+
+.ivs-file-row strong { font-size:.85rem; font-weight:600; }
+.ivs-file-row small { font-size:.8rem; }
+.ivs-file-actions a, .ivs-file-actions button { font-size:.8rem; font-weight:600; }
+
+.ivs-panelist-head strong { font-size:.9rem; font-weight:700; }
+.ivs-panelist-body textarea, .ivs-inline-add input { font-size:.85rem; }
+.ivs-rating-value { font-size:1.05rem; font-weight:700; }
+.ivs-rating-value small { font-size:.8rem; font-weight:600; }
+.ivs-rating-value.is-empty { font-weight:600; }
+.ivs-rating-clear { font-size:.8rem; font-weight:600; }
+.ivs-tag { font-size:.75rem; font-weight:700; }
+
+.ivs-ai-photo-empty span { font-size:.8rem; font-weight:600; }
+.ivs-ai-profile-text > span { font-size:.75rem; font-weight:700; }
+.ivs-ai-profile-text p { font-size:.85rem; }
+.ivs-ai-profile-text small { font-size:.8rem; }
+.ivs-ai-group h4 { font-size:.85rem; font-weight:700; }
+.ivs-ai-group li { font-size:.85rem; }
+.ivs-ai-group p { font-size:.85rem; }
+.ivs-ai-notice { font-size:.8rem; }
+.ivs-ai-empty strong { font-size:.9rem; font-weight:700; }
+.ivs-ai-empty p { font-size:.85rem; }
+
+.ivs-progress-head strong { font-size:.85rem; font-weight:700; }
+.ivs-progress-head p { font-size:.8rem; }
+.ivs-progress-head > span:last-child { font-size:.85rem; font-weight:700; }
+.ivs-progress-log { font-size:.8rem; }
+.ivs-dropzone strong { font-size:.85rem; font-weight:700; }
+.ivs-dropzone small { font-size:.8rem; }
+.ivs-selected-files { font-size:.8rem; }
+.ivs-selected-files button { font-size:.8rem; }
+.ivs-inline-check { font-size:.85rem; font-weight:600; }

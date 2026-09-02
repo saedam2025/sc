@@ -25,6 +25,29 @@
         return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())} ${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
     }
 
+
+    // 면접일시는 '2026-09-03 (오후02:30)' 형태로 보여준다. 다른 일시(완료 처리 등)는
+    // 기존 24시간 표기를 그대로 쓰므로 이 함수는 면접일시에만 사용한다.
+    function interviewWhen(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const parsed = new Date(raw.replace(' ', 'T'));
+        if (Number.isNaN(parsed.getTime())) return { day: raw, time: '' };
+        const pad = (n) => String(n).padStart(2, '0');
+        const hours = parsed.getHours();
+        const meridiem = hours < 12 ? '오전' : '오후';
+        const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+        return {
+            day: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+            time: `(${meridiem}${pad(hour12)}:${pad(parsed.getMinutes())})`,
+        };
+    }
+
+    function interviewWhenText(value) {
+        const when = interviewWhen(value);
+        return when ? `${when.day} ${when.time}`.trim() : '-';
+    }
+
     // ------------------------------------------------------------ 별점 (5개 만점, 0.5개 단위)
     // DB 컬럼은 0~100 정수를 그대로 쓰고, 화면에서만 별 = 점수 / 20 으로 환산한다.
     const STAR_COUNT = 5;
@@ -187,6 +210,16 @@
         </div>`;
         }).join('');
 
+        // 사전질문지를 등록하면 완료 전이라도 '면접진행중'으로 표시한다.
+        const progressState = item.progress_state
+            || (item.is_completed ? 'completed' : (item.has_answers ? 'ongoing' : 'scheduled'));
+        const progressClass = {
+            scheduled: 'is-progress', ongoing: 'is-ongoing', completed: 'is-complete',
+        }[progressState];
+        const progressText = item.progress_label || {
+            scheduled: '면접예정', ongoing: '면접진행중', completed: '면접완료',
+        }[progressState];
+
         const resultButtons = ['pass', 'fail', 'hold'].map((key) => {
             const label = { pass: '합격', fail: '불합격', hold: '보류' }[key];
             const active = item.result === key ? ' is-active' : '';
@@ -199,7 +232,7 @@
                     <div><span class="ivs-step">01</span><h2>면접 진행상태</h2><p>면접 완료 처리와 합격 여부를 저장합니다.</p></div>
                 </header>
                 <div class="ivs-status-line">
-                    <span class="ivs-status-badge ${item.is_completed ? 'is-complete' : 'is-progress'}">${item.is_completed ? '면접완료' : '면접예정'}</span>
+                    <span class="ivs-status-badge ${progressClass}">${escapeHtml(progressText)}</span>
                     <span class="ivs-status-score">평균 ${item.average_score === null ? '-' : `★ ${averageStars(item.average_score)} / 5.0`}
                         <small>면접관 ${item.evaluated_count}/${item.panelist_count}명 입력</small></span>
                     ${item.result_label ? `<span class="ivs-status-result is-${item.result}">${escapeHtml(item.result_label)}</span>` : ''}
@@ -220,7 +253,7 @@
                     <div><dt>이름</dt><dd>${escapeHtml(item.name)}</dd></div>
                     <div><dt>대상 직급</dt><dd>${escapeHtml(item.target_position || '-')}</dd></div>
                     <div><dt>대상학교</dt><dd>${escapeHtml(item.target_school || '-')}</dd></div>
-                    <div><dt>면접일시</dt><dd>${escapeHtml(formatDateTime(item.interview_at) || '-')}</dd></div>
+                    <div><dt>면접일시</dt><dd>${escapeHtml(interviewWhenText(item.interview_at))}</dd></div>
                     <div class="full"><dt>면접 준비 메모</dt><dd class="pre">${escapeHtml(item.memo || '-')}</dd></div>
                     <div class="full"><dt>사전질문지 링크</dt><dd class="ivs-link-actions">
                         <button class="ivs-button" id="openQuestion"><i class="fa-solid fa-up-right-from-square"></i> 사전질문지 열기</button>
@@ -346,7 +379,7 @@
             <div><dt>이름</dt><dd>${escapeHtml(item.name)}</dd></div>
             <div><dt>대상 직급</dt><dd>${escapeHtml(item.target_position || '-')}</dd></div>
             <div><dt>대상학교</dt><dd>${escapeHtml(item.target_school || '-')}</dd></div>
-            <div><dt>면접일시</dt><dd>${escapeHtml(formatDateTime(item.interview_at) || '-')}</dd></div>
+            <div><dt>면접일시</dt><dd>${escapeHtml(interviewWhenText(item.interview_at))}</dd></div>
             ${item.memo ? `<div class="full"><dt>면접 준비 메모</dt><dd class="pre">${escapeHtml(item.memo)}</dd></div>` : ''}
         </div>`;
 
