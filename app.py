@@ -844,7 +844,7 @@ def activity_feed():
                     SELECT t.id, t.school_id, t.title, t.owner, t.created_at,
                            s.access_key
                     FROM school_tasks t
-                    JOIN schools s ON s.id = t.school_id
+                    LEFT JOIN schools s ON s.id = t.school_id
                 """
                 school_task_params = []
                 if is_center_director:
