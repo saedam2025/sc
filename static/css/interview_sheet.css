@@ -35,6 +35,9 @@ button, input, textarea, select { font: inherit; }
     font-size:.66rem; font-weight:850; letter-spacing:.15em; }
 .ivs-topbar h1 { margin:0; font-size:1.35rem; letter-spacing:-.035em; }
 .ivs-topbar-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+/* 면접진행·되돌리기 버튼은 제목 바로 오른쪽에 붙인다. */
+.ivs-title-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-left:4px; }
+.ivs-title-actions:empty { display:none; }
 .ivs-zoom { display:flex; align-items:center; gap:4px; padding:4px 6px; border:1px solid var(--ivs-line);
     border-radius:11px; background:rgba(255,255,255,.8); }
 .ivs-zoom button { min-height:31px; display:inline-flex; align-items:center; gap:3px; border:0; border-radius:8px;
@@ -78,14 +81,23 @@ button, input, textarea, select { font: inherit; }
 .ivs-hint { margin:8px 0 0; color:var(--ivs-muted); font-size:.72rem; }
 
 /* ---------------------------------------------------------------- 진행상태 */
-.ivs-status-line { display:flex; flex-wrap:wrap; align-items:center; gap:11px; }
-.ivs-status-badge { padding:7px 15px; border-radius:999px; font-size:.8rem; font-weight:850; }
+.ivs-status-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:9px; }
+.ivs-status-cell { display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-width:0;
+    padding:9px 13px; border:1px solid var(--ivs-line); border-radius:11px; background:#fbfdfe; }
+.ivs-status-key { color:var(--ivs-muted); font-size:.65rem; font-weight:800; letter-spacing:.02em; }
+.ivs-status-sub { color:var(--ivs-muted); font-size:.7rem; font-weight:700; line-height:1.45; }
+.ivs-status-sub.is-strong { color:var(--ivs-ink); }
+.ivs-status-badge { padding:5px 13px; border-radius:999px; font-size:.8rem; font-weight:850; }
 .ivs-status-badge.is-complete { background:#e6f4ff; color:#1d5fa8; }
 .ivs-status-badge.is-progress { background:#f3f0ff; color:#5b46b8; }
 .ivs-status-badge.is-ongoing { background:#fff1e0; color:#b45c09; }
-.ivs-status-score { display:flex; align-items:baseline; gap:8px; color:var(--ivs-ink); font-size:1.05rem; font-weight:850; }
+.ivs-status-score { display:flex; align-items:baseline; gap:4px; color:var(--ivs-ink); font-size:1.05rem; font-weight:850; }
+.ivs-status-score.is-empty { color:var(--ivs-muted); font-size:.8rem; font-weight:750; }
 .ivs-status-score small { color:var(--ivs-muted); font-size:.7rem; font-weight:650; }
-.ivs-status-result { margin-left:auto; padding:7px 16px; border-radius:11px; font-size:.9rem; font-weight:850; }
+.ivs-status-result { display:inline-flex; align-items:center; gap:7px; padding:5px 13px;
+    border-radius:9px; font-size:.9rem; font-weight:850; }
+.ivs-status-result.is-none { background:#f1f5f8; color:#8c9aad; font-weight:800; }
+.ivs-status-result i { font-size:.92rem; }
 .ivs-status-result.is-pass { background:#e4f7ec; color:#1b7a45; }
 .ivs-status-result.is-fail { background:#fdeaea; color:#b23434; }
 .ivs-status-result.is-hold { background:#f4f1e4; color:#8a6d1f; }
@@ -100,11 +112,11 @@ button, input, textarea, select { font: inherit; }
 .ivs-result-button.is-hold.is-active { border-color:#8a6d1f; background:#f4f1e4; color:#8a6d1f; }
 
 /* ---------------------------------------------------------------- 면접자 정보 */
-.ivs-info-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
-.ivs-info-grid > div { padding:11px 13px; border:1px solid var(--ivs-line); border-radius:11px; background:#fbfdfe; }
-.ivs-info-grid dt { margin:0 0 4px; color:var(--ivs-muted); font-size:.65rem; font-weight:800; }
+.ivs-info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(168px, 1fr)); gap:7px; }
+.ivs-info-grid > div { padding:8px 11px; border:1px solid var(--ivs-line); border-radius:10px; background:#fbfdfe; }
+.ivs-info-grid dt { margin:0 0 2px; color:var(--ivs-muted); font-size:.65rem; font-weight:800; }
 .ivs-info-grid dd { margin:0; font-size:.82rem; word-break:break-word; }
-.ivs-info-grid dd.pre { white-space:pre-wrap; line-height:1.7; }
+.ivs-info-grid dd.pre { white-space:pre-wrap; line-height:1.55; }
 .ivs-info-grid .full { grid-column:1/-1; }
 .ivs-link-actions { display:flex; flex-wrap:wrap; gap:6px; }
 
@@ -116,27 +128,42 @@ button, input, textarea, select { font: inherit; }
 .ivs-answer p.empty { color:#a2adbb; }
 
 /* ---------------------------------------------------------------- 첨부자료 */
-.ivs-file-row { display:grid; grid-template-columns:30px 1fr auto; gap:10px; align-items:center; margin-bottom:7px;
-    padding:10px 13px; border:1px solid var(--ivs-line); border-radius:11px; background:#fff; }
-.ivs-file-row > i { color:var(--ivs-mint-dark); }
-.ivs-file-row strong { display:block; font-size:.76rem; font-weight:750; word-break:break-all; }
-.ivs-file-row small { color:var(--ivs-muted); font-size:.65rem; }
-.ivs-file-actions { display:flex; gap:5px; }
-.ivs-file-actions a, .ivs-file-actions button { min-height:31px; display:inline-flex; align-items:center; padding:5px 10px;
-    border:1px solid var(--ivs-line); border-radius:8px; background:#fff; color:#435168; font-size:.66rem;
-    font-weight:780; text-decoration:none; cursor:pointer; }
-.ivs-file-actions a:hover { border-color:var(--ivs-mint); color:var(--ivs-mint-dark); }
-.ivs-file-actions button:hover { border-color:#efb1b1; color:#c13d3d; }
+.ivs-file-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.ivs-file-chip { display:inline-flex; align-items:center; max-width:100%; border:1px solid var(--ivs-line);
+    border-radius:9px; background:#fff; transition:.16s ease; }
+.ivs-file-chip:hover { border-color:var(--ivs-mint); }
+/* 파일명 자체가 내려받기 링크다. */
+.ivs-file-chip a, .ivs-file-chip .ivs-file-name { display:inline-flex; align-items:center; gap:7px; min-width:0;
+    min-height:31px; padding:5px 11px; border:0; background:transparent; color:var(--ivs-ink); font-size:.76rem;
+    font-weight:750; text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    cursor:pointer; font-family:inherit; }
+.ivs-file-chip a i, .ivs-file-chip .ivs-file-name i { flex:0 0 auto; color:var(--ivs-mint-dark); font-size:.76rem; }
+.ivs-file-chip a small, .ivs-file-chip .ivs-file-name small { flex:0 0 auto; color:var(--ivs-muted);
+    font-size:.65rem; font-weight:700; }
+.ivs-file-chip a:hover, .ivs-file-chip .ivs-file-name:hover { color:var(--ivs-mint-dark);
+    text-decoration:underline; text-underline-offset:3px; }
+.ivs-file-chip [data-delete-file] { flex:0 0 auto; display:inline-flex; align-items:center; align-self:stretch; border:0;
+    border-left:1px solid var(--ivs-line); border-radius:0 8px 8px 0; padding:0 9px; background:transparent;
+    color:#a9b6c4; font-size:.7rem; cursor:pointer; }
+.ivs-file-chip [data-delete-file]:hover { background:#fdeaea; color:#c13d3d; }
 
 /* ---------------------------------------------------------------- 면접관 평가 */
-.ivs-panelist { margin-bottom:9px; padding:13px 15px; border:1px solid var(--ivs-line); border-radius:13px; background:#fbfdfe; }
-.ivs-panelist-head { display:flex; align-items:center; gap:9px; margin-bottom:9px; }
-.ivs-panelist-head strong { flex:1; font-size:.84rem; }
+.ivs-panelist { margin-bottom:7px; padding:10px 12px; border:1px solid var(--ivs-line); border-radius:12px; background:#fbfdfe; }
+.ivs-panelist-head { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:7px; }
+.ivs-panelist-head strong { flex:0 0 auto; min-width:74px; font-size:.84rem; }
+/* 별점 줄을 이름 옆으로 끌어올려 면접관 한 명이 두 줄에 들어가게 한다. */
+.ivs-panelist-head .ivs-rating { flex:1 1 190px; margin-bottom:0; }
+.ivs-panelist-head .ivs-stars-row { font-size:1.12rem; }
+.ivs-panelist-head .ivs-button-danger { margin-left:auto; }
 .ivs-panelist-body { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:start; }
+.ivs-panelist-body.is-view { align-items:center; }
+.ivs-panelist-note { margin:0; padding:7px 11px; border:1px solid transparent; border-radius:9px;
+    background:#f2f7f9; color:var(--ivs-ink); font-size:.8rem; line-height:1.55; white-space:pre-wrap;
+    word-break:break-word; }
 .ivs-panelist-body textarea, .ivs-inline-add input {
     width:100%; min-height:44px; padding:9px 12px; border:1.5px solid #aebdca; border-radius:10px;
     background:#fff; color:var(--ivs-ink); font-size:.8rem; outline:0; }
-.ivs-panelist-body textarea { min-height:44px; resize:vertical; line-height:1.6; }
+.ivs-panelist-body textarea { min-height:38px; resize:vertical; line-height:1.55; }
 .ivs-panelist-body textarea:focus, .ivs-inline-add input:focus {
     border-color:var(--ivs-mint); box-shadow:0 0 0 3px rgba(25,168,135,.13); }
 
@@ -158,7 +185,7 @@ button, input, textarea, select { font: inherit; }
 .ivs-rating-clear { min-height:28px; border:1px solid var(--ivs-line); border-radius:8px; padding:3px 9px;
     background:#fff; color:#7d8a9b; font-size:.64rem; font-weight:780; cursor:pointer; }
 .ivs-rating-clear:hover { border-color:#efb1b1; color:#c13d3d; }
-.ivs-inline-add { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:10px; }
+.ivs-inline-add { display:grid; grid-template-columns:1fr auto; gap:8px; margin-top:8px; }
 .ivs-tag { padding:4px 10px; border-radius:999px; background:#f1f5f8; color:#4c5b6f; font-size:.66rem; font-weight:780; }
 .ivs-tag.is-wait { background:#fdf2e6; color:#a5642a; }
 .ivs-tag.is-score { background:#eef2ff; color:#3b56b8; }
@@ -179,6 +206,24 @@ button, input, textarea, select { font: inherit; }
 .ivs-ai-profile-text p { margin:6px 0 0; font-size:.82rem; line-height:1.75; white-space:pre-wrap; }
 .ivs-ai-profile-text small { display:block; margin-top:7px; color:var(--ivs-muted); font-size:.62rem; }
 .ivs-ai-groups { display:grid; gap:9px; margin-top:13px; }
+/* 학력 위에 놓이는 지원자 기본정보(생년월일·거주지·연락처·이메일) */
+.ivs-ai-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px 13px;
+    padding:12px 14px; border:1px solid #dce7eb; border-radius:12px; background:rgba(255,255,255,.9); }
+.ivs-ai-fact { display:grid; gap:2px; min-width:0; }
+.ivs-ai-fact dt { display:flex; align-items:center; gap:6px; margin:0; color:var(--ivs-muted);
+    font-size:.68rem; font-weight:800; }
+.ivs-ai-fact dt i { width:12px; color:var(--ivs-mint-dark); text-align:center; font-size:.66rem; }
+.ivs-ai-fact dd { margin:0; font-size:.78rem; font-weight:700; line-height:1.5; word-break:break-all; }
+.ivs-ai-fact.is-empty dd { color:#9aa8b6; font-weight:600; }
+/* 면접 집중 모드는 검은 배경이라 색만 바꿔 쓴다. */
+.ivs-ai-facts.is-focus { margin-bottom:12px; padding:14px 17px; border-color:#1f2935; border-radius:13px; background:#121924; }
+.ivs-ai-facts.is-focus .ivs-ai-fact dt { color:#9fb0c0; font-size:.76rem; }
+.ivs-ai-facts.is-focus .ivs-ai-fact dt i { color:#3fd6b0; }
+.ivs-ai-facts.is-focus .ivs-ai-fact dd { color:#dde5ed; font-size:.95rem; }
+.ivs-ai-facts.is-focus .ivs-ai-fact.is-empty dd { color:#5d6b7a; }
+@media (max-width:520px) {
+    .ivs-ai-facts { grid-template-columns:1fr; }
+}
 .ivs-ai-group { padding:13px 14px; border:1px solid #dce7eb; border-radius:12px; background:rgba(255,255,255,.9); }
 .ivs-ai-group h4 { display:flex; align-items:center; gap:7px; margin:0 0 8px; font-size:.75rem; }
 .ivs-ai-group h4 i { color:var(--ivs-mint-dark); }
@@ -327,15 +372,13 @@ body.ivs-focus-open { overflow:hidden; }
 .ivs-focus-files h4 { display:flex; align-items:center; gap:8px; margin:0 0 9px; color:#9fb0c0; font-size:.8rem; font-weight:800; }
 .ivs-focus-files h4 i { color:#3fd6b0; }
 .ivs-focus-files h4 small { margin-left:auto; color:#5d6b7a; font-size:.66rem; font-weight:600; }
-.ivs-focus-file { display:grid; grid-template-columns:26px minmax(0,1fr) 18px; align-items:center; gap:11px;
-    margin-bottom:7px; padding:11px 14px; border:1px solid #22303e; border-radius:12px; background:#131c27;
-    color:#dde5ed; text-decoration:none; transition:.16s ease; }
-.ivs-focus-file:last-child { margin-bottom:0; }
-.ivs-focus-file:hover { border-color:#3fd6b0; background:#16262c; }
-.ivs-focus-file > i:first-child { color:#3fd6b0; font-size:1.05rem; }
-.ivs-focus-file > i:last-child { color:#5d6b7a; font-size:.72rem; }
-.ivs-focus-file strong { display:block; font-size:.85rem; font-weight:750; word-break:break-all; }
-.ivs-focus-file small { color:#7f8f9f; font-size:.68rem; }
+/* 집중 모드도 본문과 같은 칩 배열을 쓰되 검은 배경에 맞춰 색만 바꾼다. */
+.ivs-file-chips.is-focus .ivs-file-chip { border-color:#22303e; background:#131c27; }
+.ivs-file-chips.is-focus .ivs-file-chip:hover { border-color:#3fd6b0; background:#16262c; }
+.ivs-file-chips.is-focus .ivs-file-name { color:#dde5ed; font-size:.85rem; }
+.ivs-file-chips.is-focus .ivs-file-name i { color:#3fd6b0; }
+.ivs-file-chips.is-focus .ivs-file-name small { color:#7f8f9f; }
+.ivs-file-chips.is-focus .ivs-file-name:hover { color:#5fe0bf; }
 .ivs-focus-file-empty { margin:0; color:#5d6b7a; font-size:.8rem; }
 
 /* 집중 모드 - 면접관 평가 */
@@ -393,8 +436,8 @@ body.ivs-focus-open { overflow:hidden; }
     .ivs-ai-profile > img, .ivs-ai-photo-empty { width:92px; height:116px; }
 }
 @media print {
-    .ivs-topbar-actions, .ivs-resume-drop, .ivs-progress, .ivs-file-actions, .ivs-inline-add,
-    .ivs-result-row, .ivs-status-line .ivs-button { display:none !important; }
+    .ivs-topbar-actions, .ivs-resume-drop, .ivs-progress, .ivs-file-chip [data-delete-file], .ivs-inline-add,
+    .ivs-result-row, .ivs-title-actions { display:none !important; }
     .ivs-body { padding:0; background:#fff; }
     .ivs-topbar { position:static; box-shadow:none; }
     .ivs-layout { grid-template-columns:1fr; }
@@ -433,12 +476,12 @@ body.ivs-focus-open { overflow:hidden; }
 .ivs-answer h4 { font-size:.85rem; font-weight:700; }
 .ivs-answer p { font-size:.85rem; }
 
-.ivs-file-row strong { font-size:.85rem; font-weight:600; }
-.ivs-file-row small { font-size:.8rem; }
-.ivs-file-actions a, .ivs-file-actions button { font-size:.8rem; font-weight:600; }
+.ivs-file-chip a, .ivs-file-chip .ivs-file-name { font-size:.85rem; font-weight:600; }
+.ivs-file-chip a small, .ivs-file-chip .ivs-file-name small { font-size:.8rem; font-weight:600; }
 
 .ivs-panelist-head strong { font-size:.9rem; font-weight:700; }
 .ivs-panelist-body textarea, .ivs-inline-add input { font-size:.85rem; }
+.ivs-panelist-note { font-size:.85rem; }
 .ivs-rating-value { font-size:1.05rem; font-weight:700; }
 .ivs-rating-value small { font-size:.8rem; font-weight:600; }
 .ivs-rating-value.is-empty { font-weight:600; }
@@ -449,6 +492,8 @@ body.ivs-focus-open { overflow:hidden; }
 .ivs-ai-profile-text > span { font-size:.75rem; font-weight:700; }
 .ivs-ai-profile-text p { font-size:.85rem; }
 .ivs-ai-profile-text small { font-size:.8rem; }
+.ivs-ai-fact dt { font-size:.8rem; font-weight:700; }
+.ivs-ai-fact dd { font-size:.85rem; font-weight:600; }
 .ivs-ai-group h4 { font-size:.85rem; font-weight:700; }
 .ivs-ai-group li { font-size:.85rem; }
 .ivs-ai-group p { font-size:.85rem; }

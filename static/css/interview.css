@@ -41,62 +41,37 @@
 .iv-ai-brand-logo { height:34px; width:auto; }
 .iv-ai-brand .iv-ai-brand-preset { margin:0; color:var(--iv-muted); font-size:.68rem; white-space:nowrap; }
 
-/* ------------------------------------------------------------ 상단 요약판 */
-/* 진행상태·합격·총평점을 한 줄로 보여주고, 오른쪽에 등록 버튼을 둔다. */
-.iv-summary { display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,238px); align-items:stretch; gap:12px;
-    margin:0 0 14px; padding:13px 15px; border:1px solid var(--iv-line); border-radius:12px;
-    background:var(--iv-surface); box-shadow:var(--card-shadow, 0 6px 20px rgba(15,23,42,.05)); }
-.iv-summary-stats { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:9px; }
-.iv-summary-item { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:7px;
-    min-height:70px; border:1px solid var(--iv-line); border-radius:10px; padding:11px 13px;
-    background:var(--iv-widget); color:var(--iv-ink); text-align:left; font:inherit; cursor:default; transition:.16s ease; }
-.iv-summary-item.is-score { cursor:default; }
-button.iv-summary-item { cursor:pointer; }
-button.iv-summary-item:hover { border-color:var(--iv-primary); background:var(--iv-widget-hover); }
-button.iv-summary-item.is-active { border-color:var(--iv-primary); background:var(--iv-primary); }
-button.iv-summary-item.is-active .iv-summary-label,
-button.iv-summary-item.is-active .iv-summary-value strong,
-button.iv-summary-item.is-active .iv-summary-value small { color:#fff; }
-.iv-summary-label { display:inline-flex; align-items:center; gap:6px; color:var(--iv-muted); font-size:.72rem; font-weight:800; white-space:nowrap; }
-.iv-summary-label::before { content:""; width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:#c6d0da; }
-.iv-summary-item.is-scheduled .iv-summary-label::before { background:#7d68d6; }
-.iv-summary-item.is-ongoing .iv-summary-label::before { background:#e08a1e; }
-.iv-summary-item.is-completed .iv-summary-label::before { background:#3d86d8; }
-.iv-summary-item.is-pass .iv-summary-label::before { background:#1f9b62; }
-.iv-summary-item.is-score .iv-summary-label::before { background:#f0ad32; }
-.iv-summary-value { display:flex; align-items:baseline; gap:4px; }
-.iv-summary-value strong { color:var(--iv-ink); font-size:1.42rem; font-weight:850; line-height:1;
-    letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
-.iv-summary-value strong.is-empty { color:#a9b4c2; }
-.iv-summary-value small { color:var(--iv-muted); font-size:.7rem; font-weight:700; }
-.iv-summary-cta { display:grid; grid-template-columns:42px 1fr 14px; align-items:center; gap:11px;
-    border:0; border-radius:10px; padding:12px 14px; text-align:left; cursor:pointer; color:#fff;
-    background:linear-gradient(122deg,var(--iv-mint) 0%,#2f95c9 55%,#4d79e7 100%);
-    box-shadow:0 10px 22px rgba(19,131,109,.24); transition:.17s ease; }
-.iv-summary-cta:hover { transform:translateY(-1px); box-shadow:0 14px 28px rgba(19,131,109,.3); }
-.iv-summary-cta:active { transform:translateY(0); }
-.iv-summary-cta-icon { width:42px; height:42px; display:grid; place-items:center; border-radius:13px;
-    background:rgba(255,255,255,.22); font-size:1rem; }
-.iv-summary-cta-copy strong { display:block; font-size:.92rem; font-weight:850; letter-spacing:-.02em; }
-.iv-summary-cta-copy small { display:block; margin-top:3px; font-size:.66rem; opacity:.9; }
-.iv-summary-cta > i:last-child { color:rgba(255,255,255,.82); font-size:.72rem; }
-
 /* ---------------------------------------------------------------- 레이아웃 */
 .iv-workspace { display:block; }
 .iv-card { border:1px solid var(--iv-line); border-radius:12px; background:var(--iv-surface); box-shadow:var(--card-shadow, 0 6px 20px rgba(15,23,42,.05)); }
 .iv-list-card { padding:16px 22px 22px; }
 /* ---------------------------------------------------------------- 검색·필터 */
-.iv-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
-.iv-search { position:relative; flex:1 1 260px; max-width:360px; }
+.iv-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+.iv-search { position:relative; flex:0 1 280px; }
 .iv-search i { position:absolute; top:50%; left:13px; transform:translateY(-50%); color:var(--iv-muted); font-size:.72rem; }
 .iv-search input { width:100%; min-height:36px; padding:6px 10px 6px 34px; border:1px solid var(--iv-line); border-radius:4px;
     background:var(--input-bg, #fff); color:var(--iv-ink); font-size:.8rem; outline:0; }
 .iv-search input:focus { border-color:var(--iv-primary); box-shadow:0 0 0 2px rgba(74,144,226,.12); }
-.iv-filter-chips { display:flex; flex-wrap:wrap; gap:5px; }
+.iv-filter-chips { display:flex; flex-wrap:wrap; align-items:center; gap:5px; flex:1 1 auto; }
 .iv-filter-chips button { min-height:34px; border:1px solid var(--iv-line); border-radius:5px; padding:6px 12px;
-    background:var(--iv-widget); color:var(--iv-muted); font-size:.74rem; font-weight:700; cursor:pointer; transition:.16s ease; }
+    background:var(--iv-widget); color:var(--iv-muted); font-size:.74rem; font-weight:700; cursor:pointer; transition:.16s ease;
+    white-space:nowrap; }
+.iv-filter-chips button b { margin:0 1px 0 3px; color:var(--iv-ink); font-size:.82rem; font-weight:850;
+    font-variant-numeric:tabular-nums; }
 .iv-filter-chips button:hover { border-color:var(--iv-primary); color:var(--iv-primary-dark); }
+.iv-filter-chips button:hover b { color:var(--iv-primary-dark); }
 .iv-filter-chips button.is-active { border-color:var(--iv-primary); background:var(--iv-primary); color:#fff; }
+.iv-filter-chips button.is-active b { color:#fff; }
+
+/* 면접자 입력 버튼은 툴바 오른쪽 끝에 붙인다. */
+.iv-toolbar-cta { display:inline-flex; align-items:center; gap:7px; margin-left:auto; flex:0 0 auto;
+    min-height:34px; border:0; border-radius:6px; padding:6px 14px; color:#fff; font-size:.76rem; font-weight:800;
+    white-space:nowrap; cursor:pointer; transition:.16s ease;
+    background:linear-gradient(122deg,var(--iv-mint) 0%,#2f95c9 55%,#4d79e7 100%);
+    box-shadow:0 6px 14px rgba(19,131,109,.22); }
+.iv-toolbar-cta:hover { transform:translateY(-1px); box-shadow:0 9px 18px rgba(19,131,109,.28); }
+.iv-toolbar-cta:active { transform:translateY(0); }
+.iv-toolbar-cta i { font-size:.78rem; }
 
 /* ---------------------------------------------------------------- 면접자 표 */
 .iv-table-wrap { width:100%; margin-top:11px; overflow-x:auto; border:1px solid var(--iv-line);
@@ -121,8 +96,6 @@ button.iv-summary-item.is-active .iv-summary-value small { color:#fff; }
 .iv-row { transition:box-shadow .16s ease, transform .16s ease; }
 .iv-row:hover { position:relative; z-index:1; box-shadow:inset 3px 0 0 var(--iv-mint), 0 5px 18px rgba(21,34,56,.06); }
 .iv-row:hover td { background:#f7fcfa; }
-.iv-row.is-completed td { background:#fbfffd; }
-.iv-row.is-completed:hover td { background:#f4fcf9; }
 .iv-table th:first-child, .iv-cell-number { text-align:center; }
 .iv-th-select, .iv-cell-select { text-align:center; }
 .iv-select-box { width:16px; height:16px; margin:0; accent-color:var(--iv-primary, #4a90e2); cursor:pointer; vertical-align:middle; }
@@ -144,7 +117,8 @@ button.iv-summary-item.is-active .iv-summary-value small { color:#fff; }
 .iv-cell-when small { display:block; margin-top:2px; color:var(--iv-muted); font-size:.65rem; font-weight:650; }
 .iv-cell-stack { display:grid; align-content:center; gap:7px; }
 .iv-status-line { display:flex; flex-wrap:wrap; gap:4px; }
-.iv-progress-note { display:flex; align-items:center; gap:5px; color:var(--iv-muted); font-size:.62rem; font-weight:700; white-space:nowrap; }
+.iv-progress-note { display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--iv-muted); font-size:.62rem; font-weight:700; white-space:nowrap; }
+.iv-progress-note-main { display:flex; align-items:center; gap:5px; }
 .iv-progress-note i { width:12px; color:#a66b32; text-align:center; font-size:.6rem; }
 .iv-progress-note.is-done { color:var(--iv-mint-dark); }
 .iv-progress-note.is-done i { color:var(--iv-mint); }
@@ -172,13 +146,13 @@ button.iv-summary-item.is-active .iv-summary-value small { color:#fff; }
 .iv-cell-score small { display:block; margin-top:4px; color:var(--iv-muted); font-size:.61rem; font-weight:700; }
 .iv-dash { color:#a9b4c2; }
 .iv-empty-cell { padding:46px 18px !important; color:var(--iv-muted); font-size:.74rem; line-height:1.7; }
-.iv-tag { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; background:#f1f5f8; color:#4c5b6f; font-size:.61rem; font-weight:800; white-space:nowrap; }
+.iv-tag { display:inline-flex; align-items:center; padding:4px 8px; background:transparent; color:#4c5b6f; font-size:.61rem; font-weight:800; white-space:nowrap; }
 .iv-tag.is-done { background:var(--iv-mint-soft); color:var(--iv-mint-dark); }
 .iv-tag.is-wait { background:#fdf2e6; color:#a5642a; }
 .iv-tag.is-score { background:#eef2ff; color:#3b56b8; }
-.iv-tag.is-complete { background:#e6f4ff; color:#1d5fa8; }
-.iv-tag.is-progress { background:#f3f0ff; color:#5b46b8; }
-.iv-tag.is-ongoing { background:#fff1e0; color:#b45c09; }
+.iv-tag.is-complete { color:#1d5fa8; }
+.iv-tag.is-progress { color:#5b46b8; }
+.iv-tag.is-ongoing { color:#b45c09; }
 .iv-tag.is-pass { background:#e4f7ec; color:#1b7a45; }
 .iv-tag.is-fail { background:#fdeaea; color:#b23434; }
 .iv-tag.is-hold { background:#f4f1e4; color:#8a6d1f; }
@@ -284,7 +258,8 @@ body.iv-modal-open { overflow:hidden; }
     .iv-hero-icon { width:48px; height:48px; flex-basis:48px; }
     .iv-ai-brand { padding:10px 0 0; }
     .iv-list-card { padding:18px; }
-    .iv-search { max-width:none; }
+    .iv-search { flex:1 1 100%; }
+    .iv-toolbar-cta { margin-left:0; flex:1 1 100%; justify-content:center; }
     .iv-form-grid { grid-template-columns:1fr; }
     .iv-form-grid .full { grid-column:auto; }
 }
@@ -335,7 +310,7 @@ body.iv-modal-open { overflow:hidden; }
         font-weight:700; text-align:center; border-bottom:1px solid rgba(0,0,0,.06); }
     .iv-table td { height:66px; padding:10px 12px; background:var(--iv-surface); color:var(--iv-ink); font-size:.8rem;
         text-align:center; border-bottom:1px solid rgba(0,0,0,.06); }
-    .iv-row:hover td, .iv-row.is-completed:hover td { background:var(--iv-widget-hover); }
+    .iv-row:hover td { background:var(--iv-widget-hover); }
     .iv-cell-candidate, .iv-cell-school { text-align:left !important; }
 }
 
@@ -353,10 +328,21 @@ body.iv-modal-open { overflow:hidden; }
 .iv-status-line { justify-content:center; }
 .iv-progress-note { font-size:.8rem; font-weight:600; }
 .iv-progress-note i { font-size:.7rem; }
-.iv-progress-note small { font-size:.8rem; font-weight:500; }
+.iv-progress-note small { font-size:.72rem; font-weight:500; }
 .iv-material-count { font-size:.72rem; font-weight:700; }
 .iv-material-ai, .iv-material-ai.is-pending, .iv-material-empty { font-size:.69rem; font-weight:500; }
-.iv-tag { padding:3px 7px; border-radius:4px; font-size:.8rem; font-weight:700; }
+.iv-tag { padding:3px 7px; font-size:.8rem; font-weight:700; }
+/* 면접예정은 LED가 켜졌다 꺼지듯 앞쪽 점이 깜빡인다. */
+.iv-tag.is-progress { position:relative; padding-left:19px; }
+.iv-tag.is-progress::before { content:""; position:absolute; left:8px; top:50%; width:6px; height:6px; margin-top:-3px;
+    border-radius:50%; background:#7d68d6; animation:iv-led-blink 1.5s ease-in-out infinite; }
+@keyframes iv-led-blink {
+    0%, 100% { opacity:.25; box-shadow:0 0 0 0 rgba(125,104,214,0); }
+    50% { opacity:1; box-shadow:0 0 7px 2px rgba(125,104,214,.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .iv-tag.is-progress::before { animation:none; opacity:1; }
+}
 
 .iv-score-line { justify-content:center; gap:9px; }
 .iv-score-value { color:var(--iv-primary-dark); font-size:1.32rem; line-height:1; font-weight:800; font-variant-numeric:tabular-nums; }
@@ -381,18 +367,7 @@ body.iv-modal-open { overflow:hidden; }
 .iv-cell-actions button.primary { border-color:var(--iv-primary); background:var(--iv-primary); }
 .iv-cell-actions button.primary:hover { border-color:var(--iv-primary); background:var(--iv-primary); }
 
-@media (max-width:1100px) {
-    .iv-summary { grid-template-columns:1fr; }
-    .iv-summary-cta { grid-template-columns:42px 1fr 14px; }
-}
-
-@media (max-width:820px) {
-    .iv-summary-stats { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .iv-summary-item.is-score { grid-column:1/-1; }
-}
-
 @media (max-width:760px) {
-    .iv-summary { padding:12px; }
     .iv-bulk-bar { justify-content:space-between; }
     .iv-bulk-actions { flex:1 1 100%; }
     .iv-bulk-actions .iv-button { flex:1 1 0; }

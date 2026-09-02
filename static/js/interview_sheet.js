@@ -26,7 +26,7 @@
     }
 
 
-    // 면접일시는 '2026-09-03 (오후02:30)' 형태로 보여준다. 다른 일시(완료 처리 등)는
+    // 면접일시는 '09-03 (오후02:30)' 형태로 보여준다. 다른 일시(완료 처리 등)는
     // 기존 24시간 표기를 그대로 쓰므로 이 함수는 면접일시에만 사용한다.
     function interviewWhen(value) {
         const raw = String(value || '').trim();
@@ -38,7 +38,7 @@
         const meridiem = hours < 12 ? '오전' : '오후';
         const hour12 = hours % 12 === 0 ? 12 : hours % 12;
         return {
-            day: `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
+            day: `${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`,
             time: `(${meridiem}${pad(hour12)}:${pad(parsed.getMinutes())})`,
         };
     }
@@ -58,6 +58,26 @@
     // 평균은 0.5 단위로 반올림하지 않고 계산된 값을 그대로 보여준다.
     const averageStars = (score) => (Number(score) / 20).toFixed(1);
     const starLabel = (stars) => (stars === null ? '평가 대기' : `★ ${stars.toFixed(1)} / 5.0`);
+
+    // 이미 입력된 평가는 글로 보여주고 [수정]을 눌러야 입력창이 열린다.
+    function panelistBody(id, comment) {
+        const saved = String(comment || '').trim();
+        if (saved) {
+            return `<div class="ivs-panelist-body is-view">
+                <p class="ivs-panelist-note">${escapeHtml(saved)}</p>
+                <button class="ivs-button" data-edit-panelist="${id}">수정</button>
+            </div>`;
+        }
+        return `<div class="ivs-panelist-body">
+            <textarea rows="2" placeholder="평가 내용" data-comment="${id}">${escapeHtml(saved)}</textarea>
+            <button class="ivs-button ivs-button-primary" data-save-panelist="${id}">저장</button>
+        </div>`;
+    }
+
+    function panelistEditBody(id, comment) {
+        return `<textarea rows="2" placeholder="평가 내용" data-comment="${id}">${escapeHtml(comment)}</textarea>
+            <button class="ivs-button ivs-button-primary" data-save-panelist="${id}">저장</button>`;
+    }
 
     function starsMarkup(id, stars) {
         const value = stars === null ? 0 : stars;
@@ -185,13 +205,13 @@
             : '<p class="ivs-hint">아직 사전질문지가 제출되지 않았습니다. 위 <b>사전질문지 열기</b> 버튼으로 면접자에게 작성하도록 안내해주세요.</p>';
 
         const filesHtml = item.attachments.length
-            ? item.attachments.map((file) => `<div class="ivs-file-row">
-                <i class="fa-regular fa-file-lines"></i>
-                <div><strong>${escapeHtml(file.filename)}</strong><small>${fileSize(file.file_size)}</small></div>
-                <div class="ivs-file-actions">
-                    <a href="${file.download_url}">받기</a>
-                    ${item.can_manage ? `<button data-delete-file="${file.id}">삭제</button>` : ''}
-                </div></div>`).join('')
+            ? `<div class="ivs-file-chips">${item.attachments.map((file) => `<span class="ivs-file-chip">
+                <a href="${file.download_url}" title="${escapeHtml(file.filename)} 내려받기">
+                    <i class="fa-regular fa-file-lines"></i>${escapeHtml(file.filename)}
+                    <small>${fileSize(file.file_size)}</small>
+                </a>${item.can_manage ? `<button data-delete-file="${file.id}" title="${escapeHtml(file.filename)} 삭제"
+                    aria-label="${escapeHtml(file.filename)} 삭제"><i class="fa-solid fa-xmark"></i></button>` : ''}
+            </span>`).join('')}</div>`
             : '<p class="ivs-hint">등록된 첨부파일이 없습니다. 오른쪽 AI 이력서 요약에서 이력서를 올려주세요.</p>';
 
         const panelistHtml = item.panelists.map((panelist) => {
@@ -199,14 +219,10 @@
             return `<div class="ivs-panelist">
             <div class="ivs-panelist-head">
                 <strong>${escapeHtml(panelist.name)}</strong>
-                <span class="ivs-tag ${stars === null ? 'is-wait' : 'is-score'}">${starLabel(stars)}</span>
+                ${starsMarkup(panelist.id, stars)}
                 ${item.can_manage ? `<button class="ivs-button ivs-button-danger" data-delete-panelist="${panelist.id}">삭제</button>` : ''}
             </div>
-            ${starsMarkup(panelist.id, stars)}
-            <div class="ivs-panelist-body">
-                <textarea rows="2" placeholder="평가 내용" data-comment="${panelist.id}">${escapeHtml(panelist.comment || '')}</textarea>
-                <button class="ivs-button ivs-button-primary" data-save-panelist="${panelist.id}">저장</button>
-            </div>
+            ${panelistBody(panelist.id, panelist.comment || '')}
         </div>`;
         }).join('');
 
@@ -220,34 +236,59 @@
             scheduled: '면접예정', ongoing: '면접진행중', completed: '면접완료',
         }[progressState];
 
+        // 합격 여부는 목록 화면과 같은 아이콘을 쓴다(합격 하트 · 불합격 깨진 하트 · 보류 모래시계).
+        const resultIcon = { pass: 'fa-heart', fail: 'fa-heart-crack', hold: 'fa-hourglass-half' }[item.result];
+
         const resultButtons = ['pass', 'fail', 'hold'].map((key) => {
             const label = { pass: '합격', fail: '불합격', hold: '보류' }[key];
             const active = item.result === key ? ' is-active' : '';
             return `<button class="ivs-result-button is-${key}${active}" data-result="${key}">${label}</button>`;
         }).join('');
 
+        // 면접진행·되돌리기 버튼은 맨 위 제목 오른쪽에 붙인다.
+        byId('sheetTitleActions').innerHTML = `
+            <button class="ivs-button ivs-button-focus" id="startFocus"><i class="fa-solid fa-expand"></i> 면접진행</button>
+            ${item.can_manage ? (item.is_completed
+                ? '<button class="ivs-button" id="reopenInterview">면접 진행중으로 되돌리기</button>'
+                : '<button class="ivs-button ivs-button-primary" id="completeInterview"><i class="fa-solid fa-circle-check"></i> 면접진행완료</button>') : ''}`;
+
         byId('sheetMain').innerHTML = `
             <section class="ivs-card">
                 <header class="ivs-card-head">
-                    <div><span class="ivs-step">01</span><h2>면접 진행상태</h2><p>면접 완료 처리와 합격 여부를 저장합니다.</p></div>
+                    <div><span class="ivs-step">01</span><h2>면접 진행상태</h2></div>
                 </header>
-                <div class="ivs-status-line">
-                    <span class="ivs-status-badge ${progressClass}">${escapeHtml(progressText)}</span>
-                    <span class="ivs-status-score">평균 ${item.average_score === null ? '-' : `★ ${averageStars(item.average_score)} / 5.0`}
-                        <small>면접관 ${item.evaluated_count}/${item.panelist_count}명 입력</small></span>
-                    ${item.result_label ? `<span class="ivs-status-result is-${item.result}">${escapeHtml(item.result_label)}</span>` : ''}
-                    <button class="ivs-button ivs-button-focus" id="startFocus"><i class="fa-solid fa-expand"></i> 면접진행</button>
-                    ${item.can_manage ? (item.is_completed
-                        ? '<button class="ivs-button" id="reopenInterview">면접 진행중으로 되돌리기</button>'
-                        : '<button class="ivs-button ivs-button-primary" id="completeInterview"><i class="fa-solid fa-circle-check"></i> 면접진행완료</button>') : ''}
+                <div class="ivs-status-grid">
+                    <div class="ivs-status-cell">
+                        <span class="ivs-status-key">진행 현황</span>
+                        <span class="ivs-status-badge ${progressClass}">${escapeHtml(progressText)}</span>
+                    </div>
+                    <div class="ivs-status-cell">
+                        <span class="ivs-status-key">최종 결과</span>
+                        ${item.result_label
+                            ? `<span class="ivs-status-result is-${item.result}"><i class="fa-solid ${resultIcon || 'fa-hourglass-half'}" aria-hidden="true"></i>${escapeHtml(item.result_label)}</span>`
+                            : '<span class="ivs-status-result is-none">미정</span>'}
+                    </div>
+                    <div class="ivs-status-cell">
+                        <span class="ivs-status-key">면접관 평균</span>
+                        <span class="ivs-status-score${item.average_score === null ? ' is-empty' : ''}">${
+                            item.average_score === null ? '평가 전' : `★ ${averageStars(item.average_score)} <small>/ 5.0</small>`}</span>
+                        <span class="ivs-status-sub">${item.evaluated_count}/${item.panelist_count}명 입력</span>
+                    </div>
+                    <div class="ivs-status-cell">
+                        <span class="ivs-status-key">완료 처리</span>
+                        <span class="ivs-status-sub is-strong">${item.completed_at
+                            ? `${escapeHtml(formatDateTime(item.completed_at))}${
+                                item.completed_by_label ? `<br>${escapeHtml(item.completed_by_label)}` : ''}`
+                            : '아직 완료 전'}</span>
+                    </div>
                 </div>
-                ${item.can_manage && item.is_completed ? `<div class="ivs-result-row"><span>합격 여부</span>${resultButtons}</div>` : ''}
-                ${item.completed_at ? `<p class="ivs-hint">완료 처리 ${escapeHtml(formatDateTime(item.completed_at))}</p>` : ''}
+                ${item.can_manage && item.is_completed && !item.result
+                    ? `<div class="ivs-result-row"><span>합격 여부</span>${resultButtons}</div>` : ''}
             </section>
 
             <section class="ivs-card">
                 <header class="ivs-card-head">
-                    <div><span class="ivs-step">02</span><h2>면접자 정보</h2><p>면접 전 준비 내용과 사전질문지 링크입니다.</p></div>
+                    <div><span class="ivs-step">02</span><h2>면접자 정보</h2></div>
                 </header>
                 <div class="ivs-info-grid">
                     <div><dt>이름</dt><dd>${escapeHtml(item.name)}</dd></div>
@@ -255,10 +296,6 @@
                     <div><dt>대상학교</dt><dd>${escapeHtml(item.target_school || '-')}</dd></div>
                     <div><dt>면접일시</dt><dd>${escapeHtml(interviewWhenText(item.interview_at))}</dd></div>
                     <div class="full"><dt>면접 준비 메모</dt><dd class="pre">${escapeHtml(item.memo || '-')}</dd></div>
-                    <div class="full"><dt>사전질문지 링크</dt><dd class="ivs-link-actions">
-                        <button class="ivs-button" id="openQuestion"><i class="fa-solid fa-up-right-from-square"></i> 사전질문지 열기</button>
-                        <button class="ivs-button" id="copyQuestion"><i class="fa-regular fa-copy"></i> 링크 복사</button>
-                    </dd></div>
                 </div>
             </section>
 
@@ -296,6 +333,48 @@
     }
 
     // ------------------------------------------------------------ 오른쪽 AI 요약
+
+    // 생년월일에서 만 나이를 구한다(연·월·일이 모두 있을 때만).
+    function ageFromBirth(value) {
+        const digits = String(value || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+        if (!digits) return null;
+        const [year, month, day] = digits.slice(1).map(Number);
+        if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+        const today = new Date();
+        let age = today.getFullYear() - year;
+        if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age -= 1;
+        return age >= 0 && age < 130 ? age : null;
+    }
+
+    function birthText(value) {
+        const text = String(value || '').trim();
+        if (!text) return '';
+        const age = ageFromBirth(text);
+        if (age !== null) return `${text} (만 ${age}세)`;
+        // 태어난 해만 확인된 이력서도 나이를 계산해서 보여준다.
+        const year = text.match(/(?:19|20)\d{2}/);
+        if (year) {
+            const rough = new Date().getFullYear() - Number(year[0]);
+            if (rough >= 0 && rough < 130) return `${year[0]}년생 (만 ${rough}세)`;
+        }
+        return text;
+    }
+
+    // 학력 위에 지원자 기본정보를 한 줄로 정리한다.
+    function profileFacts(profile, variant = '') {
+        const data = profile && typeof profile === 'object' ? profile : {};
+        const facts = [
+            ['생년월일', birthText(data.birth_date), 'fa-cake-candles'],
+            ['거주지', String(data.address || '').trim(), 'fa-location-dot'],
+            ['연락처', String(data.phone || '').trim(), 'fa-phone'],
+            ['이메일', String(data.email || '').trim(), 'fa-envelope'],
+        ];
+        return `<div class="ivs-ai-facts${variant ? ` ${variant}` : ''}">${facts.map(([label, value, icon]) => `
+            <div class="ivs-ai-fact${value ? '' : ' is-empty'}">
+                <dt><i class="fa-solid ${icon}"></i>${label}</dt>
+                <dd>${value ? escapeHtml(value) : '확인 안 됨'}</dd>
+            </div>`).join('')}</div>`;
+    }
 
     function analysisGroup(title, values, icon) {
         const rows = Array.isArray(values) ? values : [];
@@ -356,6 +435,7 @@
                 </div>
             </div>
             <div class="ivs-ai-groups">
+                ${profileFacts(analysis.profile)}
                 ${analysisGroup('학력', analysis.education, 'fa-graduation-cap')}
                 ${analysisGroup('자격', analysis.qualifications, 'fa-certificate')}
                 ${analysisGroup('경력', analysis.career, 'fa-briefcase')}
@@ -407,17 +487,24 @@
                         <p>${escapeHtml(analysis.summary || '요약된 내용이 없습니다.')}</p>
                     </div>
                 </div>
+                ${profileFacts(analysis.profile, 'is-focus')}
                 ${focusGroup('학력', analysis.education, 'fa-graduation-cap')}
                 ${focusGroup('자격', analysis.qualifications, 'fa-certificate')}
                 ${focusGroup('경력', analysis.career, 'fa-briefcase')}`;
         }
 
-        // 첨부 이력서는 새 탭에서 바로 열어 원문을 확인한다.
+        // 첨부 이력서는 별도 창으로 띄워 원문을 확인한다.
+        // 진행표가 팝업 창이라 <a target="_blank">를 쓰면 새 창이 아니라 이 창을 덮어써서
+        // 면접진행 화면이 통째로 사라진다. 스스로 이동할 수 없는 <button>으로 두고
+        // 창 열기는 아래 handleFocusClick에서만 처리한다.
         const filesHtml = item.attachments.length
-            ? item.attachments.map((file) => `<a class="ivs-focus-file" href="${file.download_url}?inline=1" target="_blank" rel="noopener">
-                <i class="fa-regular fa-file-lines"></i>
-                <span><strong>${escapeHtml(file.filename)}</strong><small>${fileSize(file.file_size)}</small></span>
-                <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`).join('')
+            ? `<div class="ivs-file-chips is-focus">${item.attachments.map((file) => `<span class="ivs-file-chip">
+                <button type="button" class="ivs-file-name" data-open-file="${file.download_url}?inline=1"
+                    title="${escapeHtml(file.filename)} 새 창으로 열기">
+                    <i class="fa-regular fa-file-lines"></i>${escapeHtml(file.filename)}
+                    <small>${fileSize(file.file_size)}</small>
+                </button>
+            </span>`).join('')}</div>`
             : '<p class="ivs-focus-file-empty">첨부된 이력서가 없습니다.</p>';
 
         const panelistHtml = item.panelists.length
@@ -450,7 +537,7 @@
                 <div class="ivs-focus-scroll">
                     ${aiHtml}
                     <div class="ivs-focus-files">
-                        <h4><i class="fa-regular fa-folder-open"></i> 첨부된 이력서 <small>눌러서 새 탭으로 열기</small></h4>
+                        <h4><i class="fa-regular fa-folder-open"></i> 첨부된 이력서 <small>눌러서 새 창으로 열기</small></h4>
                         ${filesHtml}
                     </div>
                 </div>
@@ -472,6 +559,16 @@
     }
 
     async function handleFocusClick(event) {
+        // 첨부 이력서는 이름 붙인 별도 창으로 띄운다. 이 창(면접진행)은 그대로 남는다.
+        const fileButton = event.target.closest('[data-open-file]');
+        if (fileButton) {
+            event.preventDefault();
+            const viewer = window.open(fileButton.dataset.openFile, 'ivsResumeView',
+                'width=1000,height=900,resizable=yes,scrollbars=yes');
+            if (viewer) viewer.focus();
+            else setFocusFeedback('브라우저가 새 창을 막았습니다. 팝업 차단을 풀어주세요.', 'error');
+            return;
+        }
         const button = event.target.closest('[data-save-panelist]');
         if (!button || button.disabled) return;
         const id = button.dataset.savePanelist;
@@ -730,18 +827,12 @@
                 openFocus();
                 return;
             }
-            if (button.id === 'openQuestion') {
-                window.open(state.candidate.questionnaire_url, '_blank', 'noopener,width=880,height=960');
-                return;
-            }
-            if (button.id === 'copyQuestion') {
-                const url = new URL(state.candidate.questionnaire_url, window.location.origin).href;
-                try {
-                    await navigator.clipboard.writeText(url);
-                    setFeedback('사전질문지 링크를 복사했습니다.', 'success');
-                } catch (error) {
-                    window.prompt('아래 링크를 복사해 면접자에게 전달해주세요.', url);
-                }
+            if (button.dataset.editPanelist) {
+                const body = button.closest('.ivs-panelist-body');
+                const note = body.querySelector('.ivs-panelist-note');
+                body.classList.remove('is-view');
+                body.innerHTML = panelistEditBody(button.dataset.editPanelist, note ? note.textContent : '');
+                body.querySelector('textarea').focus();
                 return;
             }
 
@@ -806,6 +897,8 @@
     // ------------------------------------------------------------ 시작
 
     byId('sheetMain').addEventListener('click', handleMainClick);
+    // 제목 옆으로 옮긴 면접진행·되돌리기 버튼도 같은 처리를 탄다.
+    byId('sheetTitleActions').addEventListener('click', handleMainClick);
     byId('analyzeResume').addEventListener('click', () => runResumeAnalysis());
     byId('uploadResume').addEventListener('click', uploadResume);
     byId('reloadSheet').addEventListener('click', async () => {
@@ -841,6 +934,8 @@
                 await runResumeAnalysis();
             }
         } catch (error) {
+            // 불러오기에 실패하면 제목 옆 버튼도 함께 지워 옛 상태로 누르지 못하게 한다.
+            byId('sheetTitleActions').innerHTML = '';
             byId('sheetMain').innerHTML = `<section class="ivs-card"><div class="ivs-ai-empty is-error">
                 <i class="fa-solid fa-triangle-exclamation"></i>
                 <div><strong>면접 정보를 불러오지 못했습니다.</strong><p>${escapeHtml(error.message)}</p></div></div></section>`;

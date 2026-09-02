@@ -166,34 +166,19 @@
         node.classList.toggle('is-success', type === 'success');
     }
 
-    // ------------------------------------------------------------ 상단 요약판
+    // ------------------------------------------------------------ 필터칩 집계
 
+    // 진행상태별 인원을 검색창 오른쪽 필터칩에 그대로 얹어준다.
     function renderSummary() {
         const rows = state.candidates;
-        const total = rows.length;
         const counts = { scheduled: 0, ongoing: 0, completed: 0 };
         rows.forEach((item) => { counts[progressState(item)] += 1; });
-        const passed = rows.filter((item) => item.result === 'pass').length;
-        // 총평점은 평가가 입력된 면접자의 별점(점수÷20) 평균이다.
-        const scores = rows.filter((item) => item.average_score !== null)
-            .map((item) => Number(item.average_score) / 20);
-        const average = scores.length
-            ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0;
 
-        byId('sumScheduled').textContent = counts.scheduled;
-        byId('sumOngoing').textContent = counts.ongoing;
-        byId('sumCompleted').textContent = counts.completed;
-        byId('sumPassed').textContent = passed;
-        byId('sumTotal').textContent = `/ ${total}명`;
-        byId('sumAverage').textContent = average.toFixed(1);
-        byId('sumAverage').classList.toggle('is-empty', !scores.length);
-        syncSummaryActive();
-    }
-
-    function syncSummaryActive() {
-        Array.from(document.querySelectorAll('[data-summary-filter]')).forEach((node) => {
-            node.classList.toggle('is-active', node.dataset.summaryFilter === state.filter);
-        });
+        byId('cntAll').textContent = rows.length;
+        byId('cntScheduled').textContent = counts.scheduled;
+        byId('cntOngoing').textContent = counts.ongoing;
+        byId('cntCompleted').textContent = counts.completed;
+        byId('cntPass').textContent = rows.filter((item) => item.result === 'pass').length;
     }
 
     // ------------------------------------------------------------ 목록
@@ -244,8 +229,9 @@
         if (!item.has_answers) {
             note = '<span class="iv-progress-note is-wait"><i class="fa-regular fa-clipboard"></i> 미작성</span>';
         } else {
+            // 타수는 '작성완료' 글씨 아래 줄에 따로 붙인다.
             const typing = item.typing_cpm ? `<small>(${item.typing_cpm}타/분)</small>` : '';
-            note = `<span class="iv-progress-note is-done"><i class="fa-solid fa-check"></i> 작성완료 ${typing}</span>`;
+            note = `<span class="iv-progress-note is-done"><span class="iv-progress-note-main"><i class="fa-solid fa-check"></i> 작성완료</span>${typing}</span>`;
         }
         return `<button type="button" class="iv-questionnaire-open" data-open-question="${item.id}"
             title="사전질문지 열기" aria-label="${escapeHtml(item.name)} 사전질문지 열기">${note}</button>`;
@@ -539,21 +525,12 @@
         Array.from(byId('filterChips').children).forEach((node) => {
             node.classList.toggle('is-active', node.dataset.filter === value);
         });
-        syncSummaryActive();
         renderList();
     }
 
     byId('filterChips').addEventListener('click', (event) => {
         const button = event.target.closest('button[data-filter]');
         if (button) applyFilter(button.dataset.filter);
-    });
-
-    // 요약판을 눌러도 같은 필터가 걸리고, 한 번 더 누르면 전체로 돌아온다.
-    byId('summaryStats').addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-summary-filter]');
-        if (!button) return;
-        const value = button.dataset.summaryFilter;
-        applyFilter(state.filter === value ? 'all' : value);
     });
 
     byId('openCreate').addEventListener('click', () => openCandidateModal());
