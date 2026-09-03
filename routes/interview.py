@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import functools
 import hmac
 import json
@@ -33,6 +34,7 @@ from .secure_files import (
     read_decrypted,
 )
 from .storage import INTERVIEW_UPLOADS
+from services import interview_guide as guide
 from services.interview_resume import (
     analyze_with_claude,
     analyze_with_openai,
@@ -200,6 +202,53 @@ def ensure_interview_schema(conn=None):
             );
             CREATE INDEX IF NOT EXISTS idx_interview_panelists_candidate
             ON interview_panelists(candidate_id, sort_order, id);
+
+            -- 합격자 안내전송(출근 안내 · 준비서류) 내용과 마지막 발송 결과.
+            CREATE TABLE IF NOT EXISTS interview_guide_notices (
+                candidate_id INTEGER PRIMARY KEY,
+                to_email TEXT NOT NULL DEFAULT '',
+                start_date TEXT NOT NULL DEFAULT '',
+                start_time TEXT NOT NULL DEFAULT '',
+                start_place TEXT NOT NULL DEFAULT '',
+                contact TEXT NOT NULL DEFAULT '',
+                kind TEXT NOT NULL DEFAULT 'pass',
+                documents_json TEXT NOT NULL DEFAULT '[]',
+                extra_notes TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT '',
+                send_count INTEGER NOT NULL DEFAULT 0,
+                sent_at DATETIME,
+                sent_by TEXT NOT NULL DEFAULT '',
+                sent_by_name TEXT NOT NULL DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- 안내메일 발송 이력. 밖으로 나가는 메일이므로 누가 언제 보냈는지 남긴다.
+            CREATE TABLE IF NOT EXISTS interview_guide_notice_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                candidate_id INTEGER NOT NULL,
+                to_email TEXT NOT NULL DEFAULT '',
+                kind TEXT NOT NULL DEFAULT 'pass',
+                document_keys TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT '',
+                emp_no TEXT NOT NULL DEFAULT '',
+                emp_name TEXT NOT NULL DEFAULT '',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_interview_guide_history_candidate
+            ON interview_guide_notice_history(candidate_id, id);
+
+            -- 준비서류별 샘플 사진. 담당자가 올리면 기본 예시 그림 대신 이 사진을 보낸다.
+            CREATE TABLE IF NOT EXISTS interview_guide_samples (
+                doc_key TEXT PRIMARY KEY,
+                stored_name TEXT NOT NULL DEFAULT '',
+                mime TEXT NOT NULL DEFAULT '',
+                original_name TEXT NOT NULL DEFAULT '',
+                uploaded_by TEXT NOT NULL DEFAULT '',
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         ''')
         # 이미 만들어진 설치본에도 진행상태·합격여부 컬럼을 채워 넣는다.
         candidate_columns = {
@@ -223,6 +272,22 @@ def ensure_interview_schema(conn=None):
         }
         if 'profile_json' not in analysis_columns:
             conn.execute("ALTER TABLE interview_resume_analyses ADD COLUMN profile_json TEXT NOT NULL DEFAULT '{}'")
+        # 안내전송에 담당자 항목을 뒤늦게 추가했다.
+        guide_columns = {
+            row['name'] if hasattr(row, 'keys') else row[1]
+            for row in conn.execute('PRAGMA table_info(interview_guide_notices)').fetchall()
+        }
+        if guide_columns and 'contact' not in guide_columns:
+            conn.execute("ALTER TABLE interview_guide_notices ADD COLUMN contact TEXT NOT NULL DEFAULT ''")
+        # 합격·불합격 중 어떤 안내를 보냈는지도 뒤늦게 추가했다.
+        if guide_columns and 'kind' not in guide_columns:
+            conn.execute("ALTER TABLE interview_guide_notices ADD COLUMN kind TEXT NOT NULL DEFAULT 'pass'")
+        history_columns = {
+            row['name'] if hasattr(row, 'keys') else row[1]
+            for row in conn.execute('PRAGMA table_info(interview_guide_notice_history)').fetchall()
+        }
+        if history_columns and 'kind' not in history_columns:
+            conn.execute("ALTER TABLE interview_guide_notice_history ADD COLUMN kind TEXT NOT NULL DEFAULT 'pass'")
         # 사전질문지 분당 타자수도 기존 설치본에 뒤늦게 추가한다.
         answer_columns = {
             row['name'] if hasattr(row, 'keys') else row[1]
@@ -363,7 +428,32 @@ def _analysis_dict(row):
     }
 
 
-def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=None):
+def _guide_notice_dict(row, analysis=None):
+    """합격자 안내전송 창에 채워 넣을 값과 마지막 발송 결과."""
+    profile = _json_dict(_row_get(analysis, 'profile_json', '{}')) if analysis is not None else {}
+    resume_email = str(profile.get('email') or '').strip()
+    status = str(_row_get(row, 'status', '') or '') if row is not None else ''
+    return {
+        'status': status,
+        'is_sent': status == 'sent',
+        # 담당자가 고친 주소가 있으면 그것을, 없으면 AI가 이력서에서 찾은 주소를 쓴다.
+        'to_email': (str(_row_get(row, 'to_email', '') or '').strip() if row is not None else '') or resume_email,
+        'resume_email': resume_email,
+        'start_date': str(_row_get(row, 'start_date', '') or '') if row is not None else '',
+        'start_time': str(_row_get(row, 'start_time', '') or '') if row is not None else '',
+        'start_place': str(_row_get(row, 'start_place', '') or '') if row is not None else '',
+        'contact': str(_row_get(row, 'contact', '') or '') if row is not None else '',
+        'kind': (str(_row_get(row, 'kind', 'pass') or 'pass') if row is not None else 'pass'),
+        'documents': _json_list(_row_get(row, 'documents_json', '[]')) if row is not None else [],
+        'extra_notes': str(_row_get(row, 'extra_notes', '') or '') if row is not None else '',
+        'error_message': str(_row_get(row, 'error_message', '') or '') if row is not None else '',
+        'send_count': int(_row_get(row, 'send_count', 0) or 0) if row is not None else 0,
+        'sent_at': str(_row_get(row, 'sent_at', '') or '') if row is not None else '',
+        'sent_by_name': str(_row_get(row, 'sent_by_name', '') or '') if row is not None else '',
+    }
+
+
+def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=None, guide=None):
     scores = [int(item['score']) for item in panelists if item['score'] is not None]
     result = str(_row_get(row, 'result', '') or '')
     is_completed = str(_row_get(row, 'status', '') or '') == 'completed'
@@ -411,6 +501,7 @@ def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=No
         'attachment_count': len(attachments),
         'attachment_total_size': sum(int(item['file_size'] or 0) for item in attachments),
         'resume_analysis': _analysis_dict(analysis),
+        'guide_notice': _guide_notice_dict(guide, analysis),
         'panelists': [
             {
                 'id': item['id'],
@@ -459,7 +550,10 @@ def _load_related(conn, candidate_id):
     analysis = conn.execute(
         'SELECT * FROM interview_resume_analyses WHERE candidate_id=?', (candidate_id,)
     ).fetchone()
-    return _answers_dict(answers), attachments, panelists, analysis
+    guide = conn.execute(
+        'SELECT * FROM interview_guide_notices WHERE candidate_id=?', (candidate_id,)
+    ).fetchone()
+    return _answers_dict(answers), attachments, panelists, analysis, guide
 
 
 def _store_attachments(conn, candidate_id, files):
@@ -589,8 +683,8 @@ def list_candidates():
         ''').fetchall()
         candidates = []
         for row in rows:
-            answers, attachments, panelists, analysis = _load_related(conn, row['id'])
-            candidates.append(_candidate_dict(row, answers, attachments, panelists, analysis))
+            answers, attachments, panelists, analysis, guide_row = _load_related(conn, row['id'])
+            candidates.append(_candidate_dict(row, answers, attachments, panelists, analysis, guide_row))
         return _success(
             '면접 목록을 불러왔습니다.',
             csrf_token=_csrf_token(),
@@ -630,8 +724,8 @@ def create_candidate():
         saved_paths = _store_attachments(conn, candidate_id, files)
         conn.commit()
         row = _load_candidate(conn, candidate_id)
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
-        return _success('면접자를 등록했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis))
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
+        return _success('면접자를 등록했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row))
     except ValueError as exc:
         conn.rollback()
         for path in saved_paths:
@@ -655,11 +749,11 @@ def get_candidate(candidate_id):
         row = _load_candidate(conn, candidate_id)
         if not row:
             return _error('면접 기록을 찾을 수 없습니다.', 404, 'CANDIDATE_NOT_FOUND')
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
         return _success(
             '면접 정보를 불러왔습니다.',
             csrf_token=_csrf_token(),
-            candidate=_candidate_dict(row, answers, attachments, panelists, analysis),
+            candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row),
         )
     finally:
         conn.close()
@@ -688,6 +782,8 @@ def modify_candidate(candidate_id):
             conn.execute('DELETE FROM interview_resume_analyses WHERE candidate_id=?', (candidate_id,))
             conn.execute('DELETE FROM interview_answers WHERE candidate_id=?', (candidate_id,))
             conn.execute('DELETE FROM interview_panelists WHERE candidate_id=?', (candidate_id,))
+            conn.execute('DELETE FROM interview_guide_notices WHERE candidate_id=?', (candidate_id,))
+            conn.execute('DELETE FROM interview_guide_notice_history WHERE candidate_id=?', (candidate_id,))
             conn.execute('DELETE FROM interview_candidates WHERE id=?', (candidate_id,))
             conn.commit()
             for item in stored:
@@ -715,8 +811,8 @@ def modify_candidate(candidate_id):
         ))
         conn.commit()
         row = _load_candidate(conn, candidate_id)
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
-        return _success('면접자 정보를 수정했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis))
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
+        return _success('면접자 정보를 수정했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row))
     finally:
         conn.close()
 
@@ -772,11 +868,11 @@ def update_candidate_status(candidate_id):
         conn.commit()
 
         row = _load_candidate(conn, candidate_id)
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
         message = '면접을 완료 처리했습니다.' if status == 'completed' else '면접을 진행중 상태로 되돌렸습니다.'
         if status == 'completed' and result:
             message = f'면접을 완료 처리하고 {RESULT_LABELS[result]}으로 저장했습니다.'
-        return _success(message, candidate=_candidate_dict(row, answers, attachments, panelists, analysis))
+        return _success(message, candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row))
     finally:
         conn.close()
 
@@ -819,10 +915,10 @@ def add_attachments(candidate_id):
         conn.commit()
         for path in removed_paths:
             delete_file(path)
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
         return _success(
             '이력서를 교체했습니다.' if replace else '첨부파일을 등록했습니다.',
-            candidate=_candidate_dict(row, answers, attachments, panelists, analysis),
+            candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row),
         )
     except ValueError as exc:
         conn.rollback()
@@ -951,25 +1047,44 @@ def analyze_resume(candidate_id):
         conn.commit()
 
         stored_files = []
+        read_warnings = []
         for row in supported:
             path = os.path.join(_upload_dir(), row['stored_name'])
             if not os.path.exists(path):
+                current_app.logger.warning(
+                    '면접 이력서 첨부 파일 없음: candidate_id=%s, file=%s', candidate_id, row['filename']
+                )
+                read_warnings.append(f"{row['filename']}: 서버에 저장된 파일을 찾지 못했습니다.")
+                continue
+            try:
+                data = read_decrypted(path, MAX_ATTACHMENT_TOTAL_BYTES + 1)
+            except Exception:
+                # 첨부 하나를 못 읽는다고 나머지 이력서 분석까지 막지 않는다.
+                current_app.logger.exception(
+                    '면접 이력서 첨부 복호화 실패: candidate_id=%s, file=%s', candidate_id, row['filename']
+                )
+                read_warnings.append(f"{row['filename']}: 저장된 파일을 읽지 못해 분석에서 제외했습니다.")
                 continue
             stored_files.append({
                 'filename': row['filename'],
                 'mime': mimetypes.guess_type(row['filename'])[0] or 'application/octet-stream',
-                'data': read_decrypted(path, MAX_ATTACHMENT_TOTAL_BYTES + 1),
+                'data': data,
             })
         if not stored_files:
             raise ValueError('저장된 이력서 파일을 읽을 수 없습니다.')
 
         documents, warnings = prepare_documents(stored_files)
+        warnings = read_warnings + warnings
         analyzer = analyze_with_claude if provider == 'claude' else analyze_with_openai
         result, usage = analyzer(
             str(settings['api_key']), str(settings['model']), documents,
             safety_value=_emp_no() or str(candidate_id),
         )
         photo = extract_candidate_photo(documents)
+        current_app.logger.info(
+            '면접 이력서 사진 추출: candidate_id=%s, 결과=%s',
+            candidate_id, '성공' if photo else '없음',
+        )
         photo_stored_name = ''
         photo_mime = ''
         if photo:
@@ -1023,10 +1138,10 @@ def analyze_resume(candidate_id):
         if old_photo and old_photo != photo_stored_name:
             delete_file(os.path.join(_upload_dir(), old_photo))
         row = _load_candidate(conn, candidate_id)
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
         return _success(
             '이력서 AI 분석을 완료했습니다.',
-            candidate=_candidate_dict(row, answers, attachments, panelists, analysis),
+            candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row),
         )
     except Exception as exc:
         conn.rollback()
@@ -1068,6 +1183,314 @@ def resume_photo(candidate_id):
     return encrypted_response(path, '지원자사진.jpg', as_attachment=False)
 
 
+# ---------------------------------------------------------------- 합격자 안내전송
+
+SAMPLE_UPLOAD_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
+
+
+def _can_manage_samples():
+    """준비서류 샘플은 모든 안내메일에 함께 나가므로 실장(레벨 3) 이상만 손댄다."""
+    return _user_level() <= 3
+
+
+def _sample_row(conn, doc_key):
+    return conn.execute(
+        'SELECT * FROM interview_guide_samples WHERE doc_key=?', (doc_key,)
+    ).fetchone()
+
+
+def _sample_bytes(conn, doc_key):
+    """준비서류 샘플 그림. 담당자가 올린 사진이 있으면 그것을, 없으면 기본 예시 그림을 쓴다."""
+    row = _sample_row(conn, doc_key)
+    stored_name = str(_row_get(row, 'stored_name', '') or '') if row is not None else ''
+    if stored_name:
+        path = os.path.join(_upload_dir(), stored_name)
+        if os.path.exists(path):
+            try:
+                return read_decrypted(path, guide.MAX_SAMPLE_BYTES + 1), str(row['mime'] or 'image/jpeg')
+            except Exception:
+                current_app.logger.exception('준비서류 샘플 읽기 실패: doc_key=%s', doc_key)
+    return guide.builtin_sample(doc_key), 'image/png'
+
+
+def _guide_context(candidate, payload, documents, kind='pass'):
+    return {
+        'kind': kind,
+        'name': str(candidate['name'] or ''),
+        'start_date': str(payload.get('start_date') or ''),
+        'start_time': str(payload.get('start_time') or ''),
+        'start_place': str(payload.get('start_place') or ''),
+        'contact': str(payload.get('contact') or ''),
+        'extra_notes': str(payload.get('extra_notes') or ''),
+        'documents': documents,
+    }
+
+
+def _notice_kind(candidate):
+    """합격·불합격에 따라 보낼 안내문 종류. 아직 정해지지 않았으면 빈 문자열."""
+    result = str(_row_get(candidate, 'result', '') or '')
+    return result if result in guide.NOTICE_KINDS else ''
+
+
+def _guide_payload():
+    data = request.get_json(silent=True) or {}
+    documents = guide.selected_documents(data.get('documents'))
+    payload = {
+        'to_email': _text(data.get('to_email'), 200),
+        'start_date': _text(data.get('start_date'), 20),
+        'start_time': _text(data.get('start_time'), 20),
+        'start_place': _text(data.get('start_place'), 300),
+        'contact': _text(data.get('contact'), 200),
+        'extra_notes': _text(data.get('extra_notes'), 2000),
+    }
+    return payload, documents
+
+
+@interview_bp.route('/interview/api/guide-documents', methods=['GET'])
+@_login_required
+def guide_documents():
+    conn = get_db()
+    try:
+        ensure_interview_schema(conn)
+        custom = {
+            str(row['doc_key']): row for row in
+            conn.execute('SELECT * FROM interview_guide_samples').fetchall()
+        }
+    finally:
+        conn.close()
+    items = []
+    for item in guide.document_catalog():
+        row = custom.get(item['key'])
+        items.append({
+            **item,
+            'has_custom_sample': bool(row is not None and str(row['stored_name'] or '')),
+            'sample_name': str(_row_get(row, 'original_name', '') or '') if row is not None else '',
+            'sample_url': url_for('interview.guide_document_sample', doc_key=item['key']),
+        })
+    return _success('', documents=items, can_manage_samples=_can_manage_samples())
+
+
+@interview_bp.route('/interview/api/guide-documents/<doc_key>/sample', methods=['GET'])
+@_login_required
+def guide_document_sample(doc_key):
+    if doc_key not in guide.GUIDE_DOCUMENT_KEYS:
+        abort(404)
+    conn = get_db()
+    try:
+        ensure_interview_schema(conn)
+        data, mime = _sample_bytes(conn, doc_key)
+    finally:
+        conn.close()
+    response = make_response(data)
+    response.headers['Content-Type'] = mime
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@interview_bp.route('/interview/api/guide-documents/<doc_key>/sample', methods=['POST'])
+@_mutating
+def upload_guide_document_sample(doc_key):
+    if doc_key not in guide.GUIDE_DOCUMENT_KEYS:
+        return _error('알 수 없는 준비서류입니다.', 404, 'GUIDE_DOC_NOT_FOUND')
+    if not _can_manage_samples():
+        return _error('준비서류 샘플은 실장 이상만 등록할 수 있습니다.', 403, 'FORBIDDEN')
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        return _error('등록할 샘플 사진을 선택해주세요.', 400, 'SAMPLE_FILE_REQUIRED')
+    display_name = original_filename(upload.filename)
+    if os.path.splitext(display_name)[1].lower() not in SAMPLE_UPLOAD_EXTENSIONS:
+        return _error('샘플 사진은 PNG·JPG·WEBP·GIF 형식만 등록할 수 있습니다.', 400, 'SAMPLE_TYPE_INVALID')
+    raw = upload.read(guide.MAX_SAMPLE_BYTES + 1)
+    if len(raw) > guide.MAX_SAMPLE_BYTES:
+        return _error('샘플 사진은 4MB 이하만 등록할 수 있습니다.', 400, 'SAMPLE_TOO_LARGE')
+    try:
+        data, mime = guide.normalize_sample_upload(raw)
+    except Exception:
+        return _error('샘플 사진을 읽을 수 없습니다. 다른 이미지로 시도해주세요.', 400, 'SAMPLE_INVALID')
+
+    conn = get_db()
+    stored_name = encrypted_storage_name(f'guide-sample-{doc_key}.jpg')
+    new_path = os.path.join(_upload_dir(), stored_name)
+    try:
+        ensure_interview_schema(conn)
+        previous = _sample_row(conn, doc_key)
+        old_name = str(_row_get(previous, 'stored_name', '') or '') if previous is not None else ''
+        encrypt_bytes(data, new_path)
+        conn.execute('''
+            INSERT INTO interview_guide_samples (doc_key, stored_name, mime, original_name, uploaded_by, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(doc_key) DO UPDATE SET
+                stored_name=excluded.stored_name, mime=excluded.mime,
+                original_name=excluded.original_name, uploaded_by=excluded.uploaded_by,
+                updated_at=CURRENT_TIMESTAMP
+        ''', (doc_key, stored_name, mime, display_name, _emp_no()))
+        conn.commit()
+        if old_name and old_name != stored_name:
+            delete_file(os.path.join(_upload_dir(), old_name))
+        return _success('준비서류 샘플 사진을 등록했습니다.')
+    except Exception:
+        conn.rollback()
+        delete_file(new_path)
+        current_app.logger.exception('준비서류 샘플 등록 실패: doc_key=%s', doc_key)
+        return _error('샘플 사진을 저장하지 못했습니다.', 500, 'SAMPLE_SAVE_FAILED')
+    finally:
+        conn.close()
+
+
+@interview_bp.route('/interview/api/guide-documents/<doc_key>/sample', methods=['DELETE'])
+@_mutating
+def delete_guide_document_sample(doc_key):
+    if doc_key not in guide.GUIDE_DOCUMENT_KEYS:
+        return _error('알 수 없는 준비서류입니다.', 404, 'GUIDE_DOC_NOT_FOUND')
+    if not _can_manage_samples():
+        return _error('준비서류 샘플은 실장 이상만 삭제할 수 있습니다.', 403, 'FORBIDDEN')
+    conn = get_db()
+    try:
+        ensure_interview_schema(conn)
+        row = _sample_row(conn, doc_key)
+        stored_name = str(_row_get(row, 'stored_name', '') or '') if row is not None else ''
+        conn.execute('DELETE FROM interview_guide_samples WHERE doc_key=?', (doc_key,))
+        conn.commit()
+        if stored_name:
+            delete_file(os.path.join(_upload_dir(), stored_name))
+        return _success('등록한 샘플 사진을 지우고 기본 예시 그림으로 되돌렸습니다.')
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception('준비서류 샘플 삭제 실패: doc_key=%s', doc_key)
+        return _error('샘플 사진을 삭제하지 못했습니다.', 500, 'SAMPLE_DELETE_FAILED')
+    finally:
+        conn.close()
+
+
+@interview_bp.route('/interview/api/candidates/<int:candidate_id>/guide-notice/preview', methods=['POST'])
+@_mutating
+def preview_guide_notice(candidate_id):
+    """보내기 전에 담당자가 실제 메일 모양을 확인할 수 있게 본문을 만들어 돌려준다."""
+    conn = get_db()
+    try:
+        ensure_interview_schema(conn)
+        candidate = _load_candidate(conn, candidate_id)
+        if not candidate:
+            return _error('면접 기록을 찾을 수 없습니다.', 404, 'CANDIDATE_NOT_FOUND')
+        if not _can_manage(candidate):
+            return _error('이 면접 기록을 다룰 권한이 없습니다.', 403, 'FORBIDDEN')
+        kind = _notice_kind(candidate)
+        payload, documents = _guide_payload()
+        if kind == 'fail':
+            documents = []  # 불합격 안내에는 준비서류가 들어가지 않는다.
+        sources = {}
+        for name, (data, mime) in guide.brand_images(kind).items():
+            sources[name] = f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}'
+        for document in documents:
+            data, mime = _sample_bytes(conn, document['key'])
+            sources[f"sample_{document['key']}"] = f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}'
+        html = guide.render_mail_html(_guide_context(candidate, payload, documents, kind), sources)
+        return _success('', html=html)
+    finally:
+        conn.close()
+
+
+@interview_bp.route('/interview/api/candidates/<int:candidate_id>/guide-notice', methods=['POST'])
+@_mutating
+def send_guide_notice(candidate_id):
+    """합격자에게 출근 안내와 준비서류를 메일로 보내고 보낸 내용을 남긴다."""
+    conn = get_db()
+    try:
+        ensure_interview_schema(conn)
+        candidate = _load_candidate(conn, candidate_id)
+        if not candidate:
+            return _error('면접 기록을 찾을 수 없습니다.', 404, 'CANDIDATE_NOT_FOUND')
+        if not _can_manage(candidate):
+            return _error('이 면접 기록을 다룰 권한이 없습니다.', 403, 'FORBIDDEN')
+        kind = _notice_kind(candidate)
+        if not kind:
+            return _error('합격 또는 불합격을 먼저 정해주세요.', 400, 'RESULT_REQUIRED')
+
+        payload, documents = _guide_payload()
+        if not guide.is_valid_email(payload['to_email']):
+            return _error('받는 사람 이메일 주소를 확인해주세요.', 400, 'EMAIL_INVALID')
+        if kind == 'pass':
+            if not payload['start_date']:
+                return _error('출근일을 입력해주세요.', 400, 'START_DATE_REQUIRED')
+            if not payload['start_place']:
+                return _error('출근장소를 입력해주세요.', 400, 'START_PLACE_REQUIRED')
+        else:
+            documents = []  # 불합격 안내에는 준비서류가 들어가지 않는다.
+
+        images = dict(guide.brand_images(kind))
+        for document in documents:
+            images[f"sample_{document['key']}"] = _sample_bytes(conn, document['key'])
+
+        error_message = ''
+        try:
+            guide.send_guide_mail(
+                payload['to_email'], _guide_context(candidate, payload, documents, kind), images,
+            )
+            status = 'sent'
+        except Exception as exc:
+            status = 'failed'
+            error_message = _text(exc, 500)
+            current_app.logger.exception('합격 안내메일 발송 실패: candidate_id=%s', candidate_id)
+
+        emp_name = _text(session.get('user_name'), 60)
+        conn.execute('''
+            INSERT INTO interview_guide_notices (
+                candidate_id, to_email, start_date, start_time, start_place, contact, kind,
+                documents_json, extra_notes, status, error_message, send_count,
+                sent_at, sent_by, sent_by_name, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(candidate_id) DO UPDATE SET
+                to_email=excluded.to_email, start_date=excluded.start_date,
+                start_time=excluded.start_time, start_place=excluded.start_place,
+                contact=excluded.contact, kind=excluded.kind,
+                documents_json=excluded.documents_json, extra_notes=excluded.extra_notes,
+                status=excluded.status, error_message=excluded.error_message,
+                send_count=interview_guide_notices.send_count + excluded.send_count,
+                sent_at=CASE WHEN excluded.status='sent' THEN CURRENT_TIMESTAMP
+                             ELSE interview_guide_notices.sent_at END,
+                sent_by=CASE WHEN excluded.status='sent' THEN excluded.sent_by
+                             ELSE interview_guide_notices.sent_by END,
+                sent_by_name=CASE WHEN excluded.status='sent' THEN excluded.sent_by_name
+                                  ELSE interview_guide_notices.sent_by_name END,
+                updated_at=CURRENT_TIMESTAMP
+        ''', (
+            candidate_id, payload['to_email'], payload['start_date'], payload['start_time'],
+            payload['start_place'], payload['contact'], kind,
+            json.dumps([{'key': item['key'], 'detail': item['detail']} for item in documents],
+                       ensure_ascii=False),
+            payload['extra_notes'], status, error_message, 1 if status == 'sent' else 0,
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S') if status == 'sent' else None,
+            _emp_no() if status == 'sent' else '', emp_name if status == 'sent' else '',
+        ))
+        conn.execute('''
+            INSERT INTO interview_guide_notice_history (
+                candidate_id, to_email, kind, document_keys, status, error_message, emp_no, emp_name
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            candidate_id, payload['to_email'], kind,
+            ','.join(item['key'] for item in documents), status, error_message,
+            _emp_no(), emp_name,
+        ))
+        conn.commit()
+
+        row = _load_candidate(conn, candidate_id)
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
+        candidate_payload = _candidate_dict(row, answers, attachments, panelists, analysis, guide_row)
+        if status != 'sent':
+            return _error(error_message or '안내메일을 보내지 못했습니다.', 502, 'GUIDE_MAIL_FAILED')
+        label = '합격' if kind == 'pass' else '불합격'
+        return _success(
+            f"{payload['to_email']} 로 {label} 안내를 보냈습니다.",
+            candidate=candidate_payload,
+        )
+    except Exception:
+        conn.rollback()
+        current_app.logger.exception('합격 안내전송 처리 실패: candidate_id=%s', candidate_id)
+        return _error('안내전송 처리 중 오류가 발생했습니다.', 500, 'GUIDE_NOTICE_FAILED')
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------- 면접관 평가
 
 @interview_bp.route('/interview/api/candidates/<int:candidate_id>/panelists', methods=['POST'])
@@ -1093,8 +1516,8 @@ def add_panelist(candidate_id):
             VALUES (?, ?, ?, ?)
         ''', (candidate_id, name, _text(data.get('emp_no'), 30), count + 1))
         conn.commit()
-        answers, attachments, panelists, analysis = _load_related(conn, candidate_id)
-        return _success('면접관을 추가했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis))
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
+        return _success('면접관을 추가했습니다.', candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row))
     finally:
         conn.close()
 
@@ -1137,10 +1560,10 @@ def modify_panelist(panelist_id):
             ''', (name, score_value, _text(data.get('comment'), 4000), panelist_id))
             conn.commit()
 
-        answers, attachments, panelists, analysis = _load_related(conn, item['candidate_id'])
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, item['candidate_id'])
         return _success(
             '면접관 정보를 삭제했습니다.' if request.method == 'DELETE' else '면접 평가를 저장했습니다.',
-            candidate=_candidate_dict(candidate, answers, attachments, panelists, analysis),
+            candidate=_candidate_dict(candidate, answers, attachments, panelists, analysis, guide_row),
         )
     finally:
         conn.close()
