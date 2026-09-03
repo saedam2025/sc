@@ -12,9 +12,11 @@ yagmail
 hashids
 holidays>=0.45,<1.0
 cryptography
-Pillow
-opencv-python-headless
-PyPDF2
+Pillow>=10.0,<13
+# 이력서 얼굴 인식용. 버전이 흔들리면 Render에서만 얼굴 추출이 실패하므로 범위를 고정한다.
+numpy>=1.26,<3
+opencv-python-headless>=4.9,<5
+PyPDF2>=3.0,<4
 olefile
 xlsxwriter
 pywebpush>=2.0.0
