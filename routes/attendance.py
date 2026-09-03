@@ -33,6 +33,12 @@ BASE_SELECT = """
            a.clock_out_time,
            a.status,
            a.reason,
+           a.in_ip,
+           a.in_device,
+           a.in_user_agent,
+           a.out_ip,
+           a.out_device,
+           a.out_user_agent,
            COALESCE(NULLIF(a.position, ''), u.position, '미지정') AS position,
            COALESCE(u.name, CAST(a.emp_no AS TEXT)) AS user_name
     FROM daily_attendance a
@@ -57,6 +63,141 @@ LATE_SQL = """
         ELSE 0
     END
 """
+
+
+# ---------------------------------------------------------------------------
+# 접속정보(전송자 IP · 기기) 기록과 이상 감지
+# ---------------------------------------------------------------------------
+
+# 평소 접속정보를 계산할 기간(일)과, '평소'로 인정하기 위한 최소 기록 수.
+ACCESS_BASELINE_DAYS = 90
+ACCESS_BASELINE_MIN_RECORDS = 3
+
+# User-Agent에서 사람이 읽을 수 있는 기기 요약을 뽑기 위한 규칙. 위에서부터 먼저 맞는 것을 쓴다.
+_DEVICE_OS_RULES = (
+    ('iPhone', 'iPhone'),
+    ('iPad', 'iPad'),
+    ('Android', 'Android'),
+    ('Windows NT', 'Windows'),
+    ('Windows', 'Windows'),
+    ('Mac OS X', 'Mac'),
+    ('Macintosh', 'Mac'),
+    ('CrOS', 'ChromeOS'),
+    ('Linux', 'Linux'),
+)
+_DEVICE_BROWSER_RULES = (
+    ('Edg', 'Edge'),
+    ('Whale', 'Whale'),
+    ('SamsungBrowser', 'Samsung Internet'),
+    ('OPR/', 'Opera'),
+    ('CriOS', 'Chrome'),
+    ('FxiOS', 'Firefox'),
+    ('Chrome/', 'Chrome'),
+    ('Firefox/', 'Firefox'),
+    ('Safari/', 'Safari'),
+)
+_MOBILE_TOKENS = ('Mobile', 'Android', 'iPhone', 'iPad', 'iPod')
+
+
+def _client_ip():
+    """프록시(Render 등) 뒤에서도 실제 전송자 IP를 얻는다."""
+    forwarded = request.headers.get('X-Forwarded-For', '')
+    ip = forwarded.split(',')[0].strip() if forwarded else (request.remote_addr or '')
+    return ip[:100]
+
+
+def _client_user_agent():
+    return str(request.headers.get('User-Agent') or '')[:500]
+
+
+def _device_label(user_agent):
+    """User-Agent를 '모바일 · Android · Chrome' 형태의 짧은 기기 정보로 요약한다."""
+    ua = str(user_agent or '').strip()
+    if not ua:
+        return ''
+    os_name = next((label for token, label in _DEVICE_OS_RULES if token in ua), '기타')
+    browser = next((label for token, label in _DEVICE_BROWSER_RULES if token in ua), '기타')
+    kind = '모바일' if any(token in ua for token in _MOBILE_TOKENS) else 'PC'
+    return '%s · %s · %s' % (kind, os_name, browser)
+
+
+def _current_access():
+    """지금 요청을 보낸 단말의 (IP, 기기요약, User-Agent)."""
+    user_agent = _client_user_agent()
+    return _client_ip(), _device_label(user_agent), user_agent
+
+
+def _access_pairs(row):
+    """한 기록에서 (구분, IP, 기기) 목록을 뽑는다. 값이 하나도 없으면 건너뛴다."""
+    pairs = []
+    for label, ip_key, device_key in (('출근', 'in_ip', 'in_device'), ('퇴근', 'out_ip', 'out_device')):
+        ip = (row.get(ip_key) or '').strip()
+        device = (row.get(device_key) or '').strip()
+        if ip or device:
+            pairs.append((label, ip, device))
+    return pairs
+
+
+def load_access_baseline(conn, emp_nos, before_date):
+    """지정 일자 이전 기록으로 사람별 평소 IP·기기 사용 횟수를 만든다."""
+    baseline = {}
+    emp_nos = [str(emp_no) for emp_no in dict.fromkeys(emp_nos) if str(emp_no).strip()]
+    if not emp_nos:
+        return baseline
+
+    placeholders = ','.join('?' * len(emp_nos))
+    rows = conn.execute(
+        """SELECT CAST(emp_no AS TEXT) AS emp_no, date,
+                  in_ip, in_device, out_ip, out_device
+             FROM daily_attendance
+            WHERE CAST(emp_no AS TEXT) IN (%s)
+              AND date < ?
+              AND date >= DATE(?, '-%d day')
+            ORDER BY date ASC""" % (placeholders, ACCESS_BASELINE_DAYS),
+        emp_nos + [before_date, before_date]
+    ).fetchall()
+
+    for raw in rows:
+        row = dict(raw)
+        pairs = _access_pairs(row)
+        if not pairs:
+            continue
+        entry = baseline.setdefault(row['emp_no'], {'ips': {}, 'devices': {}, 'records': 0, 'last_date': ''})
+        for _, ip, device in pairs:
+            if ip:
+                entry['ips'][ip] = entry['ips'].get(ip, 0) + 1
+            if device:
+                entry['devices'][device] = entry['devices'].get(device, 0) + 1
+        entry['records'] += 1
+        entry['last_date'] = row['date']
+    return baseline
+
+
+def _access_anomaly(row, baseline):
+    """평소 쓰던 IP·기기와 다른 접속인지 판단한다.
+
+    비교할 과거 기록이 충분하지 않으면(신규 입사자 등) 이상으로 보지 않는다.
+    """
+    entry = baseline.get(str(row.get('emp_no')))
+    pairs = _access_pairs(row)
+    if not pairs:
+        return {'is_unusual': False, 'reasons': []}
+    if not entry or entry['records'] < ACCESS_BASELINE_MIN_RECORDS:
+        return {'is_unusual': False, 'reasons': []}
+
+    reasons = []
+    for label, ip, device in pairs:
+        if ip and entry['ips'] and ip not in entry['ips']:
+            reasons.append('%s IP(%s)가 평소 접속 기록에 없습니다.' % (label, ip))
+        if device and entry['devices'] and device not in entry['devices']:
+            reasons.append('%s 기기(%s)가 평소 접속 기록에 없습니다.' % (label, device))
+    return {'is_unusual': bool(reasons), 'reasons': reasons}
+
+
+def _usual_list(counter, limit=5):
+    """평소 접속정보를 많이 쓴 순서로 정렬해 화면용 목록으로 만든다."""
+    items = sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    return [{'value': value, 'count': count} for value, count in items]
 
 
 def _scope_clause(user_level, emp_no, search_emp_no='', search_position=''):
@@ -591,10 +732,13 @@ def daily_detail():
         BASE_SELECT + ' WHERE a.date = ? ' + scope_sql + ' ORDER BY a.clock_in_time ASC, a.id ASC',
         [day] + scope_params
     ).fetchall()]
-    conn.close()
+
+    # 이름을 빨갛게 표시할지 판단하려면 그 사람의 평소 접속정보가 필요하다.
+    baseline = load_access_baseline(conn, [row['emp_no'] for row in rows], day)
 
     members = []
     for index, row in enumerate(rows, start=1):
+        anomaly = _access_anomaly(row, baseline)
         members.append({
             'id': row['id'],
             'emp_no': row['emp_no'],
@@ -608,7 +752,12 @@ def daily_detail():
             'is_late': _is_late(row, schedules),
             'plan_text': _plan_text(schedules, row),
             'work_hours_text': _format_hours(_work_hours(row)),
+            'has_access_info': bool(_access_pairs(row)),
+            'is_unusual_access': anomaly['is_unusual'],
+            'access_reasons': anomaly['reasons'],
         })
+
+    conn.close()
 
     return jsonify({
         'status': 'success',
@@ -616,6 +765,77 @@ def daily_detail():
         'weekday': _weekday_label(day),
         'summary': _summarize_rows(rows, schedules),
         'members': members,
+    })
+
+
+@attendance_bp.route('/attendance/access-info')
+def access_info():
+    """일별 명단에서 이름을 눌렀을 때 보여줄 접속 IP·기기 정보."""
+    record_id = (request.args.get('record_id') or '').strip()
+    if not record_id.isdigit():
+        return jsonify({'status': 'error', 'message': '잘못된 요청입니다.'}), 400
+
+    emp_no = session.get('emp_no')
+    if not emp_no:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    user_level = session.get('user_level', 4)
+
+    conn = get_db()
+    row = conn.execute(
+        BASE_SELECT + ' WHERE a.id = ?', (int(record_id),)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '기록을 찾을 수 없습니다.'}), 404
+
+    row = dict(row)
+    # 레벨 4 이상(일반회원)은 본인 기록의 접속정보만 볼 수 있다.
+    if int(user_level or 4) >= 4 and str(row['emp_no']) != str(emp_no):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '다른 사람의 접속정보를 볼 권한이 없습니다.'}), 403
+
+    baseline = load_access_baseline(conn, [row['emp_no']], row['date'])
+    conn.close()
+
+    anomaly = _access_anomaly(row, baseline)
+    entry = baseline.get(str(row['emp_no'])) or {'ips': {}, 'devices': {}, 'records': 0, 'last_date': ''}
+
+    return jsonify({
+        'status': 'success',
+        'record': {
+            'id': row['id'],
+            'emp_no': row['emp_no'],
+            'user_name': row['user_name'],
+            'position': row['position'],
+            'date': row['date'],
+            'weekday': _weekday_label(row['date']),
+            'clock_in_time': row['clock_in_time'] or '-',
+            'clock_out_time': row['clock_out_time'] or '',
+        },
+        'access': {
+            'in': {
+                'time': row['clock_in_time'] or '',
+                'ip': row['in_ip'] or '',
+                'device': row['in_device'] or '',
+                'user_agent': row['in_user_agent'] or '',
+            },
+            'out': {
+                'time': row['clock_out_time'] or '',
+                'ip': row['out_ip'] or '',
+                'device': row['out_device'] or '',
+                'user_agent': row['out_user_agent'] or '',
+            },
+        },
+        'usual': {
+            'records': entry['records'],
+            'baseline_days': ACCESS_BASELINE_DAYS,
+            'min_records': ACCESS_BASELINE_MIN_RECORDS,
+            'last_date': entry.get('last_date', ''),
+            'ips': _usual_list(entry['ips']),
+            'devices': _usual_list(entry['devices']),
+        },
+        'anomaly': anomaly,
     })
 
 
@@ -640,10 +860,14 @@ def clock_out():
         return jsonify({"success": False, "message": "이미 퇴근 처리가 완료되었습니다."}), 400
 
     current_time = datetime.now().strftime('%H:%M:%S')
+    out_ip, out_device, out_user_agent = _current_access()
 
     conn.execute(
-        "UPDATE daily_attendance SET clock_out_time = ?, status = ?, reason = ? WHERE id = ?",
-        (current_time, action_type, reason, record_id)
+        """UPDATE daily_attendance
+              SET clock_out_time = ?, status = ?, reason = ?,
+                  out_ip = ?, out_device = ?, out_user_agent = ?
+            WHERE id = ?""",
+        (current_time, action_type, reason, out_ip, out_device, out_user_agent, record_id)
     )
     conn.commit()
     conn.close()
@@ -691,16 +915,24 @@ def record_attendance(action_type):
             return jsonify({'status': 'error', 'message': '이미 오늘의 출근 처리가 완료되었습니다.'})
 
         position = session.get('position', '미지정')
+        in_ip, in_device, in_user_agent = _current_access()
 
         if not record:
             conn.execute(
-                "INSERT INTO daily_attendance (emp_no, date, clock_in_time, status, position) VALUES (?, ?, ?, ?, ?)",
-                (emp_no, current_date, now_time, '출근', position)
+                """INSERT INTO daily_attendance
+                       (emp_no, date, clock_in_time, status, position,
+                        in_ip, in_device, in_user_agent)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (emp_no, current_date, now_time, '출근', position,
+                 in_ip, in_device, in_user_agent)
             )
         else:
             conn.execute(
-                "UPDATE daily_attendance SET clock_in_time = ?, status = '출근' WHERE id = ?",
-                (now_time, record['id'])
+                """UPDATE daily_attendance
+                      SET clock_in_time = ?, status = '출근',
+                          in_ip = ?, in_device = ?, in_user_agent = ?
+                    WHERE id = ?""",
+                (now_time, in_ip, in_device, in_user_agent, record['id'])
             )
 
         conn.commit()
@@ -721,9 +953,13 @@ def record_attendance(action_type):
         tdelta = datetime.strptime(now_time, fmt) - datetime.strptime(record['clock_in_time'], fmt)
         hours = round(tdelta.total_seconds() / 3600, 1)
 
+        out_ip, out_device, out_user_agent = _current_access()
         conn.execute(
-            "UPDATE daily_attendance SET clock_out_time = ?, status = '퇴근', reason = ? WHERE id = ?",
-            (now_time, f"{hours}시간 근무", record['id'])
+            """UPDATE daily_attendance
+                  SET clock_out_time = ?, status = '퇴근', reason = ?,
+                      out_ip = ?, out_device = ?, out_user_agent = ?
+                WHERE id = ?""",
+            (now_time, f"{hours}시간 근무", out_ip, out_device, out_user_agent, record['id'])
         )
         conn.commit()
         conn.close()

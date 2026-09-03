@@ -51,6 +51,11 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {
     '.pdf', '.hwp', '.hwpx', '.doc', '.docx', '.xls', '.xlsx',
     '.ppt', '.pptx', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.zip',
 }
+# 면접 진행표 상단바 녹음 버튼이 올려보내는 음성 파일. 면접 한 건이 통째로
+# 들어오므로 이력서 첨부(30MB)와는 개수·용량 한도를 따로 계산한다.
+ALLOWED_RECORDING_EXTENSIONS = {'.webm', '.ogg', '.oga', '.m4a', '.mp4', '.mp3', '.wav'}
+MAX_RECORDINGS = 20
+MAX_RECORDING_TOTAL_BYTES = 300 * 1024 * 1024
 
 # 사전질문지 문항. (필드명, 화면 제목, 안내문, 입력줄수, 파란색 덧붙임말)
 QUESTIONNAIRE_FIELDS = (
@@ -66,6 +71,9 @@ QUESTIONNAIRE_KEYS = tuple(field[0] for field in QUESTIONNAIRE_FIELDS)
 # 사전질문지 작성 중 측정한 타자 기록. (분당 타자수, 총 타수, 실제 입력 시간)
 TYPING_KEYS = ('typing_cpm', 'typing_strokes', 'typing_seconds')
 TYPING_LIMITS = {'typing_cpm': 2000, 'typing_strokes': 200000, 'typing_seconds': 86400}
+# 분당 타자수를 내지 못한 이유. 화면에서 '왜 기록이 없는지' 알려주는 데 쓴다.
+TYPING_NOTES = {'', 'none', 'paste', 'short', 'odd'}
+TYPING_SAVE_KEYS = TYPING_KEYS + ('typing_note',)
 
 
 def _interview_when(value):
@@ -94,6 +102,8 @@ def _typing_stats(form):
         except (TypeError, ValueError):
             number = 0
         stats[key] = max(0, min(number, TYPING_LIMITS[key]))
+    note = str(form.get('typing_note') or '').strip().lower()
+    stats['typing_note'] = note if note in TYPING_NOTES else ''
     return stats
 
 
@@ -136,6 +146,7 @@ def ensure_interview_schema(conn=None):
                 availability TEXT NOT NULL DEFAULT '',
                 other_notes TEXT NOT NULL DEFAULT '',
                 typing_cpm INTEGER NOT NULL DEFAULT 0,
+                typing_note TEXT NOT NULL DEFAULT '',
                 typing_strokes INTEGER NOT NULL DEFAULT 0,
                 typing_seconds INTEGER NOT NULL DEFAULT 0,
                 submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -297,6 +308,7 @@ def ensure_interview_schema(conn=None):
             'typing_cpm': 'INTEGER NOT NULL DEFAULT 0',
             'typing_strokes': 'INTEGER NOT NULL DEFAULT 0',
             'typing_seconds': 'INTEGER NOT NULL DEFAULT 0',
+            'typing_note': "TEXT NOT NULL DEFAULT ''",
         }.items():
             if column not in answer_columns:
                 conn.execute(f'ALTER TABLE interview_answers ADD COLUMN {column} {definition}')
@@ -484,6 +496,9 @@ def _candidate_dict(row, answers=None, attachments=(), panelists=(), analysis=No
         'questionnaire_submitted_at': str(row['questionnaire_submitted_at'] or ''),
         'has_answers': has_answers,
         'typing_cpm': int((answers or {}).get('typing_cpm') or 0),
+        'typing_strokes': int((answers or {}).get('typing_strokes') or 0),
+        'typing_seconds': int((answers or {}).get('typing_seconds') or 0),
+        'typing_note': str((answers or {}).get('typing_note') or ''),
         'created_by': row['created_by'],
         'created_by_name': row['created_by_name'],
         'created_at': str(row['created_at'] or ''),
@@ -524,6 +539,7 @@ def _answers_dict(row):
     data = {key: row[key] for key in QUESTIONNAIRE_KEYS}
     for key in TYPING_KEYS:
         data[key] = int(_row_get(row, key, 0) or 0)
+    data['typing_note'] = str(_row_get(row, 'typing_note', '') or '')
     data['submitted_at'] = str(row['submitted_at'] or '')
     data['updated_at'] = str(row['updated_at'] or '')
     return data
@@ -556,30 +572,44 @@ def _load_related(conn, candidate_id):
     return _answers_dict(answers), attachments, panelists, analysis, guide
 
 
-def _store_attachments(conn, candidate_id, files):
-    """첨부파일을 암호화 저장하고 저장된 경로 목록을 돌려준다."""
-    existing_row = conn.execute(
-        'SELECT COUNT(*) AS file_count, COALESCE(SUM(file_size), 0) AS total_size '
-        'FROM interview_attachments WHERE candidate_id=?', (candidate_id,)
-    ).fetchone()
-    existing = int(existing_row['file_count'] or 0)
-    total_size = int(existing_row['total_size'] or 0)
-    if existing + len(files) > MAX_ATTACHMENTS:
-        raise ValueError(f'첨부파일은 최대 {MAX_ATTACHMENTS}개까지 등록할 수 있습니다.')
+def _store_attachments(conn, candidate_id, files, allowed=None, count_limit=None,
+                       total_limit=None, label='첨부파일'):
+    """첨부파일을 암호화 저장하고 저장된 경로 목록을 돌려준다.
+
+    allowed 확장자에 해당하는 기존 첨부만 세어 한도를 계산한다. 녹음 파일은
+    이력서보다 훨씬 크므로, 녹음을 저장했다고 이력서를 못 올리는 일이
+    없도록 종류별로 개수·용량 한도를 따로 둔다.
+    """
+    allowed = ALLOWED_ATTACHMENT_EXTENSIONS if allowed is None else allowed
+    count_limit = MAX_ATTACHMENTS if count_limit is None else count_limit
+    total_limit = MAX_ATTACHMENT_TOTAL_BYTES if total_limit is None else total_limit
+    rows = conn.execute(
+        'SELECT filename, file_size FROM interview_attachments WHERE candidate_id=?', (candidate_id,)
+    ).fetchall()
+    same_kind = [
+        row for row in rows
+        if os.path.splitext(str(row['filename'] or ''))[1].lower() in allowed
+    ]
+    existing = len(same_kind)
+    total_size = sum(int(row['file_size'] or 0) for row in same_kind)
+    if existing + len(files) > count_limit:
+        raise ValueError(f'{label}은 최대 {count_limit}개까지 등록할 수 있습니다.')
     saved_paths = []
     try:
         for file in files:
             display_name = original_filename(file.filename)
             extension = os.path.splitext(display_name)[1].lower()
-            if extension not in ALLOWED_ATTACHMENT_EXTENSIONS:
+            if extension not in allowed:
                 raise ValueError(f'{display_name}: 등록할 수 없는 형식입니다.')
             stored_name = encrypted_storage_name(display_name)
             save_path = os.path.join(_upload_dir(), stored_name)
             size = encrypt_upload(file, save_path)
             saved_paths.append(save_path)
             total_size += size
-            if total_size > MAX_ATTACHMENT_TOTAL_BYTES:
-                raise ValueError('첨부파일 전체 용량은 30MB 이하만 등록할 수 있습니다.')
+            if total_size > total_limit:
+                raise ValueError(
+                    f'{label} 전체 용량은 {total_limit // (1024 * 1024)}MB 이하만 등록할 수 있습니다.'
+                )
             conn.execute('''
                 INSERT INTO interview_attachments (
                     candidate_id, filename, stored_name, file_size, uploaded_by
@@ -934,6 +964,55 @@ def add_attachments(candidate_id):
         conn.close()
 
 
+@interview_bp.route('/interview/api/candidates/<int:candidate_id>/recordings', methods=['POST'])
+@_mutating
+def add_recording(candidate_id):
+    """면접 진행표 상단바 녹음 버튼이 만든 음성 파일을 첨부자료로 저장한다.
+
+    이력서 첨부와 달리 AI 요약을 초기화하지 않는다. 면접 중에 녹음을 멈췄다고
+    이미 만들어 둔 이력서 요약과 사진이 사라지면 안 되기 때문이다.
+    """
+    files = _uploaded_files()
+    if not files:
+        return _error('저장할 녹음 파일이 없습니다.', 400, 'FILE_REQUIRED')
+    if len(files) > 1:
+        return _error('녹음 파일은 한 번에 하나만 저장할 수 있습니다.', 400, 'FILE_TOO_MANY')
+    conn = get_db()
+    saved_paths = []
+    try:
+        ensure_interview_schema(conn)
+        row = _load_candidate(conn, candidate_id)
+        if not row:
+            return _error('면접 기록을 찾을 수 없습니다.', 404, 'CANDIDATE_NOT_FOUND')
+        if not _can_manage(row):
+            return _error('이 면접 기록을 수정할 권한이 없습니다.', 403, 'FORBIDDEN')
+        saved_paths = _store_attachments(
+            conn, candidate_id, files,
+            allowed=ALLOWED_RECORDING_EXTENSIONS,
+            count_limit=MAX_RECORDINGS,
+            total_limit=MAX_RECORDING_TOTAL_BYTES,
+            label='녹음 파일',
+        )
+        conn.commit()
+        answers, attachments, panelists, analysis, guide_row = _load_related(conn, candidate_id)
+        return _success(
+            '녹음 파일을 첨부자료에 저장했습니다.',
+            candidate=_candidate_dict(row, answers, attachments, panelists, analysis, guide_row),
+        )
+    except ValueError as exc:
+        conn.rollback()
+        for path in saved_paths:
+            delete_file(path)
+        return _error(str(exc), 400, 'ATTACHMENT_INVALID')
+    except Exception:
+        conn.rollback()
+        for path in saved_paths:
+            delete_file(path)
+        raise
+    finally:
+        conn.close()
+
+
 @interview_bp.route('/interview/api/attachments/<int:attachment_id>', methods=['DELETE'])
 @_mutating
 def delete_attachment(attachment_id):
@@ -949,8 +1028,13 @@ def delete_attachment(attachment_id):
         if not _can_manage(candidate):
             return _error('이 첨부파일을 삭제할 권한이 없습니다.', 403, 'FORBIDDEN')
         conn.execute('DELETE FROM interview_attachments WHERE id=?', (attachment_id,))
-        photo_path = _stored_photo_path(conn, item['candidate_id'])
-        _reset_resume_analysis(conn, item['candidate_id'])
+        # 요약 초기화는 이력서로 쓰이는 파일을 지웠을 때만 한다. 녹음 파일을
+        # 지웠다고 애써 만든 AI 이력서 요약까지 없어지면 안 된다.
+        extension = os.path.splitext(str(item['filename'] or ''))[1].lower()
+        photo_path = ''
+        if extension in RESUME_ANALYSIS_EXTENSIONS:
+            photo_path = _stored_photo_path(conn, item['candidate_id'])
+            _reset_resume_analysis(conn, item['candidate_id'])
         conn.commit()
         delete_file(os.path.join(_upload_dir(), item['stored_name']))
         if photo_path:
@@ -1611,13 +1695,15 @@ def questionnaire(token):
             values.update(_typing_stats(request.form))
             if not values['typing_cpm']:
                 # 다시 들어와 조금만 고친 경우에는 먼저 잰 타자 기록을 그대로 둔다.
+                # 예전에도 못 쟀다면 이번에 잰 값(타수·시간·이유)을 그대로 남긴다.
                 previous = conn.execute(
                     'SELECT * FROM interview_answers WHERE candidate_id=?', (candidate['id'],)
                 ).fetchone()
-                if previous:
+                if previous and int(_row_get(previous, 'typing_cpm', 0) or 0):
                     for key in TYPING_KEYS:
                         values[key] = int(_row_get(previous, key, 0) or 0)
-            save_keys = QUESTIONNAIRE_KEYS + TYPING_KEYS
+                    values['typing_note'] = str(_row_get(previous, 'typing_note', '') or '')
+            save_keys = QUESTIONNAIRE_KEYS + TYPING_SAVE_KEYS
             columns = ', '.join(save_keys)
             placeholders = ', '.join('?' for _ in save_keys)
             updates = ', '.join(f'{key}=excluded.{key}' for key in save_keys)

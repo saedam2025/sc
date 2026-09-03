@@ -542,6 +542,7 @@ def init_db():
         approval_id INTEGER
     )''')
 
+    # in_/out_ 접두 컬럼은 출퇴근 버튼을 누른 단말의 접속 정보(전송자 IP·기기)를 남긴다.
     c.execute('''CREATE TABLE IF NOT EXISTS daily_attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         emp_no TEXT NOT NULL,
@@ -550,7 +551,13 @@ def init_db():
         clock_out_time TEXT,
         status TEXT NOT NULL,
         reason TEXT,
-        position TEXT
+        position TEXT,
+        in_ip TEXT,
+        in_device TEXT,
+        in_user_agent TEXT,
+        out_ip TEXT,
+        out_device TEXT,
+        out_user_agent TEXT
     )''')
     
     # 개인정보 수정창에서 설정하는 월~금 근무시간. 근태관리의 지각 판정 기준으로 쓴다.
@@ -1278,6 +1285,12 @@ def init_db():
         "ALTER TABLE messages ADD COLUMN deleted_at DATETIME",
         "ALTER TABLE daily_attendance ADD COLUMN reason TEXT",
         "ALTER TABLE daily_attendance ADD COLUMN position TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN in_ip TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN in_device TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN in_user_agent TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN out_ip TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN out_device TEXT",
+        "ALTER TABLE daily_attendance ADD COLUMN out_user_agent TEXT",
         "ALTER TABLE gallery ADD COLUMN tab_id INTEGER DEFAULT 1",
         "ALTER TABLE users ADD COLUMN profile_icon TEXT DEFAULT '👤'",
         "ALTER TABLE users ADD COLUMN address TEXT",
