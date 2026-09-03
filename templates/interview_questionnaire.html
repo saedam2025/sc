@@ -203,6 +203,7 @@
         <input type="hidden" name="typing_cpm" id="typingCpm" value="0">
         <input type="hidden" name="typing_strokes" id="typingStrokes" value="0">
         <input type="hidden" name="typing_seconds" id="typingSeconds" value="0">
+        <input type="hidden" name="typing_note" id="typingNote" value="">
         <p id="submitFeedback" class="submit-feedback" role="alert" hidden></p>
         <div class="actions">
             {% if show_submitted_state %}
@@ -238,12 +239,31 @@
         optionalFields[f].removeAttribute('pattern');
     }
 
-    var IDLE_LIMIT = 5000;   // 5초 넘게 멈춘 구간은 작성 시간에서 뺀다.
-    var MIN_STROKES = 20;    // 너무 짧게 친 경우는 측정하지 않는다.
-    var MIN_ACTIVE = 5000;
+    var IDLE_LIMIT = 5000;   // 5초 넘게 멈춘 구간은 5초까지만 작성 시간에 넣는다.
+    var MIN_STROKES = 40;    // 이보다 적게 치면 속도가 크게 튀어 재지 않는다.
+    var MIN_ACTIVE = 10000;  // 10초가 안 되는 표본도 마찬가지다.
+    var MAX_CPM = 900;       // 사람이 낼 수 있는 범위를 넘으면 잘못 잰 것으로 본다.
+    var PASTE_RATIO = 0.25;  // 붙여넣은 글이 이만큼을 넘으면 본인 타자로 보지 않는다.
+    // 실제로 잰 속도 중 기록에 인정하는 비율. 재는 방식과는 별개인 평가 기준이라
+    // 여기 값만 바꾸면 인정 비율을 조정할 수 있다.
+    var RECOGNITION = 0.75;
+
     var strokes = 0;
     var activeMs = 0;
     var lastAt = 0;
+    var pastedChars = 0;
+    var keyboardMode = false;   // 물리 자판이라 keydown이 제대로 오는 환경인지
+
+    // 글자를 만들지 않는 키는 타수에서 뺀다. 지우기(Backspace·Delete)는
+    // 고쳐 쓴 것이므로 예전처럼 타수에 넣지 않는다.
+    var SKIP_KEYS = {
+        Shift: 1, Control: 1, Alt: 1, AltGraph: 1, Meta: 1, CapsLock: 1, ContextMenu: 1,
+        Tab: 1, Escape: 1, Insert: 1, NumLock: 1, ScrollLock: 1, Pause: 1, PrintScreen: 1,
+        ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1,
+        Home: 1, End: 1, PageUp: 1, PageDown: 1,
+        Backspace: 1, Delete: 1, Clear: 1,
+        HangulMode: 1, HanjaMode: 1, KanaMode: 1, Dead: 1
+    };
 
     function tick() {
         var now = Date.now();
@@ -254,14 +274,74 @@
         lastAt = now;
     }
 
-    // input 이벤트는 한글 IME(자모 한 타마다 발생)와 모바일 자판까지 함께 잡아준다.
+    // 타수는 '누른 키'로 센다. 한글 IME는 글자가 완성되는 순간 input 이벤트가
+    // 두 번(완성된 앞 글자 + 새로 시작한 글자) 나기 때문에, input으로 세면
+    // 한글만 타수가 두 배 가까이 부풀고 그 두 이벤트 사이 간격이 0에 가까워
+    // 작성 시간까지 짧아진다. keydown은 한글 조합 중에도 물리 키 하나에
+    // 정확히 한 번만 오므로(keyCode 229 / key 'Process') 이것으로 센다.
+    form.addEventListener('keydown', function (event) {
+        if (event.ctrlKey || event.metaKey) { return; }   // 단축키는 타수가 아니다
+        if (event.repeat) { return; }                     // 키를 누르고 있는 것은 친 것이 아니다
+        var key = event.key || '';
+        // 화면 자판은 키 이름을 'Unidentified'로만 준다. 한 번에 한 낱말이
+        // 들어오기도 해서 이것으로 세면 오히려 적게 잡히므로 아래 input에 맡긴다.
+        if (!key || key === 'Unidentified') { return; }
+        if (SKIP_KEYS[key] || /^F\d{1,2}$/.test(key)) { return; }
+        keyboardMode = true;
+        tick();
+        strokes += 1;
+    });
+
+    // 화면 자판(휴대전화·태블릿)은 keydown이 오지 않거나 쓸모없는 값만 온다.
+    // 그런 환경에서만 예전처럼 input 이벤트로 센다.
     form.addEventListener('input', function (event) {
         var type = event.inputType || '';
-        tick();
+        tick();   // 붙여넣기·지우기도 '작성하던 시간'에는 넣는다
+        if (keyboardMode) { return; }
         if (type.indexOf('delete') === 0 || type.indexOf('history') === 0) { return; }
         if (type === 'insertFromPaste' || type === 'insertFromDrop') { return; }
         strokes += 1;
     });
+
+    // 붙여넣은 분량을 따로 세어 둔다. 남이 써준 글을 옮겨 붙이면 타자 속도가
+    // 아니라 붙여넣기 속도가 찍히기 때문이다.
+    form.addEventListener('paste', function (event) {
+        var clip = event.clipboardData || window.clipboardData;
+        var text = clip ? String(clip.getData('text') || '') : '';
+        pastedChars += text.length || 1;
+    });
+    form.addEventListener('drop', function (event) {
+        var moved = event.dataTransfer ? String(event.dataTransfer.getData('text') || '') : '';
+        pastedChars += moved.length || 1;
+    });
+
+    // 잰 값을 분당 타자수로 바꾼다. 믿을 수 없으면 0과 함께 이유를 남긴다.
+    function typingResult() {
+        var typed = 0;
+        var boxes = form.querySelectorAll('textarea');
+        for (var i = 0; i < boxes.length; i += 1) { typed += boxes[i].value.length; }
+        var seconds = Math.round(activeMs / 1000);
+        // 기록에 남기는 타수와 분당 타자수는 모두 실제로 친 값의 75%다.
+        var counted = Math.round(strokes * RECOGNITION);
+        if (!strokes) { return { cpm: 0, strokes: 0, seconds: seconds, note: 'none' }; }
+        if (typed && pastedChars / typed >= PASTE_RATIO) {
+            return { cpm: 0, strokes: counted, seconds: seconds, note: 'paste' };
+        }
+        // 표본이 쓸 만한지(너무 짧지 않은지)는 비율을 곱하기 전의 실측값으로 따진다.
+        if (strokes < MIN_STROKES || activeMs < MIN_ACTIVE) {
+            return { cpm: 0, strokes: counted, seconds: seconds, note: 'short' };
+        }
+        // n번 친 사이의 간격은 n-1개다. 타수를 그대로 나누면 짧게 칠수록
+        // 속도가 부풀려지므로 간격 수로 나눈다.
+        var measured = Math.round((strokes - 1) / (activeMs / 60000));
+        // 사람이 낼 수 있는 범위인지도 비율을 곱하기 전의 실측값으로 따진다.
+        // 먼저 곱하면 불가능한 1200타/분이 900으로 둔갑해 통과한다.
+        if (measured > MAX_CPM) { return { cpm: 0, strokes: counted, seconds: seconds, note: 'odd' }; }
+        return {
+            cpm: Math.round(measured * RECOGNITION),
+            strokes: counted, seconds: seconds, note: ''
+        };
+    }
 
     var submitButton = document.getElementById('submitButton');
     var feedback = document.getElementById('submitFeedback');
@@ -321,13 +401,11 @@
         submitButton.textContent = '전송 중…';
         var alarmFinished;
         try {
-            var cpm = 0;
-            if (strokes >= MIN_STROKES && activeMs >= MIN_ACTIVE) {
-                cpm = Math.round(strokes / (activeMs / 60000));
-            }
-            document.getElementById('typingCpm').value = cpm;
-            document.getElementById('typingStrokes').value = strokes;
-            document.getElementById('typingSeconds').value = Math.round(activeMs / 1000);
+            var measured = typingResult();
+            document.getElementById('typingCpm').value = measured.cpm;
+            document.getElementById('typingStrokes').value = measured.strokes;
+            document.getElementById('typingSeconds').value = measured.seconds;
+            document.getElementById('typingNote').value = measured.note;
             var formData = new FormData(form);
             // 음원 재생과 별개로 저장 요청을 즉시 보낸다.
             alarmFinished = playSoundOnce(alarmSoundUrl);

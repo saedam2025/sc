@@ -156,6 +156,78 @@
     .btn-mini-danger { border-color: transparent; color: #adb5bd; background: transparent; padding: 4px 7px; }
     .btn-mini-danger:hover { background: #fa5252; color: #fff; }
 
+    /* 접속정보(IP·기기) 보기 - 이름 버튼과 이상 접속 강조 */
+    .att-name-btn {
+        border: 0; background: transparent; padding: 0; cursor: pointer;
+        font: inherit; font-weight: 700; color: var(--text-dark);
+        display: inline-flex; align-items: center; gap: 5px;
+        border-bottom: 1px dashed var(--border-color, #cbd5e1);
+    }
+    .att-name-btn:hover { color: var(--primary-color, #4a90e2); border-bottom-color: currentColor; }
+    .att-name-btn.is-unusual { color: #dc2626; font-weight: 900; border-bottom-color: #dc2626; }
+    .att-name-btn.is-unusual:hover { color: #b91c1c; }
+    .att-name-btn[disabled] { cursor: default; border-bottom: 0; opacity: .85; }
+
+    /* 접속정보 모달 */
+    .att-modal[hidden] { display: none; }
+    .att-modal {
+        position: fixed; inset: 0; z-index: 1200;
+        display: flex; align-items: center; justify-content: center; padding: 18px;
+        background: rgba(15, 23, 42, .45);
+    }
+    .att-modal-card {
+        width: min(620px, 100%); max-height: 86vh; overflow: auto;
+        background: var(--card-bg, #fff); color: var(--text-dark);
+        border: 1px solid var(--border-color, #dbe3ef); border-radius: 16px;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, .28); padding: 20px;
+    }
+    .att-modal-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .att-modal-head h3 { margin: 0; font-size: 1.05rem; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+    .att-modal-head h3 i { color: var(--primary-color, #4a90e2); }
+    .att-modal-close {
+        margin-left: auto; border: 0; background: var(--widget-bg, #f1f5f9);
+        color: var(--text-gray, #64748b); width: 30px; height: 30px; border-radius: 8px;
+        cursor: pointer; font-size: 14px;
+    }
+    .att-modal-close:hover { background: var(--widget-hover, #e2e8f0); color: var(--text-dark); }
+    .att-access-alert {
+        border: 1px solid rgba(220, 38, 38, .35); background: rgba(220, 38, 38, .08);
+        color: #b91c1c; border-radius: 10px; padding: 11px 13px; font-size: 12.5px;
+        font-weight: 700; margin-bottom: 13px; line-height: 1.6;
+    }
+    .att-access-ok {
+        border: 1px solid rgba(34, 197, 94, .3); background: rgba(34, 197, 94, .09);
+        color: #15803d; border-radius: 10px; padding: 11px 13px; font-size: 12.5px;
+        font-weight: 700; margin-bottom: 13px;
+    }
+    .att-access-section { margin-bottom: 14px; }
+    .att-access-section > h4 {
+        margin: 0 0 8px; font-size: 12px; font-weight: 900;
+        color: var(--text-gray, #64748b); text-transform: none;
+    }
+    .att-access-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .att-access-box {
+        border: 1px solid var(--border-color, #e2e8f0); border-radius: 11px;
+        padding: 11px 12px; background: var(--widget-bg, #f8fafc); min-width: 0;
+    }
+    .att-access-box b { display: block; font-size: 12px; font-weight: 900; margin-bottom: 7px; }
+    .att-access-row { display: flex; gap: 7px; font-size: 12px; margin-top: 4px; line-height: 1.5; }
+    .att-access-row span:first-child { color: var(--text-gray, #64748b); font-weight: 700; flex: 0 0 52px; }
+    .att-access-row span:last-child { font-weight: 700; word-break: break-all; min-width: 0; }
+    .att-access-row.is-new span:last-child { color: #dc2626; }
+    .att-access-ua { margin-top: 7px; font-size: 10.5px; color: var(--text-gray, #94a3b8); word-break: break-all; line-height: 1.45; }
+    .att-usual-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .att-usual-chip {
+        border: 1px solid var(--border-color, #e2e8f0); border-radius: 999px;
+        padding: 4px 10px; font-size: 11.5px; font-weight: 700;
+        background: var(--widget-bg, #f1f5f9); color: var(--text-dark);
+    }
+    .att-usual-chip small { color: var(--text-gray, #94a3b8); font-weight: 700; margin-left: 4px; }
+
+    @media (max-width: 560px) {
+        .att-access-grid { grid-template-columns: 1fr; }
+    }
+
     @media (max-width: 1150px) {
         .att-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
@@ -442,6 +514,19 @@
     </div>
 
 </div>
+
+<!-- 접속정보(IP·기기) 모달 -->
+<div class="att-modal" id="attAccessModal" hidden role="dialog" aria-modal="true" aria-labelledby="attAccessTitle">
+    <div class="att-modal-card">
+        <div class="att-modal-head">
+            <h3 id="attAccessTitle"><i class="fa-solid fa-shield-halved"></i> 접속정보</h3>
+            <button type="button" class="att-modal-close" onclick="closeAccessInfo()" aria-label="닫기">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="attAccessBody"></div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -513,6 +598,120 @@ function attRankLabel(rank) {
     return `${rank}등`;
 }
 
+/* 이름 셀: 클릭하면 접속정보를 보여주고, 평소와 다른 접속이면 빨갛게 표시한다. */
+function attNameCell(member) {
+    const name = escapeAttHtml(member.user_name);
+    if (!member.has_access_info) {
+        return `<button type="button" class="att-name-btn" disabled title="저장된 접속정보가 없습니다.">${name}</button>`;
+    }
+    const unusual = !!member.is_unusual_access;
+    const title = unusual
+        ? escapeAttHtml((member.access_reasons || []).join(' / ') || '평소와 다른 접속정보입니다.')
+        : '접속 IP·기기 정보 보기';
+    const mark = unusual ? ' <i class="fa-solid fa-triangle-exclamation"></i>' : '';
+    return `<button type="button" class="att-name-btn${unusual ? ' is-unusual' : ''}"
+                    title="${title}" onclick="openAccessInfo(${member.id})">${name}${mark}</button>`;
+}
+
+/* ---------- 접속정보 모달 ---------- */
+const attAccessModal = document.getElementById('attAccessModal');
+const attAccessBody = document.getElementById('attAccessBody');
+const attAccessTitle = document.getElementById('attAccessTitle');
+
+function closeAccessInfo() {
+    attAccessModal.hidden = true;
+    attAccessBody.innerHTML = '';
+}
+
+attAccessModal.addEventListener('click', (event) => {
+    if (event.target === attAccessModal) closeAccessInfo();
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !attAccessModal.hidden) closeAccessInfo();
+});
+
+function attAccessRow(label, value, isNew) {
+    const text = value ? escapeAttHtml(value) : '기록 없음';
+    return `<div class="att-access-row${isNew ? ' is-new' : ''}">
+                <span>${escapeAttHtml(label)}</span><span>${text}</span>
+            </div>`;
+}
+
+function attAccessBox(title, entry, usual) {
+    if (!entry.ip && !entry.device) {
+        return `<div class="att-access-box"><b>${escapeAttHtml(title)}</b>
+                    <div class="att-access-row"><span>기록</span><span>없음</span></div>
+                </div>`;
+    }
+    // 평소 목록에 없는 값은 빨갛게 짚어준다.
+    const knownIps = usual.ips.map((item) => item.value);
+    const knownDevices = usual.devices.map((item) => item.value);
+    const compare = usual.records >= usual.min_records;
+    return `<div class="att-access-box">
+        <b>${escapeAttHtml(title)}${entry.time ? ' · ' + escapeAttHtml(entry.time) : ''}</b>
+        ${attAccessRow('IP', entry.ip, compare && entry.ip && !knownIps.includes(entry.ip))}
+        ${attAccessRow('기기', entry.device, compare && entry.device && !knownDevices.includes(entry.device))}
+        ${entry.user_agent ? `<div class="att-access-ua">${escapeAttHtml(entry.user_agent)}</div>` : ''}
+    </div>`;
+}
+
+function attUsualChips(items, emptyText) {
+    if (!items.length) return `<div class="stat-hint">${escapeAttHtml(emptyText)}</div>`;
+    return `<div class="att-usual-list">${items.map((item) => `
+        <span class="att-usual-chip">${escapeAttHtml(item.value)}<small>${item.count}회</small></span>
+    `).join('')}</div>`;
+}
+
+async function openAccessInfo(recordId) {
+    attAccessModal.hidden = false;
+    attAccessTitle.innerHTML = '<i class="fa-solid fa-shield-halved"></i> 접속정보';
+    attAccessBody.innerHTML = '<div class="empty-note"><i class="fa-solid fa-spinner fa-spin"></i> 접속정보를 불러오는 중입니다.</div>';
+
+    try {
+        const response = await fetch(`/attendance/access-info?record_id=${encodeURIComponent(recordId)}`);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || '접속정보를 불러오지 못했습니다.');
+
+        const { record, access, usual, anomaly } = result;
+        attAccessTitle.innerHTML = `<i class="fa-solid fa-shield-halved"></i>
+            ${escapeAttHtml(record.user_name)} <span class="stat-hint" style="margin:0 0 0 2px;">
+            ${escapeAttHtml(record.position)} · ${escapeAttHtml(record.date)} (${escapeAttHtml(record.weekday)})</span>`;
+
+        const notice = anomaly.is_unusual
+            ? `<div class="att-access-alert"><i class="fa-solid fa-triangle-exclamation"></i>
+                   평소와 다른 접속정보가 확인되었습니다.<br>
+                   ${anomaly.reasons.map((reason) => '· ' + escapeAttHtml(reason)).join('<br>')}
+               </div>`
+            : (usual.records >= usual.min_records
+                ? `<div class="att-access-ok"><i class="fa-solid fa-circle-check"></i> 평소 사용하던 IP·기기와 같습니다.</div>`
+                : `<div class="stat-hint" style="margin-bottom:13px;">
+                       <i class="fa-solid fa-circle-info"></i> 비교할 과거 기록이 ${usual.records}건뿐이라
+                       평소 접속정보 판정은 ${usual.min_records}건 이상 쌓인 뒤부터 적용됩니다.
+                   </div>`);
+
+        attAccessBody.innerHTML = `
+            ${notice}
+            <div class="att-access-section">
+                <h4>이 날의 접속정보</h4>
+                <div class="att-access-grid">
+                    ${attAccessBox('출근', access.in, usual)}
+                    ${attAccessBox('퇴근', access.out, usual)}
+                </div>
+            </div>
+            <div class="att-access-section">
+                <h4>평소 사용 IP (최근 ${usual.baseline_days}일 · ${usual.records}건 기준)</h4>
+                ${attUsualChips(usual.ips, '이전 접속 기록이 없습니다.')}
+            </div>
+            <div class="att-access-section" style="margin-bottom:0;">
+                <h4>평소 사용 기기</h4>
+                ${attUsualChips(usual.devices, '이전 접속 기록이 없습니다.')}
+            </div>
+        `;
+    } catch (error) {
+        attAccessBody.innerHTML = `<div class="empty-note">${escapeAttHtml(error.message || '접속정보를 불러오지 못했습니다.')}</div>`;
+    }
+}
+
 function attActionCell(member) {
     const buttons = [];
     if (String(member.emp_no) === String(attCurrentEmpNo) && !member.clock_out_time) {
@@ -554,7 +753,7 @@ bindExpandableAttRows('.js-daily-attendance', async (row) => {
             <tbody>${result.members.map((member) => `
                 <tr>
                     <td style="font-weight:700;">${attRankLabel(member.daily_rank)}</td>
-                    <td style="font-weight:700;">${escapeAttHtml(member.user_name)}</td>
+                    <td>${attNameCell(member)}</td>
                     <td>${escapeAttHtml(member.position)}</td>
                     <td style="color: var(--text-gray, #64748b);">${escapeAttHtml(member.plan_text)}</td>
                     <td>${escapeAttHtml(member.clock_in_time)}${member.is_late ? ' <span class="att-badge att-badge-late">지각</span>' : ''}</td>

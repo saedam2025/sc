@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview_sheet.css', v='20260903-25') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview_sheet.css', v='20260904-31') }}">
 </head>
 <body class="ivs-body">
 
@@ -21,6 +21,10 @@
         <div class="ivs-title-actions" id="sheetTitleActions"></div>
     </div>
     <div class="ivs-topbar-actions">
+        <button class="ivs-button ivs-record" id="recordToggle" type="button" aria-pressed="false" hidden>
+            <span class="ivs-record-dot" aria-hidden="true"></span>
+            <span class="ivs-record-text" id="recordLabel">녹음</span>
+        </button>
         <div class="ivs-zoom" role="group" aria-label="글자 크기">
             <button type="button" id="zoomOut" aria-label="글자 작게">A<i class="fa-solid fa-minus"></i></button>
             <span id="zoomLabel">100%</span>
@@ -100,6 +104,11 @@
             <h2 id="focusTitle">면접 진행</h2>
         </div>
         <div class="ivs-focus-actions">
+            <!-- 면접 집중 모드에서도 같은 녹음을 멈출 수 있도록 상단바 버튼을 나란히 둔다. -->
+            <button class="ivs-button ivs-record is-dark" id="focusRecordToggle" type="button" aria-pressed="false" hidden>
+                <span class="ivs-record-dot" aria-hidden="true"></span>
+                <span class="ivs-record-text" id="focusRecordLabel">녹음</span>
+            </button>
             <div class="ivs-zoom is-dark" role="group" aria-label="글자 크기">
                 <button type="button" id="focusZoomOut" aria-label="글자 작게">A<i class="fa-solid fa-minus"></i></button>
                 <span id="focusZoomLabel">100%</span>
@@ -209,6 +218,6 @@ window.IVS_MAX_PANELISTS = {{ max_panelists }};
 window.IVS_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IVS_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview_sheet.js', v='20260903-25') }}"></script>
+<script src="{{ url_for('static', filename='js/interview_sheet.js', v='20260904-31') }}"></script>
 </body>
 </html>

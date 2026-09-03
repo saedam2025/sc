@@ -2,12 +2,15 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260903-35') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260904-43') }}">
 
 <main class="iv-page">
     <section class="iv-hero" aria-labelledby="interviewTitle">
         <div class="iv-hero-copy">
-            <span class="iv-hero-icon" aria-hidden="true"><i class="fa-solid fa-user-check"></i></span>
+            <button type="button" class="iv-hero-icon" id="heroReveal"
+                    title="면접자 목록 열기" aria-label="면접자 목록 열기" aria-expanded="true">
+                <i class="fa-solid fa-user-check" aria-hidden="true"></i>
+            </button>
             <div>
                 <span class="iv-eyebrow">SAEDAM INTERVIEW</span>
                 <h1 id="interviewTitle">면접관리</h1>
@@ -18,6 +21,14 @@
             <img src="{{ url_for('static', filename='logo01.gif') }}" alt="SAEDAM" class="iv-ai-brand-logo">
             <p class="iv-ai-brand-preset">{% if ai_status.source != 'none' %}SaeDam AI Preset {{ ai_status.preset_id }} - {{ ai_status.model_short_name }}.{% else %}SaeDam AI Preset 미설정{% endif %}</p>
         </div>
+    </section>
+
+    <!-- 면접자가 사전질문지를 쓰는 동안 목록을 감춰 둔다. 제목 앞 큰 아이콘을
+         눌러야 다시 열린다. -->
+    <section class="iv-handoff-note" id="handoffNote" hidden>
+        <img class="iv-handoff-character" alt="" aria-hidden="true"
+             src="{{ url_for('static', filename='girl_ok.png') }}">
+        <p class="iv-handoff-bubble" id="handoffBubble" role="status">면접자가 사전질문지를 작성하고 있습니다</p>
     </section>
 
     <section class="iv-workspace">
@@ -148,5 +159,5 @@ window.IV_MAX_PANELISTS = {{ max_panelists }};
 window.IV_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IV_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview.js', v='20260903-35') }}"></script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260904-43') }}"></script>
 {% endblock %}
