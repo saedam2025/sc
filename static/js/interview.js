@@ -11,6 +11,13 @@
     const MAX_ATTACHMENTS = Number(window.IV_MAX_ATTACHMENTS || 20);
     const MAX_ATTACHMENT_TOTAL_BYTES = Number(window.IV_MAX_ATTACHMENT_TOTAL_BYTES || (30 * 1024 * 1024));
 
+    // 다른 창(진행표·사전질문지)의 변경을 알리는 메시지 종류와 같은 출처 방송채널.
+    const INTERVIEW_SYNC_TYPES = new Set([
+        'interview-sheet-updated', 'interview-questionnaire-submitted',
+    ]);
+    const syncChannel = (typeof BroadcastChannel !== 'undefined')
+        ? new BroadcastChannel('saedam-interview') : null;
+
     const PAGE_SIZE = 10;
     const LIST_STAR_COUNT = 5;
     const LIST_STAR_GLYPHS = '<i class="fa-solid fa-star"></i>'.repeat(LIST_STAR_COUNT);
@@ -223,6 +230,22 @@
         return `<span class="iv-result-icon ${tone}" role="img" title="${label}" aria-label="${label}"><i class="fa-solid ${icon}"></i></span>`;
     }
 
+    // 결과안내 열. 합격·불합격이 정해진 지원자에게 '안내전송' 글자가 나오고,
+    // 누르면 면접 진행표 창이 열리면서 안내전송 창이 바로 뜬다.
+    const GUIDE_RESULTS = new Set(['pass', 'fail']);
+
+    function guideCell(item) {
+        if (!item.can_manage || !GUIDE_RESULTS.has(item.result)) return '<span class="iv-dash">-</span>';
+        const notice = item.guide_notice || {};
+        const sent = Boolean(notice.is_sent);
+        const title = sent
+            ? `${notice.sent_at || ''} 안내전송${notice.sent_by_name ? ` · ${notice.sent_by_name}` : ''}`
+            : `${item.result === 'pass' ? '합격' : '불합격'} 안내메일 보내기`;
+        return `<button type="button" class="iv-guide-link${sent ? ' is-sent' : ''}"
+                    data-open-guide="${item.id}" title="${escapeHtml(title.trim())}">${
+                    sent ? '다시전송' : '안내전송'}</button>`;
+    }
+
     function questionnaireCell(item) {
         // 글자를 눌러도 관리 열의 [사전질문지] 버튼과 같은 창이 열린다.
         let note;
@@ -271,7 +294,7 @@
         if (!rows.length) {
             state.page = 1;
             state.pageManageableIds = [];
-            candidateList.innerHTML = `<tr><td class="iv-empty-cell" colspan="11">${
+            candidateList.innerHTML = `<tr><td class="iv-empty-cell" colspan="12">${
                 state.candidates.length ? '조건에 맞는 면접 기록이 없습니다.'
                     : '등록된 면접자가 없습니다. 위쪽 <b>면접자 입력</b> 버튼으로 시작해주세요.'
             }</td></tr>`;
@@ -309,6 +332,7 @@
                 <td class="iv-cell-progress" data-label="진행 현황"><div class="iv-status-line">${statusCell(item)}</div></td>
                 <td class="iv-cell-score" data-label="면접관 평가">${scoreCell(item)}</td>
                 <td class="iv-cell-result" data-label="최종결과"><div class="iv-status-line">${resultCell(item)}</div></td>
+                <td class="iv-cell-guide" data-label="결과안내"><div class="iv-status-line">${guideCell(item)}</div></td>
                 <td class="iv-cell-actions" data-label="관리">
                     <div class="iv-actions-layout">
                         <span class="iv-action-sub">
@@ -479,7 +503,7 @@
                 await loadCandidates();
                 closeCandidateModal();
                 // 이력서를 함께 올렸으면 진행표 창에서 곧바로 AI 분석을 시작한다.
-                if (created.candidate) openSheet(created.candidate.id, files.length > 0);
+                if (created.candidate) openSheet(created.candidate.id, { analyze: files.length > 0 });
                 return;
             }
             await loadCandidates();
@@ -494,8 +518,9 @@
 
     // ------------------------------------------------------------ 면접 진행표 (새 브라우저 창)
 
-    function openSheet(id, autoAnalyze = false) {
-        const url = `/interview/sheet/${id}${autoAnalyze ? '?analyze=1' : ''}`;
+    function openSheet(id, options = {}) {
+        const query = options.analyze ? '?analyze=1' : (options.guide ? '?guide=1' : '');
+        const url = `/interview/sheet/${id}${query}`;
         const width = Math.min(1560, Math.max(1100, window.screen.availWidth - 80));
         const height = Math.max(720, window.screen.availHeight - 90);
         // 진행표 창이 저장 결과를 목록으로 알려야 해서 opener 연결(noopener 제외)을 유지한다.
@@ -507,7 +532,8 @@
 
     function openQuestionnaire(id) {
         const item = state.candidates.find((row) => row.id === Number(id));
-        if (item) window.open(item.questionnaire_url, '_blank', 'noopener,width=880,height=960');
+        // 전송 완료를 목록에 알려야 해서 opener 연결(noopener 제외)을 유지한다.
+        if (item) window.open(item.questionnaire_url, `ivQuestion${id}`, 'width=880,height=960,resizable=yes,scrollbars=yes');
     }
 
     // ------------------------------------------------------------ 이벤트
@@ -516,6 +542,7 @@
         const button = event.target.closest('button');
         if (!button) return;
         if (button.dataset.openDetail) return openSheet(button.dataset.openDetail);
+        if (button.dataset.openGuide) return openSheet(button.dataset.openGuide, { guide: true });
         if (button.dataset.openQuestion) return openQuestionnaire(button.dataset.openQuestion);
     }
 
@@ -581,11 +608,32 @@
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !candidateModal.hidden) closeCandidateModal();
     });
-    // 진행표 창에서 저장이 끝나면 목록을 자동으로 갱신한다.
+    // ------------------------------------------------------------ 다른 창의 변경 반영
+    // 진행표·사전질문지는 별도 창에서 열리므로, 그쪽에서 저장이 끝나면 목록을 바로 다시 읽는다.
+    // 창을 여는 방식(팝업 차단·opener 없음 등)에 따라 한 가지 경로만으로는 놓치는 경우가 있어
+    // ① 같은 출처 방송채널 ② opener 메시지 ③ 창이 다시 활성화될 때, 세 가지를 함께 쓴다.
+    let syncTimer = 0;
+
+    function syncList() {
+        window.clearTimeout(syncTimer);
+        syncTimer = window.setTimeout(() => { loadCandidates(); }, 120);
+    }
+
     window.addEventListener('message', (event) => {
-        if (event.origin === window.location.origin && event.data && event.data.type === 'interview-sheet-updated') {
-            loadCandidates();
-        }
+        if (event.origin !== window.location.origin || !event.data) return;
+        if (INTERVIEW_SYNC_TYPES.has(event.data.type)) syncList();
+    });
+
+    if (syncChannel) {
+        syncChannel.addEventListener('message', (event) => {
+            if (event.data && INTERVIEW_SYNC_TYPES.has(event.data.type)) syncList();
+        });
+    }
+
+    // 진행표 창에서 작업하고 목록 창으로 돌아왔을 때도 최신 상태를 보여준다.
+    window.addEventListener('focus', syncList);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') syncList();
     });
 
     setupDropZone(byId('createDropZone'));

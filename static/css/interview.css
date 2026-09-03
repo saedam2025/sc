@@ -85,9 +85,10 @@
 .iv-table col.iv-col-progress { width:10%; }
 .iv-table col.iv-col-questionnaire { width:11%; }
 .iv-table col.iv-col-materials { width:9%; }
-.iv-table col.iv-col-score { width:12%; }
-.iv-table col.iv-col-result { width:7%; }
-.iv-table col.iv-col-actions { width:15%; }
+.iv-table col.iv-col-score { width:10%; }
+.iv-table col.iv-col-result { width:6%; }
+.iv-table col.iv-col-guide { width:8%; }
+.iv-table col.iv-col-actions { width:13%; }
 .iv-table th { padding:12px 13px; background:#f4f7f9; color:#536176; font-size:.69rem; font-weight:850;
     text-align:left; white-space:nowrap; border-bottom:1px solid #dbe5ec; letter-spacing:-.01em; }
 .iv-table td { height:64px; padding:8px 12px; border-bottom:1px solid #e8eef2; color:var(--iv-ink);
@@ -161,6 +162,13 @@
 .iv-result-icon.is-pass { color:#e0435c; }
 .iv-result-icon.is-fail { color:#8794a6; }
 .iv-result-icon.is-hold { color:#c9922a; }
+/* 결과안내 열의 작은 글자 버튼(합격자만). 자리를 거의 쓰지 않는다. */
+.iv-cell-guide .iv-status-line { flex-wrap:nowrap; align-items:center; justify-content:center; }
+.iv-guide-link { padding:0; border:0; background:none; color:#0b7a63;
+    font-size:.68rem; font-weight:800; white-space:nowrap; cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+.iv-guide-link:hover { color:#065c4d; }
+.iv-guide-link.is-sent { color:#8a6d1f; }
 .iv-table td.iv-cell-actions { padding:8px 10px; }
 .iv-actions-layout { display:flex; align-items:center; gap:4px; }
 .iv-cell-actions button { min-height:28px; display:inline-flex; align-items:center; justify-content:center; gap:5px;
@@ -298,20 +306,26 @@ body.iv-modal-open { overflow:hidden; }
     .iv-table col.iv-col-select { width:3%; }
     .iv-table col.iv-col-number { width:4%; }
     .iv-table col.iv-col-candidate { width:11%; }
-    .iv-table col.iv-col-school { width:11%; }
+    .iv-table col.iv-col-school { width:10%; }
     .iv-table col.iv-col-when { width:8%; }
     .iv-table col.iv-col-progress { width:9%; }
-    .iv-table col.iv-col-questionnaire { width:12%; }
+    .iv-table col.iv-col-questionnaire { width:10%; }
     .iv-table col.iv-col-materials { width:9%; }
-    .iv-table col.iv-col-score { width:12%; }
+    .iv-table col.iv-col-score { width:10%; }
     .iv-table col.iv-col-result { width:6%; }
-    .iv-table col.iv-col-actions { width:15%; }
+    /* 결과안내: 합격자에게만 '안내전송' 글자가 들어가는 열 */
+    .iv-table col.iv-col-guide { width:7%; }
+    .iv-table col.iv-col-actions { width:13%; }
     .iv-table th { padding:12px 12px; background:rgba(0,0,0,.03); color:var(--iv-ink); font-size:.82rem;
         font-weight:700; text-align:center; border-bottom:1px solid rgba(0,0,0,.06); }
     .iv-table td { height:66px; padding:10px 12px; background:var(--iv-surface); color:var(--iv-ink); font-size:.8rem;
         text-align:center; border-bottom:1px solid rgba(0,0,0,.06); }
     .iv-row:hover td { background:var(--iv-widget-hover); }
-    .iv-cell-candidate, .iv-cell-school { text-align:left !important; }
+    /* 열 제목이 모두 가운데 정렬이므로 지원자·대상학교 칸도 가운데로 맞춘다.
+       (예전에는 이 두 칸만 왼쪽 정렬이라 제목과 줄이 어긋나 보였다.) */
+    .iv-cell-candidate, .iv-cell-school { text-align:center; }
+    .iv-cell-candidate .iv-candidate-layout { justify-content:center; }
+    .iv-cell-candidate .iv-candidate-copy { text-align:center; }
 }
 
 .iv-cell-number { color:var(--iv-muted); font-size:.76rem; font-weight:700; font-variant-numeric:tabular-nums; }

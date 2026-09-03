@@ -8,6 +8,8 @@
     const MAX_ATTACHMENT_TOTAL_BYTES = Number(window.IVS_MAX_ATTACHMENT_TOTAL_BYTES || (30 * 1024 * 1024));
 
     const state = { csrfToken: String(window.IVS_CSRF_TOKEN || ''), candidate: null, analyzing: false, focus: false };
+    // 안내메일을 보낼 수 있는 최종결과. 보류는 아직 알릴 내용이 없으므로 뺀다.
+    const GUIDE_RESULTS = new Set(['pass', 'fail']);
 
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]
@@ -158,12 +160,21 @@
         return data;
     }
 
+    // 같은 출처의 다른 창(면접관리 목록)에 변경을 알린다. opener 연결이 끊겼거나
+    // 목록을 다른 탭에서 열어둔 경우까지 닿도록 방송채널도 함께 쓴다.
+    const syncChannel = (typeof BroadcastChannel !== 'undefined')
+        ? new BroadcastChannel('saedam-interview') : null;
+
     function notifyOpener() {
+        const message = { type: 'interview-sheet-updated', id: CANDIDATE_ID };
         try {
             if (window.opener && !window.opener.closed) {
-                window.opener.postMessage({ type: 'interview-sheet-updated', id: CANDIDATE_ID }, window.location.origin);
+                window.opener.postMessage(message, window.location.origin);
             }
         } catch (error) { /* 목록 창이 이미 닫힌 경우는 무시한다. */ }
+        try {
+            if (syncChannel) syncChannel.postMessage(message);
+        } catch (error) { /* 방송채널을 못 쓰는 환경은 opener 경로만 쓴다. */ }
     }
 
     const questionnaireLabels = Array.from(
@@ -239,6 +250,31 @@
         // 합격 여부는 목록 화면과 같은 아이콘을 쓴다(합격 하트 · 불합격 깨진 하트 · 보류 모래시계).
         const resultIcon = { pass: 'fa-heart', fail: 'fa-heart-crack', hold: 'fa-hourglass-half' }[item.result];
 
+        // 합격·불합격이 정해지면 그 글자 오른쪽에 안내전송 버튼이 붙는다.
+        const guideButton = (row) => (row.can_manage && GUIDE_RESULTS.has(row.result)
+            ? `<button type="button" class="ivs-guide-open${
+                row.guide_notice && row.guide_notice.is_sent ? ' is-sent' : ''}" id="openGuide"
+                   title="${row.result === 'pass' ? '합격' : '불합격'} 안내메일 보내기">${
+                       row.guide_notice && row.guide_notice.is_sent ? '다시전송' : '안내전송'}</button>`
+            : '');
+        const guideSentMark = (row) => {
+            const notice = row.guide_notice;
+            if (!notice || !GUIDE_RESULTS.has(row.result)) return '';
+            if (notice.is_sent) {
+                // 칸이 좁으므로 화면에는 연도를 뺀 날짜만 두고, 자세한 내용은 툴팁으로 보여준다.
+                const when = formatDateTime(notice.sent_at);
+                const full = `${when} 안내전송${notice.sent_by_name ? ` · ${notice.sent_by_name}` : ''}`
+                    + `${notice.to_email ? ` · ${notice.to_email}` : ''}`;
+                return `<span class="ivs-guide-sent-mark" title="${escapeHtml(full)}">${
+                    escapeHtml(when.slice(5))} 안내전송</span>`;
+            }
+            if (notice.status === 'failed') {
+                return `<span class="ivs-guide-sent-mark is-failed" title="${
+                    escapeHtml(notice.error_message || '')}">지난 안내전송 실패</span>`;
+            }
+            return '';
+        };
+
         const resultButtons = ['pass', 'fail', 'hold'].map((key) => {
             const label = { pass: '합격', fail: '불합격', hold: '보류' }[key];
             const active = item.result === key ? ' is-active' : '';
@@ -264,9 +300,10 @@
                     </div>
                     <div class="ivs-status-cell">
                         <span class="ivs-status-key">최종 결과</span>
-                        ${item.result_label
+                        <span class="ivs-status-result-line">${item.result_label
                             ? `<span class="ivs-status-result is-${item.result}"><i class="fa-solid ${resultIcon || 'fa-hourglass-half'}" aria-hidden="true"></i>${escapeHtml(item.result_label)}</span>`
-                            : '<span class="ivs-status-result is-none">미정</span>'}
+                            : '<span class="ivs-status-result is-none">미정</span>'}${guideButton(item)}</span>
+                        ${guideSentMark(item)}
                     </div>
                     <div class="ivs-status-cell">
                         <span class="ivs-status-key">면접관 평균</span>
@@ -827,6 +864,10 @@
                 openFocus();
                 return;
             }
+            if (button.id === 'openGuide') {
+                await openGuideModal();
+                return;
+            }
             if (button.dataset.editPanelist) {
                 const body = button.closest('.ivs-panelist-body');
                 const note = body.querySelector('.ivs-panelist-note');
@@ -894,6 +935,280 @@
         }
     }
 
+    // ------------------------------------------------------------ 합격 안내전송
+
+    const guideState = { catalog: null, canManageSamples: false, sampleKey: '', previewTimer: 0, busy: false };
+
+    function setGuideFeedback(message, type) {
+        const node = byId('guideFeedback');
+        node.textContent = message || '';
+        node.classList.toggle('is-error', type === 'error');
+        node.classList.toggle('is-success', type === 'success');
+    }
+
+    // 준비서류 샘플은 등록·삭제될 수 있으므로 볼 때마다 새로 받아온다.
+    const sampleThumbUrl = (doc) => `${doc.sample_url}?t=${Date.now()}`;
+
+    function guideDocRow(doc, chosen) {
+        const picked = chosen.get(doc.key);
+        const on = picked !== undefined;
+        const detailInput = doc.key === 'etc'
+            ? `<input type="text" data-guide-detail="${doc.key}" maxlength="300"
+                      placeholder="예) 통장 사본, 신분증 사본" value="${escapeHtml(picked || '')}">`
+            : '';
+        const tools = guideState.canManageSamples
+            ? `<div class="ivs-guide-doc-tools">
+                   <button type="button" data-guide-sample="${doc.key}">샘플등록</button>
+                   ${doc.has_custom_sample
+                       ? `<button type="button" data-guide-sample-reset="${doc.key}">기본으로</button>` : ''}
+               </div>`
+            : '';
+        return `<li class="ivs-guide-doc${on ? ' is-on' : ''}" data-guide-doc="${doc.key}">
+            <input type="checkbox" data-guide-check="${doc.key}"${on ? ' checked' : ''}
+                   aria-label="${escapeHtml(doc.label)} 안내">
+            <span class="ivs-guide-doc-thumb" data-guide-zoom="${doc.key}"
+                  style="background-image:url('${sampleThumbUrl(doc)}')" title="샘플 사진 크게 보기"></span>
+            <div class="ivs-guide-doc-copy">
+                <strong>${escapeHtml(doc.label)}</strong>
+                <p>${escapeHtml(doc.note)}</p>
+                ${detailInput}
+            </div>
+            ${tools}
+        </li>`;
+    }
+
+    function renderGuideDocs(selected) {
+        const chosen = new Map((selected || []).map((item) => [
+            typeof item === 'string' ? item : String(item.key || ''),
+            typeof item === 'string' ? '' : String(item.detail || ''),
+        ]));
+        byId('guideDocs').innerHTML = (guideState.catalog || [])
+            .map((doc) => guideDocRow(doc, chosen)).join('');
+    }
+
+    function collectGuideDocuments() {
+        return Array.from(byId('guideDocs').querySelectorAll('[data-guide-check]:checked')).map((box) => {
+            const key = box.dataset.guideCheck;
+            const detail = byId('guideDocs').querySelector(`[data-guide-detail="${key}"]`);
+            return { key, detail: detail ? detail.value.trim() : '' };
+        });
+    }
+
+    function guidePayload() {
+        return {
+            to_email: byId('guideEmail').value.trim(),
+            start_date: byId('guideStartDate').value,
+            start_time: byId('guideStartTime').value,
+            start_place: byId('guideStartPlace').value.trim(),
+            contact: byId('guideContact').value.trim(),
+            extra_notes: byId('guideExtraNotes').value,
+            documents: collectGuideDocuments(),
+        };
+    }
+
+    async function refreshGuidePreview() {
+        try {
+            const data = await apiRequest(`candidates/${CANDIDATE_ID}/guide-notice/preview`, {
+                method: 'POST', body: JSON.stringify(guidePayload()),
+            });
+            byId('guidePreviewFrame').srcdoc = data.html || '';
+        } catch (error) {
+            setGuideFeedback(error.message, 'error');
+        }
+    }
+
+    // 입력할 때마다 서버를 부르지 않도록 잠깐 기다렸다가 한 번만 다시 그린다.
+    function scheduleGuidePreview() {
+        window.clearTimeout(guideState.previewTimer);
+        guideState.previewTimer = window.setTimeout(refreshGuidePreview, 500);
+    }
+
+    async function loadGuideCatalog() {
+        if (guideState.catalog) return;
+        const data = await apiRequest('guide-documents');
+        guideState.catalog = data.documents || [];
+        guideState.canManageSamples = Boolean(data.can_manage_samples);
+    }
+
+    async function openGuideModal() {
+        const item = state.candidate;
+        if (!item) return;
+        setGuideFeedback('');
+        try {
+            await loadGuideCatalog();
+        } catch (error) {
+            setFeedback(error.message, 'error');
+            return;
+        }
+        const notice = item.guide_notice || {};
+        const passed = item.result === 'pass';
+        // 불합격 안내에는 출근 안내와 준비서류가 들어가지 않는다.
+        byId('guideTitle').textContent = passed ? '합격 안내전송' : '불합격 안내전송';
+        byId('guideKicker').textContent = passed ? 'WELCOME GUIDE' : 'INTERVIEW RESULT';
+        byId('guideSubtitle').textContent = passed
+            ? `${item.name} 님에게 출근 안내와 준비서류를 이메일로 보냅니다.`
+            : `${item.name} 님에게 면접 결과를 정중하게 안내합니다.`;
+        byId('guidePassOnly').hidden = !passed;
+        byId('guideDocsField').hidden = !passed;
+        byId('guideExtraLabel').textContent = passed ? '기타 준비사항' : '추가 안내 말씀';
+        byId('guideExtraNotes').placeholder = passed
+            ? '예) 첫날은 편한 복장으로 오셔도 됩니다. 주차는 건물 뒤편 주차장을 이용해주세요.'
+            : '예) 다음 채용 공고는 기관 홈페이지에 안내드릴 예정입니다.';
+        byId('guideSend').innerHTML = `<i class="fa-solid fa-paper-plane"></i> ${
+            passed ? '합격' : '불합격'} 안내메일 보내기`;
+        byId('guideEmail').value = notice.to_email || '';
+        byId('guideEmailHint').textContent = notice.to_email
+            ? (notice.to_email === notice.resume_email
+                ? 'AI 이력서 요약에서 찾은 주소입니다. 필요하면 직접 고쳐주세요.'
+                : '직접 입력한 주소입니다.')
+            : 'AI가 이력서에서 이메일을 찾지 못했습니다. 직접 입력해주세요.';
+        byId('guideStartDate').value = notice.start_date || '';
+        byId('guideStartTime').value = notice.start_time || '';
+        byId('guideStartPlace').value = notice.start_place || '';
+        byId('guideContact').value = notice.contact || '';
+        byId('guideExtraNotes').value = notice.extra_notes || '';
+        // 처음 여는 경우에는 자주 쓰는 서류를 미리 체크해 둔다.
+        const preset = (notice.documents && notice.documents.length)
+            ? notice.documents
+            : ['resume', 'education', 'health', 'tuberculosis'];
+        renderGuideDocs(preset);
+
+        const sentInfo = byId('guideSentInfo');
+        if (notice.is_sent && notice.sent_at) {
+            sentInfo.textContent = `이미 ${formatDateTime(notice.sent_at)}에 ${notice.to_email} 로 보냈습니다`
+                + `${notice.sent_by_name ? ` (${notice.sent_by_name})` : ''}. 다시 보내면 새로 발송됩니다.`;
+            sentInfo.hidden = false;
+        } else if (notice.status === 'failed' && notice.error_message) {
+            sentInfo.textContent = `지난 발송이 실패했습니다: ${notice.error_message}`;
+            sentInfo.hidden = false;
+        } else {
+            sentInfo.hidden = true;
+        }
+
+        byId('guideModal').hidden = false;
+        document.body.classList.add('ivs-guide-open-body');
+        byId('guideEmail').focus();
+        refreshGuidePreview();
+    }
+
+    function closeGuideModal() {
+        window.clearTimeout(guideState.previewTimer);
+        byId('guideModal').hidden = true;
+        document.body.classList.remove('ivs-guide-open-body');
+    }
+
+    async function sendGuideNotice() {
+        const payload = guidePayload();
+        const passed = state.candidate && state.candidate.result === 'pass';
+        if (!payload.to_email) { byId('guideEmail').focus(); setGuideFeedback('받는 사람 이메일을 입력해주세요.', 'error'); return; }
+        if (passed && !payload.start_date) { byId('guideStartDate').focus(); setGuideFeedback('출근일을 입력해주세요.', 'error'); return; }
+        if (passed && !payload.start_place) { byId('guideStartPlace').focus(); setGuideFeedback('출근장소를 입력해주세요.', 'error'); return; }
+        if (!window.confirm(`${payload.to_email} 로 ${passed ? '합격' : '불합격'} 안내메일을 보냅니다. 계속할까요?`)) return;
+        const button = byId('guideSend');
+        button.disabled = true;
+        guideState.busy = true;
+        setGuideFeedback('안내메일을 보내는 중입니다…');
+        try {
+            const data = await apiRequest(`candidates/${CANDIDATE_ID}/guide-notice`, {
+                method: 'POST', body: JSON.stringify(payload),
+            });
+            render(data.candidate);
+            notifyOpener();
+            closeGuideModal();
+            const done = data.message || `${passed ? '합격' : '불합격'} 안내를 보냈습니다.`;
+            setFeedback(done, 'success');
+            // 메일은 되돌릴 수 없으므로 보냈다는 사실을 확인창으로 분명히 알린다.
+            window.alert(`전송이 완료되었습니다.\n\n${done}`);
+        } catch (error) {
+            setGuideFeedback(error.message, 'error');
+            await loadCandidate().catch(() => {});
+        } finally {
+            guideState.busy = false;
+            button.disabled = false;
+        }
+    }
+
+    async function uploadGuideSample(file) {
+        const key = guideState.sampleKey;
+        if (!key || !file) return;
+        setGuideFeedback('샘플 사진을 올리는 중입니다…');
+        try {
+            const formData = new FormData();
+            formData.append('file', file, file.name);
+            await apiRequest(`guide-documents/${key}/sample`, { method: 'POST', body: formData });
+            guideState.catalog = null;
+            await loadGuideCatalog();
+            renderGuideDocs(collectGuideDocuments());
+            setGuideFeedback('샘플 사진을 등록했습니다.', 'success');
+            refreshGuidePreview();
+        } catch (error) {
+            setGuideFeedback(error.message, 'error');
+        }
+    }
+
+    async function resetGuideSample(key) {
+        if (!window.confirm('등록한 샘플 사진을 지우고 기본 예시 그림으로 되돌릴까요?')) return;
+        try {
+            await apiRequest(`guide-documents/${key}/sample`, { method: 'DELETE' });
+            guideState.catalog = null;
+            await loadGuideCatalog();
+            renderGuideDocs(collectGuideDocuments());
+            setGuideFeedback('기본 예시 그림으로 되돌렸습니다.', 'success');
+            refreshGuidePreview();
+        } catch (error) {
+            setGuideFeedback(error.message, 'error');
+        }
+    }
+
+    function handleGuideClick(event) {
+        if (event.target.closest('[data-guide-close]')) {
+            if (!guideState.busy) closeGuideModal();
+            return;
+        }
+        const zoom = event.target.closest('[data-guide-zoom]');
+        if (zoom) {
+            const doc = (guideState.catalog || []).find((item) => item.key === zoom.dataset.guideZoom);
+            if (doc) window.open(sampleThumbUrl(doc), '_blank', 'noopener');
+            return;
+        }
+        const upload = event.target.closest('[data-guide-sample]');
+        if (upload) {
+            guideState.sampleKey = upload.dataset.guideSample;
+            byId('guideSampleInput').value = '';
+            byId('guideSampleInput').click();
+            return;
+        }
+        const reset = event.target.closest('[data-guide-sample-reset]');
+        if (reset) {
+            resetGuideSample(reset.dataset.guideSampleReset);
+            return;
+        }
+        if (event.target.closest('#guideRefreshPreview')) {
+            setGuideFeedback('');
+            refreshGuidePreview();
+            return;
+        }
+        if (event.target.closest('#guideSend')) sendGuideNotice();
+    }
+
+    byId('guideModal').addEventListener('click', handleGuideClick);
+    byId('guideModal').addEventListener('change', (event) => {
+        const box = event.target.closest('[data-guide-check]');
+        if (box) {
+            const row = box.closest('.ivs-guide-doc');
+            if (row) row.classList.toggle('is-on', box.checked);
+        }
+        scheduleGuidePreview();
+    });
+    byId('guideModal').addEventListener('input', scheduleGuidePreview);
+    byId('guideSampleInput').addEventListener('change', (event) => {
+        const file = (event.target.files || [])[0];
+        if (file) uploadGuideSample(file);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !byId('guideModal').hidden && !guideState.busy) closeGuideModal();
+    });
+
     // ------------------------------------------------------------ 시작
 
     byId('sheetMain').addEventListener('click', handleMainClick);
@@ -928,10 +1243,14 @@
     (async () => {
         try {
             const item = await loadCandidate();
-            const autoAnalyze = new URLSearchParams(window.location.search).get('analyze') === '1';
-            if (autoAnalyze && item.can_manage && item.attachment_count
+            const query = new URLSearchParams(window.location.search);
+            if (query.get('analyze') === '1' && item.can_manage && item.attachment_count
                 && !(item.resume_analysis && item.resume_analysis.is_ready)) {
                 await runResumeAnalysis();
+            }
+            // 목록에서 '안내전송' 글자를 눌러 열면 안내전송 창이 바로 뜬다.
+            if (query.get('guide') === '1' && item.can_manage && GUIDE_RESULTS.has(item.result)) {
+                await openGuideModal();
             }
         } catch (error) {
             // 불러오기에 실패하면 제목 옆 버튼도 함께 지워 옛 상태로 누르지 못하게 한다.

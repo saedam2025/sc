@@ -510,3 +510,97 @@ body.ivs-focus-open { overflow:hidden; }
 .ivs-selected-files { font-size:.8rem; }
 .ivs-selected-files button { font-size:.8rem; }
 .ivs-inline-check { font-size:.85rem; font-weight:600; }
+
+/* ---------------------------------------------------------------- 합격 안내전송 */
+/* 최종 결과의 '합격' 글자 오른쪽에 붙는 작은 글자 버튼. 칸이 좁으므로 자리를 거의 안 쓴다. */
+.ivs-guide-open { margin-left:7px; padding:0; border:0; background:none; color:var(--ivs-mint-dark);
+    font-size:.72rem; font-weight:800; white-space:nowrap; cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+.ivs-guide-open:hover:not(:disabled) { color:#065c4d; }
+.ivs-guide-open:disabled { opacity:.5; cursor:not-allowed; }
+.ivs-guide-open.is-sent { color:#8a6d1f; }
+.ivs-guide-sent-mark { display:block; max-width:100%; margin-top:3px; overflow:hidden;
+    color:#9aa6b6; font-size:.64rem; font-weight:700; white-space:nowrap; text-overflow:ellipsis; }
+.ivs-guide-sent-mark.is-failed { color:#c07070; }
+
+.ivs-guide { position:fixed; inset:0; z-index:9500; display:flex; align-items:center; justify-content:center;
+    padding:24px 16px; }
+.ivs-guide[hidden] { display:none; }
+body.ivs-guide-open-body { overflow:hidden; }
+.ivs-guide-backdrop { position:absolute; inset:0; background:rgba(12,20,33,.55); backdrop-filter:blur(2px); }
+.ivs-guide-panel { position:relative; z-index:1; display:flex; flex-direction:column;
+    width:min(1080px,100%); max-height:min(92vh,880px); overflow:hidden;
+    border-radius:20px; background:#fffdf6; border:1px solid #ddd2b6;
+    box-shadow:0 28px 70px rgba(12,20,33,.34); }
+.ivs-guide-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+    padding:20px 24px 16px; border-bottom:3px double #e3d3a8;
+    background:linear-gradient(115deg,#f6fffc,#f7fbff 60%,#f3efe2); }
+.ivs-guide-kicker { display:block; margin-bottom:4px; color:#0b7a63; font-size:.64rem;
+    font-weight:850; letter-spacing:.16em; }
+.ivs-guide-head h2 { margin:0; font-size:1.16rem; font-weight:850; letter-spacing:-.03em; }
+.ivs-guide-head p { margin:5px 0 0; color:var(--ivs-muted); font-size:.78rem; }
+.ivs-guide-close { width:34px; height:34px; flex:0 0 34px; border:1px solid var(--ivs-line);
+    border-radius:11px; background:#fff; color:#7a8798; cursor:pointer; }
+.ivs-guide-close:hover { border-color:#b0bccb; color:#3d4b5c; }
+
+.ivs-guide-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:0; }
+.ivs-guide-form { min-height:0; overflow:auto; padding:20px 22px 24px; border-right:1px solid #eee5d0; }
+.ivs-guide-sent { margin:0 0 14px; padding:9px 13px; border-radius:10px;
+    background:#fdf6e6; color:#8a6d1f; font-size:.76rem; font-weight:750; }
+.ivs-guide-sent[hidden] { display:none; }
+.ivs-guide-field { display:block; margin-bottom:15px; }
+/* display:block 이 hidden 속성을 이겨버리므로, 감출 때는 확실히 감춘다.
+   (불합격 안내에서는 출근 안내와 준비서류 항목을 통째로 숨긴다.) */
+.ivs-guide-field[hidden], #guidePassOnly[hidden] { display:none; }
+.ivs-guide-field > span { display:block; margin-bottom:6px; color:#3d4b5c; font-size:.78rem; font-weight:800; }
+.ivs-guide-field > span em { margin-left:5px; color:#c0553f; font-size:.68rem; font-style:normal; font-weight:800; }
+.ivs-guide-field > span small { margin-left:6px; color:var(--ivs-muted); font-size:.7rem; font-weight:600; }
+.ivs-guide-field input[type="email"], .ivs-guide-field input[type="text"],
+.ivs-guide-field input[type="date"], .ivs-guide-field input[type="time"],
+.ivs-guide-field textarea { width:100%; padding:9px 12px; border:1.5px solid var(--ivs-line);
+    border-radius:11px; background:#fff; color:var(--ivs-ink); font-size:.85rem; outline:0;
+    transition:border-color .15s ease, box-shadow .15s ease; }
+.ivs-guide-field textarea { resize:vertical; line-height:1.6; }
+.ivs-guide-field input:focus, .ivs-guide-field textarea:focus {
+    border-color:var(--ivs-mint); box-shadow:0 0 0 3px rgba(25,168,135,.14); }
+.ivs-guide-field small { display:block; margin-top:5px; color:var(--ivs-muted); font-size:.72rem; }
+.ivs-guide-row { display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:11px; }
+
+.ivs-guide-docs { margin:0; padding:0; list-style:none; display:grid; gap:8px; }
+.ivs-guide-doc { display:flex; align-items:flex-start; gap:10px; padding:10px 12px;
+    border:1.5px solid var(--ivs-line); border-radius:12px; background:#fff; transition:.15s ease; }
+.ivs-guide-doc.is-on { border-color:#8fd8c4; background:#f4fdfa; }
+.ivs-guide-doc input[type="checkbox"] { width:17px; height:17px; margin-top:2px; flex:0 0 17px;
+    accent-color:var(--ivs-mint); cursor:pointer; }
+.ivs-guide-doc-copy { min-width:0; flex:1; }
+.ivs-guide-doc-copy strong { display:block; font-size:.82rem; font-weight:800; }
+.ivs-guide-doc-copy p { margin:3px 0 0; color:var(--ivs-muted); font-size:.72rem; line-height:1.55; }
+.ivs-guide-doc-copy input[type="text"] { margin-top:7px; }
+.ivs-guide-doc-thumb { width:52px; height:68px; flex:0 0 52px; border:1px solid var(--ivs-line);
+    border-radius:8px; background:#f7fafc center/cover no-repeat; cursor:zoom-in; }
+.ivs-guide-doc-tools { display:flex; flex-direction:column; gap:5px; }
+.ivs-guide-doc-tools button { padding:4px 8px; border:1px solid var(--ivs-line); border-radius:8px;
+    background:#fff; color:#64748b; font-size:.66rem; font-weight:750; cursor:pointer; white-space:nowrap; }
+.ivs-guide-doc-tools button:hover { border-color:#9fb0c2; color:#3d4b5c; }
+
+.ivs-guide-preview { min-height:0; display:flex; flex-direction:column; background:#eceff2; }
+.ivs-guide-preview-head { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 16px; border-bottom:1px solid #dfe6ee; background:#f7f9fb; }
+.ivs-guide-preview-head span { color:#3d4b5c; font-size:.76rem; font-weight:800; }
+.ivs-guide-preview-head span i { margin-right:5px; color:var(--ivs-mint-dark); }
+.ivs-guide-preview iframe { flex:1; min-height:0; width:100%; border:0; background:#eceff2; }
+
+.ivs-guide-foot { display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:14px 22px; border-top:1px solid #eee5d0; background:#fffaf0; }
+.ivs-guide-feedback { margin:0; min-height:1.1em; color:var(--ivs-muted); font-size:.78rem; font-weight:600; }
+.ivs-guide-feedback.is-error { color:#b23434; }
+.ivs-guide-feedback.is-success { color:#0b7a63; }
+.ivs-guide-actions { display:flex; align-items:center; gap:8px; }
+
+@media (max-width: 900px) {
+    .ivs-guide-body { grid-template-columns:minmax(0,1fr); }
+    .ivs-guide-form { border-right:0; border-bottom:1px solid #eee5d0; }
+    .ivs-guide-preview { min-height:320px; }
+}
+.ivs-status-result-line { display:inline-flex; flex-wrap:nowrap; align-items:center; }
