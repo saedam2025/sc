@@ -2,7 +2,7 @@
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260902-31') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview.css', v='20260903-35') }}">
 
 <main class="iv-page">
     <section class="iv-hero" aria-labelledby="interviewTitle">
@@ -52,6 +52,7 @@
                         <col class="iv-col-progress">
                         <col class="iv-col-score">
                         <col class="iv-col-result">
+                        <col class="iv-col-guide">
                         <col class="iv-col-actions">
                     </colgroup>
                     <thead>
@@ -68,6 +69,7 @@
                             <th>진행 현황</th>
                             <th>면접관 평가</th>
                             <th>최종결과</th>
+                            <th>결과안내</th>
                             <th>관리</th>
                         </tr>
                     </thead>
@@ -146,5 +148,5 @@ window.IV_MAX_PANELISTS = {{ max_panelists }};
 window.IV_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IV_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview.js', v='20260902-31') }}"></script>
+<script src="{{ url_for('static', filename='js/interview.js', v='20260903-35') }}"></script>
 {% endblock %}

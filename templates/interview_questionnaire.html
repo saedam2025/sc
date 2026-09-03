@@ -343,6 +343,7 @@
             }
             document.querySelector('.sheet').innerHTML = result.querySelector('.sheet').innerHTML;
             window.scrollTo(0, 0);
+            notifyInterviewList();
         } catch (error) {
             try { if (sound) { sound.pause(); } } catch (audioError) {}
             submitting = false;
@@ -354,6 +355,24 @@
         // 저장 성공과 알림음 종료 후 완료 안내를 한 번 이어서 재생한다.
         await alarmFinished;
         await playSoundOnce(completeSoundUrl);
+    }
+
+    // 전송이 끝나면 같은 출처의 면접관리 목록 창이 진행현황을 바로 다시 읽도록 알린다.
+    // (면접자가 메일 링크로 연 창에는 받을 상대가 없으므로 조용히 지나간다.)
+    function notifyInterviewList() {
+        var message = { type: 'interview-questionnaire-submitted' };
+        try {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage(message, window.location.origin);
+            }
+        } catch (error) {}
+        try {
+            if (typeof BroadcastChannel !== 'undefined') {
+                var channel = new BroadcastChannel('saedam-interview');
+                channel.postMessage(message);
+                channel.close();
+            }
+        } catch (error) {}
     }
 
     // 클릭과 키보드 전송을 같은 경로로 처리하고 중복 전송을 막는다.

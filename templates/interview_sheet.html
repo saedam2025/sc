@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/interview_sheet.css', v='20260902-19') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/interview_sheet.css', v='20260903-25') }}">
 </head>
 <body class="ivs-body">
 
@@ -111,6 +111,93 @@
     <div class="ivs-focus-body" id="focusBody"></div>
 </div>
 
+<!-- 합격자 안내전송: 출근 안내와 준비서류를 골라 합격자에게 메일로 보낸다. -->
+<div class="ivs-guide" id="guideModal" hidden>
+    <div class="ivs-guide-backdrop" data-guide-close></div>
+    <div class="ivs-guide-panel" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+        <header class="ivs-guide-head">
+            <div>
+                <span class="ivs-guide-kicker" id="guideKicker">WELCOME GUIDE</span>
+                <h2 id="guideTitle">합격 안내전송</h2>
+                <p id="guideSubtitle">출근 안내와 준비서류를 합격자 이메일로 보냅니다.</p>
+            </div>
+            <button type="button" class="ivs-guide-close" data-guide-close aria-label="닫기">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </header>
+
+        <div class="ivs-guide-body">
+            <div class="ivs-guide-form" id="guideForm">
+                <p class="ivs-guide-sent" id="guideSentInfo" hidden></p>
+
+                <label class="ivs-guide-field">
+                    <span>받는 사람 이메일 <em>필수</em></span>
+                    <input type="email" id="guideEmail" placeholder="hong@example.com" autocomplete="off">
+                    <small id="guideEmailHint"></small>
+                </label>
+
+                <!-- 출근 안내와 준비서류는 합격 안내에만 쓴다. 불합격 안내에서는 감춘다. -->
+                <div id="guidePassOnly">
+                    <div class="ivs-guide-row">
+                        <label class="ivs-guide-field">
+                            <span>출근일 <em>필수</em></span>
+                            <input type="date" id="guideStartDate">
+                        </label>
+                        <label class="ivs-guide-field">
+                            <span>출근시간</span>
+                            <input type="time" id="guideStartTime" step="600">
+                        </label>
+                    </div>
+
+                    <label class="ivs-guide-field">
+                        <span>출근장소 <em>필수</em></span>
+                        <input type="text" id="guideStartPlace" placeholder="예) 새담청소년교육문화원 3층 교육실 (용인시 기흥구 …)">
+                    </label>
+                </div>
+
+                <label class="ivs-guide-field">
+                    <span>담당자</span>
+                    <input type="text" id="guideContact" placeholder="예) 인사팀 김새담 팀장 (031-000-0000)">
+                    <small>안내문에 문의처로 함께 적힙니다. 비워두면 표시되지 않습니다.</small>
+                </label>
+
+                <div class="ivs-guide-field" id="guideDocsField">
+                    <span>준비서류 <small>체크한 서류만 안내되고, 샘플 사진도 함께 보냅니다.</small></span>
+                    <ul class="ivs-guide-docs" id="guideDocs"></ul>
+                </div>
+
+                <label class="ivs-guide-field">
+                    <span id="guideExtraLabel">기타 준비사항</span>
+                    <textarea id="guideExtraNotes" rows="4"
+                              placeholder="예) 첫날은 편한 복장으로 오셔도 됩니다. 주차는 건물 뒤편 주차장을 이용해주세요."></textarea>
+                </label>
+            </div>
+
+            <div class="ivs-guide-preview">
+                <div class="ivs-guide-preview-head">
+                    <span><i class="fa-regular fa-envelope-open"></i> 보낼 안내문 미리보기</span>
+                    <button type="button" class="ivs-button" id="guideRefreshPreview">
+                        <i class="fa-solid fa-rotate"></i> 새로 그리기
+                    </button>
+                </div>
+                <iframe id="guidePreviewFrame" title="안내문 미리보기" sandbox=""></iframe>
+            </div>
+        </div>
+
+        <footer class="ivs-guide-foot">
+            <p class="ivs-guide-feedback" id="guideFeedback" role="status"></p>
+            <div class="ivs-guide-actions">
+                <button type="button" class="ivs-button" data-guide-close>취소</button>
+                <button type="button" class="ivs-button ivs-button-primary" id="guideSend">
+                    <i class="fa-solid fa-paper-plane"></i> 안내메일 보내기
+                </button>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<input type="file" id="guideSampleInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
 <template id="questionnaireLabels">
     {% for key, title, hint, rows, note in questionnaire_fields %}<i data-key="{{ key }}" data-title="{{ title }}"></i>{% endfor %}
 </template>
@@ -122,6 +209,6 @@ window.IVS_MAX_PANELISTS = {{ max_panelists }};
 window.IVS_MAX_ATTACHMENTS = {{ max_attachments }};
 window.IVS_MAX_ATTACHMENT_TOTAL_BYTES = {{ max_attachment_total_bytes }};
 </script>
-<script src="{{ url_for('static', filename='js/interview_sheet.js', v='20260902-19') }}"></script>
+<script src="{{ url_for('static', filename='js/interview_sheet.js', v='20260903-25') }}"></script>
 </body>
 </html>
