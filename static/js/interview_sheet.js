@@ -18,6 +18,12 @@
         ? `${Math.max(1, Math.round(bytes / 1024))} KB`
         : `${(bytes / (1024 * 1024)).toFixed(1)} MB`);
 
+    // 녹음 파일은 내려받아 열기 번거로우므로 새 탭에서 바로 재생시킨다.
+    const AUDIO_PATTERN = /\.(webm|ogg|oga|m4a|mp4|mp3|wav)$/i;
+    const isAudioFile = (name) => AUDIO_PATTERN.test(String(name || ''));
+    const fileIcon = (file) => (isAudioFile(file.filename)
+        ? 'fa-solid fa-microphone-lines' : 'fa-regular fa-file-lines');
+
     function formatDateTime(value) {
         const raw = String(value || '').trim();
         if (!raw) return '';
@@ -135,6 +141,40 @@
         });
     }
 
+
+    // 분당 타자수를 내지 못한 이유. 값이 비어 보이는 대신 까닭을 알려준다.
+    const TYPING_NOTES = {
+        none: '자판으로 입력한 기록이 없습니다. 붙여넣기만 했거나 다른 기기에서 옮겨 적었을 수 있습니다.',
+        paste: '붙여넣은 글이 많아 타자 속도를 재지 않았습니다.',
+        short: '실제 입력이 적어(40타·10초 미만) 타자 속도를 재지 않았습니다.',
+        odd: '측정값이 사람이 낼 수 있는 범위를 벗어나 쓰지 않았습니다.',
+    };
+    const typingReason = (item) => TYPING_NOTES[item.typing_note]
+        || '타자 속도를 재지 못했습니다.';
+    // 기록에 남는 타수·분당 타자수는 실측값의 75%다. 숫자만 보고 헷갈리지 않도록
+    // 마우스를 올리면 실제로 친 타수와 시간을 함께 알려준다.
+    const typingSpeedHint = (item) => {
+        const detail = item.typing_seconds ? ` (측정 ${item.typing_seconds}초)` : '';
+        return `실제로 친 타수·속도의 75%만 인정해 기록한 값입니다.${detail}`;
+    };
+
+    // 진행표 위쪽 태그. 잰 값이 있으면 타/분, 없으면 왜 없는지 붙인다.
+    function typingTag(item) {
+        if (!item.has_answers) return '';
+        if (item.typing_cpm) {
+            return `<span class="ivs-tag is-speed" title="${escapeHtml(typingSpeedHint(item))}">${item.typing_cpm}타/분</span>`;
+        }
+        const body = item.typing_strokes ? `${item.typing_strokes}타 · 속도 미측정` : '타자 기록 없음';
+        return `<span class="ivs-tag is-quiet" title="${escapeHtml(typingReason(item))}">${body}</span>`;
+    }
+
+    // 면접 집중 모드 제목 옆에는 한 줄로 짧게 붙인다.
+    function typingLine(item) {
+        if (item.typing_cpm) return ` · ${item.typing_cpm}타/분`;
+        if (!item.has_answers) return '';
+        return item.typing_strokes ? ` · ${item.typing_strokes}타(속도 미측정)` : ' · 타자 기록 없음';
+    }
+
     function setFeedback(message = '', type = '') {
         const node = byId('sheetFeedback');
         node.textContent = message;
@@ -216,11 +256,18 @@
             : '<p class="ivs-hint">아직 사전질문지가 제출되지 않았습니다. 위 <b>사전질문지 열기</b> 버튼으로 면접자에게 작성하도록 안내해주세요.</p>';
 
         const filesHtml = item.attachments.length
-            ? `<div class="ivs-file-chips">${item.attachments.map((file) => `<span class="ivs-file-chip">
-                <a href="${file.download_url}" title="${escapeHtml(file.filename)} 내려받기">
-                    <i class="fa-regular fa-file-lines"></i>${escapeHtml(file.filename)}
+            ? `<div class="ivs-file-chips">${item.attachments.map((file) => (isAudioFile(file.filename)
+                ? `<span class="ivs-file-chip">
+                <button type="button" class="ivs-file-name" data-open-file="${file.download_url}?inline=1"
+                    title="${escapeHtml(file.filename)} 새 창에서 듣기">
+                    <i class="${fileIcon(file)}"></i>${escapeHtml(file.filename)}
                     <small>${fileSize(file.file_size)}</small>
-                </a>${item.can_manage ? `<button data-delete-file="${file.id}" title="${escapeHtml(file.filename)} 삭제"
+                </button>`
+                : `<span class="ivs-file-chip">
+                <a href="${file.download_url}" title="${escapeHtml(file.filename)} 내려받기">
+                    <i class="${fileIcon(file)}"></i>${escapeHtml(file.filename)}
+                    <small>${fileSize(file.file_size)}</small>
+                </a>`) + `${item.can_manage ? `<button data-delete-file="${file.id}" title="${escapeHtml(file.filename)} 삭제"
                     aria-label="${escapeHtml(file.filename)} 삭제"><i class="fa-solid fa-xmark"></i></button>` : ''}
             </span>`).join('')}</div>`
             : '<p class="ivs-hint">등록된 첨부파일이 없습니다. 오른쪽 AI 이력서 요약에서 이력서를 올려주세요.</p>';
@@ -342,7 +389,7 @@
                         ? `제출 ${escapeHtml(formatDateTime(item.questionnaire_submitted_at))}` : '아직 제출되지 않았습니다.'}</p></div>
                     <div class="ivs-tag-group">
                         <span class="ivs-tag ${item.has_answers ? 'is-done' : 'is-wait'}">${item.has_answers ? '작성완료' : '미작성'}</span>
-                        ${item.typing_cpm ? `<span class="ivs-tag is-speed">${item.typing_cpm}타/분</span>` : ''}
+                        ${typingTag(item)}
                     </div>
                 </header>
                 ${answerHtml}
@@ -565,7 +612,7 @@
         byId('focusBody').innerHTML = `
             <section class="ivs-focus-pane">
                 <h3><i class="fa-regular fa-comments"></i> 면접자 정보 · 사전질문지
-                    <em>${item.has_answers ? '작성완료' : '미작성'}${item.typing_cpm ? ` · ${item.typing_cpm}타/분` : ''}</em></h3>
+                    <em>${item.has_answers ? '작성완료' : '미작성'}${typingLine(item)}</em></h3>
                 <div class="ivs-focus-scroll">${infoHtml}${answerHtml}</div>
             </section>
             <section class="ivs-focus-pane">
@@ -651,6 +698,7 @@
         byId('sheetTitle').textContent = `${item.name} 면접 진행표`;
         renderMain(item);
         renderAi(item);
+        showRecordButtons(item.can_manage);
         if (state.focus) renderFocus(item);
     }
 
@@ -854,11 +902,196 @@
         }
     }
 
+    // ------------------------------------------------------------ 면접 녹음
+    // 상단바 녹음 버튼: 한 번 누르면 마이크가 켜지고, 다시 누르면 멈춰서
+    // 그 자리에서 첨부자료로 올라간다. 저장이 끝나야 버튼이 다시 풀린다.
+
+    // 브라우저마다 지원하는 형식이 달라 앞에서부터 되는 것을 고른다.
+    const RECORD_MIME_TYPES = [
+        ['audio/webm;codecs=opus', 'webm'],
+        ['audio/webm', 'webm'],
+        ['audio/ogg;codecs=opus', 'ogg'],
+        ['audio/mp4', 'm4a'],
+        ['audio/mpeg', 'mp3'],
+    ];
+
+    const recorder = {
+        media: null, stream: null, chunks: [], startedAt: 0,
+        timer: null, saving: false, extension: 'webm',
+    };
+
+    const recordTargets = () => [
+        { button: byId('recordToggle'), label: byId('recordLabel') },
+        { button: byId('focusRecordToggle'), label: byId('focusRecordLabel') },
+    ];
+
+    const isRecording = () => !!recorder.media && recorder.media.state === 'recording';
+
+    function durationText(seconds) {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        const pad = (n) => String(n).padStart(2, '0');
+        const clock = `${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
+        const hours = Math.floor(total / 3600);
+        return hours ? `${hours}:${clock}` : clock;
+    }
+
+    // 파일명에 넣을 날짜. 이름이 길어지지 않도록 연월일까지만 쓴다.
+    function recordStamp() {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+    }
+
+    // 파일명에 넣을 녹음 길이. 화면에 쓰는 '00:04'는 ':'가 파일명에서 지워지므로
+    // 한 시간이 넘는 녹음까지 한글로 또박또박 적는다.
+    function durationFileText(seconds) {
+        const total = Math.max(0, Math.floor(Number(seconds) || 0));
+        const pad = (n) => String(n).padStart(2, '0');
+        const body = `${pad(Math.floor(total / 60) % 60)}분${pad(total % 60)}초`;
+        const hours = Math.floor(total / 3600);
+        return hours ? `${hours}시간${body}` : body;
+    }
+
+    function paintRecordButtons() {
+        const active = isRecording();
+        const elapsed = active ? durationText((Date.now() - recorder.startedAt) / 1000) : '';
+        recordTargets().forEach(({ button, label }) => {
+            if (!button) return;
+            button.classList.toggle('is-recording', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            button.disabled = recorder.saving;
+            if (label) {
+                label.textContent = recorder.saving ? '저장중…' : (active ? `녹음중 ${elapsed}` : '녹음');
+            }
+            button.title = active
+                ? '녹음을 멈추고 첨부자료로 저장합니다.'
+                : '마이크 녹음을 시작합니다. 멈추면 첨부자료에 저장됩니다.';
+        });
+    }
+
+    // 면접 기록을 수정할 수 있는 사람에게만 녹음 버튼을 보여준다.
+    function showRecordButtons(canManage) {
+        recordTargets().forEach(({ button }) => { if (button) button.hidden = !canManage; });
+        paintRecordButtons();
+    }
+
+    function pickRecordMime() {
+        const supported = window.MediaRecorder && window.MediaRecorder.isTypeSupported;
+        for (let index = 0; index < RECORD_MIME_TYPES.length; index += 1) {
+            const [mime, extension] = RECORD_MIME_TYPES[index];
+            if (supported && window.MediaRecorder.isTypeSupported(mime)) return { mime, extension };
+        }
+        return { mime: '', extension: 'webm' };
+    }
+
+    async function startRecording() {
+        if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setFeedback('이 브라우저에서는 녹음을 지원하지 않습니다. 크롬이나 엣지에서 열어주세요.', 'error');
+            return;
+        }
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true },
+            });
+        } catch (error) {
+            const name = error && error.name;
+            setFeedback(name === 'NotAllowedError' || name === 'SecurityError'
+                ? '마이크 사용이 차단되어 있습니다. 주소창의 자물쇠 아이콘에서 마이크를 허용해주세요.'
+                : '마이크를 찾지 못했습니다. 마이크 연결 상태를 확인해주세요.', 'error');
+            return;
+        }
+        const picked = pickRecordMime();
+        let media;
+        try {
+            media = new MediaRecorder(stream, picked.mime
+                ? { mimeType: picked.mime, audioBitsPerSecond: 64000 } : {});
+        } catch (error) {
+            stream.getTracks().forEach((track) => track.stop());
+            setFeedback('녹음을 시작하지 못했습니다. 다른 프로그램이 마이크를 쓰고 있는지 확인해주세요.', 'error');
+            return;
+        }
+        recorder.media = media;
+        recorder.stream = stream;
+        recorder.chunks = [];
+        recorder.extension = picked.extension;
+        recorder.startedAt = Date.now();
+        media.addEventListener('dataavailable', (event) => {
+            if (event.data && event.data.size) recorder.chunks.push(event.data);
+        });
+        media.addEventListener('stop', saveRecording);
+        media.addEventListener('error', () => setFeedback('녹음 중 오류가 발생했습니다.', 'error'));
+        // 1초마다 조각을 받아 두면 중간에 문제가 생겨도 그때까지는 남는다.
+        media.start(1000);
+        recorder.timer = window.setInterval(paintRecordButtons, 500);
+        paintRecordButtons();
+        setFeedback('녹음을 시작했습니다. 같은 버튼을 다시 누르면 멈추고 첨부자료로 저장합니다.');
+    }
+
+    function stopRecording() {
+        if (!isRecording()) return;
+        recorder.saving = true;
+        paintRecordButtons();
+        setFeedback('녹음을 마무리하고 있습니다…');
+        recorder.media.stop();
+    }
+
+    // MediaRecorder가 멈추면 모아둔 조각을 하나로 묶어 첨부자료로 올린다.
+    async function saveRecording() {
+        window.clearInterval(recorder.timer);
+        recorder.timer = null;
+        const seconds = Math.round((Date.now() - recorder.startedAt) / 1000);
+        if (recorder.stream) recorder.stream.getTracks().forEach((track) => track.stop());
+        const type = (recorder.media && recorder.media.mimeType) || 'audio/webm';
+        const blob = new Blob(recorder.chunks, { type });
+        const extension = recorder.extension;
+        recorder.media = null;
+        recorder.stream = null;
+        recorder.chunks = [];
+        if (!blob.size) {
+            recorder.saving = false;
+            paintRecordButtons();
+            setFeedback('녹음된 소리가 없어 저장하지 않았습니다.', 'error');
+            return;
+        }
+        const who = (state.candidate && state.candidate.name) || '면접자';
+        const name = `면접녹음_${who}_${recordStamp()}_${durationFileText(seconds)}.${extension}`;
+        setFeedback(`녹음(${durationText(seconds)} · ${fileSize(blob.size)})을 저장하고 있습니다…`);
+        try {
+            const formData = new FormData();
+            formData.append('files', blob, name);
+            const data = await apiRequest(`candidates/${CANDIDATE_ID}/recordings`, { method: 'POST', body: formData });
+            render(data.candidate);
+            notifyOpener();
+            setFeedback(`녹음 ${durationText(seconds)} 파일을 첨부자료에 저장했습니다.`, 'success');
+        } catch (error) {
+            setFeedback(`녹음을 저장하지 못했습니다. ${error.message}`, 'error');
+        } finally {
+            recorder.saving = false;
+            paintRecordButtons();
+        }
+    }
+
+    function toggleRecording() {
+        if (recorder.saving) return;
+        if (isRecording()) stopRecording();
+        else startRecording();
+    }
+
     // ------------------------------------------------------------ 본문 이벤트
 
     async function handleMainClick(event) {
         const button = event.target.closest('button');
         if (!button || button.disabled) return;
+        // 녹음 파일은 이름 붙인 별도 창에서 재생한다. 이 창은 팝업이라
+        // target="_blank"를 쓰면 진행표가 통째로 덮여버린다.
+        if (button.dataset.openFile) {
+            event.preventDefault();
+            const viewer = window.open(button.dataset.openFile, 'ivsResumeView',
+                'width=1000,height=900,resizable=yes,scrollbars=yes');
+            if (viewer) viewer.focus();
+            return;
+        }
         try {
             if (button.id === 'startFocus') {
                 openFocus();
@@ -1222,6 +1455,14 @@
     });
     byId('printSheet').addEventListener('click', () => window.print());
     byId('closeSheet').addEventListener('click', () => window.close());
+    byId('recordToggle').addEventListener('click', toggleRecording);
+    byId('focusRecordToggle').addEventListener('click', toggleRecording);
+    // 녹음이 아직 저장되지 않았는데 창을 닫으면 그대로 사라지므로 한 번 물어본다.
+    window.addEventListener('beforeunload', (event) => {
+        if (!isRecording() && !recorder.saving) return;
+        event.preventDefault();
+        event.returnValue = '';
+    });
     const zoomBy = (step) => {
         zoomIndex = Math.min(ZOOM_STEPS.length - 1, Math.max(0, zoomIndex + step));
         applyZoom();

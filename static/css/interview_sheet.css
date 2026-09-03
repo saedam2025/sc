@@ -56,6 +56,29 @@ button, input, textarea, select { font: inherit; }
 .ivs-button-primary:hover:not(:disabled) { color:#fff; border-color:transparent; filter:brightness(1.04); }
 .ivs-button-danger:hover:not(:disabled) { border-color:#efb1b1; color:#c13d3d; }
 
+/* 녹음 버튼. 쉬는 중에는 회색 점, 녹음 중에는 빨갛게 깜빡이며 시간을 센다. */
+.ivs-record { gap:8px; }
+.ivs-record .ivs-record-text { font-variant-numeric:tabular-nums; }
+.ivs-record .ivs-record-dot { width:9px; height:9px; flex:0 0 9px; border-radius:50%;
+    background:#b6c1cf; transition:.16s ease; }
+.ivs-record:hover:not(:disabled) .ivs-record-dot { background:#d0473a; }
+.ivs-record.is-recording { border-color:#e58074; background:#fdeeec; color:#b02a1c; }
+.ivs-record.is-recording:hover:not(:disabled) { border-color:#d0473a; color:#8f1f13; }
+.ivs-record.is-recording .ivs-record-dot { background:#d0473a; box-shadow:0 0 0 4px rgba(208,71,58,.16);
+    animation:ivs-record-blink 1.1s ease-in-out infinite; }
+/* 면접 집중 모드(검은 배경)에서도 같은 버튼을 쓴다. */
+.ivs-record.is-dark { border-color:#28313d; background:#141a22; color:#c3ced9; }
+.ivs-record.is-dark:hover:not(:disabled) { border-color:#5fe0bf; color:#5fe0bf; }
+.ivs-record.is-dark .ivs-record-dot { background:#6d7b91; }
+.ivs-record.is-dark.is-recording { border-color:#d0473a; background:#2b1613; color:#ff9d90; }
+@keyframes ivs-record-blink {
+    0%, 100% { opacity:1; transform:scale(1); }
+    50% { opacity:.3; transform:scale(.72); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .ivs-record.is-recording .ivs-record-dot { animation:none; }
+}
+
 .ivs-feedback { max-width:1720px; min-height:16px; margin:0 auto 10px; color:var(--ivs-muted); font-size:.72rem; font-weight:700; }
 .ivs-feedback.is-error { color:#c43d3d; }
 .ivs-feedback.is-success { color:var(--ivs-mint-dark); }
@@ -191,6 +214,8 @@ button, input, textarea, select { font: inherit; }
 .ivs-tag.is-score { background:#eef2ff; color:#3b56b8; }
 .ivs-tag.is-done { background:var(--ivs-mint-soft); color:var(--ivs-mint-dark); }
 .ivs-tag.is-speed { background:#eaf1fb; color:#2f5c9c; }
+/* 타자 속도를 재지 못했을 때. 값이 있는 태그와 구분되도록 흐리게 둔다. */
+.ivs-tag.is-quiet { background:#f2f4f7; color:#8794a6; font-weight:700; cursor:help; }
 .ivs-tag-group { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:6px; }
 
 /* ---------------------------------------------------------------- AI 이력서 요약 */
@@ -404,6 +429,7 @@ body.ivs-focus-open { overflow:hidden; }
 .ivs-focus .ivs-tag.is-wait { background:#33291a; color:#e0ab63; }
 .ivs-focus .ivs-tag.is-score { background:#16302a; color:#5fe0bf; }
 .ivs-focus .ivs-tag.is-speed { background:#1a2740; color:#8fb4e8; }
+.ivs-focus .ivs-tag.is-quiet { background:#1b2531; color:#7c8a99; }
 .ivs-focus .ivs-rating { margin-bottom:8px; }
 .ivs-focus .ivs-stars-base { color:#2d3947; }
 .ivs-focus .ivs-rating-value { color:#f7d08a; }

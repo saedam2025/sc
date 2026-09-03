@@ -23,8 +23,48 @@
     const LIST_STAR_GLYPHS = '<i class="fa-solid fa-star"></i>'.repeat(LIST_STAR_COUNT);
     let state = {
         csrfToken: '', candidates: [], filter: 'all', page: 1,
-        selected: new Set(), pageManageableIds: [],
+        selected: new Set(), pageManageableIds: [], handoff: false, handoffDone: false,
     };
+
+    // 면접자에게 자리를 내준 상태인지 이 탭에 기억해 둔다. 면접자가 새로고침해도
+    // 목록이 도로 나타나지 않아야 하고, 이미 전송을 마쳤다면 그 표시도 남아야 한다.
+    const HANDOFF_KEY = 'saedam_interview_handoff';
+    function readHandoff() {
+        try { return window.sessionStorage.getItem(HANDOFF_KEY) || ''; }
+        catch (error) { return ''; }
+    }
+    function writeHandoff(value) {
+        try {
+            if (value) window.sessionStorage.setItem(HANDOFF_KEY, value);
+            else window.sessionStorage.removeItem(HANDOFF_KEY);
+        } catch (error) { /* 저장 불가 브라우저에서도 감추기는 동작한다 */ }
+    }
+
+    const HANDOFF_WRITING = '면접자가 사전질문지를 작성하고 있습니다';
+    const HANDOFF_DONE = '면접자가 사전질문지를 작성완료했습니다';
+
+    // 캐릭터 말풍선 문구를 지금 상태에 맞춘다.
+    function paintHandoffBubble() {
+        const bubble = byId('handoffBubble');
+        if (!bubble) return;
+        const text = state.handoffDone ? HANDOFF_DONE : HANDOFF_WRITING;
+        if (bubble.textContent !== text) {
+            bubble.textContent = text;
+            // 문구가 바뀔 때만 말풍선이 다시 톡 나타나게 한다.
+            bubble.style.animation = 'none';
+            void bubble.offsetWidth;
+            bubble.style.animation = '';
+        }
+        byId('handoffNote').classList.toggle('is-done', state.handoffDone);
+    }
+
+    // 면접자가 사전질문지 창에서 전송을 누르면 말풍선이 '작성완료'로 바뀐다.
+    function markQuestionnaireDone() {
+        if (!state.handoff || state.handoffDone) return;
+        state.handoffDone = true;
+        writeHandoff('done');
+        paintHandoffBubble();
+    }
 
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]
@@ -177,7 +217,7 @@
 
     // 진행상태별 인원을 검색창 오른쪽 필터칩에 그대로 얹어준다.
     function renderSummary() {
-        const rows = state.candidates;
+        const rows = state.handoff ? [] : state.candidates;
         const counts = { scheduled: 0, ongoing: 0, completed: 0 };
         rows.forEach((item) => { counts[progressState(item)] += 1; });
 
@@ -246,6 +286,22 @@
                     sent ? '다시전송' : '안내전송'}</button>`;
     }
 
+    // 분당 타자수를 내지 못한 이유. 값이 비어 보이는 대신 까닭을 알려준다.
+    const TYPING_NOTES = {
+        none: '자판으로 입력한 기록이 없습니다. 붙여넣기만 했거나 다른 기기에서 옮겨 적었을 수 있습니다.',
+        paste: '붙여넣은 글이 많아 타자 속도를 재지 않았습니다.',
+        short: '실제 입력이 적어(40타·10초 미만) 타자 속도를 재지 않았습니다.',
+        odd: '측정값이 사람이 낼 수 있는 범위를 벗어나 쓰지 않았습니다.',
+    };
+    const typingReason = (item) => TYPING_NOTES[item.typing_note]
+        || '타자 속도를 재지 못했습니다.';
+    // 기록에 남는 타수·분당 타자수는 실측값의 75%다. 숫자만 보고 헷갈리지 않도록
+    // 마우스를 올리면 실제로 친 타수와 시간을 함께 알려준다.
+    const typingSpeedHint = (item) => {
+        const detail = item.typing_seconds ? ` (측정 ${item.typing_seconds}초)` : '';
+        return `실제로 친 타수·속도의 75%만 인정해 기록한 값입니다.${detail}`;
+    };
+
     function questionnaireCell(item) {
         // 글자를 눌러도 관리 열의 [사전질문지] 버튼과 같은 창이 열린다.
         let note;
@@ -253,7 +309,15 @@
             note = '<span class="iv-progress-note is-wait"><i class="fa-regular fa-clipboard"></i> 미작성</span>';
         } else {
             // 타수는 '작성완료' 글씨 아래 줄에 따로 붙인다.
-            const typing = item.typing_cpm ? `<small>(${item.typing_cpm}타/분)</small>` : '';
+            // 속도를 못 쟀으면 빈칸 대신 친 타수와 그 까닭을 보여준다.
+            let typing;
+            if (item.typing_cpm) {
+                typing = `<small title="${escapeHtml(typingSpeedHint(item))}">(${item.typing_cpm}타/분)</small>`;
+            } else if (item.typing_strokes) {
+                typing = `<small class="is-quiet" title="${escapeHtml(typingReason(item))}">(${item.typing_strokes}타 · 속도 미측정)</small>`;
+            } else {
+                typing = `<small class="is-quiet" title="${escapeHtml(typingReason(item))}">(타자 기록 없음)</small>`;
+            }
             note = `<span class="iv-progress-note is-done"><span class="iv-progress-note-main"><i class="fa-solid fa-check"></i> 작성완료</span>${typing}</span>`;
         }
         return `<button type="button" class="iv-questionnaire-open" data-open-question="${item.id}"
@@ -286,6 +350,14 @@
     }
 
     function renderList() {
+        // 감춘 동안에는 표를 아예 비워 둔다. display:none으로 가리기만 하면
+        // 지원자 이름과 평가가 문서에 그대로 남는다.
+        if (state.handoff) {
+            candidateList.innerHTML = '';
+            byId('candidatePaging').innerHTML = '';
+            state.pageManageableIds = [];
+            return;
+        }
         const keyword = searchInput.value.trim().toLowerCase();
         const rows = state.candidates.filter((item) => matchesFilter(item) && (!keyword || [
             item.name, item.target_position, item.target_school,
@@ -532,8 +604,50 @@
 
     function openQuestionnaire(id) {
         const item = state.candidates.find((row) => row.id === Number(id));
+        if (!item) return;
         // 전송 완료를 목록에 알려야 해서 opener 연결(noopener 제외)을 유지한다.
-        if (item) window.open(item.questionnaire_url, `ivQuestion${id}`, 'width=880,height=960,resizable=yes,scrollbars=yes');
+        const opened = window.open(item.questionnaire_url, `ivQuestion${id}`,
+            'width=880,height=960,resizable=yes,scrollbars=yes');
+        if (!opened) {
+            window.alert('팝업이 차단되어 사전질문지를 열지 못했습니다. 브라우저의 팝업 차단을 해제해주세요.');
+            return;
+        }
+        opened.focus();
+        // 사전질문지가 뜬 뒤에만 감춘다. 팝업이 막혔는데 목록까지 사라지면
+        // 담당자가 아무것도 못 하게 된다.
+        setHandoff(true);
+    }
+
+    // 면접자가 담당자 자리에서 사전질문지를 쓰는 동안 다른 지원자 목록이
+    // 뒤에 남지 않도록 감춘다. 되돌리기는 제목 앞 큰 아이콘으로만 한다.
+    function setHandoff(on, options = {}) {
+        state.handoff = !!on;
+        state.handoffDone = !!options.done;
+        writeHandoff(state.handoff ? (state.handoffDone ? 'done' : 'writing') : '');
+        paintHandoffBubble();
+        const page = document.querySelector('.iv-page');
+        const hero = byId('heroReveal');
+        if (hero) {
+            hero.setAttribute('aria-expanded', state.handoff ? 'false' : 'true');
+            hero.title = state.handoff ? '면접자 목록 다시 열기' : '면접자 목록 열기';
+            hero.setAttribute('aria-label', hero.title);
+        }
+        const apply = () => {
+            if (page) page.classList.toggle('is-handoff', state.handoff);
+            byId('handoffNote').hidden = !state.handoff;
+            renderList();
+            renderSummary();
+        };
+        // '스르륵' 사라지도록 잠깐 흐려진 뒤에 실제로 지운다.
+        if (state.handoff && !options.instant && page) {
+            page.classList.add('is-handoff-leaving');
+            window.setTimeout(() => {
+                page.classList.remove('is-handoff-leaving');
+                apply();
+            }, 380);
+            return;
+        }
+        apply();
     }
 
     // ------------------------------------------------------------ 이벤트
@@ -619,15 +733,20 @@
         syncTimer = window.setTimeout(() => { loadCandidates(); }, 120);
     }
 
+    // 사전질문지 전송 알림은 목록 새로고침과 함께 말풍선 문구도 바꾼다.
+    function handleSyncMessage(data) {
+        if (!data || !INTERVIEW_SYNC_TYPES.has(data.type)) return;
+        if (data.type === 'interview-questionnaire-submitted') markQuestionnaireDone();
+        syncList();
+    }
+
     window.addEventListener('message', (event) => {
-        if (event.origin !== window.location.origin || !event.data) return;
-        if (INTERVIEW_SYNC_TYPES.has(event.data.type)) syncList();
+        if (event.origin !== window.location.origin) return;
+        handleSyncMessage(event.data);
     });
 
     if (syncChannel) {
-        syncChannel.addEventListener('message', (event) => {
-            if (event.data && INTERVIEW_SYNC_TYPES.has(event.data.type)) syncList();
-        });
+        syncChannel.addEventListener('message', (event) => handleSyncMessage(event.data));
     }
 
     // 진행표 창에서 작업하고 목록 창으로 돌아왔을 때도 최신 상태를 보여준다.
@@ -637,5 +756,16 @@
     });
 
     setupDropZone(byId('createDropZone'));
+
+    // 제목 앞 큰 아이콘: 감춰 둔 면접자 목록을 다시 여는 유일한 통로.
+    byId('heroReveal').addEventListener('click', () => {
+        if (!state.handoff) return;
+        setHandoff(false);
+        loadCandidates();
+    });
+
+    // 새로고침으로 목록이 도로 나타나지 않도록 감춘 상태를 그대로 복원한다.
+    const savedHandoff = readHandoff();
+    setHandoff(!!savedHandoff, { instant: true, done: savedHandoff === 'done' });
     loadCandidates();
 })();

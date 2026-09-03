@@ -32,7 +32,89 @@
 .iv-hero::after { content:none; }
 .iv-hero-copy { position:relative; z-index:1; display:flex; align-items:center; gap:17px; }
 .iv-hero-icon { width:48px; height:48px; flex:0 0 48px; display:grid; place-items:center; border-radius:10px;
-    background:var(--iv-primary); color:#fff; font-size:1.15rem; box-shadow:0 5px 13px rgba(53,122,189,.2); }
+    border:0; padding:0; background:var(--iv-primary); color:#fff; font-size:1.15rem;
+    box-shadow:0 5px 13px rgba(53,122,189,.2); cursor:pointer; transition:.18s ease; }
+.iv-hero-icon:hover { filter:brightness(1.07); transform:translateY(-1px); }
+/* 목록을 감춘 동안에는 이 아이콘이 '다시 열기' 버튼이라는 것을 알린다. */
+.iv-page.is-handoff .iv-hero-icon { background:var(--iv-primary-dark); animation:iv-hero-knock 1.8s ease-in-out infinite; }
+@keyframes iv-hero-knock {
+    0%, 100% { box-shadow:0 5px 13px rgba(53,122,189,.2); }
+    50% { box-shadow:0 5px 13px rgba(53,122,189,.2), 0 0 0 7px rgba(53,122,189,.14); }
+}
+
+/* 면접자에게 자리를 내준 동안 목록 자리에 두는 안내 */
+/* 평소에는 없는 것처럼 두고, 감춘 동안에만 나타난다.
+   display를 여기서 flex로 두면 hidden 속성이 먹지 않아 항상 보인다.
+   틀(흰 상자) 없이 화면 한가운데에 캐릭터만 세운다. position:fixed라
+   화면 좌우·위아래 정중앙이 되고, pointer-events:none이라 뒤에 있는
+   제목 앞 큰 아이콘을 그대로 누를 수 있다. */
+.iv-handoff-note { display:none; position:fixed; inset:0; z-index:5;
+    align-items:center; justify-content:center; gap:4px;
+    margin:0; padding:24px; pointer-events:none; }
+.iv-page.is-handoff .iv-handoff-note { display:flex; }
+
+/* 사전질문지 완료 화면과 같은 캐릭터가 말을 거는 모양으로 둔다. */
+.iv-handoff-character { width:288px; height:auto; flex:0 0 auto;
+    filter:drop-shadow(0 18px 30px rgba(24,34,49,.18));
+    animation:iv-handoff-bob 3.4s ease-in-out infinite; }
+@keyframes iv-handoff-bob {
+    0%, 100% { transform:translateY(0) rotate(0deg); }
+    50% { transform:translateY(-6px) rotate(-1.2deg); }
+}
+
+.iv-handoff-bubble { position:relative; margin:0; padding:18px 28px;
+    border:1.5px solid #d5e4f2; border-radius:20px; background:#f5faff;
+    color:var(--iv-ink); font-size:1.12rem; font-weight:750; letter-spacing:-.01em;
+    box-shadow:0 10px 26px rgba(21,34,56,.08);
+    animation:iv-handoff-say .38s ease-out; }
+/* 말풍선 꼬리를 캐릭터 쪽으로 낸다. 테두리용·바탕용 삼각형 두 겹. */
+.iv-handoff-bubble::before, .iv-handoff-bubble::after {
+    content:''; position:absolute; top:50%; right:100%; transform:translateY(-50%);
+    width:0; height:0; border:11px solid transparent; border-right-color:#d5e4f2; }
+.iv-handoff-bubble::after { margin-right:-2px; border-right-color:#f5faff; }
+@keyframes iv-handoff-say {
+    0% { opacity:0; transform:translateX(-8px) scale(.94); }
+    100% { opacity:1; transform:translateX(0) scale(1); }
+}
+
+/* 면접자가 전송을 누르면 초록으로 바뀌어 다 됐음을 알린다. */
+.iv-handoff-note.is-done .iv-handoff-bubble { border-color:#b7e3d4; background:#eefaf5; color:var(--iv-mint-dark); }
+.iv-handoff-note.is-done .iv-handoff-bubble::before { border-right-color:#b7e3d4; }
+.iv-handoff-note.is-done .iv-handoff-bubble::after { border-right-color:#eefaf5; }
+.iv-handoff-note.is-done .iv-handoff-character { animation:iv-handoff-cheer .7s ease-out; }
+@keyframes iv-handoff-cheer {
+    0% { transform:translateY(0) scale(1); }
+    35% { transform:translateY(-12px) scale(1.06); }
+    100% { transform:translateY(0) scale(1); }
+}
+
+@media (max-width:1100px) {
+    .iv-handoff-character { width:220px; }
+    .iv-handoff-bubble { font-size:1rem; }
+}
+@media (max-width:720px) {
+    .iv-handoff-note { flex-direction:column; gap:14px; }
+    .iv-handoff-character { width:170px; order:2; }
+    .iv-handoff-bubble { order:1; font-size:.95rem; padding:14px 20px; }
+    /* 세로로 서면 꼬리도 아래쪽(캐릭터 쪽)을 향한다. */
+    .iv-handoff-bubble::before, .iv-handoff-bubble::after {
+        top:100%; right:auto; left:50%; transform:translateX(-50%);
+        border-right-color:transparent; border-top-color:#d5e4f2; }
+    .iv-handoff-bubble::after { margin:-2px 0 0; border-top-color:#f5faff; }
+    .iv-handoff-note.is-done .iv-handoff-bubble::before { border-right-color:transparent; border-top-color:#b7e3d4; }
+    .iv-handoff-note.is-done .iv-handoff-bubble::after { border-right-color:transparent; border-top-color:#eefaf5; }
+}
+/* 감춰 두는 동안에는 목록 카드 자체를 문서에서 내린다. */
+.iv-page.is-handoff .iv-workspace { display:none; }
+/* '스르륵' 사라지는 잠깐의 흐려짐 */
+.iv-page .iv-workspace { transition:opacity .34s ease, transform .34s ease; }
+.iv-page.is-handoff-leaving .iv-workspace { opacity:0; transform:translateY(-8px); pointer-events:none; }
+@media (prefers-reduced-motion: reduce) {
+    .iv-page .iv-workspace { transition:none; }
+    .iv-page.is-handoff .iv-hero-icon { animation:none; }
+    .iv-handoff-character, .iv-handoff-bubble,
+    .iv-handoff-note.is-done .iv-handoff-character { animation:none; }
+}
 .iv-eyebrow, .iv-card-kicker { display:block; margin-bottom:4px; color:var(--iv-primary-dark); font-size:.7rem; font-weight:800; letter-spacing:.12em; }
 .iv-hero h1 { margin:0; font-size:1.45rem; letter-spacing:-.035em; }
 .iv-hero p { margin:5px 0 0; color:var(--iv-muted); font-size:.85rem; }
@@ -124,6 +206,8 @@
 .iv-progress-note.is-done { color:var(--iv-mint-dark); }
 .iv-progress-note.is-done i { color:var(--iv-mint); }
 .iv-progress-note small { color:#8794a6; font-size:.59rem; font-weight:650; }
+/* 타자 속도를 재지 못한 줄. 마우스를 올리면 까닭이 뜬다. */
+.iv-progress-note small.is-quiet { color:#a4b0bf; cursor:help; }
 /* 사전질문지 칸의 글자 자체가 질문지 창을 여는 버튼이다. */
 .iv-questionnaire-open { display:inline-flex; align-items:center; border:0; padding:0; background:transparent;
     color:inherit; font:inherit; cursor:pointer; }
