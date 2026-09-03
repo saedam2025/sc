@@ -931,6 +931,57 @@
             cursor: pointer; transition: all 0.2s;
         }
         .file-remove-btn:hover { background: #c92a2a; color: #fff; border-color: #c92a2a; }
+
+        /* 프로필 사진 액션 버튼(캠으로 촬영 / 사진 삭제)은 폭을 맞춰 세로로 쌓는다. */
+        .profile-photo-actions { display: flex; flex-direction: column; gap: 6px; width: 116px; }
+        .profile-photo-actions .file-remove-btn,
+        .profile-photo-actions .file-camera-btn { width: 100%; justify-content: center; }
+        .file-camera-btn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 6px 12px; border-radius: 8px; border: 1px solid var(--primary-color);
+            background: var(--primary-light, #eef4ff); color: var(--primary-color); font-weight: 700;
+            font-size: 0.78rem; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+        }
+        .file-camera-btn:hover { background: var(--primary-color); color: #fff; }
+        .file-camera-btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+        /* 웹캠 촬영 모달 */
+        #profileCamModal .cam-card {
+            width: min(420px, 100%); margin: 0 auto; background: var(--card-bg, #fff);
+            border: 1px solid var(--border-color); border-radius: 16px; padding: 20px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, .3);
+        }
+        #profileCamModal .cam-head {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+            font-weight: 800; font-size: 1rem; color: var(--text-dark);
+        }
+        #profileCamModal .cam-head i { color: var(--primary-color); }
+        #profileCamModal .cam-close {
+            margin-left: auto; border: 0; background: var(--widget-bg, #f1f5f9); color: var(--text-gray);
+            width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 14px;
+        }
+        #profileCamModal .cam-close:hover { background: #c92a2a; color: #fff; }
+        /* 원형 프로필로 잘릴 영역을 미리 보여주기 위해 촬영 화면도 정사각형으로 둔다. */
+        .cam-stage {
+            position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 14px;
+            overflow: hidden; background: #0f172a; display: flex; align-items: center; justify-content: center;
+        }
+        .cam-stage video, .cam-stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        /* 각도를 맞추기 쉽도록 촬영 화면은 거울처럼 좌우를 뒤집어 보여준다. */
+        .cam-stage video { transform: scaleX(-1); }
+        .cam-stage .cam-guide {
+            position: absolute; inset: 9%; border: 2px dashed rgba(255, 255, 255, .55);
+            border-radius: 50%; pointer-events: none;
+        }
+        .cam-status { margin-top: 11px; font-size: 0.82rem; font-weight: 700; color: var(--text-gray); text-align: center; line-height: 1.5; }
+        .cam-status.is-error { color: #c92a2a; }
+        .cam-actions { display: flex; gap: 8px; margin-top: 13px; }
+        .cam-actions button { flex: 1; padding: 11px 12px; border-radius: 10px; font-size: 0.85rem; font-weight: 800; cursor: pointer; border: 1px solid var(--border-color); }
+        .cam-actions .cam-btn-main { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+        .cam-actions .cam-btn-main:hover { filter: brightness(1.08); }
+        .cam-actions .cam-btn-sub { background: var(--card-bg, #fff); color: var(--text-dark); }
+        .cam-actions .cam-btn-sub:hover { background: var(--widget-hover, #f1f5f9); }
+        .cam-actions button[disabled] { opacity: .5; cursor: not-allowed; }
     </style>
     
     {% block extra_css %}{% endblock %}
@@ -1132,6 +1183,27 @@
         </div>
     </div>
 
+    <!-- 프로필 사진 웹캠 촬영 -->
+    <div id="profileCamModal" style="display:none; position:fixed; z-index:3200; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); padding:18px; overflow:auto;">
+        <div class="cam-card" style="margin-top:6vh;">
+            <div class="cam-head">
+                <i class="fa-solid fa-camera-retro"></i> 웹캠으로 프로필 사진 촬영
+                <button type="button" class="cam-close" onclick="closeProfileCamera()" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="cam-stage">
+                <video id="profileCamVideo" autoplay playsinline muted></video>
+                <img id="profileCamShot" alt="촬영한 사진" style="display:none;">
+                <div class="cam-guide" id="profileCamGuide"></div>
+            </div>
+            <div class="cam-status" id="profileCamStatus">카메라를 준비하는 중입니다...</div>
+            <div class="cam-actions">
+                <button type="button" class="cam-btn-main" id="profileCamShoot" onclick="captureProfilePhoto()" disabled><i class="fa-solid fa-camera"></i> 촬영</button>
+                <button type="button" class="cam-btn-sub" id="profileCamRetake" onclick="retakeProfilePhoto()" style="display:none;"><i class="fa-solid fa-rotate-left"></i> 다시 촬영</button>
+                <button type="button" class="cam-btn-main" id="profileCamUse" onclick="useProfilePhoto()" style="display:none;"><i class="fa-solid fa-check"></i> 이 사진 사용</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentMyInfo = null;
 
@@ -1196,6 +1268,7 @@
         }
 
         function onProfileFileChange(input, filenameId, removeFlagId, removeBtnId) {
+            if (input.files && input.files[0]) webcamProfileFile = null;
             const nameEl = document.getElementById(filenameId);
             const removeFlag = document.getElementById(removeFlagId);
             const removeBtn = document.getElementById(removeBtnId);
@@ -1209,6 +1282,7 @@
         }
 
         function removeProfileImage(fileInputId, previewId, filenameId, removeBtnId, removeFlagId) {
+            webcamProfileFile = null;
             const fileInput = document.getElementById(fileInputId);
             if (fileInput) fileInput.value = '';
             const preview = document.getElementById(previewId);
@@ -1220,6 +1294,176 @@
             const removeFlag = document.getElementById(removeFlagId);
             if (removeFlag) removeFlag.value = '1';
         }
+
+        /* ================= 프로필 사진 웹캠 촬영 =================
+           촬영한 사진은 '파일 선택'과 똑같이 프로필 폼에 얹히고,
+           [변경사항 적용]을 누르면 기존 업로드 경로 그대로 등록된다. */
+        const PROFILE_CAM_SIZE = 480;   // 저장할 정사각형 사진 한 변(px)
+        let profileCamStream = null;
+        let profileCamBlob = null;
+        let webcamProfileFile = null;   // DataTransfer를 못 쓰는 브라우저용 예비 보관
+
+        function profileCamStatus(text, isError) {
+            const el = document.getElementById('profileCamStatus');
+            if (!el) return;
+            el.textContent = text;
+            el.classList.toggle('is-error', !!isError);
+        }
+
+        function profileCamPhase(phase) {
+            const shooting = phase === 'shooting';
+            document.getElementById('profileCamVideo').style.display = shooting ? 'block' : 'none';
+            document.getElementById('profileCamShot').style.display = shooting ? 'none' : 'block';
+            document.getElementById('profileCamGuide').style.display = shooting ? 'block' : 'none';
+            document.getElementById('profileCamShoot').style.display = shooting ? 'inline-flex' : 'none';
+            document.getElementById('profileCamRetake').style.display = shooting ? 'none' : 'inline-flex';
+            document.getElementById('profileCamUse').style.display = shooting ? 'none' : 'inline-flex';
+        }
+
+        function stopProfileCamStream() {
+            if (profileCamStream) {
+                profileCamStream.getTracks().forEach(track => track.stop());
+                profileCamStream = null;
+            }
+            const video = document.getElementById('profileCamVideo');
+            if (video) video.srcObject = null;
+        }
+
+        async function openProfileCamera() {
+            const modal = document.getElementById('profileCamModal');
+            const shootBtn = document.getElementById('profileCamShoot');
+            modal.style.display = 'block';
+            profileCamBlob = null;
+            profileCamPhase('shooting');
+            shootBtn.disabled = true;
+            profileCamStatus('카메라를 준비하는 중입니다...');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                profileCamStatus('이 브라우저에서는 웹캠 촬영을 지원하지 않습니다. 크롬이나 엣지에서 열어주세요.', true);
+                return;
+            }
+
+            try {
+                profileCamStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+            } catch (error) {
+                const name = error && error.name;
+                if (name === 'NotAllowedError' || name === 'SecurityError') {
+                    profileCamStatus('카메라 사용이 차단되어 있습니다. 주소창의 자물쇠 아이콘에서 카메라를 허용해주세요.', true);
+                } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+                    profileCamStatus('연결된 카메라를 찾지 못했습니다. 웹캠 연결 상태를 확인해주세요.', true);
+                } else if (name === 'NotReadableError') {
+                    profileCamStatus('다른 프로그램이 카메라를 사용 중입니다. 해당 프로그램을 닫고 다시 시도해주세요.', true);
+                } else {
+                    profileCamStatus('카메라를 열지 못했습니다. 잠시 후 다시 시도해주세요.', true);
+                }
+                return;
+            }
+
+            const video = document.getElementById('profileCamVideo');
+            video.srcObject = profileCamStream;
+            try { await video.play(); } catch (e) {}
+            shootBtn.disabled = false;
+            profileCamStatus('얼굴을 원 안에 맞추고 [촬영]을 눌러주세요.');
+        }
+
+        function closeProfileCamera() {
+            stopProfileCamStream();
+            profileCamBlob = null;
+            const shot = document.getElementById('profileCamShot');
+            if (shot && shot.src) { URL.revokeObjectURL(shot.src); shot.src = ''; }
+            document.getElementById('profileCamModal').style.display = 'none';
+        }
+
+        function captureProfilePhoto() {
+            const video = document.getElementById('profileCamVideo');
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            if (!width || !height) {
+                profileCamStatus('아직 화면이 준비되지 않았습니다. 잠시 후 다시 눌러주세요.', true);
+                return;
+            }
+
+            // 프로필은 원형으로 보이므로 가운데를 정사각형으로 잘라 담는다.
+            const side = Math.min(width, height);
+            const canvas = document.createElement('canvas');
+            canvas.width = PROFILE_CAM_SIZE;
+            canvas.height = PROFILE_CAM_SIZE;
+            const ctx = canvas.getContext('2d');
+            // 화면이 거울 모드이므로 저장본도 똑같이 뒤집어 '보이는 그대로' 남긴다.
+            ctx.translate(PROFILE_CAM_SIZE, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(
+                video,
+                (width - side) / 2, (height - side) / 2, side, side,
+                0, 0, PROFILE_CAM_SIZE, PROFILE_CAM_SIZE
+            );
+
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    profileCamStatus('사진을 만들지 못했습니다. 다시 촬영해주세요.', true);
+                    return;
+                }
+                profileCamBlob = blob;
+                const shot = document.getElementById('profileCamShot');
+                if (shot.src) URL.revokeObjectURL(shot.src);
+                shot.src = URL.createObjectURL(blob);
+                profileCamPhase('preview');
+                profileCamStatus('이 사진을 쓰시려면 [이 사진 사용]을 눌러주세요.');
+            }, 'image/jpeg', 0.92);
+        }
+
+        function retakeProfilePhoto() {
+            profileCamBlob = null;
+            const shot = document.getElementById('profileCamShot');
+            if (shot.src) { URL.revokeObjectURL(shot.src); shot.src = ''; }
+            profileCamPhase('shooting');
+            profileCamStatus('얼굴을 원 안에 맞추고 [촬영]을 눌러주세요.');
+        }
+
+        function useProfilePhoto() {
+            if (!profileCamBlob) {
+                profileCamStatus('먼저 사진을 촬영해주세요.', true);
+                return;
+            }
+
+            const stamp = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const filename = `webcam-${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}`
+                + `-${pad(stamp.getHours())}${pad(stamp.getMinutes())}${pad(stamp.getSeconds())}.jpg`;
+            const file = new File([profileCamBlob], filename, { type: 'image/jpeg' });
+
+            // 파일 선택 input에 그대로 얹어 기존 저장 로직을 그대로 태운다.
+            const input = document.getElementById('myinfo_profile_image');
+            webcamProfileFile = file;
+            try {
+                const transfer = new DataTransfer();
+                transfer.items.add(file);
+                input.files = transfer.files;
+            } catch (e) {
+                // DataTransfer 미지원 브라우저는 webcamProfileFile로 대신 전송한다.
+            }
+
+            const preview = document.getElementById('preview_myinfo');
+            if (preview) {
+                preview.src = URL.createObjectURL(profileCamBlob);
+                preview.style.display = 'block';
+            }
+            const nameEl = document.getElementById('myinfo_file_name');
+            if (nameEl) nameEl.textContent = '웹캠 촬영 사진';
+            const removeFlag = document.getElementById('myinfo_remove_flag');
+            if (removeFlag) removeFlag.value = '0';
+            const removeBtn = document.getElementById('myinfo_remove_btn');
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
+
+            profileCamBlob = null;   // 위에서 만든 objectURL은 미리보기가 계속 쓴다.
+            closeProfileCamera();
+            alert('촬영한 사진을 프로필에 담았습니다.\n[변경사항 적용]을 누르면 등록됩니다.');
+        }
+
+        window.addEventListener('beforeunload', stopProfileCamStream);
 
         function formatPhoneNumber(input) {
             let val = input.value.replace(/[^0-9]/g, '');
@@ -1300,6 +1544,7 @@
         }
 
         async function openMyInfoModal() {
+            webcamProfileFile = null;
             const modal = document.getElementById('myInfoModal');
             const loading = document.getElementById('myInfoLoading');
             const errorDiv = document.getElementById('myInfoError');
@@ -1346,7 +1591,10 @@ if (currentMyInfo) {
                 <input type="hidden" id="myinfo_remove_flag" value="0">
                 <div class="profile-img-preview-row">
                     <img id="preview_myinfo" class="profile-img-preview" src="${profilePath}" style="display:${profilePath ? 'block' : 'none'}; width:70px; height:70px;">
-                    <button type="button" id="myinfo_remove_btn" class="file-remove-btn" style="display:${profilePath ? 'inline-flex' : 'none'};" onclick="removeProfileImage('myinfo_profile_image', 'preview_myinfo', 'myinfo_file_name', 'myinfo_remove_btn', 'myinfo_remove_flag')"><i class="fa-solid fa-trash"></i> 사진 삭제</button>
+                    <div class="profile-photo-actions">
+                        <button type="button" class="file-camera-btn" onclick="openProfileCamera()"><i class="fa-solid fa-camera-retro"></i> 캠으로 촬영</button>
+                        <button type="button" id="myinfo_remove_btn" class="file-remove-btn" style="display:${profilePath ? 'inline-flex' : 'none'};" onclick="removeProfileImage('myinfo_profile_image', 'preview_myinfo', 'myinfo_file_name', 'myinfo_remove_btn', 'myinfo_remove_flag')"><i class="fa-solid fa-trash"></i> 사진 삭제</button>
+                    </div>
                 </div>
             </div>
             <div style="flex:2;">
@@ -1436,7 +1684,7 @@ if (currentMyInfo) {
             const email = document.getElementById('myinfo_email').value;
             const address = document.getElementById('myinfo_address').value;
             const profileIcon = document.getElementById('myinfo_profile_icon').value;
-            const profileImage = document.getElementById('myinfo_profile_image').files[0];
+            const profileImage = document.getElementById('myinfo_profile_image').files[0] || webcamProfileFile;
             const removeProfile = document.getElementById('myinfo_remove_flag').value === '1';
 
             if (password) {
@@ -1495,7 +1743,10 @@ if (currentMyInfo) {
             }
         }
 
-        function closeMyInfoModal() { document.getElementById('myInfoModal').style.display = "none"; }
+        function closeMyInfoModal() {
+            closeProfileCamera();
+            document.getElementById('myInfoModal').style.display = "none";
+        }
         window.onclick = function(event) { if (event.target == document.getElementById('myInfoModal')) closeMyInfoModal(); }
 </script>
 <script src="{{ url_for('static', filename='js/unified_search.js', v='20260830-1') }}" defer></script>
