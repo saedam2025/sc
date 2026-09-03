@@ -6,9 +6,11 @@ import base64
 import hashlib
 import io
 import json
+import logging
 import mimetypes
 import os
 import re
+import time
 import zipfile
 import zlib
 from datetime import date
@@ -16,6 +18,7 @@ from typing import Any
 from xml.etree import ElementTree
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL.Image import DecompressionBombError
 from PyPDF2 import PdfReader
 
 
@@ -173,50 +176,232 @@ def prepare_documents(files: list[dict[str, Any]]) -> tuple[list[dict[str, Any]]
     return prepared, warnings
 
 
-_FACE_CASCADE: Any = None
-_FACE_CASCADE_LOADED = False
+# 얼굴 검출은 환경에 따라 준비 상태가 달라진다. Windows 개발 PC에서는 잘 뽑히던
+# 사진이 Render(리눅스)에서 자주 실패했고, 검출기를 못 쓰면 PDF 안에 사진과 함께
+# 들어 있는 '투명도 마스크'(새까만 판)가 사진 대신 뽑히는 문제가 있었다.
+# 그래서 (1) 검출기를 여러 경로·여러 모델로 찾아 쓰고, (2) 크기·대비·회전을 바꿔가며
+# 여러 번 시도하고, (3) 검출기를 아예 못 쓰는 환경을 위한 살색 판별을 함께 둔다.
+_CASCADE_NAMES = (
+    'haarcascade_frontalface_default.xml',
+    'haarcascade_frontalface_alt2.xml',
+    'haarcascade_frontalface_alt.xml',
+    'haarcascade_profileface.xml',
+)
+# OpenCV 설치본에 분류기 XML이 빠져 있어도 동작하도록 저장소에 같은 파일을 함께 둔다.
+_BUNDLED_CASCADE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'vendor', 'haarcascades')
+# 이미지가 많은 이력서에서 검출에 시간을 무한정 쓰지 않도록 총량을 제한한다.
+FACE_DETECT_BUDGET_SECONDS = float(os.environ.get('RESUME_FACE_DETECT_BUDGET', '') or 40.0)
+# 600dpi 스캔본까지는 다루되, 그보다 큰 이미지는 메모리가 작은 서버에서 위험하므로 건너뛴다.
+MAX_PHOTO_PIXELS = 80_000_000
+# JPEG는 디코딩 단계에서 미리 줄여 읽어 메모리와 시간을 아낀다.
+JPEG_DRAFT_SIZE = (2400, 2400)
+
+_LOGGER = logging.getLogger(__name__)
+_FACE_ENGINE: Any = None
+_FACE_ENGINE_LOADED = False
+
+# (배율 증가폭, 이웃 최소 개수, 최소 얼굴 비율, 사용할 분류기 수)
+# 앞 단계일수록 빠르고 오탐이 적다. 못 찾으면 점점 느슨하게 다시 본다.
+_DETECT_PASSES = (
+    (1.10, 5, 0.045, 2),
+    (1.05, 4, 0.030, 3),
+    (1.04, 4, 0.022, 4),
+)
 
 
-def _face_cascade() -> Any:
-    """정면 얼굴 검출기를 한 번만 만들어 재사용한다. 없으면 None."""
-    global _FACE_CASCADE, _FACE_CASCADE_LOADED
-    if _FACE_CASCADE_LOADED:
-        return _FACE_CASCADE
-    _FACE_CASCADE_LOADED = True
+def _cascade_directories() -> list[str]:
+    """분류기 XML을 찾을 후보 폴더를 우선순위대로 돌려준다."""
+    directories: list[str] = []
+    configured = os.environ.get('RESUME_HAARCASCADE_DIR', '').strip()
+    if configured:
+        directories.append(configured)
     try:
         import cv2
-        cascade = cv2.CascadeClassifier(
-            os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
-        )
-        _FACE_CASCADE = None if cascade.empty() else cascade
+        directories.append(str(getattr(getattr(cv2, 'data', None), 'haarcascades', '') or ''))
+        directories.append(os.path.join(os.path.dirname(os.path.abspath(cv2.__file__)), 'data'))
     except Exception:
-        _FACE_CASCADE = None
-    return _FACE_CASCADE
+        pass
+    directories.append(_BUNDLED_CASCADE_DIR)
+    seen: set[str] = set()
+    result: list[str] = []
+    for directory in directories:
+        if directory and directory not in seen and os.path.isdir(directory):
+            seen.add(directory)
+            result.append(directory)
+    return result
+
+
+def _face_engine() -> tuple[Any, list[Any]] | None:
+    """OpenCV 모듈과 얼굴 분류기 묶음을 한 번만 준비한다. 못 쓰면 None."""
+    global _FACE_ENGINE, _FACE_ENGINE_LOADED
+    if _FACE_ENGINE_LOADED:
+        return _FACE_ENGINE
+    _FACE_ENGINE_LOADED = True
+    try:
+        import cv2
+        import numpy  # noqa: F401  (검출에 필요하므로 여기서 함께 확인한다)
+    except Exception as exc:
+        _LOGGER.warning('이력서 얼굴 검출 사용 불가 - OpenCV/NumPy 로드 실패: %s', exc)
+        _FACE_ENGINE = None
+        return None
+    directories = _cascade_directories()
+    cascades: list[Any] = []
+    loaded: list[str] = []
+    for name in _CASCADE_NAMES:
+        for directory in directories:
+            path = os.path.join(directory, name)
+            if not os.path.isfile(path):
+                continue
+            try:
+                cascade = cv2.CascadeClassifier(path)
+            except Exception:
+                continue
+            if not cascade.empty():
+                cascades.append(cascade)
+                loaded.append(name)
+                break
+    if not cascades:
+        _LOGGER.warning('이력서 얼굴 검출 사용 불가 - 분류기 파일 없음. 탐색 경로: %s', directories)
+        _FACE_ENGINE = None
+        return None
+    _LOGGER.info(
+        '이력서 얼굴 검출 준비 완료 - OpenCV %s, 분류기 %s',
+        getattr(cv2, '__version__', '?'), ', '.join(loaded),
+    )
+    _FACE_ENGINE = (cv2, cascades)
+    return _FACE_ENGINE
+
+
+def face_detection_status() -> dict[str, Any]:
+    """운영 서버에서 얼굴 검출 준비 상태를 확인하기 위한 진단 정보."""
+    engine = _face_engine()
+    return {
+        'available': engine is not None,
+        'cascade_count': len(engine[1]) if engine else 0,
+        'search_paths': _cascade_directories(),
+        'bundled_dir_exists': os.path.isdir(_BUNDLED_CASCADE_DIR),
+    }
+
+
+def _work_sizes(longest: int) -> list[int]:
+    """검출에 쓸 작업 해상도 목록.
+
+    이력서 한 장을 통째로 스캔한 이미지는 증명사진이 작게 박혀 있어 640으로
+    줄이면 얼굴이 30픽셀 아래로 뭉개져 검출에 실패한다. 큰 이미지는 높은
+    해상도부터 보고, 아주 작은 사진은 오히려 키워서 본다.
+    """
+    if longest <= 400:
+        return [max(400, min(900, longest * 2)), longest]
+    if longest <= 1200:
+        return [longest, 640]
+    return [1600, 900]
+
+
+def _gray_variants(cv2: Any, numpy: Any, image: Image.Image, size: int) -> list[Any]:
+    """대비를 달리한 흑백 배열들. 스캔·복사본은 대비 보정을 해야 얼굴이 잡힌다."""
+    work = image.convert('L')
+    longest = max(work.size)
+    if longest and longest != size:
+        ratio = size / float(longest)
+        target = (max(1, int(round(work.size[0] * ratio))), max(1, int(round(work.size[1] * ratio))))
+        work = work.resize(target, Image.Resampling.LANCZOS)
+    gray = numpy.array(work)
+    if gray.size == 0:
+        return []
+    variants = [cv2.equalizeHist(gray), gray]
+    try:
+        variants.append(cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray))
+    except Exception:
+        pass
+    return variants
+
+
+def _detect_boxes(cv2: Any, cascades: list[Any], variants: list[Any], size: int,
+                  passes: tuple[tuple[float, int, float, int], ...] = _DETECT_PASSES) -> tuple[int, int, int, int] | None:
+    """느슨함을 단계별로 높여가며 가장 큰 얼굴 상자를 찾는다(작업 해상도 좌표)."""
+    for index, (scale_factor, neighbors, min_ratio, cascade_count) in enumerate(passes):
+        minimum = max(20, int(size * min_ratio))
+        for variant in (variants[:1] if index == 0 else variants):
+            for cascade in cascades[:cascade_count]:
+                try:
+                    faces = cascade.detectMultiScale(
+                        variant, scaleFactor=scale_factor, minNeighbors=neighbors,
+                        minSize=(minimum, minimum), flags=cv2.CASCADE_SCALE_IMAGE,
+                    )
+                except Exception:
+                    continue
+                if len(faces) == 0:
+                    continue
+                face = max(faces, key=lambda item: int(item[2]) * int(item[3]))
+                return int(face[0]), int(face[1]), int(face[2]), int(face[3])
+    return None
+
+
+def _unrotate_box(box: tuple[int, int, int, int], angle: int,
+                  width: int, height: int) -> tuple[int, int, int, int]:
+    """회전시켜 찾은 얼굴 상자를 원본 좌표로 되돌린다(PIL rotate는 반시계 방향)."""
+    box_x, box_y, box_w, box_h = box
+    if angle == 90:
+        return width - box_h - box_y, box_x, box_h, box_w
+    if angle == 270:
+        return box_y, height - box_w - box_x, box_h, box_w
+    if angle == 180:
+        return width - box_x - box_w, height - box_y - box_h, box_w, box_h
+    return box_x, box_y, box_w, box_h
 
 
 def _largest_face(image: Image.Image) -> tuple[tuple[int, int, int, int], float] | None:
-    """가장 큰 정면 얼굴의 원본 좌표 사각형과 이미지 대비 넓이 비율. 못 찾으면 None."""
-    cascade = _face_cascade()
-    if cascade is None:
+    """가장 큰 얼굴의 원본 좌표 사각형과 이미지 대비 넓이 비율. 못 찾으면 None."""
+    engine = _face_engine()
+    if engine is None:
         return None
+    cv2, cascades = engine
     try:
         import numpy
-        work = image.convert('L')
-        work.thumbnail((640, 640), Image.Resampling.LANCZOS)
-        gray = numpy.array(work)
-        if gray.size == 0:
-            return None
-        faces = cascade.detectMultiScale(gray, scaleFactor=1.12, minNeighbors=5, minSize=(28, 28))
-        if len(faces) == 0:
-            return None
-        face_x, face_y, face_w, face_h = max(faces, key=lambda item: int(item[2]) * int(item[3]))
-        coverage = int(face_w) * int(face_h) / float(gray.shape[0] * gray.shape[1])
-        scale_x = image.size[0] / float(gray.shape[1])
-        scale_y = image.size[1] / float(gray.shape[0])
-        box = (int(face_x * scale_x), int(face_y * scale_y),
-               int(face_w * scale_x), int(face_h * scale_y))
-        return box, coverage
     except Exception:
+        return None
+    width, height = image.size
+    if width < 24 or height < 24:
+        return None
+    def restore(found: tuple[int, int, int, int], source: Image.Image, size: int,
+                angle: int) -> tuple[tuple[int, int, int, int], float]:
+        # 작업 해상도 좌표를 회전본 원래 크기로 되돌린 뒤, 회전까지 되돌린다.
+        ratio = max(source.size) / float(size)
+        box = _unrotate_box(
+            (int(found[0] * ratio), int(found[1] * ratio),
+             int(found[2] * ratio), int(found[3] * ratio)),
+            angle, width, height,
+        )
+        return box, (box[2] * box[3]) / float(max(1, width * height))
+
+    try:
+        sizes = _work_sizes(max(width, height))
+        for index, size in enumerate(sizes):
+            variants = _gray_variants(cv2, numpy, image, size)
+            if not variants:
+                continue
+            # 기준 해상도에서만 끝까지 느슨하게 보고, 나머지 해상도는 빠른 단계만 본다.
+            found = _detect_boxes(cv2, cascades, variants, size,
+                                  passes=_DETECT_PASSES if index == 0 else _DETECT_PASSES[:2])
+            if found is not None:
+                return restore(found, image, size, 0)
+        # 정방향으로 못 찾으면 뒤집혀 스캔된 이력서까지 살핀다. 다만 회전본은 오탐이
+        # 늘기 쉬우므로 가장 엄격한 단계만 쓰고, 그중 가장 큰 얼굴을 고른다.
+        best: tuple[tuple[int, int, int, int], float] | None = None
+        for angle in (270, 90, 180):
+            source = image.rotate(angle, expand=True)
+            variants = _gray_variants(cv2, numpy, source, sizes[0])
+            if not variants:
+                continue
+            found = _detect_boxes(cv2, cascades, variants, sizes[0], passes=_DETECT_PASSES[:1])
+            if found is None:
+                continue
+            candidate = restore(found, source, sizes[0], angle)
+            if best is None or candidate[1] > best[1]:
+                best = candidate
+        return best
+    except Exception as exc:
+        _LOGGER.info('이력서 얼굴 검출 중 오류(건너뜁니다): %s', exc)
         return None
 
 
@@ -254,59 +439,130 @@ def _seal_like(image: Image.Image) -> bool:
         return False
 
 
-def _photo_score(data: bytes, order: int) -> tuple[float, bytes, str] | None:
-    try:
-        with Image.open(io.BytesIO(data)) as source:
-            image = ImageOps.exif_transpose(source)
-            if image.size[0] < 80 or image.size[1] < 80:
-                return None
-            # 이력서에는 지원자 사진과 도장(인영)이 함께 들어 있는 경우가 많고,
-            # 스캔본은 사진이 문서 한 장 안에 조그맣게 박혀 있다.
-            # 얼굴이 작게 잡히면 그 둘레만 증명사진 비율로 잘라내 사진으로 쓴다.
-            found = _largest_face(image)
-            if found is not None:
-                box, coverage = found
-                if coverage < 0.04:
-                    image = _portrait_crop(image, box)
-                face_score = 7.0
-            else:
-                face_score = 0.0
-            width, height = image.size
-            # 얼굴이 없는 문서 스캔 한 장은 인물사진이 아니다.
-            # (얼굴 검출기를 못 쓰는 환경에서는 판단할 수 없으니 종전대로 둔다.)
-            if face_score == 0.0 and _face_cascade() is not None and _page_like(width, height):
-                return None
-            ratio = width / max(height, 1)
-            pixels = width * height
-            # 증명사진은 3:4 안팎의 세로 이미지다. 비율이 가까울수록 높은 점수를 준다.
-            ratio_score = max(0.0, 5.0 - abs(ratio - 0.75) * 9.0)
-            # 너무 작으면 장식용 아이콘, 아주 크면 문서 전체를 스캔한 이미지일 수 있다.
-            if pixels < 20_000:
-                area_score = -1.5
-            elif pixels <= 25_000_000:
-                area_score = 2.0
-            else:
-                area_score = 0.0
-            order_score = max(0.0, 1.5 - order * 0.08)
-            # 얼굴 없는 붉은 인영은 뒤로 밀어낸다.
-            seal_penalty = 5.0 if (face_score == 0.0 and _seal_like(image)) else 0.0
-            score = ratio_score + area_score + order_score + face_score - seal_penalty
-            image.thumbnail((900, 900), Image.Resampling.LANCZOS)
-            if image.mode not in {'RGB', 'L'}:
-                canvas = Image.new('RGB', image.size, 'white')
-                if 'A' in image.getbands():
-                    canvas.paste(image.convert('RGBA'), mask=image.getchannel('A'))
-                else:
-                    canvas.paste(image.convert('RGB'))
-                image = canvas
-            elif image.mode == 'L':
-                image = image.convert('RGB')
-            output = io.BytesIO()
-            image.save(output, format='JPEG', quality=88, optimize=True)
-            return score, output.getvalue(), 'image/jpeg'
-    except (UnidentifiedImageError, OSError, ValueError):
-        return None
+def _mask_like(image: Image.Image) -> bool:
+    """사람 사진일 수 없는 단색 판·투명도 마스크인지 본다.
 
+    한글·워드 이력서를 PDF로 저장하면 사진과 똑같은 크기의 흑백 마스크가 함께
+    들어간다. 얼굴 검출을 못 하는 환경에서 이 판이 사진 대신 뽑히면 화면에
+    새까만 네모가 나오므로, 점수를 매기기 전에 걸러낸다.
+    """
+    try:
+        # 문서 한 장을 통째로 스캔한 이미지는 여백이 넓어 단색처럼 보이므로 여기서 판단하지 않는다.
+        if _page_like(*image.size):
+            return False
+        work = image.convert('RGB')
+        work.thumbnail((64, 64), Image.Resampling.LANCZOS)
+        pixels = list(work.getdata())
+        if not pixels:
+            return True
+        levels = [(r + g + b) / 3.0 for r, g, b in pixels]
+        if max(levels) - min(levels) < 16.0:
+            return True  # 명암 변화가 없는 단색 판
+        colored = sum(1 for r, g, b in pixels if max(r, g, b) - min(r, g, b) > 18)
+        flat = sum(1 for value in levels if value < 8.0 or value > 247.0)
+        # 색이 사실상 없고 순흑·순백만으로 이뤄졌으면 사진이 아니라 마스크(알파 판)다.
+        return colored / len(pixels) < 0.005 and flat / len(pixels) > 0.99
+    except Exception:
+        return False
+
+
+def _skin_ratio(image: Image.Image) -> float:
+    """살색으로 보이는 화소 비율. 얼굴 검출기를 못 쓰는 환경의 보조 판단."""
+    try:
+        work = image.convert('RGB')
+        work.thumbnail((96, 96), Image.Resampling.LANCZOS)
+        pixels = list(work.getdata())
+        if not pixels:
+            return 0.0
+        skin = sum(
+            1 for r, g, b in pixels
+            if r > 95 and g > 40 and b > 20 and r > g and r > b
+            and max(r, g, b) - min(r, g, b) > 15 and abs(r - g) > 15
+        )
+        return skin / len(pixels)
+    except Exception:
+        return 0.0
+
+
+def _open_photo(data: bytes) -> Image.Image | None:
+    """후보 이미지를 메모리 부담 없이 연다. 쓸 수 없으면 None."""
+    with Image.open(io.BytesIO(data)) as source:
+        width, height = source.size
+        if width < 80 or height < 80:
+            return None
+        if width * height > MAX_PHOTO_PIXELS:
+            _LOGGER.info('이력서 사진 후보가 너무 커서 건너뜁니다: %sx%s', width, height)
+            return None
+        if str(getattr(source, 'format', '') or '').upper() == 'JPEG':
+            # 큰 스캔본은 줄여서 디코딩해 메모리가 작은 서버에서도 안전하게 읽는다.
+            source.draft('RGB', JPEG_DRAFT_SIZE)
+        return ImageOps.exif_transpose(source)
+
+
+def _photo_score(data: bytes, order: int, deadline: float | None = None) -> tuple[float, bytes, str] | None:
+    try:
+        image = _open_photo(data)
+        if image is None:
+            return None
+        # 이력서에는 지원자 사진과 도장(인영)이 함께 들어 있는 경우가 많고,
+        # 스캔본은 사진이 문서 한 장 안에 조그맣게 박혀 있다.
+        # 얼굴이 작게 잡히면 그 둘레만 증명사진 비율로 잘라내 사진으로 쓴다.
+        if _mask_like(image):
+            return None
+        engine_ready = _face_engine() is not None
+        detection_ran = False
+        found = None
+        if engine_ready and (deadline is None or time.monotonic() < deadline):
+            detection_ran = True
+            found = _largest_face(image)
+        if found is not None:
+            box, coverage = found
+            # 잘라내기는 '큰 문서 안에 작게 박힌 사진'을 꺼내기 위한 것이다.
+            # 증명사진 크기의 이미지는 원본 그대로 두어 잘못 잘리는 일이 없게 한다.
+            if coverage < 0.04 and max(image.size) >= 700:
+                image = _portrait_crop(image, box)
+            face_score = 7.0
+        elif engine_ready:
+            face_score = 0.0
+        else:
+            # 검출기를 못 쓰는 환경에서는 살색 비율로 인물사진 여부를 가늠한다.
+            face_score = 4.0 if 0.06 <= _skin_ratio(image) <= 0.80 else 0.0
+        width, height = image.size
+        # 얼굴이 없는 문서 스캔 한 장은 인물사진이 아니다. 검출을 실제로 돌려보고
+        # 못 찾았을 때만 버리고, 검출기를 못 쓰는 환경에서는 살색이 거의 없을 때만 버린다.
+        if face_score == 0.0 and _page_like(width, height):
+            if detection_ran or _skin_ratio(image) < 0.02:
+                return None
+        ratio = width / max(height, 1)
+        pixels = width * height
+        # 증명사진은 3:4 안팎의 세로 이미지다. 비율이 가까울수록 높은 점수를 준다.
+        ratio_score = max(0.0, 5.0 - abs(ratio - 0.75) * 9.0)
+        # 너무 작으면 장식용 아이콘, 아주 크면 문서 전체를 스캔한 이미지일 수 있다.
+        if pixels < 20_000:
+            area_score = -1.5
+        elif pixels <= 25_000_000:
+            area_score = 2.0
+        else:
+            area_score = 0.0
+        order_score = max(0.0, 1.5 - order * 0.08)
+        # 얼굴 없는 붉은 인영은 뒤로 밀어낸다.
+        seal_penalty = 5.0 if (face_score == 0.0 and _seal_like(image)) else 0.0
+        score = ratio_score + area_score + order_score + face_score - seal_penalty
+        image.thumbnail((900, 900), Image.Resampling.LANCZOS)
+        if image.mode not in {'RGB', 'L'}:
+            canvas = Image.new('RGB', image.size, 'white')
+            if 'A' in image.getbands():
+                canvas.paste(image.convert('RGBA'), mask=image.getchannel('A'))
+            else:
+                canvas.paste(image.convert('RGB'))
+            image = canvas
+        elif image.mode == 'L':
+            image = image.convert('RGB')
+        output = io.BytesIO()
+        image.save(output, format='JPEG', quality=88, optimize=True)
+        return score, output.getvalue(), 'image/jpeg'
+    except (UnidentifiedImageError, DecompressionBombError, OSError, ValueError, MemoryError):
+        return None
 
 IMAGE_MAGIC = (
     bytes.fromhex('ffd8ff'),            # JPEG
@@ -389,18 +645,75 @@ def _zip_images(data: bytes) -> list[bytes]:
     return result
 
 
+def _pdf_mask_names(page: Any) -> set[str]:
+    """다른 이미지의 투명도 판으로 쓰인 XObject 이름을 모은다.
+
+    한글·워드에서 만든 이력서를 PDF로 저장하면 지원자 사진과 똑같은 크기의
+    마스크(대개 새까만 판)가 함께 들어간다. 사진과 구분이 안 되면 이 판이
+    지원자 사진으로 뽑히므로 문서 구조에서 미리 걸러낸다.
+    """
+    masks: set[str] = set()
+    try:
+        resources = page.get('/Resources')
+        resources = resources.get_object() if resources is not None else None
+        xobjects = resources.get('/XObject') if resources is not None else None
+        xobjects = xobjects.get_object() if xobjects is not None else None
+        if xobjects is None:
+            return masks
+        by_number: dict[int, str] = {}
+        for key in list(xobjects.keys()):
+            number = getattr(xobjects.raw_get(key), 'idnum', None)
+            if number is not None:
+                by_number[int(number)] = str(key).lstrip('/')
+        for key in list(xobjects.keys()):
+            entry = xobjects[key].get_object()
+            if str(entry.get('/Subtype') or '') != '/Image':
+                continue
+            # 스텐실 마스크와 소프트 마스크(/Matte)는 사진이 아니라 투명도 판이다.
+            if entry.get('/ImageMask') or '/Matte' in entry:
+                masks.add(str(key).lstrip('/'))
+            for mask_key in ('/SMask', '/Mask'):
+                if mask_key not in entry:
+                    continue
+                number = getattr(entry.raw_get(mask_key), 'idnum', None)
+                if number is not None and int(number) in by_number:
+                    masks.add(by_number[int(number)])
+    except Exception:
+        return masks
+    return masks
+
+
 def _pdf_images(data: bytes) -> list[bytes]:
     result: list[bytes] = []
     try:
         reader = PdfReader(io.BytesIO(data))
-        for page in reader.pages[:5]:
+        for page in reader.pages[:8]:
+            masks = _pdf_mask_names(page)
             for image in list(getattr(page, 'images', ()) or ()):  # PyPDF2 3.x
+                stem = os.path.splitext(str(getattr(image, 'name', '') or ''))[0].lstrip('/')
+                if stem and stem in masks:
+                    continue
                 image_data = getattr(image, 'data', None)
                 if image_data:
                     result.append(bytes(image_data))
     except Exception:
         pass
     return result
+
+
+def _candidate_priority(data: bytes, order: int) -> tuple[float, int]:
+    """검출 순서를 정하는 값. 이미지를 풀지 않고 크기만 보고 증명사진다움을 가늠한다."""
+    try:
+        with Image.open(io.BytesIO(data)) as source:
+            width, height = source.size
+    except Exception:
+        return 99.0, order
+    if width < 80 or height < 80:
+        return 90.0, order
+    penalty = abs(width / max(1, height) - 0.75)
+    if _page_like(width, height):
+        penalty += 1.0  # 문서 한 장 스캔은 검출에 시간이 오래 걸리므로 뒤로 둔다
+    return penalty, order
 
 
 def extract_candidate_photo(files: list[dict[str, Any]]) -> tuple[bytes, str] | None:
@@ -418,9 +731,26 @@ def extract_candidate_photo(files: list[dict[str, Any]]) -> tuple[bytes, str] | 
             candidates.extend(_hwp_images(data))
         elif extension == '.pdf':
             candidates.extend(_pdf_images(data))
-    scored = [candidate for index, raw in enumerate(candidates[:100])
-              if (candidate := _photo_score(raw, index)) is not None]
+    # 같은 사진이 장마다 반복되는 이력서에서 검출 시간을 낭비하지 않도록 중복을 지운다.
+    unique: list[bytes] = []
+    seen: set[str] = set()
+    for raw in candidates:
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest in seen:
+            continue
+        seen.add(digest)
+        unique.append(raw)
+    # 후보가 많아도 요청이 늘어지지 않도록 얼굴 검출에 쓸 시간의 총량을 정해둔다.
+    # 시간이 모자라면 뒤로 밀린 후보만 검출을 건너뛰도록, 증명사진에 가까운 순서로 본다.
+    deadline = time.monotonic() + FACE_DETECT_BUDGET_SECONDS
+    ordered = sorted(enumerate(unique[:100]), key=lambda pair: _candidate_priority(pair[1], pair[0]))
+    scored = [candidate for index, raw in ordered
+              if (candidate := _photo_score(raw, index, deadline)) is not None]
     if not scored:
+        _LOGGER.info(
+            '이력서 사진을 찾지 못했습니다(후보 %s개, 얼굴 검출 %s).',
+            len(unique), '가능' if _face_engine() is not None else '불가',
+        )
         return None
     _, photo, mime = max(scored, key=lambda item: item[0])
     return photo, mime
