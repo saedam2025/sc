@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, session, request, render_template, current_app
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask_socketio import join_room, leave_room
 import json
 import os
@@ -58,7 +58,8 @@ def _save_chat_attachment(file_storage):
 
     os.makedirs(CHAT_UPLOAD_FOLDER, exist_ok=True)
     # 원본명과 저장명을 분리해 한글명을 보존하고 동일 파일명의 덮어쓰기를 방지한다.
-    stored_path = os.path.join(CHAT_UPLOAD_FOLDER, encrypted_storage_name(original_name))
+    stored_name = encrypted_storage_name(original_name)
+    stored_path = os.path.join(CHAT_UPLOAD_FOLDER, stored_name)
     try:
         encrypt_upload(file_storage, stored_path)
     except Exception:
@@ -68,7 +69,9 @@ def _save_chat_attachment(file_storage):
             pass
         raise
 
-    return original_name, stored_path
+    # DB에는 절대경로가 아니라 저장명만 남긴다. 절대경로를 넣으면 프로젝트 폴더가
+    # 다른 드라이브나 서버로 옮겨졌을 때 예전 첨부를 통째로 못 찾게 된다.
+    return original_name, stored_name
 
 
 def _is_allowed_chat_path(filepath):
@@ -84,11 +87,34 @@ def _is_allowed_chat_path(filepath):
     return False
 
 
+def _resolve_chat_path(filepath):
+    """DB에 저장된 값에서 실제 첨부파일 경로를 찾아낸다.
+
+    예전 메시지는 저장 당시의 절대경로(E:\\... 또는 /mnt/data/...)를 그대로
+    담고 있어서, 프로젝트 폴더가 옮겨지면 파일이 멀쩡히 있어도 못 찾았다.
+    경로가 맞지 않으면 저장명만 떼어 현재 업로드 폴더에서 다시 찾는다.
+    """
+    raw = str(filepath or '').strip()
+    if not raw:
+        return ''
+    if ('/' in raw or '\\' in raw) and _is_allowed_chat_path(raw) and os.path.isfile(raw):
+        return os.path.abspath(raw)
+    stored_name = os.path.basename(raw.replace('\\', '/'))
+    if not stored_name or stored_name in ('.', '..'):
+        return ''
+    for root in (CHAT_UPLOAD_FOLDER, LEGACY_UPLOAD_FOLDER):
+        candidate = os.path.join(root, stored_name)
+        if os.path.isfile(candidate) and _is_allowed_chat_path(candidate):
+            return os.path.abspath(candidate)
+    return ''
+
+
 def _get_attachment_metadata(filepath, sent_at):
     file_size = 0
-    if filepath and _is_allowed_chat_path(filepath) and os.path.isfile(filepath):
+    resolved = _resolve_chat_path(filepath)
+    if resolved:
         try:
-            file_size = plaintext_size(filepath)
+            file_size = plaintext_size(resolved)
         except OSError:
             file_size = 0
 
@@ -103,17 +129,16 @@ def _get_attachment_metadata(filepath, sent_at):
 
 
 def _remove_physical_file(filepath):
-    if not _is_allowed_chat_path(filepath):
-        return False
-    if not os.path.exists(filepath):
+    resolved = _resolve_chat_path(filepath)
+    if not resolved:
+        # 이미 지워졌거나 이 서버에 없는 파일이면 정리된 것으로 본다.
+        # (False로 두면 만료 정리가 매번 같은 행을 다시 붙잡아 filepath가 영구히 남는다.)
         return True
-    if not os.path.isfile(filepath):
-        return False
     try:
-        os.remove(filepath)
+        os.remove(resolved)
         return True
     except OSError:
-        current_app.logger.exception('메신저 첨부파일 삭제 실패: %s', filepath)
+        current_app.logger.exception('메신저 첨부파일 삭제 실패: %s', resolved)
         return False
 
 
@@ -128,7 +153,11 @@ def _remove_file_if_unreferenced(conn, filepath):
 
 
 def _cleanup_expired_chat_attachments(conn):
-    cutoff = (datetime.now() - timedelta(days=CHAT_RETENTION_DAYS)).strftime('%Y-%m-%d %H:%M:%S')
+    # sent_at 은 SQLite CURRENT_TIMESTAMP(UTC)로 저장되므로 기준 시각도 UTC로 맞춘다.
+    # local time으로 비교하면 한국 기준 9시간 일찍 삭제된다.
+    cutoff = (
+        datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=CHAT_RETENTION_DAYS)
+    ).strftime('%Y-%m-%d %H:%M:%S')
     rows = conn.execute('''
         SELECT DISTINCT filepath
         FROM messages
@@ -259,6 +288,74 @@ def _ensure_chat_tables_impl(conn):
     )''')
     conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_push_user ON chat_push_subscriptions(user_name)")
 
+    conn.execute('''CREATE TABLE IF NOT EXISTS chat_task_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_key TEXT NOT NULL DEFAULT '',
+        message_id INTEGER,
+        message_uid TEXT,
+        requester TEXT NOT NULL,
+        assignee TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        responded_at DATETIME,
+        response_text TEXT,
+        response_message_id INTEGER
+    )''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_task_assignee ON chat_task_requests(assignee, status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_task_requester ON chat_task_requests(requester, status)")
+    conn.execute("DROP INDEX IF EXISTS idx_chat_task_message")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_task_msg_uid ON chat_task_requests(message_uid, assignee)")
+
+    conn.execute('''CREATE TABLE IF NOT EXISTS chat_polls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_key TEXT NOT NULL,
+        creator TEXT NOT NULL,
+        question TEXT NOT NULL,
+        options TEXT NOT NULL,
+        allow_multiple INTEGER NOT NULL DEFAULT 0,
+        is_anonymous INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'open',
+        message_id INTEGER,
+        message_uid TEXT,
+        deadline DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        closed_at DATETIME
+    )''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_polls_room ON chat_polls(room_key, id)")
+
+    poll_columns = {
+        row['name'] for row in conn.execute("PRAGMA table_info(chat_polls)").fetchall()
+    }
+    if 'message_uid' not in poll_columns:
+        conn.execute("ALTER TABLE chat_polls ADD COLUMN message_uid TEXT")
+    if 'deadline' not in poll_columns:
+        conn.execute("ALTER TABLE chat_polls ADD COLUMN deadline DATETIME")
+    # 대화창 카드는 논리 메시지 uid로 붙이므로, 예전 설문에도 uid를 채워 넣는다.
+    conn.execute('''
+        UPDATE chat_polls
+        SET message_uid = (
+            SELECT message_uid FROM messages WHERE messages.id = chat_polls.message_id
+        )
+        WHERE (message_uid IS NULL OR message_uid = '') AND message_id IS NOT NULL
+    ''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_polls_uid ON chat_polls(message_uid)")
+
+    conn.execute('''CREATE TABLE IF NOT EXISTS chat_poll_votes (
+        poll_id INTEGER NOT NULL,
+        user_name TEXT NOT NULL,
+        option_index INTEGER NOT NULL,
+        voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY(poll_id, user_name, option_index)
+    )''')
+
+    conn.execute('''CREATE TABLE IF NOT EXISTS chat_user_status (
+        user_name TEXT PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT '',
+        status_message TEXT NOT NULL DEFAULT '',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+
     message_columns = {
         row['name'] for row in conn.execute("PRAGMA table_info(messages)").fetchall()
     }
@@ -294,6 +391,19 @@ def _ensure_chat_tables_impl(conn):
             "UPDATE messages SET message_uid=? WHERE id=?",
             (message_uid, row['id'])
         )
+
+    # 예전에는 첨부 경로를 절대경로로 저장해, 프로젝트 폴더가 다른 드라이브나
+    # 서버로 옮겨지면 첨부가 통째로 깨졌다. 저장명만 남겨 위치와 무관하게 만든다.
+    for row in conn.execute(
+        "SELECT DISTINCT filepath FROM messages WHERE filepath IS NOT NULL AND filepath <> ''"
+    ).fetchall():
+        stored_path = str(row['filepath'])
+        stored_name = os.path.basename(stored_path.replace('\\', '/'))
+        if stored_name and stored_name != stored_path:
+            conn.execute(
+                "UPDATE messages SET filepath=? WHERE filepath=?",
+                (stored_name, stored_path)
+            )
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_uid ON messages(message_uid)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_room_id_id ON messages(room_id, id)")
@@ -363,8 +473,8 @@ def _ensure_group_room(conn, room_key, created_by=None):
         ORDER BY id ASC LIMIT 1
     ''', (room_key,)).fetchone()
     creator = (
-        str(created_by or '').strip()
-        or (first_message['sender'] if first_message else '')
+        (first_message['sender'] if first_message else '')
+        or str(created_by or '').strip()
         or (legacy_members[0] if legacy_members else '')
     )
     if not creator:
@@ -919,6 +1029,7 @@ def _send_chat_push(conn, target_user, room_key, actor, content='', filename='',
     payload = {
         'title': title,
         'body': body,
+        'icon': '/static/chat_notify_icon.png',
         'tag': f"saedam-chat-{quote(str(room_key), safe='')}",
         'partner': str(room_key),
         'url': f"/chat_popup/{quote(str(room_key), safe='')}",
@@ -1127,6 +1238,44 @@ def api_unread_messages():
     return jsonify({"total_unread": total_count, "details": details, "rooms": rooms})
 
 
+@chat_bp.route('/api/chat/mark-read', methods=['POST'])
+def mark_chat_room_read():
+    """알림의 [읽음 처리] 버튼처럼 대화방을 열지 않고 읽음만 표시한다."""
+    current_user = session.get('user_name')
+    data = request.get_json(silent=True) or {}
+    room_key = str(data.get('partner') or '').strip()
+    if not current_user:
+        return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
+    if not room_key:
+        return jsonify({"status": "error", "message": "대화방 정보가 없습니다."}), 400
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    if not _can_access_room(conn, room_key, current_user):
+        conn.close()
+        return jsonify({"status": "error", "message": "대화방 접근 권한이 없습니다."}), 403
+
+    cutoff_id = _message_access_cutoff(conn, room_key, current_user) or 0
+    if ',' in room_key:
+        cursor = conn.execute(
+            "UPDATE messages SET is_read=1 "
+            "WHERE receiver=? AND room_id=? AND id>? AND " + UNREAD_SQL,
+            (current_user, room_key, cutoff_id)
+        )
+    else:
+        cursor = conn.execute(
+            "UPDATE messages SET is_read=1 "
+            "WHERE receiver=? AND sender=? AND room_id IS NULL AND id>? AND " + UNREAD_SQL,
+            (current_user, room_key, cutoff_id)
+        )
+    updated = int(cursor.rowcount or 0)
+    conn.commit()
+    if updated:
+        _emit_chat_event(conn, room_key, current_user, 'message_changed')
+    conn.close()
+    return jsonify({"status": "success", "updated": updated})
+
+
 @chat_bp.route('/api/chat/organization')
 def chat_organization():
     """로그인 사용자가 메신저 조직도에 필요한 최소 회원정보만 조회한다."""
@@ -1134,6 +1283,7 @@ def chat_organization():
         return jsonify({"status": "error", "message": "로그인이 필요합니다."}), 401
 
     conn = get_db()
+    _ensure_chat_tables(conn)
     users = conn.execute('''
         SELECT emp_no, name, department, position, level, profile_icon, profile_path
         FROM users
@@ -1143,6 +1293,8 @@ def chat_organization():
         ORDER BY level ASC, id ASC
     ''').fetchall()
     point_balances = get_point_balances(conn, [user['name'] or '' for user in users])
+    # 조직도에서도 자리비움·연차 같은 상태를 바로 보여준다.
+    user_statuses = _get_user_statuses(conn, [user['name'] or '' for user in users])
     current_user_points = point_balances.get(str(session.get('user_name') or ''), 0)
     conn.close()
 
@@ -1162,6 +1314,7 @@ def chat_organization():
                 "icon": user['profile_icon'] or '👤',
                 "profile_path": user['profile_path'] or '',
                 "points": point_balances.get(user['name'] or '', 0),
+                "status": user_statuses.get(user['name'] or ''),
             }
             for user in users
         ],
@@ -1364,7 +1517,7 @@ def chat_attachment(message_id):
             return jsonify({"status": "error", "message": "첨부파일 접근 권한이 없습니다."}), 403
         if msg['deleted_for_all']:
             return jsonify({"status": "error", "message": "삭제된 첨부파일입니다."}), 410
-        cutoff = datetime.now() - timedelta(days=CHAT_RETENTION_DAYS)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=CHAT_RETENTION_DAYS)
         try:
             sent_at = datetime.fromisoformat(str(msg['sent_at']).replace('Z', '+00:00')).replace(tzinfo=None)
         except (TypeError, ValueError):
@@ -1378,10 +1531,11 @@ def chat_attachment(message_id):
     finally:
         conn.close()
 
-    if not _is_allowed_chat_path(filepath) or not os.path.isfile(filepath):
+    resolved = _resolve_chat_path(filepath)
+    if not resolved:
         return jsonify({"status": "error", "message": "첨부파일을 찾을 수 없습니다."}), 404
     return encrypted_response(
-        filepath,
+        resolved,
         filename,
         as_attachment=request.args.get('download') == '1',
     )
@@ -1814,7 +1968,7 @@ def update_chat_room_name():
     _ensure_chat_tables(conn)
     if not _require_group_admin(conn, room_key, current_user):
         conn.close()
-        return jsonify({"status": "error", "message": "그룹 관리자만 이름을 변경할 수 있습니다."}), 403
+        return jsonify({"status": "error", "message": "방장만 대화방 이름을 변경할 수 있습니다."}), 403
     conn.execute('''
         UPDATE chat_room_profiles
         SET display_name=?, updated_at=CURRENT_TIMESTAMP
@@ -1880,7 +2034,7 @@ def add_chat_room_members():
     _ensure_chat_tables(conn)
     if not _require_group_admin(conn, room_key, current_user):
         conn.close()
-        return jsonify({"status": "error", "message": "그룹 관리자만 멤버를 초대할 수 있습니다."}), 403
+        return jsonify({"status": "error", "message": "방장만 멤버를 초대할 수 있습니다."}), 403
     if any(name not in _approved_user_names(conn) for name in members):
         conn.close()
         return jsonify({"status": "error", "message": "승인되지 않은 사용자가 포함되어 있습니다."}), 400
@@ -1930,7 +2084,7 @@ def remove_chat_room_member():
     _ensure_chat_tables(conn)
     if not _require_group_admin(conn, room_key, current_user):
         conn.close()
-        return jsonify({"status": "error", "message": "그룹 관리자만 멤버를 내보낼 수 있습니다."}), 403
+        return jsonify({"status": "error", "message": "방장만 멤버를 내보낼 수 있습니다."}), 403
     target = conn.execute('''
         SELECT user_name FROM chat_room_members
         WHERE room_key=? AND user_name=? AND left_at IS NULL
@@ -1984,14 +2138,14 @@ def update_chat_room_admin():
     _ensure_chat_tables(conn)
     if not _require_group_admin(conn, room_key, current_user):
         conn.close()
-        return jsonify({"status": "error", "message": "현재 그룹 관리자만 관리자를 변경할 수 있습니다."}), 403
+        return jsonify({"status": "error", "message": "현재 방장만 방장을 넘길 수 있습니다."}), 403
     target = conn.execute('''
         SELECT user_name FROM chat_room_members
         WHERE room_key=? AND user_name=? AND left_at IS NULL
     ''', (room_key, admin_user)).fetchone()
     if not target:
         conn.close()
-        return jsonify({"status": "error", "message": "관리자로 지정할 멤버가 없습니다."}), 404
+        return jsonify({"status": "error", "message": "방장으로 지정할 멤버가 없습니다."}), 404
 
     conn.execute(
         "UPDATE chat_room_profiles SET admin_user=?, updated_at=CURRENT_TIMESTAMP WHERE room_key=?",
@@ -2051,6 +2205,759 @@ def move_pin():
             
     conn.close()
     return jsonify({"status": "success"})
+
+
+# ---------------------------------------------------------------------------
+# 대화창 상단 메뉴바 3종: 업무요청 / 설문·투표 / 상태표시
+# ---------------------------------------------------------------------------
+
+CHAT_STATUS_PRESETS = (
+    {'key': 'away', 'label': '자리비움', 'icon': '🚶', 'color': '#f59e0b'},
+    {'key': 'meeting', 'label': '회의중', 'icon': '📋', 'color': '#6366f1'},
+    {'key': 'field', 'label': '외근', 'icon': '🚗', 'color': '#0ea5e9'},
+    {'key': 'leave', 'label': '연차', 'icon': '🌴', 'color': '#10b981'},
+    {'key': 'call', 'label': '통화중', 'icon': '📞', 'color': '#ec4899'},
+    {'key': 'absent', 'label': '부재중', 'icon': '🌙', 'color': '#94a3b8'},
+)
+CHAT_STATUS_MAP = {item['key']: item for item in CHAT_STATUS_PRESETS}
+CHAT_TASK_SUMMARY_LIMIT = 500
+CHAT_POLL_MAX_OPTIONS = 10
+
+
+def _status_payload(user_name, status_key, status_message='', updated_at=''):
+    preset = CHAT_STATUS_MAP.get(str(status_key or ''))
+    return {
+        'user': user_name,
+        'status': preset['key'] if preset else '',
+        'label': preset['label'] if preset else '',
+        'icon': preset['icon'] if preset else '',
+        'color': preset['color'] if preset else '',
+        'message': str(status_message or ''),
+        'updated_at': str(updated_at or ''),
+    }
+
+
+def _get_user_statuses(conn, names):
+    names = [str(name) for name in dict.fromkeys(names) if str(name or '').strip()]
+    if not names:
+        return {}
+    placeholders = ','.join(['?'] * len(names))
+    rows = conn.execute(f"""
+        SELECT user_name, status, status_message, updated_at
+        FROM chat_user_status
+        WHERE user_name IN ({placeholders}) AND status <> ''
+    """, names).fetchall()
+    return {
+        row['user_name']: _status_payload(
+            row['user_name'], row['status'], row['status_message'], row['updated_at']
+        )
+        for row in rows
+        if row['status'] in CHAT_STATUS_MAP
+    }
+
+
+def _deliver_chat_message(conn, sender, room_key, content, filename='', filepath=''):
+    """설문·업무요청처럼 서버가 대신 보내는 메시지를 대화방에 남긴다.
+
+    반환값은 (첫 메시지 id, 논리 메시지 uid) 이며 실패하면 (None, None).
+    """
+    room_key = str(room_key or '').strip()
+    content = str(content or '')
+    if not sender or not room_key or not (content.strip() or filename):
+        return None, None
+
+    is_group = ',' in room_key
+    room_id = room_key if is_group else None
+    if is_group:
+        receivers = [
+            row['user_name'] for row in _active_group_members(conn, room_key)
+            if row['user_name'] != sender
+        ]
+    else:
+        receivers = [room_key]
+    if not receivers:
+        return None, None
+
+    first_message_id = None
+    first_message_uid = None
+    direct_targets = []
+    group_message_uid = uuid.uuid4().hex if room_id else None
+    for receiver in receivers:
+        message_uid = group_message_uid or uuid.uuid4().hex
+        cursor = conn.execute("""
+            INSERT INTO messages
+                (sender, receiver, content, filename, filepath, room_id, is_read, message_uid)
+            VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+        """, (sender, receiver, content, filename, filepath, room_id, message_uid))
+        if first_message_id is None:
+            first_message_id = int(cursor.lastrowid)
+            first_message_uid = message_uid
+        if not room_id:
+            for user_name, key in ((sender, receiver), (receiver, sender)):
+                conn.execute("""
+                    INSERT OR IGNORE INTO chat_user_room_settings (user_name, room_key)
+                    VALUES (?, ?)
+                """, (user_name, key))
+                conn.execute("""
+                    UPDATE chat_user_room_settings SET left_at=NULL
+                    WHERE user_name=? AND room_key=?
+                """, (user_name, key))
+            direct_targets.append((receiver, int(cursor.lastrowid)))
+    conn.commit()
+
+    if room_id:
+        _emit_chat_event(
+            conn, room_id, sender, 'message',
+            message_id=first_message_id, content=content[:120], filename=filename,
+        )
+        for receiver in receivers:
+            _send_chat_push(
+                conn, receiver, room_id, sender,
+                content=content, filename=filename, message_id=first_message_id,
+            )
+    else:
+        for partner, message_id in direct_targets:
+            _emit_chat_event(
+                conn, partner, sender, 'message',
+                message_id=message_id, content=content[:120], filename=filename,
+            )
+            _send_chat_push(
+                conn, partner, sender, sender,
+                content=content, filename=filename, message_id=message_id,
+            )
+    return first_message_id, first_message_uid
+
+
+def _emit_user_event(target_user, event_type, **payload):
+    """대화방과 무관하게 특정 사용자에게만 전달하는 사이드 이벤트."""
+    if not target_user:
+        return
+    socketio.emit(
+        'chat_side_event',
+        {'type': event_type, **payload},
+        to=f"user:{target_user}",
+        namespace='/chat',
+    )
+
+
+def _task_room_key(row, viewer):
+    """1:1 업무요청은 보는 사람에 따라 대화방 키가 달라진다."""
+    room_key = str(row['room_key'] or '')
+    if room_key:
+        return room_key
+    return row['requester'] if viewer == row['assignee'] else row['assignee']
+
+
+def _serialize_task_request(row, viewer):
+    return {
+        'id': row['id'],
+        'room_key': _task_room_key(row, viewer),
+        'is_group': bool(str(row['room_key'] or '')),
+        'message_id': row['message_id'],
+        'requester': row['requester'],
+        'assignee': row['assignee'],
+        'content': row['content'] or '',
+        'status': row['status'],
+        'created_at': row['created_at'] or '',
+        'responded_at': row['responded_at'] or '',
+        'response_text': row['response_text'] or '',
+        'direction': 'sent' if viewer == row['requester'] else 'received',
+    }
+
+
+def _fetch_task_request(conn, request_id):
+    return conn.execute("""
+        SELECT id, room_key, message_id, message_uid, requester, assignee, content,
+               status, created_at, responded_at, response_text, response_message_id
+        FROM chat_task_requests WHERE id=?
+    """, (request_id,)).fetchone()
+
+
+def _parse_poll_deadline(value):
+    """클라이언트가 보낸 ISO 마감일시를 UTC 기준 문자열로 바꾼다."""
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    except ValueError:
+        return False
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _close_expired_polls(conn, room_key=None):
+    """마감기한이 지난 설문은 조회/투표 시점에 자동으로 마감한다."""
+    sql = """
+        UPDATE chat_polls
+        SET status='closed', closed_at=CURRENT_TIMESTAMP
+        WHERE status='open' AND deadline IS NOT NULL AND deadline <> ''
+          AND deadline <= CURRENT_TIMESTAMP
+    """
+    params = []
+    if room_key:
+        sql += " AND room_key=?"
+        params.append(room_key)
+    cursor = conn.execute(sql, params)
+    if cursor.rowcount:
+        conn.commit()
+    return cursor.rowcount
+
+
+def _poll_row(conn, poll_id):
+    return conn.execute("""
+        SELECT id, room_key, creator, question, options, allow_multiple, is_anonymous,
+               status, message_id, message_uid, deadline, created_at, closed_at
+        FROM chat_polls WHERE id=?
+    """, (poll_id,)).fetchone()
+
+
+def _is_room_admin(conn, room_key, current_user):
+    profile = conn.execute(
+        "SELECT admin_user FROM chat_room_profiles WHERE room_key=?", (room_key,)
+    ).fetchone()
+    return bool(profile and profile['admin_user'] == current_user)
+
+
+def _poll_payload(conn, poll, current_user, is_room_admin=False):
+    try:
+        options = json.loads(poll['options'] or '[]')
+    except (TypeError, ValueError):
+        options = []
+    vote_rows = conn.execute(
+        "SELECT user_name, option_index FROM chat_poll_votes WHERE poll_id=? ORDER BY voted_at ASC",
+        (poll['id'],)
+    ).fetchall()
+    counts = [0] * len(options)
+    voters = [[] for _ in options]
+    my_votes = []
+    participants = set()
+    for vote in vote_rows:
+        index = int(vote['option_index'])
+        participants.add(vote['user_name'])
+        if 0 <= index < len(options):
+            counts[index] += 1
+            voters[index].append(vote['user_name'])
+        if vote['user_name'] == current_user:
+            my_votes.append(index)
+    is_anonymous = bool(poll['is_anonymous'])
+    return {
+        'id': poll['id'],
+        'room_key': poll['room_key'],
+        'creator': poll['creator'],
+        'question': poll['question'],
+        'allow_multiple': bool(poll['allow_multiple']),
+        'is_anonymous': is_anonymous,
+        'status': poll['status'],
+        'created_at': poll['created_at'] or '',
+        'closed_at': poll['closed_at'] or '',
+        'deadline': poll['deadline'] or '',
+        'message_id': poll['message_id'],
+        'message_uid': poll['message_uid'] or '',
+        'is_owner': poll['creator'] == current_user,
+        'can_close': poll['creator'] == current_user or bool(is_room_admin),
+        'my_votes': sorted(my_votes),
+        'total_voters': len(participants),
+        'options': [
+            {
+                'index': index,
+                'text': str(text),
+                'count': counts[index],
+                'voters': [] if is_anonymous else voters[index],
+            }
+            for index, text in enumerate(options)
+        ],
+    }
+
+
+@chat_bp.route('/api/chat/status', methods=['GET'])
+def get_chat_status():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    requested = [
+        name.strip() for name in str(request.args.get('users') or '').split(',')
+        if name.strip()
+    ]
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    statuses = _get_user_statuses(conn, requested + [current_user])
+    conn.close()
+    return jsonify({
+        'status': 'success',
+        'presets': list(CHAT_STATUS_PRESETS),
+        'my_status': statuses.get(current_user) or _status_payload(current_user, ''),
+        'statuses': {
+            name: statuses.get(name) or _status_payload(name, '')
+            for name in requested
+        },
+    })
+
+
+@chat_bp.route('/api/chat/status', methods=['POST'])
+def set_chat_status():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    status_key = str(data.get('status') or '').strip()
+    status_message = str(data.get('message') or '').strip()[:60]
+    if status_key and status_key not in CHAT_STATUS_MAP:
+        return jsonify({'status': 'error', 'message': '지원하지 않는 상태입니다.'}), 400
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    conn.execute("""
+        INSERT INTO chat_user_status (user_name, status, status_message, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_name) DO UPDATE SET
+            status=excluded.status,
+            status_message=excluded.status_message,
+            updated_at=CURRENT_TIMESTAMP
+    """, (current_user, status_key, status_message if status_key else ''))
+    conn.commit()
+    row = conn.execute(
+        "SELECT user_name, status, status_message, updated_at FROM chat_user_status WHERE user_name=?",
+        (current_user,)
+    ).fetchone()
+    conn.close()
+
+    payload = _status_payload(
+        current_user,
+        row['status'] if row else '',
+        row['status_message'] if row else '',
+        row['updated_at'] if row else '',
+    )
+    socketio.emit('chat_status', payload, namespace='/chat')
+    return jsonify({'status': 'success', 'my_status': payload})
+
+
+@chat_bp.route('/api/chat/task-request', methods=['POST'])
+def create_chat_task_request():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    try:
+        message_id = int(data.get('message_id'))
+    except (TypeError, ValueError):
+        return jsonify({'status': 'error', 'message': '업무로 등록할 메시지를 선택해주세요.'}), 400
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    message = conn.execute("""
+        SELECT id, message_uid, sender, receiver, room_id, content, filename,
+               COALESCE(deleted_for_all, 0) AS deleted_for_all
+        FROM messages WHERE id=?
+    """, (message_id,)).fetchone()
+    if not message or not _can_access_message(conn, message, current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '메시지를 찾을 수 없습니다.'}), 404
+    if message['sender'] != current_user:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '내가 보낸 메시지만 업무요청으로 등록할 수 있습니다.'}), 403
+    if message['deleted_for_all']:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '삭제된 메시지는 업무요청으로 등록할 수 없습니다.'}), 400
+
+    summary = str(message['content'] or '').strip()
+    if not summary and message['filename']:
+        summary = '📎 ' + str(message['filename'])
+    if not summary:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '내용이 없는 메시지는 업무요청으로 등록할 수 없습니다.'}), 400
+    summary = summary[:CHAT_TASK_SUMMARY_LIMIT]
+
+    room_key = str(message['room_id'] or '')
+    if message['message_uid']:
+        assignee_rows = conn.execute(
+            "SELECT DISTINCT receiver FROM messages WHERE message_uid=?",
+            (message['message_uid'],)
+        ).fetchall()
+        assignees = [row['receiver'] for row in assignee_rows if row['receiver']]
+    else:
+        assignees = [message['receiver']] if message['receiver'] else []
+    assignees = [name for name in dict.fromkeys(assignees) if name != current_user]
+    if not assignees:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '업무를 요청할 상대가 없습니다.'}), 400
+
+    created = []
+    skipped = []
+    for assignee in assignees:
+        existing = conn.execute("""
+            SELECT id FROM chat_task_requests
+            WHERE assignee=? AND status='pending'
+              AND ((message_uid IS NOT NULL AND message_uid=?) OR message_id=?)
+        """, (assignee, message['message_uid'], message_id)).fetchone()
+        if existing:
+            skipped.append(assignee)
+            continue
+        cursor = conn.execute("""
+            INSERT INTO chat_task_requests
+                (room_key, message_id, message_uid, requester, assignee, content, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
+        """, (room_key, message_id, message['message_uid'], current_user, assignee, summary))
+        created.append((assignee, int(cursor.lastrowid)))
+    conn.commit()
+
+    for assignee, request_id in created:
+        _emit_user_event(
+            assignee, 'task_request_created',
+            request_id=request_id,
+            requester=current_user,
+            room_key=room_key or current_user,
+            content=summary[:120],
+        )
+        _send_chat_push(
+            conn, assignee, room_key or current_user, current_user,
+            content='[업무요청] ' + summary, message_id=message_id,
+        )
+    conn.close()
+
+    if not created:
+        return jsonify({'status': 'error', 'message': '이미 업무요청으로 등록된 메시지입니다.'}), 409
+    return jsonify({
+        'status': 'success',
+        'created': [assignee for assignee, _ in created],
+        'skipped': skipped,
+    })
+
+
+@chat_bp.route('/api/chat/task-requests', methods=['GET'])
+def list_chat_task_requests():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    box = str(request.args.get('box') or 'received').strip()
+    if box not in ('received', 'sent', 'all'):
+        box = 'received'
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    base_sql = """
+        SELECT id, room_key, message_id, message_uid, requester, assignee, content,
+               status, created_at, responded_at, response_text, response_message_id
+        FROM chat_task_requests
+    """
+    if box == 'received':
+        rows = conn.execute(
+            base_sql + " WHERE assignee=? ORDER BY id DESC LIMIT 100", (current_user,)
+        ).fetchall()
+    elif box == 'sent':
+        rows = conn.execute(
+            base_sql + " WHERE requester=? ORDER BY id DESC LIMIT 100", (current_user,)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            base_sql + " WHERE assignee=? OR requester=? ORDER BY id DESC LIMIT 100",
+            (current_user, current_user)
+        ).fetchall()
+    pending_received = conn.execute(
+        "SELECT COUNT(*) AS c FROM chat_task_requests WHERE assignee=? AND status='pending'",
+        (current_user,)
+    ).fetchone()['c']
+    pending_sent = conn.execute(
+        "SELECT COUNT(*) AS c FROM chat_task_requests WHERE requester=? AND status='pending'",
+        (current_user,)
+    ).fetchone()['c']
+    conn.close()
+
+    return jsonify({
+        'status': 'success',
+        'box': box,
+        'requests': [_serialize_task_request(row, current_user) for row in rows],
+        'pending_received': int(pending_received or 0),
+        'pending_sent': int(pending_sent or 0),
+    })
+
+
+@chat_bp.route('/api/chat/task-request/<int:request_id>/respond', methods=['POST'])
+def respond_chat_task_request(request_id):
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        response_text = str(data.get('content') or '').strip()[:1000]
+    else:
+        response_text = str(request.form.get('content') or '').strip()[:1000]
+    upload = request.files.get('file')
+    has_file = bool(upload and upload.filename)
+    if not response_text:
+        response_text = '첨부파일을 확인해주세요.' if has_file else '업무를 완료했습니다.'
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    task = _fetch_task_request(conn, request_id)
+    if not task:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '업무요청을 찾을 수 없습니다.'}), 404
+    if task['assignee'] != current_user:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '요청받은 담당자만 응답할 수 있습니다.'}), 403
+    if task['status'] != 'pending':
+        conn.close()
+        return jsonify({'status': 'error', 'message': '이미 처리된 업무요청입니다.'}), 400
+
+    filename, filepath = '', ''
+    if has_file:
+        try:
+            filename, filepath = _save_chat_attachment(upload)
+        except ValueError as exc:
+            conn.close()
+            return jsonify({'status': 'error', 'message': str(exc)}), 413
+        except OSError:
+            conn.close()
+            current_app.logger.exception('업무요청 응답 첨부파일 저장 실패')
+            return jsonify({'status': 'error', 'message': '첨부파일을 저장하지 못했습니다.'}), 500
+
+    room_key = _task_room_key(task, current_user)
+    body = '✅ 업무요청 응답\n· 요청: ' + (task['content'] or '') + '\n· 응답: ' + response_text
+    try:
+        response_message_id, _ = _deliver_chat_message(
+            conn, current_user, room_key, body, filename=filename, filepath=filepath
+        )
+    except Exception:
+        conn.rollback()
+        _remove_physical_file(filepath)
+        conn.close()
+        current_app.logger.exception('업무요청 응답 저장 실패')
+        return jsonify({'status': 'error', 'message': '응답을 전송하지 못했습니다.'}), 500
+    conn.execute("""
+        UPDATE chat_task_requests
+        SET status='done', responded_at=CURRENT_TIMESTAMP,
+            response_text=?, response_message_id=?
+        WHERE id=?
+    """, (response_text, response_message_id, request_id))
+    conn.commit()
+    conn.close()
+
+    _emit_user_event(
+        task['requester'], 'task_request_done',
+        request_id=request_id, assignee=current_user, response=response_text[:120],
+    )
+    _emit_user_event(
+        current_user, 'task_request_done',
+        request_id=request_id, assignee=current_user,
+    )
+    return jsonify({
+        'status': 'success',
+        'message_id': response_message_id,
+        'filename': filename,
+    })
+
+
+@chat_bp.route('/api/chat/task-request/<int:request_id>/cancel', methods=['POST'])
+def cancel_chat_task_request(request_id):
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    task = _fetch_task_request(conn, request_id)
+    if not task:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '업무요청을 찾을 수 없습니다.'}), 404
+    if task['requester'] != current_user:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '요청한 사람만 취소할 수 있습니다.'}), 403
+    if task['status'] != 'pending':
+        conn.close()
+        return jsonify({'status': 'error', 'message': '이미 처리된 업무요청입니다.'}), 400
+
+    conn.execute("UPDATE chat_task_requests SET status='canceled' WHERE id=?", (request_id,))
+    conn.commit()
+    conn.close()
+    _emit_user_event(
+        task['assignee'], 'task_request_canceled',
+        request_id=request_id, requester=current_user,
+    )
+    return jsonify({'status': 'success'})
+
+
+@chat_bp.route('/api/chat/polls', methods=['GET'])
+def list_chat_polls():
+    current_user = session.get('user_name')
+    room_key = str(request.args.get('partner') or '').strip()
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+    if not room_key:
+        return jsonify({'status': 'success', 'polls': []})
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    if not _can_access_room(conn, room_key, current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '대화방 접근 권한이 없습니다.'}), 403
+    _close_expired_polls(conn, room_key)
+    is_admin = _is_room_admin(conn, room_key, current_user)
+    rows = conn.execute("""
+        SELECT id, room_key, creator, question, options, allow_multiple, is_anonymous,
+               status, message_id, message_uid, deadline, created_at, closed_at
+        FROM chat_polls WHERE room_key=? ORDER BY id DESC LIMIT 30
+    """, (room_key,)).fetchall()
+    polls = [_poll_payload(conn, row, current_user, is_admin) for row in rows]
+    conn.close()
+    return jsonify({'status': 'success', 'polls': polls})
+
+
+@chat_bp.route('/api/chat/poll', methods=['POST'])
+def create_chat_poll():
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    room_key = str(data.get('partner') or '').strip()
+    question = str(data.get('question') or '').strip()[:200]
+    raw_options = data.get('options') or []
+    allow_multiple = 1 if data.get('allow_multiple') else 0
+    is_anonymous = 1 if data.get('is_anonymous') else 0
+    deadline = _parse_poll_deadline(data.get('deadline'))
+    if deadline is False:
+        return jsonify({'status': 'error', 'message': '마감기한 형식이 올바르지 않습니다.'}), 400
+
+    options = []
+    for option in raw_options if isinstance(raw_options, list) else []:
+        text = str(option or '').strip()[:100]
+        if text and text not in options:
+            options.append(text)
+    if not room_key or not question:
+        return jsonify({'status': 'error', 'message': '질문을 입력해주세요.'}), 400
+    if len(options) < 2:
+        return jsonify({'status': 'error', 'message': '보기를 2개 이상 입력해주세요.'}), 400
+    if len(options) > CHAT_POLL_MAX_OPTIONS:
+        return jsonify({
+            'status': 'error',
+            'message': '보기는 최대 ' + str(CHAT_POLL_MAX_OPTIONS) + '개까지 등록할 수 있습니다.',
+        }), 400
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    if not _can_access_room(conn, room_key, current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '대화방 접근 권한이 없습니다.'}), 403
+    if ',' not in room_key:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '설문/투표는 단체 대화방에서만 만들 수 있습니다.'}), 400
+
+    body = '📊 설문/투표 · ' + question
+    message_id, message_uid = _deliver_chat_message(conn, current_user, room_key, body)
+    cursor = conn.execute("""
+        INSERT INTO chat_polls
+            (room_key, creator, question, options, allow_multiple, is_anonymous, status,
+             message_id, message_uid, deadline)
+        VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)
+    """, (
+        room_key, current_user, question, json.dumps(options, ensure_ascii=False),
+        allow_multiple, is_anonymous, message_id, message_uid, deadline,
+    ))
+    poll_id = int(cursor.lastrowid)
+    conn.commit()
+    _emit_chat_event(conn, room_key, current_user, 'poll_changed', poll_id=poll_id)
+    poll = _poll_payload(
+        conn, _poll_row(conn, poll_id), current_user,
+        _is_room_admin(conn, room_key, current_user),
+    )
+    conn.close()
+    return jsonify({'status': 'success', 'poll': poll})
+
+
+@chat_bp.route('/api/chat/poll/<int:poll_id>/vote', methods=['POST'])
+def vote_chat_poll(poll_id):
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    raw_options = data.get('options')
+    if raw_options is None:
+        raw_options = [data.get('option')]
+    selected = []
+    for value in raw_options if isinstance(raw_options, list) else []:
+        try:
+            index = int(value)
+        except (TypeError, ValueError):
+            continue
+        if index not in selected:
+            selected.append(index)
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    poll = _poll_row(conn, poll_id)
+    if not poll:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '설문을 찾을 수 없습니다.'}), 404
+    if not _can_access_room(conn, poll['room_key'], current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '대화방 접근 권한이 없습니다.'}), 403
+    if _close_expired_polls(conn, poll['room_key']):
+        poll = _poll_row(conn, poll_id)
+    if poll['status'] != 'open':
+        conn.close()
+        return jsonify({'status': 'error', 'message': '마감된 설문입니다.'}), 400
+
+    try:
+        options = json.loads(poll['options'] or '[]')
+    except (TypeError, ValueError):
+        options = []
+    selected = [index for index in selected if 0 <= index < len(options)]
+    if not poll['allow_multiple']:
+        selected = selected[:1]
+
+    conn.execute(
+        "DELETE FROM chat_poll_votes WHERE poll_id=? AND user_name=?",
+        (poll_id, current_user)
+    )
+    for index in selected:
+        conn.execute("""
+            INSERT OR IGNORE INTO chat_poll_votes (poll_id, user_name, option_index)
+            VALUES (?, ?, ?)
+        """, (poll_id, current_user, index))
+    conn.commit()
+    _emit_chat_event(conn, poll['room_key'], current_user, 'poll_changed', poll_id=poll_id)
+    payload = _poll_payload(
+        conn, poll, current_user, _is_room_admin(conn, poll['room_key'], current_user)
+    )
+    conn.close()
+    return jsonify({'status': 'success', 'poll': payload})
+
+
+@chat_bp.route('/api/chat/poll/<int:poll_id>/close', methods=['POST'])
+def close_chat_poll(poll_id):
+    current_user = session.get('user_name')
+    if not current_user:
+        return jsonify({'status': 'error', 'message': '로그인이 필요합니다.'}), 401
+
+    conn = get_db()
+    _ensure_chat_tables(conn)
+    poll = _poll_row(conn, poll_id)
+    if not poll:
+        conn.close()
+        return jsonify({'status': 'error', 'message': '설문을 찾을 수 없습니다.'}), 404
+    if not _can_access_room(conn, poll['room_key'], current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '대화방 접근 권한이 없습니다.'}), 403
+    if poll['creator'] != current_user and not _is_room_admin(conn, poll['room_key'], current_user):
+        conn.close()
+        return jsonify({'status': 'error', 'message': '설문 작성자나 방장만 마감할 수 있습니다.'}), 403
+
+    conn.execute(
+        "UPDATE chat_polls SET status='closed', closed_at=CURRENT_TIMESTAMP WHERE id=?",
+        (poll_id,)
+    )
+    conn.commit()
+    _emit_chat_event(conn, poll['room_key'], current_user, 'poll_changed', poll_id=poll_id)
+    conn.close()
+    return jsonify({'status': 'success'})
 
 
 def _socket_conversation_room(room_key, current_user):

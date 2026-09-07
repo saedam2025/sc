@@ -112,6 +112,7 @@ MENU_GROUPS = (
         'icon': 'fa-layer-group',
         'default_max_level': 14,
         'children': (
+            ('meeting_main', '회의센터', 'fa-users-rectangle', 14),
             ('board_noti', '사내 게시판', 'fa-clipboard-list', 14),
             ('board_archive', '사내 자료실', 'fa-folder-open', 14),
             ('gallery_main', '사내 갤러리', 'fa-images', 14),
@@ -145,6 +146,8 @@ MENU_GROUPS = (
             ('admin_stats', '이용통계', 'fa-chart-line', 2),
             ('admin_ai_settings', 'AI api설정', 'fa-robot', 2),
             ('admin_settings', 'Admin설정', 'fa-user-shield', 2),
+            ('webtoon_main', 'Webtoon', 'fa-book-open', 2),
+            ('photobook_main', '웹전자책', 'fa-images', 2),
         ),
     },
 )
@@ -499,6 +502,10 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return 'contacts_main'
     if path.startswith('/ebook'):
         return 'ebook_library'
+    if path.startswith('/webtoon'):
+        return 'webtoon_main'
+    if path.startswith('/photobook'):
+        return 'photobook_main'
     if path.startswith('/board/'):
         board_key = str(view_args.get('board_en') or '').strip()
         if not board_key:
@@ -515,6 +522,8 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return 'gallery_main'
     if path.startswith('/memo'):
         return 'memo_main'
+    if path.startswith('/meeting'):
+        return 'meeting_main'
     return None
 
 

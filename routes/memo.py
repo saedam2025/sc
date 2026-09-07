@@ -14,11 +14,17 @@ from __future__ import annotations
 
 import mimetypes
 import os
+import random
+import json
 import sqlite3
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from flask import (
     Blueprint,
@@ -46,6 +52,40 @@ MEMO_USER_QUOTA_BYTES = 30 * 1024 * 1024
 DIAGNOSTIC_TRANSFER_BYTES = 4 * 1024 * 1024
 # 전송 속도 측정값이 압축률에 의해 부풀려지지 않도록 압축하기 어려운 표본을 사용한다.
 DIAGNOSTIC_DOWNLOAD_PAYLOAD = os.urandom(DIAGNOSTIC_TRANSFER_BYTES)
+
+# Wikimedia Commons의 공개 이미지 검색어를 명상 장면과 연결한다. 클라이언트가
+# 임의의 외부 URL을 요청할 수 없도록 서버 허용 목록으로만 조회한다.
+MEDITATION_COMMONS_SEARCHES = {
+    "korea": "Landscapes of South Korea",
+    "swiss": "Landscapes of Switzerland",
+    "paris": "Paris at night",
+    "santorini": "Santorini",
+    "newyork": "New York City at night",
+    "kyoto": "Landscapes of Kyoto prefecture",
+    "maldives": "Landscapes of the Maldives",
+    "norway": "Landscapes of Norway",
+    "iceland": "Landscapes of Iceland",
+    "patagonia": "Landscapes of Patagonia",
+    "space": "Hubble Space Telescope images",
+    "aurora": "Aurorae",
+    "forest-photo": "Forest landscapes",
+    "ocean-photo": "Seascapes",
+    "snow-photo": "Snowy landscapes",
+    "night-photo": "Night landscapes",
+    "animal-photo": "Animals in nature",
+    "waterfall-photo": "Waterfalls",
+    "desert-photo": "Desert landscapes",
+    "meadow-photo": "Meadows",
+    "cloud-photo": "Cloudscapes",
+    "lake-photo": "Lake landscapes",
+    "rain-photo": "Rain",
+    "cherry-photo": "Cherry blossoms",
+}
+MEDITATION_COMMONS_LIMIT = 36
+MEDITATION_COMMONS_CACHE_SECONDS = 6 * 60 * 60
+MEDITATION_UNSAFE_IMAGE_TERMS = {"nude", "nudity", "naked", "erotic", "porn", "nsfw", "성인", "나체", "누드"}
+_meditation_commons_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+_meditation_commons_cache_lock = threading.Lock()
 
 POSTIT_SHAPES = {
     "square",
@@ -433,6 +473,88 @@ def _quota_error(usage_bytes: int):
     )
 
 
+def _commons_scene_name(title: str) -> str:
+    """공개 아카이브의 파일명을 화면에 보여줄 짧은 장면명으로 변환한다."""
+    name = str(title or "").removeprefix("File:")
+    name = Path(name).stem.replace("_", " ").strip()
+    return name[:90] or "고요한 풍경"
+
+
+def _load_commons_meditation_scenes(theme_id: str) -> list[dict[str, Any]]:
+    """Wikimedia Commons에서 테마에 맞는 고해상도 이미지를 받아 메모리에 캐시한다."""
+    now = time.time()
+    with _meditation_commons_cache_lock:
+        cached = _meditation_commons_cache.get(theme_id)
+        if cached and now - cached[0] < MEDITATION_COMMONS_CACHE_SECONDS:
+            return cached[1]
+
+    search_text = MEDITATION_COMMONS_SEARCHES[theme_id]
+    search_text = f'"{search_text}" photograph -painting -drawing -nude -nudity -naked'
+    params = urlencode({
+        "action": "query",
+        "format": "json",
+        "formatversion": 2,
+        "generator": "search",
+        "gsrsearch": search_text,
+        "gsrnamespace": 6,
+        "gsrlimit": 80,
+        "prop": "imageinfo",
+        "iiprop": "url|mime|size",
+        "iiurlwidth": 2200,
+        "origin": "*",
+    })
+    request_object = Request(
+        f"https://commons.wikimedia.org/w/api.php?{params}",
+        headers={"User-Agent": "SaedamIntranet-Meditation/2.0 (private workplace app)"},
+    )
+    payload: dict[str, Any] = {}
+    for attempt in range(2):
+        try:
+            with urlopen(request_object, timeout=10) as response:
+                payload = json.load(response)
+            break
+        except HTTPError as error:
+            if error.code != 429 or attempt:
+                raise
+            try:
+                retry_after = float(error.headers.get("Retry-After") or 1.2)
+            except (TypeError, ValueError):
+                retry_after = 1.2
+            retry_after = min(3.0, max(0.8, retry_after))
+            time.sleep(retry_after)
+
+    scenes: list[dict[str, Any]] = []
+    for page in payload.get("query", {}).get("pages", []):
+        page_title = str(page.get("title") or "")
+        if any(term in page_title.casefold() for term in MEDITATION_UNSAFE_IMAGE_TERMS):
+            continue
+        info_items = page.get("imageinfo") or []
+        if not info_items:
+            continue
+        info = info_items[0]
+        mime = str(info.get("mime") or "")
+        width = int(info.get("width") or 0)
+        height = int(info.get("height") or 0)
+        image_url = str(info.get("thumburl") or info.get("url") or "")
+        source_url = str(info.get("descriptionurl") or "")
+        if mime not in {"image/jpeg", "image/png", "image/webp"}:
+            continue
+        if width < 1200 or height < 650 or not image_url.startswith("https://"):
+            continue
+        scenes.append({
+            "id": str(page.get("pageid") or len(scenes) + 1),
+            "name": _commons_scene_name(page_title),
+            "url": image_url,
+            "source_url": source_url,
+        })
+
+    random.SystemRandom().shuffle(scenes)
+    scenes = scenes[:MEDITATION_COMMONS_LIMIT]
+    with _meditation_commons_cache_lock:
+        _meditation_commons_cache[theme_id] = (now, scenes)
+    return scenes
+
+
 @memo_bp.route("/")
 def memo_board():
     conn = get_db()
@@ -461,12 +583,92 @@ def memo_board():
         conn.close()
 
 
+@memo_bp.route("/meditation/scenes")
+def meditation_scenes():
+    """명상 테마의 공개 고해상도 사진 목록을 반환한다."""
+    theme_id = str(request.args.get("theme") or "").strip()
+    if theme_id not in MEDITATION_COMMONS_SEARCHES:
+        return _json_error("지원하지 않는 명상 테마입니다.", 404)
+    try:
+        scenes = _load_commons_meditation_scenes(theme_id)
+    except Exception:
+        current_app.logger.exception("Failed to load Commons meditation scenes: %s", theme_id)
+        return _json_error("온라인 풍경 라이브러리에 잠시 연결할 수 없습니다.", 503)
+
+    response = jsonify({
+        "ok": True,
+        "theme": theme_id,
+        "count": len(scenes),
+        "scenes": scenes,
+    })
+    response.headers["Cache-Control"] = "private, max-age=21600"
+    return response
+
+
 @memo_bp.route("/diagnostics")
 def diagnostics():
     """현재 접속자의 인트라넷 사용환경을 새 창에서 진단한다."""
     response = make_response(render_template("network_diagnostics.html"))
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
+    return response
+
+
+@memo_bp.route("/games/ball")
+def game_ball():
+    """웹캠 앞의 움직임으로 공을 튕기는 통통볼 게임을 새 창에서 연다."""
+    response = make_response(render_template("webcam_ball_game.html"))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    # 웹캠 사용 권한이 이 문서에서 허용되도록 명시한다.
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
+    return response
+
+
+WEBCAM_ARCADE_GAMES = {
+    "balloon": {
+        "id": "balloon",
+        "title": "풍선 팡팡",
+        "subtitle": "날아오르는 풍선을 손으로 톡톡 터뜨려 보세요.",
+        "icon": "fa-balloons",
+        "accent": "#ff5ca8",
+        "accent2": "#8b5cf6",
+        "ready_title": "풍선을 터뜨릴 준비가 되었어요",
+        "ready_desc": "화면 곳곳에 풍선이 나타나면 손으로 빠르게 스쳐 터뜨리세요.",
+    },
+    "goalie": {
+        "id": "goalie",
+        "title": "슈퍼 골키퍼",
+        "subtitle": "골문으로 날아오는 슛을 온몸으로 막아 보세요.",
+        "icon": "fa-hands",
+        "accent": "#22c98b",
+        "accent2": "#22a6f2",
+        "ready_title": "골문을 지킬 준비가 되었어요",
+        "ready_desc": "공이 가까이 오기 전에 손·머리·몸으로 쳐 내세요. 다섯 골을 허용하면 끝나요.",
+    },
+    "freeze": {
+        "id": "freeze",
+        "title": "얼음! 땡!",
+        "subtitle": "초록불에는 신나게 움직이고 빨간불에는 그대로 멈추세요.",
+        "icon": "fa-person-running",
+        "accent": "#32d5e8",
+        "accent2": "#4f8cff",
+        "ready_title": "움직일 준비가 되었어요",
+        "ready_desc": "‘땡!’에는 크게 움직여 점수를 얻고, ‘얼음!’에는 꼼짝하지 마세요.",
+    },
+}
+
+
+@memo_bp.route("/games/arcade/<game_id>")
+def game_arcade(game_id: str):
+    """선택한 웹캠 모션 미니게임을 새 창에서 연다."""
+    game = WEBCAM_ARCADE_GAMES.get(game_id)
+    if game is None:
+        abort(404)
+    response = make_response(render_template("webcam_arcade_game.html", game=game))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
     return response
 
 
