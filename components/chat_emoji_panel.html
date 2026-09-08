@@ -1,0 +1,14 @@
+<aside id="chatEmojiPicker" class="emoji-panel" aria-label="이모티콘 선택" hidden>
+    <div class="emoji-topbar">
+        <div class="emoji-main-tabs" role="tablist" aria-label="이모티콘 종류">
+            <button type="button" id="emojiStickerTab" role="tab" aria-selected="true" aria-controls="emojiResults" data-emoji-tab="sticker">이모티콘</button>
+            <button type="button" id="emojiMiniTab" role="tab" aria-selected="false" aria-controls="emojiResults" data-emoji-tab="mini" tabindex="-1">미니이모티콘</button>
+        </div>
+        <button type="button" class="emoji-close" id="emojiClose" aria-label="이모티콘 창 닫기">×</button>
+    </div>
+    <div class="emoji-panel-tools">
+        <div id="emojiCategories" class="emoji-categories" aria-label="이모티콘 분류"></div>
+    </div>
+    <div class="emoji-results-heading"><strong id="emojiResultsTitle">전체</strong><span id="emojiResultCount" aria-live="polite"></span></div>
+    <div id="emojiResults" class="emoji-results" role="tabpanel" aria-labelledby="emojiStickerTab" tabindex="0"></div>
+</aside>
