@@ -16,6 +16,8 @@ import time
 import urllib.error
 import urllib.request
 
+import chat_emoji_catalog
+
 ROOT = Path(__file__).resolve().parents[1] / 'static' / 'chat-emoji'
 GROUPS = {
     '표정': '😀|활짝 😃|신나요 😄|웃음 😁|방긋 😆|깔깔 😅|휴 😂|눈물나게웃음 🤣|빵터짐 😊|미소 😇|천사 🙂|좋아요 🙃|장난 😉|윙크 😍|반했어요 🥰|사랑스러워 😘|뽀뽀 😋|맛있어요 😛|메롱 😜|장난꾸러기 🤪|신나게 😎|멋져요 🤓|공부 🧐|살펴보기 🤩|최고 🥳|파티 😏|씨익 😌|편안 😔|시무룩 😢|슬퍼요 😭|엉엉 🥺|부탁해요 😤|흥 😡|화나요 🤯|충격 😳|깜짝 😱|놀랐어요 😰|초조 😥|아쉬워 😓|식은땀 🤗|포옹 🤔|생각중 🤭|웃음참기 🤫|조용히 🤥|거짓말 😶|말없이 😐|무표정 🙄|글쎄요 😬|난감 😮|놀람 😲|깜짝이야 🥱|하품 😴|졸려요 🤤|군침 😪|졸음 🤧|감기 🤒|몸살 🤕|아파요 🥵|더워요 🥶|추워요 😷|마스크 🤠|카우보이 🤑|부자 🤡|광대 👻|유령 👽|외계인 🤖|로봇 🎃|호박 😈|장꾸 💩|똥',
@@ -24,6 +26,25 @@ GROUPS = {
     '동물·자연': '🐶|강아지 🐱|고양이 🐭|생쥐 🐹|햄스터 🐰|토끼 🦊|여우 🐻|곰 🐼|판다 🐨|코알라 🐯|호랑이 🦁|사자 🐮|소 🐷|돼지 🐸|개구리 🐵|원숭이 🙈|안볼래 🙉|안들려 🙊|비밀 🐧|펭귄 🐤|병아리 🦆|오리 🦉|부엉이 🦋|나비 🐝|꿀벌 🐢|거북이 🐙|문어 🐬|돌고래 🐳|고래 🦄|유니콘 🌸|벚꽃 🌹|장미 🌻|해바라기 🌷|튤립 🌱|새싹 🌿|풀잎 🍀|행운클로버 🌈|무지개 ☀️|햇살 🌙|달 ❄️|눈송이 ☔|우산 ⛄|눈사람',
     '일상·음식': '🍎|사과 🍊|귤 🍋|레몬 🍌|바나나 🍉|수박 🍇|포도 🍓|딸기 🍒|체리 🍑|복숭아 🍍|파인애플 🥑|아보카도 🍞|빵 🥐|크루아상 🥨|프레첼 🧀|치즈 🍔|햄버거 🍟|감자튀김 🍕|피자 🌭|핫도그 🍿|팝콘 🍚|밥 🍜|국수 🍣|초밥 🍙|주먹밥 🍦|아이스크림 🍩|도넛 🍪|쿠키 🍫|초콜릿 🍬|사탕 🍭|막대사탕 🥛|우유 🥤|음료수 ⚽|축구 🏀|농구 🎵|음악 🎶|노래 🎸|기타 🎮|게임 🏠|집 🚗|자동차 ✈️|여행 🛌|잠자기',
 }
+
+
+def head(url):
+    """Confirm a CDN-hosted image exists without downloading it."""
+    for attempt in range(3):
+        try:
+            request = urllib.request.Request(url, method='HEAD')
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.status
+        except urllib.error.HTTPError as error:
+            if error.code < 500 and error.code != 429:
+                raise
+            if attempt == 2:
+                raise
+            time.sleep(attempt + 1)
+        except (TimeoutError, urllib.error.URLError):
+            if attempt == 2:
+                raise
+            time.sleep(attempt + 1)
 
 
 def fetch(url, path):
@@ -139,6 +160,16 @@ def main():
             full_code = entry['openmoji_code']
             url = f'https://cdn.jsdelivr.net/npm/openmoji@15.1.0/color/svg/{full_code}.svg'
             extension = 'svg'
+        # The animated WebP files average 413 KiB and are served from Google's CDN
+        # instead of this repository, so only check that the image is published.
+        if pack in chat_emoji_catalog.REMOTE_PACKS:
+            try:
+                head(url)
+            except urllib.error.HTTPError as error:
+                if error.code == 404:
+                    return entry, pack, None
+                raise
+            return entry, pack, dict(source=url)
         path = ROOT / pack / f'{code}.{extension}'
         try:
             data = fetch(url, path)
@@ -172,10 +203,11 @@ def main():
         'Full legal code: https://creativecommons.org/licenses/by/4.0/legalcode\n'
         'Source: https://googlefonts.github.io/noto-emoji-animation/\n'
         'WebP files are redistributed without modification.\n', encoding='utf-8')
+    entries = chat_emoji_catalog.merge_custom_entries(entries, ROOT)
     (ROOT / 'catalog.json').write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding='utf-8')
-    browser_entries = [{key: ({'src': value['src']} if key in ('noto', 'openmoji') else value) for key, value in entry.items() if key != 'openmoji_code'} for entry in entries]
-    (ROOT / 'catalog.js').write_text('window.SAEDAM_CHAT_EMOJIS = ' + json.dumps(browser_entries, ensure_ascii=False, separators=(',', ':')) + ';\n', encoding='utf-8')
-    print(json.dumps({'mini': len(entries), 'noto': sum('noto' in e for e in entries), 'openmoji': sum('openmoji' in e for e in entries)}, ensure_ascii=False))
+    # catalog.json keeps every asset; the picker only shows the trimmed list.
+    shown = chat_emoji_catalog.write_catalog_js(entries, ROOT)
+    print(json.dumps({'downloaded': len(entries), 'noto': sum('noto' in e for e in entries), 'openmoji': sum('openmoji' in e for e in entries), 'shown': shown}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
