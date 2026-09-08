@@ -138,6 +138,7 @@ MENU_GROUPS = (
         'icon': 'fa-screwdriver-wrench',
         'default_max_level': 2,
         'children': (
+            ('mydesk_main', '마이데스크', 'fa-mug-hot', 2),
             ('admin_people', '인사관리', 'fa-user-gear', 2),
             ('admin_menu_permissions', '메뉴 권한관리', 'fa-key', 2),
             ('admin_boards', '게시판관리', 'fa-clipboard-list', 2),
@@ -403,8 +404,11 @@ def build_menu_access(user_level=None):
 
 
 def _admin_menu_key(path):
+    if path in {'/admin', '/admin/'} or path.startswith('/admin/system'):
+        return 'admin_group'
     rules = (
         ('/admin/menu-permissions', 'admin_menu_permissions'),
+        ('/admin/ai-settings', 'admin_ai_settings'),
         ('/admin/boards', 'admin_boards'),
         ('/admin/disk', 'admin_disk'),
         ('/admin/themes', 'admin_themes'),
@@ -434,6 +438,8 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return UNIFIED_SEARCH_MENU
     if path.startswith('/parent-notifications'):
         return 'parent_notifications'
+    if path.startswith('/mydesk'):
+        return 'mydesk_main'
     if path.startswith('/admin'):
         return _admin_menu_key(path)
     if endpoint.startswith('user_mgmt.'):

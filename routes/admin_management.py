@@ -23,6 +23,7 @@ from .storage import (
     LEGACY_ARCHIVE_ROOT,
     MANUAL_UPLOADS,
     MEMO_UPLOADS,
+    MYDESK_UPLOADS,
     UPLOADS_ROOT,
     VERIFIED_CONTRACT_ROOT,
     delete_storage_target,
@@ -37,11 +38,22 @@ from .menu_access import (
     ensure_menu_access_schema,
     load_menu_department_blocks,
     load_menu_max_levels,
+    menu_is_allowed,
     school_director_scope_enabled,
 )
 from . import openai_settings as ai_settings
 
 admin_bp = Blueprint('admin', __name__)
+
+SYSTEM_MANAGEMENT_ITEMS = (
+    ('admin_people', '인사관리', 'fa-user-gear', 'user_mgmt.index'),
+    ('admin_menu_permissions', '메뉴 권한관리', 'fa-key', 'admin.menu_permissions'),
+    ('admin_stats', '이용통계', 'fa-chart-line', 'admin.stats'),
+    ('admin_disk', '디스크관리', 'fa-hard-drive', 'admin.disk'),
+    ('admin_boards', '게시판관리', 'fa-clipboard-list', 'admin.boards'),
+    ('admin_ai_settings', 'AI api설정', 'fa-robot', 'admin.ai_settings_page'),
+    ('admin_settings', 'Admin설정', 'fa-user-shield', 'admin.settings'),
+)
 
 TRACKABLE_USAGE_SQL = '''
     (
@@ -92,7 +104,7 @@ TRACKABLE_USAGE_SQL = '''
 '''
 
 
-THEME_CATEGORY_NAMES = {'custom', 'gallery', 'accent', 'deep-color', 'seasonal', 'default'}
+THEME_CATEGORY_NAMES = {'custom', 'gallery', 'accent', 'deep-color', 'seasonal', 'system', 'default'}
 DEFAULT_THEME_PAGE_BACKGROUND = '#f5f6f8'
 THEME_VAR_KEYS = {
     '--body-bg', '--app-bg', '--main-bg', '--nav-bg', '--primary-color', '--primary-light',
@@ -379,6 +391,7 @@ def _storage_roots():
         {'key': 'board', 'label': '게시판·자료실·업무메뉴얼', 'path': str(BOARD_UPLOADS), 'icon': 'fa-clipboard-list'},
         {'key': 'messenger', 'label': '사내메신저', 'path': str(CHAT_UPLOADS), 'icon': 'fa-comments'},
         {'key': 'memo', 'label': '개인화이트보드', 'path': str(MEMO_UPLOADS), 'icon': 'fa-chalkboard'},
+        {'key': 'mydesk', 'label': '마이데스크', 'path': str(MYDESK_UPLOADS), 'icon': 'fa-mug-hot'},
         {'key': 'school', 'label': '학교업무메뉴', 'path': SCHOOL_UPLOADS, 'icon': 'fa-school'},
         {'key': 'certificate', 'label': '증명발급', 'path': os.path.join(data_root, 'output_pdfs'), 'icon': 'fa-file-invoice'},
         {'key': 'certificate_logos', 'label': '증명서 로고', 'path': os.path.join(data_root, 'certificate_logos'), 'icon': 'fa-image'},
@@ -659,6 +672,8 @@ def _personal_storage_usage(conn, logical_usage, storage_roots):
         ("SELECT p.author owner, f.saved_name ref FROM board_files f JOIN board_posts p ON p.id=f.post_id", str(BOARD_UPLOADS)),
         ("SELECT sender owner, filepath ref FROM messages WHERE TRIM(COALESCE(filepath,''))<>''", str(CHAT_UPLOADS)),
         ("SELECT COALESCE(owner_key, owner) owner, filepath ref FROM memos WHERE TRIM(COALESCE(filepath,''))<>''", str(MEMO_UPLOADS)),
+        ("SELECT owner_key owner, stored_name ref FROM mydesk_files WHERE TRIM(COALESCE(stored_name,''))<>''", str(MYDESK_UPLOADS)),
+        ("SELECT owner_key owner, stored_name ref FROM mydesk_photos WHERE TRIM(COALESCE(stored_name,''))<>''", str(MYDESK_UPLOADS)),
         ("SELECT drafter owner, filepath ref FROM approvals WHERE TRIM(COALESCE(filepath,''))<>''", str(UPLOADS_ROOT)),
         ("SELECT drafter owner, source_filepath ref FROM expense_reports WHERE TRIM(COALESCE(source_filepath,''))<>''", str(UPLOADS_ROOT)),
         ("SELECT drafter owner, receipt_filepath ref FROM expense_reports WHERE TRIM(COALESCE(receipt_filepath,''))<>''", str(UPLOADS_ROOT)),
@@ -791,7 +806,22 @@ def _render(section, **context):
 @admin_bp.route('/')
 def index():
     require_admin()
-    return redirect(url_for('admin.boards'))
+    return redirect(url_for('admin.system'))
+
+
+@admin_bp.route('/system')
+def system():
+    require_admin()
+    max_levels = load_menu_max_levels()
+    department_blocks = load_menu_department_blocks()
+    for key, _label, _icon, endpoint in SYSTEM_MANAGEMENT_ITEMS:
+        if menu_is_allowed(
+            key,
+            max_levels=max_levels,
+            department_blocks=department_blocks,
+        ):
+            return redirect(url_for(endpoint))
+    abort(403)
 
 
 @admin_bp.route('/menu-permissions', methods=['GET', 'POST'])

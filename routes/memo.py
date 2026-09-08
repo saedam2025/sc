@@ -614,64 +614,6 @@ def diagnostics():
     return response
 
 
-@memo_bp.route("/games/ball")
-def game_ball():
-    """웹캠 앞의 움직임으로 공을 튕기는 통통볼 게임을 새 창에서 연다."""
-    response = make_response(render_template("webcam_ball_game.html"))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    # 웹캠 사용 권한이 이 문서에서 허용되도록 명시한다.
-    response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
-    return response
-
-
-WEBCAM_ARCADE_GAMES = {
-    "balloon": {
-        "id": "balloon",
-        "title": "풍선 팡팡",
-        "subtitle": "날아오르는 풍선을 손으로 톡톡 터뜨려 보세요.",
-        "icon": "fa-balloons",
-        "accent": "#ff5ca8",
-        "accent2": "#8b5cf6",
-        "ready_title": "풍선을 터뜨릴 준비가 되었어요",
-        "ready_desc": "화면 곳곳에 풍선이 나타나면 손으로 빠르게 스쳐 터뜨리세요.",
-    },
-    "goalie": {
-        "id": "goalie",
-        "title": "슈퍼 골키퍼",
-        "subtitle": "골문으로 날아오는 슛을 온몸으로 막아 보세요.",
-        "icon": "fa-hands",
-        "accent": "#22c98b",
-        "accent2": "#22a6f2",
-        "ready_title": "골문을 지킬 준비가 되었어요",
-        "ready_desc": "공이 가까이 오기 전에 손·머리·몸으로 쳐 내세요. 다섯 골을 허용하면 끝나요.",
-    },
-    "freeze": {
-        "id": "freeze",
-        "title": "얼음! 땡!",
-        "subtitle": "초록불에는 신나게 움직이고 빨간불에는 그대로 멈추세요.",
-        "icon": "fa-person-running",
-        "accent": "#32d5e8",
-        "accent2": "#4f8cff",
-        "ready_title": "움직일 준비가 되었어요",
-        "ready_desc": "‘땡!’에는 크게 움직여 점수를 얻고, ‘얼음!’에는 꼼짝하지 마세요.",
-    },
-}
-
-
-@memo_bp.route("/games/arcade/<game_id>")
-def game_arcade(game_id: str):
-    """선택한 웹캠 모션 미니게임을 새 창에서 연다."""
-    game = WEBCAM_ARCADE_GAMES.get(game_id)
-    if game is None:
-        abort(404)
-    response = make_response(render_template("webcam_arcade_game.html", game=game))
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Permissions-Policy"] = "camera=(self), microphone=()"
-    return response
-
-
 @memo_bp.route("/diagnostics/ping")
 def diagnostics_ping():
     """브라우저에서 인트라넷 서버까지의 왕복 지연을 측정하는 경량 응답."""

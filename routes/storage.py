@@ -69,6 +69,7 @@ EXPENSE_UPLOADS = DATA_ROOT / "expense_uploads"
 BOARD_UPLOADS = DATA_ROOT / "board_uploads"
 CHAT_UPLOADS = DATA_ROOT / "chat_uploads"
 MEMO_UPLOADS = DATA_ROOT / "memo_uploads"
+MYDESK_UPLOADS = DATA_ROOT / "mydesk_uploads"
 AI_MAIL_UPLOADS = DATA_ROOT / "ai_mail_uploads"
 EBOOK_UPLOADS = DATA_ROOT / "ebook_uploads"
 WEBTOON_UPLOADS = DATA_ROOT / "webtoon_uploads"
@@ -106,6 +107,7 @@ PERSISTENT_DIRECTORIES = (
     BOARD_UPLOADS,
     CHAT_UPLOADS,
     MEMO_UPLOADS,
+    MYDESK_UPLOADS,
     AI_MAIL_UPLOADS,
     EBOOK_UPLOADS,
     WEBTOON_UPLOADS,

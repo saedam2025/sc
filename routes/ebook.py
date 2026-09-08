@@ -8,6 +8,7 @@ import secrets
 import shutil
 import uuid
 from html import escape
+from io import BytesIO
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -27,7 +28,14 @@ from PIL import Image, UnidentifiedImageError
 from .database import get_db
 from .security import is_admin_session
 from .storage import DATA_ROOT
-from .secure_files import delete_file, encrypted_response, encrypted_storage_name, encrypt_upload, original_filename
+from .secure_files import (
+    delete_file,
+    encrypted_response,
+    encrypted_storage_name,
+    encrypt_upload,
+    original_filename,
+    read_decrypted,
+)
 
 
 ebook_bp = Blueprint("ebook", __name__)
@@ -118,6 +126,10 @@ def init_ebook_schema():
             conn.execute("ALTER TABLE ebook_pages ADD COLUMN image_filename TEXT")
         if "image_path" not in page_columns:
             conn.execute("ALTER TABLE ebook_pages ADD COLUMN image_path TEXT")
+        if "width" not in page_columns:
+            conn.execute("ALTER TABLE ebook_pages ADD COLUMN width INTEGER NOT NULL DEFAULT 0")
+        if "height" not in page_columns:
+            conn.execute("ALTER TABLE ebook_pages ADD COLUMN height INTEGER NOT NULL DEFAULT 0")
 
         bookmark_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(ebook_bookmarks)")
@@ -360,8 +372,11 @@ def _save_page_image(upload, folder: Path):
     upload.stream.seek(0)
     if size > MAX_IMAGE_BYTES:
         raise ValueError(f"‘{raw_name}’ 파일이 20MB를 초과합니다.")
+    width = 0
+    height = 0
     try:
         with Image.open(upload.stream) as image:
+            width, height = image.size
             image.verify()
             if image.format not in IMAGE_FORMATS:
                 raise ValueError("PNG, JPG, JPEG 이미지만 올릴 수 있습니다.")
@@ -374,15 +389,41 @@ def _save_page_image(upload, folder: Path):
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / stored_name
     encrypt_upload(upload, path)
-    return raw_name, str(path)
+    return raw_name, str(path), int(width), int(height)
 
 
 def _leaflet_pages(conn, ebook_id: int):
-    return conn.execute(
-        """SELECT id,page_no,image_filename,image_path
+    pages = conn.execute(
+        """SELECT id,page_no,image_filename,image_path,width,height
            FROM ebook_pages WHERE ebook_id=? ORDER BY page_no""",
         (ebook_id,),
     ).fetchall()
+    updated = False
+    for page in pages:
+        if int(page["width"] or 0) > 0 and int(page["height"] or 0) > 0:
+            continue
+        path = page["image_path"]
+        if not path or not os.path.isfile(path):
+            continue
+        try:
+            with Image.open(BytesIO(read_decrypted(path, MAX_IMAGE_BYTES + 1))) as image:
+                width, height = image.size
+            if width > 0 and height > 0:
+                conn.execute(
+                    "UPDATE ebook_pages SET width=?,height=? WHERE id=?",
+                    (int(width), int(height), page["id"]),
+                )
+                updated = True
+        except (OSError, ValueError, UnidentifiedImageError):
+            continue
+    if updated:
+        conn.commit()
+        pages = conn.execute(
+            """SELECT id,page_no,image_filename,image_path,width,height
+               FROM ebook_pages WHERE ebook_id=? ORDER BY page_no""",
+            (ebook_id,),
+        ).fetchall()
+    return pages
 
 
 def _reader_context(book, pages):
@@ -457,12 +498,12 @@ def create_book():
         leaflet_dir = LEAFLET_ROOT / str(ebook_id)
         saved_pages = []
         for page_no, upload in enumerate(images, 1):
-            filename, path = _save_page_image(upload, leaflet_dir)
-            saved_pages.append((ebook_id, page_no, "", filename, path))
+            filename, path, width, height = _save_page_image(upload, leaflet_dir)
+            saved_pages.append((ebook_id, page_no, "", filename, path, width, height))
         conn.executemany(
             """INSERT INTO ebook_pages
-               (ebook_id,page_no,content_html,image_filename,image_path)
-               VALUES (?,?,?,?,?)""",
+               (ebook_id,page_no,content_html,image_filename,image_path,width,height)
+               VALUES (?,?,?,?,?,?,?)""",
             saved_pages,
         )
         first_filename, first_path = saved_pages[0][3], saved_pages[0][4]
@@ -546,8 +587,8 @@ def edit_book(ebook_id):
                 images = _selected_images(uploads)
                 replacement_dir = LEAFLET_ROOT / f"{ebook_id}_replacement_{uuid.uuid4().hex}"
                 for page_no, upload in enumerate(images, 1):
-                    filename, path = _save_page_image(upload, replacement_dir)
-                    new_pages.append((ebook_id, page_no, "", filename, path))
+                    filename, path, width, height = _save_page_image(upload, replacement_dir)
+                    new_pages.append((ebook_id, page_no, "", filename, path, width, height))
 
                 # 새 파일을 먼저 완성한 뒤 폴더를 교체한다. DB 저장이
                 # 실패하면 백업 폴더로 즉시 되돌릴 수 있다.
@@ -558,14 +599,17 @@ def edit_book(ebook_id):
                 replacement_dir = None
                 filesystem_swapped = True
                 new_pages = [
-                    (row[0], row[1], row[2], row[3], str(final_dir / Path(row[4]).name))
+                    (
+                        row[0], row[1], row[2], row[3],
+                        str(final_dir / Path(row[4]).name), row[5], row[6],
+                    )
                     for row in new_pages
                 ]
                 conn.execute("DELETE FROM ebook_pages WHERE ebook_id=?", (ebook_id,))
                 conn.executemany(
                     """INSERT INTO ebook_pages
-                       (ebook_id,page_no,content_html,image_filename,image_path)
-                       VALUES (?,?,?,?,?)""",
+                       (ebook_id,page_no,content_html,image_filename,image_path,width,height)
+                       VALUES (?,?,?,?,?,?,?)""",
                     new_pages,
                 )
                 cover_filename, cover_path = new_pages[0][3], new_pages[0][4]
