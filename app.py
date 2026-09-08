@@ -26,6 +26,7 @@ from routes.ai_mail import ai_mail_bp
 from routes.ai_agent import ai_agent_bp
 from routes.smart_document import ensure_smart_document_schema, smart_document_bp
 from routes.memo import memo_bp
+from routes.mydesk import ensure_mydesk_schema, mydesk_bp
 from routes.attendance import attendance_bp
 from routes.interview import ensure_interview_schema, interview_bp
 from routes.excel_generator import excel_bp
@@ -37,6 +38,9 @@ from routes.school_task import school_task_bp
 from routes.contacts import contacts_bp
 from routes.admin_management import admin_bp, get_active_theme
 from routes.ebook import ebook_bp, init_ebook_schema
+from routes.photobook import init_photobook_schema, photobook_bp
+from routes.meeting import init_meeting_schema, meeting_bp
+from routes.webtoon import init_webtoon_schema, webtoon_bp
 from routes.manual import manual_bp, init_manual_schema
 from routes.parent_notifications import (
     ensure_parent_notification_schema,
@@ -91,10 +95,14 @@ with app.app_context():
         storage_status = verify_storage_ready()
         init_db()
         init_ebook_schema()
+        init_webtoon_schema()
+        init_photobook_schema()
+        init_meeting_schema()
         init_manual_schema()
         ensure_parent_notification_schema()
         ensure_smart_document_schema()
         ensure_interview_schema()
+        ensure_mydesk_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -272,10 +280,12 @@ def _classify_menu(path):
         ('/attendance', '근태관리'),
         ('/contacts', '본사연락망'),
         ('/memo', '개인화이트보드'),
+        ('/meeting', '회의센터'),
         ('/excel-generator', '입금용 엑셀 생성기'),
         ('/manual', '새담메뉴얼'),
         ('/ebook/books', 'eBook'),
         ('/ebook', 'e리플렛'),
+        ('/photobook', '웹전자책'),
         ('/notifications', '알림'),
     ]
     if path == '/':
@@ -1036,7 +1046,8 @@ app.register_blueprint(payroll_bp, url_prefix='/payroll')
 app.register_blueprint(ai_mail_bp, url_prefix='/ai-mail')
 app.register_blueprint(ai_agent_bp)
 app.register_blueprint(smart_document_bp, url_prefix='/smart-document')
-app.register_blueprint(memo_bp, url_prefix='/memo')  
+app.register_blueprint(memo_bp, url_prefix='/memo')
+app.register_blueprint(mydesk_bp, url_prefix='/mydesk')
 app.register_blueprint(attendance_bp)
 app.register_blueprint(interview_bp)
 app.register_blueprint(excel_bp)       
@@ -1049,6 +1060,9 @@ app.register_blueprint(contacts_bp)
 app.register_blueprint(gall2_bp)
 app.register_blueprint(admin_bp, url_prefix='/admin')
 app.register_blueprint(ebook_bp, url_prefix='/ebook')
+app.register_blueprint(webtoon_bp, url_prefix='/webtoon')
+app.register_blueprint(photobook_bp, url_prefix='/photobook')
+app.register_blueprint(meeting_bp, url_prefix='/meeting')
 app.register_blueprint(manual_bp, url_prefix='/manual')
 app.register_blueprint(parent_notification_bp)
 app.register_blueprint(points_bp)
