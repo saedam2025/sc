@@ -146,6 +146,7 @@ MENU_GROUPS = (
             ('admin_themes', '테마관리', 'fa-palette', 2),
             ('admin_stats', '이용통계', 'fa-chart-line', 2),
             ('admin_ai_settings', 'AI api설정', 'fa-robot', 2),
+            ('admin_solapi_settings', '솔라피설정', 'fa-comment-dots', 2),
             ('admin_settings', 'Admin설정', 'fa-user-shield', 2),
             ('webtoon_main', 'Webtoon', 'fa-book-open', 2),
             ('photobook_main', '웹전자책', 'fa-images', 2),
@@ -409,6 +410,7 @@ def _admin_menu_key(path):
     rules = (
         ('/admin/menu-permissions', 'admin_menu_permissions'),
         ('/admin/ai-settings', 'admin_ai_settings'),
+        ('/admin/solapi-settings', 'admin_solapi_settings'),
         ('/admin/boards', 'admin_boards'),
         ('/admin/disk', 'admin_disk'),
         ('/admin/themes', 'admin_themes'),

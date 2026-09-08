@@ -42,6 +42,7 @@ from .menu_access import (
     school_director_scope_enabled,
 )
 from . import openai_settings as ai_settings
+from . import solapi_settings
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -52,6 +53,7 @@ SYSTEM_MANAGEMENT_ITEMS = (
     ('admin_disk', '디스크관리', 'fa-hard-drive', 'admin.disk'),
     ('admin_boards', '게시판관리', 'fa-clipboard-list', 'admin.boards'),
     ('admin_ai_settings', 'AI api설정', 'fa-robot', 'admin.ai_settings_page'),
+    ('admin_solapi_settings', '솔라피설정', 'fa-comment-dots', 'admin.solapi_settings_page'),
     ('admin_settings', 'Admin설정', 'fa-user-shield', 'admin.settings'),
 )
 
@@ -1631,6 +1633,43 @@ def _render_ai_settings(**extra):
 def ai_settings_page():
     require_admin()
     return _render_ai_settings()
+
+
+def _render_solapi_settings(**extra):
+    return render_template(
+        'solapi_settings.html',
+        solapi=solapi_settings.settings_for_view(),
+        solapi_csrf_token=solapi_settings.csrf_token(session),
+        **extra,
+    )
+
+
+@admin_bp.route('/solapi-settings')
+def solapi_settings_page():
+    require_admin()
+    return _render_solapi_settings()
+
+
+@admin_bp.route('/solapi-settings/save', methods=['POST'])
+def save_solapi_settings_route():
+    require_admin()
+    if not solapi_settings.valid_csrf(session, request.form.get('csrf_token')):
+        return _render_solapi_settings(
+            error='보안 확인값이 만료되었습니다. 화면을 새로고침해 주세요.'
+        ), 403
+    try:
+        solapi_settings.save_settings(
+            api_key=request.form.get('api_key'),
+            api_secret=request.form.get('api_secret'),
+            pf_id=request.form.get('pf_id'),
+            template_id=request.form.get('template_id'),
+            from_number=request.form.get('from_number'),
+            actor=session.get('emp_no') or session.get('user_name') or 'admin',
+            clear_credentials=request.form.get('clear_credentials') == '1',
+        )
+    except (ValueError, RuntimeError) as exc:
+        return _render_solapi_settings(error=str(exc)), 400
+    return _render_solapi_settings(success='SOLAPI 설정을 저장했습니다.')
 
 
 @admin_bp.route('/ai-settings/save', methods=['POST'])
