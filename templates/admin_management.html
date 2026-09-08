@@ -27,8 +27,42 @@
     .panel-title { font-size: 1.02rem; font-weight: 900; margin: 0; display: flex; gap: 8px; align-items: center; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .stats-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+    .stats-summary-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
     .stat-box { border: 1px solid var(--border-color, #dbe3ef); border-radius: 13px; padding: 14px; background: var(--widget-bg, #f7f9fc); }
+    .stats-summary-card {
+        position: relative; min-width: 0; min-height: 78px; padding: 10px 11px 9px;
+        border-top: 3px solid color-mix(in srgb, var(--primary-color, #4a90e2) 58%, #ffffff);
+        background: color-mix(in srgb, var(--primary-color, #4a90e2) 4%, var(--card-bg, #fff));
+        box-shadow: 0 5px 14px rgba(15,23,42,.045);
+    }
+    .stats-summary-card .stat-label {
+        padding-right: 28px; color: var(--text-dark, #1e293b); font-size: .72rem;
+        font-weight: 900; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stats-summary-card .stat-value { margin-top: 5px; font-size: 1.28rem; line-height: 1.05; letter-spacing: -.025em; }
+    .stats-summary-card .stat-hint {
+        margin-top: 4px; font-size: .61rem; font-weight: 750; line-height: 1.2;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stats-summary-card .stat-icon {
+        position: absolute; top: 8px; right: 8px; float: none;
+        width: 24px; height: 24px; display: grid; place-items: center;
+        border-radius: 8px; background: color-mix(in srgb, var(--primary-color, #4a90e2) 13%, transparent);
+        color: var(--primary-color, #4a90e2); opacity: 1; font-size: .72rem;
+    }
+    .stats-content-panel { padding: 11px 13px 12px; }
+    .stats-content-title { margin-bottom: 8px; font-size: .88rem; }
+    .stats-content-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .stats-content-card {
+        min-width: 0; padding: 8px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        border-radius: 10px; border-left: 3px solid color-mix(in srgb, var(--primary-color, #4a90e2) 58%, #ffffff);
+        background: color-mix(in srgb, var(--primary-color, #4a90e2) 4%, var(--card-bg, #fff));
+    }
+    .stats-content-card .stat-label {
+        min-width: 0; color: var(--text-dark, #1e293b); font-size: .7rem; font-weight: 850;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .stats-content-card .stat-value { flex: 0 0 auto; margin: 0; font-size: 1.08rem; line-height: 1; }
     .stat-box.preset-active {
         border-color: #0bd18a;
         box-shadow: 0 0 0 1px #0bd18a, 0 0 18px 2px rgba(11, 209, 138, .35);
@@ -85,18 +119,18 @@
     .stats-detail-box { border: 1px solid var(--border-color, #dbe4ee); border-radius: 8px; padding: 13px; background: var(--card-bg, #fff); }
     .detail-title { margin: 0 0 10px; font-size: 13px; font-weight: 900; color: var(--primary-color, #4a90e2); }
     .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .retention-note { display: flex; align-items: center; gap: 7px; color: var(--text-gray, #64748b); font-size: 12px; font-weight: 700; }
+    .retention-note { min-height:18px; margin-bottom:-8px; display:flex; align-items:center; justify-content:flex-end; gap:6px; color:var(--text-gray, #64748b); font-size:10px; font-weight:750; }
     
     /* 게시판 생성용 새로운 와이드 그리드 시스템 */
     .create-form-section { display: flex; flex-direction: column; gap: 16px; width: 100%; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color, #e2e8f0); }
     .board-create-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
     .permission-create-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; width: 100%; }
-    .menu-permission-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .menu-permission-toolbar select { min-width:220px; }
-    .menu-permission-guide { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; margin-bottom:18px; }
-    .menu-permission-guide > div { padding:14px 16px; border:1px solid var(--border-color); border-radius:12px; background:var(--widget-bg, #f8fafc); }
-    .menu-permission-guide strong { display:block; color:var(--text-dark); margin-bottom:4px; }
-    .menu-permission-guide span { color:var(--text-gray); font-size:.84rem; line-height:1.5; }
+    .menu-permission-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .menu-permission-toolbar select { width:180px; min-width:180px; flex:0 0 180px; }
+    .menu-permission-guide { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:8px; margin-bottom:14px; }
+    .menu-permission-guide > div { min-width:0; padding:10px 12px; border:1px solid var(--border-color); border-radius:10px; background:var(--widget-bg, #f8fafc); }
+    .menu-permission-guide strong { display:block; color:var(--text-dark); margin-bottom:3px; font-size:.8rem; line-height:1.3; }
+    .menu-permission-guide span { display:block; color:var(--text-gray); font-size:.72rem; line-height:1.42; }
     .menu-permission-groups { display:grid; gap:16px; }
     .menu-permission-group { border:1px solid var(--border-color); border-radius:14px; overflow:hidden; background:var(--card-bg, #fff); }
     .menu-permission-row { display:grid; grid-template-columns:minmax(200px, 1fr) minmax(240px, 340px) minmax(128px, 160px); gap:18px; align-items:center; padding:15px 18px; border-top:1px solid var(--border-color); }
@@ -320,11 +354,17 @@
     .theme-item:hover { background: rgba(74,144,226,.09); }
     .empty-note { padding: 34px; text-align: center; color: var(--text-gray, #64748b); font-weight: 700; }
     
+    @media (max-width: 1400px) {
+        .stats-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .stats-content-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
     @media (max-width: 980px) {
         .disk-layout, .grid-2, .grid-3, .detail-grid { grid-template-columns: 1fr; }
         .stats-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .stats-content-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .board-create-grid, .permission-create-grid { grid-template-columns: 1fr; }
-        .menu-permission-guide { grid-template-columns:1fr; }
+        .menu-permission-guide { grid-template-columns:repeat(2, minmax(0, 1fr)); }
         .menu-permission-row { grid-template-columns:1fr; gap:10px; }
         .menu-department-toggle { justify-content:center; }
         .menu-permission-row.child .menu-permission-label { padding-left:12px; }
@@ -332,7 +372,14 @@
     }
 
     @media (max-width: 560px) {
-        .stats-summary-grid { grid-template-columns: 1fr; }
+        .menu-permission-toolbar { align-items:stretch; }
+        .menu-permission-toolbar select { width:100%; min-width:0; flex:1 1 100%; }
+        .menu-permission-guide { grid-template-columns:1fr; }
+        .stats-content-grid { grid-template-columns:1fr; }
+    }
+
+    @media (max-width: 420px) {
+        .stats-summary-grid { grid-template-columns:1fr; }
     }
 
 </style>
@@ -340,36 +387,34 @@
 <div class="admin-shell">
     <section class="admin-main">
 
-        {% if active_section == 'menu_permissions' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-key"></i> 메뉴 권한관리</h1>
-                <div class="admin-subtitle">상단 주메뉴와 서브메뉴의 회원 접근 레벨을 각각 설정합니다.</div>
-            </div>
-            <div class="menu-permission-toolbar">
-                <select id="bulkMenuLevel" class="table-input" aria-label="전체 메뉴 일괄 레벨">
-                    <option value="">일괄 적용 레벨 선택</option>
-                    <option value="-1">전체 차단</option>
-                    {% for level in level_numbers %}
-                    <option value="{{ level }}">레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }}{% endif %}</option>
-                    {% endfor %}
-                </select>
-                <button class="btn btn-ghost" type="button" onclick="applyBulkMenuLevel()"><i class="fa-solid fa-wand-magic-sparkles"></i> 화면에 일괄 적용</button>
-                <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(true)"><i class="fa-solid fa-building-lock"></i> {{ department_block_label }} 전체 지정</button>
-                <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(false)"><i class="fa-solid fa-building-circle-check"></i> {{ department_block_label }} 전체 해제</button>
-            </div>
-        </div>
-
-        {% if saved %}
-        <div class="save-notice"><i class="fa-solid fa-circle-check"></i> 메뉴 접근권한을 저장했습니다. 열린 화면은 다음 요청부터 새 권한이 적용됩니다.</div>
+        {% if active_section in ['menu_permissions', 'boards', 'disk', 'stats', 'ai_settings', 'settings'] %}
+        {% include '_system_management_nav.html' %}
         {% endif %}
 
+        {% if active_section == 'menu_permissions' %}
         <div class="menu-permission-guide">
             <div><strong><i class="fa-solid fa-arrow-down-1-9"></i> 레벨 기준</strong><span>숫자가 작을수록 높은 권한입니다. 예: 레벨 5 이상은 권한 등급상 5 이상인 숫자 0~5 회원에게 허용됩니다.</span></div>
             <div><strong><i class="fa-solid fa-diagram-project"></i> 주메뉴 우선</strong><span>일반 서브메뉴는 주메뉴가 차단되면 함께 차단됩니다. 실제 담당 센터장의 센터장용 메뉴는 아래의 전용 권한값을 우선합니다.</span></div>
             <div><strong><i class="fa-solid fa-clipboard-list"></i> 센터 공용게시판 권한</strong><span>본부공지사항·자료실은 접근·읽기·쓰기·삭제·댓글을 각각 설정하며, 이 설정은 레벨 7·8 센터장 전용모드보다 우선합니다.</span></div>
             <div><strong><i class="fa-solid fa-building-lock"></i> {{ department_block_label }} 메뉴</strong><span>체크한 메뉴는 소속부서가 {{ department_block_target_label }}인 회원에게만 상단 메뉴에서 사라지고 직접 URL 접근도 막힙니다. 레벨 설정과 센터장 전용 예외보다 우선하며, 주메뉴를 체크하면 하위 메뉴도 함께 적용됩니다. 최고관리자(admin)는 제외됩니다.</span></div>
         </div>
+
+        <div class="menu-permission-toolbar" style="justify-content:flex-end;">
+            <select id="bulkMenuLevel" class="table-input" aria-label="전체 메뉴 일괄 레벨">
+                <option value="">일괄 적용 레벨 선택</option>
+                <option value="-1">전체 차단</option>
+                {% for level in level_numbers %}
+                <option value="{{ level }}">레벨 {{ level }} 이상{% if positions_by_level.get(level) %} · {{ positions_by_level[level].names }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-ghost" type="button" onclick="applyBulkMenuLevel()"><i class="fa-solid fa-wand-magic-sparkles"></i> 화면에 일괄 적용</button>
+            <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(true)"><i class="fa-solid fa-building-lock"></i> {{ department_block_label }} 전체 지정</button>
+            <button class="btn btn-ghost" type="button" onclick="toggleAllDepartmentBlocks(false)"><i class="fa-solid fa-building-circle-check"></i> {{ department_block_label }} 전체 해제</button>
+        </div>
+
+        {% if saved %}
+        <div class="save-notice"><i class="fa-solid fa-circle-check"></i> 메뉴 접근권한을 저장했습니다. 열린 화면은 다음 요청부터 새 권한이 적용됩니다.</div>
+        {% endif %}
 
         <form method="post" id="menuPermissionForm">
             <div class="menu-permission-groups">
@@ -431,13 +476,6 @@
         {% endif %}
 
         {% if active_section == 'boards' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-clipboard-list"></i> 게시판관리</h1>
-                <div class="admin-subtitle">게시판 생성, 전체 목록, 권한, 게시물 수, 사용 용량을 한 화면에서 관리합니다.</div>
-            </div>
-        </div>
-
         <div class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 class="panel-title"><i class="fa-solid fa-folder-plus"></i> 신규 게시판 생성</h2>
@@ -538,11 +576,7 @@
         {% endif %}
 
         {% if active_section == 'disk' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-hard-drive"></i> 디스크관리</h1>
-                <div class="admin-subtitle">메뉴별 사용량을 확인하고 허용된 데이터 폴더 안의 파일을 접근/삭제합니다.</div>
-            </div>
+        <div class="panel">
             <div class="disk-usage-widget">
                 <div class="disk-usage-head">
                     <span class="disk-usage-title"><i class="fa-solid fa-database"></i> 전체 저장공간</span>
@@ -746,28 +780,22 @@
         {% endif %}
 
         {% if active_section == 'stats' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-chart-line"></i> 이용통계</h1>
-                <div class="admin-subtitle">화면 접속만 정확히 집계하고 회원·메뉴별 누계와 최근 3개월 상세 기록을 확인합니다.</div>
-            </div>
-            <div class="retention-note"><i class="fa-solid fa-database"></i> 상세 로그 3개월 보관 · 누계 영구 유지</div>
-        </div>
+        <div class="retention-note"><i class="fa-solid fa-database"></i> 상세 로그 3개월 보관 · 누계 영구 유지</div>
         <div class="stats-summary-grid">
             {% for card in summary_cards %}
-            <div class="stat-box">
+            <div class="stat-box stats-summary-card">
                 <i class="fa-solid {{ card.icon }} stat-icon"></i>
                 <div class="stat-label">{{ card.label }}</div>
                 <div class="stat-value">{{ "{:,}".format(card.value or 0) }}</div>
-                <div class="stat-hint">{{ card.hint }}</div>
+                <div class="stat-hint" title="{{ card.hint }}">{{ card.hint }}</div>
             </div>
             {% endfor %}
         </div>
-        <div class="panel">
-            <h2 class="panel-title" style="margin-bottom: 16px;"><i class="fa-solid fa-boxes-stacked"></i> DB 콘텐츠 현황</h2>
-            <div class="grid-3">
+        <div class="panel stats-content-panel">
+            <h2 class="panel-title stats-content-title"><i class="fa-solid fa-boxes-stacked"></i> DB 콘텐츠 현황</h2>
+            <div class="stats-content-grid">
             {% for label, value in content_counts.items() %}
-                <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ "{:,}".format(value or 0) }}</div></div>
+                <div class="stat-box stats-content-card"><div class="stat-label" title="{{ label }}">{{ label }}</div><div class="stat-value">{{ "{:,}".format(value or 0) }}</div></div>
             {% endfor %}
             </div>
         </div>
@@ -824,12 +852,6 @@
         {% endif %}
 
         {% if active_section == 'ai_settings' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-robot"></i> AI api설정</h1>
-                <div class="admin-subtitle">AI에이전트와 스마트공문발송이 공통으로 사용할 AI 프리셋(OpenAI·Claude)을 여기서 관리합니다. 필요에 따라 프리셋을 최대 {{ max_presets }}개까지 늘려 바꿔 적용할 수 있습니다.</div>
-            </div>
-        </div>
         {% if error %}<div class="empty-note" style="color:#c43d3d;border-color:#f0b8b8;background:#fdf3f3;">{{ error }}</div>{% endif %}
 
         <div class="panel">
@@ -951,12 +973,6 @@
         {% endif %}
 
         {% if active_section == 'settings' %}
-        <div class="admin-header">
-            <div>
-                <h1 class="admin-title"><i class="fa-solid fa-user-shield"></i> Admin설정</h1>
-                <div class="admin-subtitle">Admin 계정과 핵심 관리자 상태를 확인하고 비밀번호를 재설정합니다.</div>
-            </div>
-        </div>
         <div class="grid-3">
             {% for label, value in counts.items() %}
             <div class="stat-box"><div class="stat-label">{{ label }}</div><div class="stat-value">{{ value }}</div></div>

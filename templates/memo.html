@@ -1121,19 +1121,19 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 13px;
-        padding: 26px 30px;
+        gap: 10px;
+        min-width: min(310px, calc(100% - 44px));
+        padding: 24px 30px;
+        border: 1px solid rgba(255, 255, 255, 0.30);
+        border-radius: 24px;
         color: #ffffff;
+        background: rgba(2, 6, 23, 0.18);
         text-align: center;
         text-shadow: 0 2px 12px rgba(2, 6, 23, 0.55);
-        opacity: 1;
-        transition: opacity 2s ease, transform 2s ease;
+        box-shadow: 0 18px 55px rgba(2, 6, 23, 0.20);
+        backdrop-filter: blur(6px);
+        transition: transform 1s ease;
         pointer-events: none;
-    }
-
-    .meditation-center.is-intro-hidden {
-        opacity: 0;
-        transform: translateY(-10px);
     }
 
     .meditation-caption {
@@ -1150,8 +1150,39 @@
         text-shadow: 0 2px 10px rgba(2, 6, 23, 0.86);
         backdrop-filter: blur(5px);
         transform: translateX(-50%);
-        pointer-events: none;
+        pointer-events: auto;
     }
+
+    .meditation-caption-head {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .meditation-scene-count {
+        padding: 3px 7px;
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        border-radius: 999px;
+        color: #dbeafe;
+        background: rgba(15, 23, 42, 0.48);
+        font-size: 0.62rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .meditation-credit {
+        display: inline-block;
+        margin-top: 4px;
+        color: #dbeafe;
+        font-size: 0.62rem;
+        font-weight: 750;
+        text-decoration: none;
+        opacity: 0.86;
+    }
+
+    .meditation-credit:hover { color: #ffffff; text-decoration: underline; }
 
     .breathing-orb {
         width: 86px;
@@ -1160,18 +1191,32 @@
         place-items: center;
         border: 2px solid #ffffff;
         border-radius: 50%;
-        background: #0f766e;
+        position: relative;
+        overflow: visible;
+        background: linear-gradient(135deg, #0f766e, #0369a1);
         box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.18), 0 12px 35px rgba(2, 6, 23, 0.35);
-        animation: meditationBreath 8s ease-in-out infinite;
+        transform: scale(.78);
+        transition: transform 4s cubic-bezier(.36, 0, .18, 1), background 1.2s ease;
     }
+
+    .breathing-orb::after {
+        content: '';
+        position: absolute;
+        inset: -13px;
+        border: 1px solid rgba(255,255,255,.66);
+        border-radius: inherit;
+        opacity: .52;
+        transition: inset 4s cubic-bezier(.36, 0, .18, 1), opacity 1s ease;
+    }
+
+    .breathing-orb.is-inhale { transform: scale(1.15); background: linear-gradient(135deg, #0891b2, #2563eb); }
+    .breathing-orb.is-hold { transform: scale(1.15); }
+    .breathing-orb.is-exhale { transform: scale(.78); background: linear-gradient(135deg, #0f766e, #0f766e); }
+    .breathing-orb.is-rest { transform: scale(.78); }
+    .breathing-orb.is-inhale::after { inset: -25px; opacity: .9; }
 
     .breathing-orb i {
         font-size: 1.55rem;
-    }
-
-    @keyframes meditationBreath {
-        0%, 100% { transform: scale(0.82); }
-        50% { transform: scale(1.18); }
     }
 
     .meditation-title {
@@ -1184,6 +1229,62 @@
         font-size: 0.92rem;
         font-weight: 700;
     }
+
+    .meditation-session-kicker { color:#bae6fd; font-size:.68rem; font-weight:900; letter-spacing:.12em; }
+    .meditation-phase-meta { display:flex; align-items:center; justify-content:center; gap:7px; color:#e0f2fe; font-size:.72rem; font-weight:850; }
+    .meditation-phase-dot { width:6px; height:6px; border-radius:50%; background:#67e8f9; box-shadow:0 0 12px #67e8f9; }
+    .meditation-breath-progress { width:min(230px, 80vw); height:4px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.25); }
+    .meditation-breath-progress span { display:block; width:0; height:100%; border-radius:inherit; background:linear-gradient(90deg,#67e8f9,#a7f3d0); }
+
+    .meditation-cue {
+        width: min(286px, 78vw);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 3px;
+        padding: 9px 11px;
+        border: 1px solid rgba(255,255,255,.25);
+        border-radius: 13px;
+        color: #f8fafc;
+        background: rgba(15,23,42,.30);
+        text-align: left;
+    }
+
+    .meditation-cue-icon {
+        width: 30px;
+        height: 30px;
+        display: grid;
+        flex: 0 0 30px;
+        place-items: center;
+        border-radius: 10px;
+        color: #cffafe;
+        background: rgba(8,145,178,.35);
+        font-size: .9rem;
+    }
+
+    .meditation-cue strong { display:block; font-size:.72rem; font-weight:900; }
+    /* 아이콘 배지도 span이라, 안내 문구 규칙이 여기까지 닿으면
+       display:grid가 덮여 아이콘이 배지 가운데를 벗어난다. */
+    .meditation-cue span:not(.meditation-cue-icon) { display:block; margin-top:2px; color:#dbeafe; font-size:.66rem; font-weight:700; line-height:1.38; }
+
+    .meditation-focus-dot {
+        position: absolute;
+        z-index: 2;
+        left: 50%;
+        top: 50%;
+        width: 13px;
+        height: 13px;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        background: #67e8f9;
+        box-shadow: 0 0 0 8px rgba(103,232,249,.16), 0 0 30px rgba(103,232,249,.95);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(.7);
+        transition: left 2.4s cubic-bezier(.22,.65,.24,1), top 2.4s cubic-bezier(.22,.65,.24,1), opacity .5s ease, transform .5s ease;
+        pointer-events: none;
+    }
+
+    .meditation-focus-dot.is-active { opacity:1; transform:translate(-50%,-50%) scale(1); }
 
     .meditation-scene-name {
         min-height: 20px;
@@ -1327,11 +1428,13 @@
     .meditation-genre-panel[hidden] { display: none; }
     .meditation-genre-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
     .meditation-genre-head strong { font-size:1rem; }
+    .meditation-genre-head strong small { display:block; margin-top:3px; color:#94a3b8; font-size:.66rem; font-weight:750; }
     .meditation-genre-close { width:32px; height:32px; border:0; border-radius:8px; color:#fff; background:#334155; cursor:pointer; }
     .meditation-genre-group + .meditation-genre-group { margin-top:15px; padding-top:14px; border-top:1px solid rgba(255,255,255,.14); }
     .meditation-genre-title { margin-bottom:8px; color:#bae6fd; font-size:.78rem; font-weight:900; }
     .meditation-genre-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:7px; }
     .meditation-genre-option { min-height:38px; padding:7px 8px; border:1px solid rgba(255,255,255,.2); border-radius:9px; color:#fff; background:rgba(255,255,255,.07); cursor:pointer; font:inherit; font-size:.73rem; font-weight:800; }
+    .meditation-genre-option.is-all { width:100%; margin-bottom:13px; border-color:rgba(103,232,249,.5); background:rgba(8,145,178,.18); }
     .meditation-genre-option:hover, .meditation-genre-option.is-active { border-color:#67e8f9; color:#cffafe; background:rgba(8,145,178,.25); }
     .meditation-genre-option small { display:block; margin-top:2px; color:#94a3b8; font-size:.62rem; font-weight:700; }
     .meditation-genre-option.is-active small { color:#a5f3fc; }
@@ -1357,6 +1460,366 @@
     .meditation-sound-status.is-visible {
         opacity: 1;
         transform: translateY(0);
+    }
+
+    /* === 명상 확장: 호흡법 · 시선 · 자세 · 글귀 === */
+    .meditation-glow {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: radial-gradient(circle at 50% 46%, rgba(103, 232, 249, 0.26), rgba(2, 6, 23, 0) 58%);
+        opacity: .18;
+        transform: scale(.9);
+        transition: opacity 3.2s ease, transform 4s cubic-bezier(.36, 0, .18, 1);
+        pointer-events: none;
+    }
+
+    .meditation-layer[data-breath="inhale"] .meditation-glow { opacity: .6; transform: scale(1.14); }
+    .meditation-layer[data-breath="hold"] .meditation-glow { opacity: .5; transform: scale(1.14); }
+    .meditation-layer[data-breath="exhale"] .meditation-glow { opacity: .14; transform: scale(.86); }
+    .meditation-layer[data-breath="rest"] .meditation-glow { opacity: .12; transform: scale(.86); }
+
+    .meditation-motes {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .meditation-motes span {
+        position: absolute;
+        bottom: -8%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, .9), rgba(186, 230, 253, 0));
+        opacity: 0;
+        animation: meditationMoteRise linear infinite;
+    }
+
+    @keyframes meditationMoteRise {
+        0% { transform: translate3d(0, 0, 0) scale(.6); opacity: 0; }
+        12% { opacity: .55; }
+        70% { opacity: .35; }
+        100% { transform: translate3d(26px, -110vh, 0) scale(1.25); opacity: 0; }
+    }
+
+    .meditation-gaze-path {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        transition: opacity .7s ease;
+        pointer-events: none;
+    }
+
+    .meditation-gaze-path.is-active { opacity: .8; }
+
+    .meditation-gaze-path polyline {
+        fill: none;
+        stroke: rgba(207, 250, 254, .72);
+        stroke-width: 1.3;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 5 7;
+        animation: meditationGazeDash 6s linear infinite;
+    }
+
+    @keyframes meditationGazeDash { to { stroke-dashoffset: -48; } }
+
+    .meditation-layer.is-gazing .meditation-center { opacity: .58; }
+    .meditation-center { transition: transform 1s ease, opacity 1.2s ease; }
+
+    .meditation-focus-dot::before {
+        content: '';
+        position: absolute;
+        inset: -6px;
+        border: 1px solid rgba(207, 250, 254, .8);
+        border-radius: 50%;
+        animation: meditationFocusPulse 2.6s ease-out infinite;
+    }
+
+    @keyframes meditationFocusPulse {
+        0% { transform: scale(.7); opacity: .85; }
+        100% { transform: scale(2.6); opacity: 0; }
+    }
+
+    /* 중앙 명상 아이콘: 후광 · 연꽃 · 스타일 변주 */
+    .breathing-orb-halo {
+        position: absolute;
+        inset: -4px;
+        border: 1px solid rgba(255, 255, 255, .5);
+        border-radius: 50%;
+        opacity: 0;
+        animation: meditationHalo 6.5s ease-out infinite;
+        pointer-events: none;
+    }
+
+    .breathing-orb-halo.is-delay { animation-delay: 3.2s; }
+
+    @keyframes meditationHalo {
+        0% { transform: scale(.7); opacity: .6; }
+        65% { opacity: .14; }
+        100% { transform: scale(2.1); opacity: 0; }
+    }
+
+    .breathing-orb-lotus {
+        position: absolute;
+        left: -20px;
+        top: -20px;
+        width: calc(100% + 40px);
+        height: calc(100% + 40px);
+        opacity: .8;
+        transform: rotate(0deg) scale(.86);
+        transition: transform 4s cubic-bezier(.36, 0, .18, 1), opacity 1.4s ease;
+        pointer-events: none;
+    }
+
+    .breathing-orb-lotus path {
+        fill: rgba(255, 255, 255, .10);
+        stroke: rgba(255, 255, 255, .58);
+        stroke-width: 1.1;
+    }
+
+    .breathing-orb.is-inhale .breathing-orb-lotus { transform: rotate(24deg) scale(1.1); opacity: 1; }
+    .breathing-orb.is-hold .breathing-orb-lotus { transform: rotate(24deg) scale(1.1); opacity: .92; }
+    .breathing-orb.is-exhale .breathing-orb-lotus { transform: rotate(-10deg) scale(.82); opacity: .55; }
+    .breathing-orb.is-rest .breathing-orb-lotus { transform: rotate(-10deg) scale(.82); opacity: .5; }
+
+    .breathing-orb.style-ripple { background: linear-gradient(135deg, #0e7490, #1d4ed8); }
+    .breathing-orb.style-flame { background: linear-gradient(135deg, #b45309, #be123c); }
+    .breathing-orb.style-flame.is-inhale { background: linear-gradient(135deg, #f59e0b, #ea580c); }
+    .breathing-orb.style-moon { background: linear-gradient(135deg, #1e293b, #4c1d95); }
+    .breathing-orb.style-moon.is-inhale { background: linear-gradient(135deg, #4338ca, #7c3aed); }
+    .breathing-orb.style-leaf { background: linear-gradient(135deg, #15803d, #0f766e); }
+    .breathing-orb.style-leaf.is-inhale { background: linear-gradient(135deg, #22c55e, #0d9488); }
+    .breathing-orb.style-star { background: linear-gradient(135deg, #0f172a, #1e3a8a); }
+    .breathing-orb.style-star.is-inhale { background: linear-gradient(135deg, #1d4ed8, #0891b2); }
+    .breathing-orb.style-flame .breathing-orb-lotus { opacity: .45; }
+
+    .meditation-session-stats {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 2px;
+    }
+
+    .meditation-program-chip,
+    .meditation-session-stat {
+        padding: 3px 8px;
+        border: 1px solid rgba(255, 255, 255, .32);
+        border-radius: 999px;
+        background: rgba(15, 23, 42, .42);
+        font-size: .62rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .meditation-program-chip { color: #a5f3fc; }
+    .meditation-session-stat { color: #e0f2fe; }
+
+    /* 사색의 글귀 */
+    .meditation-quote {
+        position: absolute;
+        z-index: 3;
+        left: 50%;
+        top: 20px;
+        width: min(720px, calc(100% - 40px));
+        padding: 12px 18px;
+        color: #f8fafc;
+        text-align: center;
+        /* 판때기 없이 사진 위에 바로 얹는다. 밝은 풍경에서도 글자가 묻히지
+           않도록 배경 대신 좁은 그림자와 넓은 그림자를 겹쳐 준다. */
+        text-shadow: 0 1px 2px rgba(2, 6, 23, .92), 0 2px 14px rgba(2, 6, 23, .8), 0 0 28px rgba(2, 6, 23, .6);
+        opacity: 0;
+        transform: translateX(-50%) translateY(-6px);
+        transition: opacity .9s ease, transform .9s ease;
+        pointer-events: none;
+    }
+
+    .meditation-quote.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .meditation-quote[hidden] { display: none; }
+    .meditation-quote-kicker { color: #bae6fd; font-size: .62rem; font-weight: 900; letter-spacing: .14em; }
+    .meditation-quote-text { margin-top: 5px; font-size: 1rem; font-weight: 850; line-height: 1.62; }
+    .meditation-quote-author { margin-top: 5px; color: #cbd5e1; font-size: .68rem; font-weight: 800; }
+
+    /* 명상 자세 · 몸 움직임 카드 */
+    .meditation-posture {
+        position: absolute;
+        z-index: 4;
+        left: 18px;
+        top: 50%;
+        width: 214px;
+        padding: 13px;
+        border: 1px solid rgba(255, 255, 255, .24);
+        border-radius: 16px;
+        color: #f8fafc;
+        background: rgba(2, 6, 23, .40);
+        box-shadow: 0 16px 44px rgba(2, 6, 23, .34);
+        backdrop-filter: blur(7px);
+        transform: translateY(-50%);
+    }
+
+    .meditation-posture[hidden] { display: none; }
+
+    .meditation-posture-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .meditation-posture-kicker { color: #bae6fd; font-size: .64rem; font-weight: 900; letter-spacing: .08em; }
+
+    .meditation-move-ring {
+        position: relative;
+        width: 34px;
+        height: 34px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: conic-gradient(#67e8f9 calc(var(--move-progress, 0) * 1%), rgba(255, 255, 255, .18) 0);
+    }
+
+    .meditation-move-ring[hidden] { display: none; }
+
+    .meditation-move-ring::after {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 50%;
+        background: #0f172a;
+    }
+
+    .meditation-move-ring span {
+        position: relative;
+        z-index: 1;
+        color: #cffafe;
+        font-size: .68rem;
+        font-weight: 900;
+    }
+
+    .meditation-posture-figure {
+        width: 100%;
+        height: 132px;
+        margin: 6px 0 4px;
+    }
+
+    .meditation-posture-figure svg {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        fill: none;
+        stroke: #e0f2fe;
+        stroke-width: 2.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .meditation-posture-figure .mv-head { fill: rgba(103, 232, 249, .22); }
+    .meditation-posture-figure .mv-prop { stroke: rgba(255, 255, 255, .3); stroke-width: 1.8; }
+    .meditation-posture-figure .mv-ground { stroke: rgba(255, 255, 255, .26); stroke-width: 1.6; stroke-dasharray: 3 5; }
+
+    .meditation-posture-figure .mv-body {
+        transform-origin: 50% 86%;
+        animation: mvBreathe 7s ease-in-out infinite;
+    }
+
+    @keyframes mvBreathe {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-2.5px) scale(1.02); }
+    }
+
+    .meditation-posture-figure.motion-tilt .mv-body { animation: mvTilt 6s ease-in-out infinite; }
+    @keyframes mvTilt {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-8deg); }
+        75% { transform: rotate(8deg); }
+    }
+
+    .meditation-posture-figure.motion-shrug .mv-body { animation: mvShrug 4.4s ease-in-out infinite; }
+    @keyframes mvShrug {
+        0%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-7px); }
+        55% { transform: translateY(1px); }
+    }
+
+    .meditation-posture-figure.motion-twist .mv-body { animation: mvTwist 6.4s ease-in-out infinite; }
+    @keyframes mvTwist {
+        0%, 100% { transform: scaleX(1) rotate(0deg); }
+        30% { transform: scaleX(.82) rotate(5deg); }
+        70% { transform: scaleX(.82) rotate(-5deg); }
+    }
+
+    .meditation-posture-figure.motion-sway .mv-body { animation: mvSway 5.2s ease-in-out infinite; }
+    @keyframes mvSway {
+        0%, 100% { transform: translateX(0) rotate(0deg); }
+        30% { transform: translateX(-5px) rotate(-3deg); }
+        70% { transform: translateX(5px) rotate(3deg); }
+    }
+
+    .meditation-posture-figure.motion-open .mv-body { animation: mvOpen 6.6s ease-in-out infinite; }
+    @keyframes mvOpen {
+        0%, 100% { transform: scale(1) translateY(0); }
+        45% { transform: scale(1.07) translateY(-4px); }
+    }
+
+    .meditation-posture-name { font-size: .84rem; font-weight: 900; }
+    .meditation-posture-guide { margin-top: 3px; color: #dbeafe; font-size: .68rem; font-weight: 700; line-height: 1.45; }
+
+    .meditation-posture-steps {
+        margin: 8px 0 0;
+        padding-left: 15px;
+        color: #cbd5e1;
+        font-size: .64rem;
+        font-weight: 700;
+        line-height: 1.55;
+    }
+
+    .meditation-posture-steps li + li { margin-top: 2px; }
+
+    .meditation-posture-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+    }
+
+    .meditation-mini-btn {
+        flex: 1;
+        min-height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 5px 6px;
+        border: 1px solid rgba(255, 255, 255, .28);
+        border-radius: 8px;
+        color: #f8fafc;
+        background: rgba(15, 23, 42, .62);
+        cursor: pointer;
+        font: inherit;
+        font-size: .66rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .meditation-mini-btn:hover { border-color: #67e8f9; color: #cffafe; background: rgba(8, 145, 178, .3); }
+    .meditation-mini-btn.is-active { border-color: #67e8f9; color: #cffafe; background: rgba(8, 145, 178, .34); }
+
+    @media (max-width: 980px) {
+        .meditation-posture { width: 186px; padding: 11px; }
+        .meditation-posture-figure { height: 112px; }
+    }
+
+    @media (max-width: 760px) {
+        .meditation-posture { display: none; }
+        .meditation-quote { top: 10px; width: calc(100% - 20px); padding: 9px 12px; }
+        .meditation-quote-text { font-size: .84rem; }
     }
 
     @media (max-width: 760px) {
@@ -1385,6 +1848,11 @@
         .meditation-caption { bottom:122px; width:calc(100% - 20px); padding:8px 11px; }
         .meditation-scene-name { font-size:.9rem; }
         .meditation-scene-description { font-size:.7rem; }
+        .meditation-center { min-width:min(292px, calc(100% - 26px)); padding:18px 16px; gap:7px; }
+        .meditation-cue { width:min(270px, 78vw); }
+        .breathing-orb { width:72px; height:72px; }
+        .meditation-title { font-size:1.28rem; }
+        .meditation-guide { font-size:.78rem; }
     }
 
     /* =====================================================
@@ -1932,16 +2400,58 @@
             {% endfor %}
 
             <div id="meditationLayer" class="meditation-layer" aria-hidden="true">
-                <img id="meditationScene" class="meditation-scene" alt="명상 풍경">
+                <img id="meditationScene" class="meditation-scene" src="{{ url_for('static', filename='meditation/scenes/meditation-fallback-v2.png') }}" alt="명상 풍경">
                 <div class="meditation-shade"></div>
+                <div class="meditation-glow" aria-hidden="true"></div>
+                <div id="meditationMotes" class="meditation-motes" aria-hidden="true"></div>
+                <svg id="meditationGazePath" class="meditation-gaze-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline id="meditationGazeLine" points="" vector-effect="non-scaling-stroke"></polyline></svg>
+                <div id="meditationFocusDot" class="meditation-focus-dot" aria-hidden="true"></div>
                 <div class="meditation-center">
-                    <div class="breathing-orb"><i class="fa-solid fa-wind"></i></div>
-                    <div class="meditation-title">잠시 쉬어가세요</div>
-                    <div class="meditation-guide">천천히 숨을 들이마시고, 길게 내쉬어 보세요.</div>
+                    <div class="meditation-session-kicker">사진 위에서 하는 호흡 명상</div>
+                    <div id="meditationBreathingOrb" class="breathing-orb is-rest style-lotus">
+                        <span class="breathing-orb-halo" aria-hidden="true"></span>
+                        <span class="breathing-orb-halo is-delay" aria-hidden="true"></span>
+                        <svg class="breathing-orb-lotus" viewBox="0 0 100 100" aria-hidden="true">
+                            <g id="meditationOrbPetals"></g>
+                        </svg>
+                        <i class="fa-solid fa-spa"></i>
+                    </div>
+                    <div id="meditationBreathTitle" class="meditation-title">숨을 고르세요</div>
+                    <div id="meditationBreathGuide" class="meditation-guide">풍경을 바라보며 편안히 시작해 보세요.</div>
+                    <div class="meditation-phase-meta"><span class="meditation-phase-dot"></span><span id="meditationBreathCountdown">준비</span></div>
+                    <div class="meditation-breath-progress" aria-hidden="true"><span id="meditationBreathProgress"></span></div>
+                    <div class="meditation-session-stats">
+                        <span id="meditationProgramChip" class="meditation-program-chip"><i class="fa-solid fa-wind"></i> 이완 호흡 · 4-2-6-2</span>
+                        <span id="meditationSessionStat" class="meditation-session-stat">00:00 명상 · 호흡 0회</span>
+                    </div>
+                    <div id="meditationCue" class="meditation-cue" aria-live="polite"></div>
                 </div>
                 <div class="meditation-caption">
-                    <div id="meditationSceneName" class="meditation-scene-name"></div>
+                    <div class="meditation-caption-head">
+                        <div id="meditationSceneName" class="meditation-scene-name"></div>
+                        <span id="meditationSceneCount" class="meditation-scene-count">풍경 라이브러리 준비 중</span>
+                    </div>
                     <div id="meditationSceneDescription" class="meditation-scene-description"></div>
+                    <a id="meditationCredit" class="meditation-credit" href="#" target="_blank" rel="noopener noreferrer" hidden>Wikimedia Commons에서 원본 보기</a>
+                </div>
+                <div id="meditationQuote" class="meditation-quote" aria-live="polite">
+                    <div id="meditationQuoteKicker" class="meditation-quote-kicker">사색의 글귀</div>
+                    <div id="meditationQuoteText" class="meditation-quote-text"></div>
+                    <div id="meditationQuoteAuthor" class="meditation-quote-author"></div>
+                </div>
+                <div id="meditationPosture" class="meditation-posture" aria-live="polite">
+                    <div class="meditation-posture-head">
+                        <span class="meditation-posture-kicker"><i class="fa-solid fa-person-praying"></i> 명상 자세</span>
+                        <div id="meditationMoveRing" class="meditation-move-ring" hidden><span id="meditationMoveCount">0</span></div>
+                    </div>
+                    <div id="meditationPostureFigure" class="meditation-posture-figure"></div>
+                    <div id="meditationPostureName" class="meditation-posture-name"></div>
+                    <div id="meditationPostureGuide" class="meditation-posture-guide"></div>
+                    <ul id="meditationPostureSteps" class="meditation-posture-steps"></ul>
+                    <div class="meditation-posture-actions">
+                        <button type="button" class="meditation-mini-btn" onclick="showNextMeditationPosture()"><i class="fa-solid fa-rotate"></i> 다른 자세</button>
+                        <button type="button" id="meditationMoveBtn" class="meditation-mini-btn" onclick="toggleMeditationBodyRoutine()"><i class="fa-solid fa-person-walking"></i> 몸 풀기</button>
+                    </div>
                 </div>
                 <div id="meditationSoundStatus" class="meditation-sound-status" aria-live="polite"></div>
                 <div class="meditation-sound-panel">
@@ -1953,7 +2463,8 @@
                     <span id="meditationAutoSound" class="meditation-auto-sound">장면 맞춤 배경음</span>
                 </div>
                 <div id="meditationGenrePanel" class="meditation-genre-panel" hidden>
-                    <div class="meditation-genre-head"><strong><i class="fa-solid fa-layer-group"></i> 감상 장르 선택</strong><button type="button" class="meditation-genre-close" onclick="toggleMeditationGenrePanel(false)" aria-label="장르 선택 닫기"><i class="fa-solid fa-xmark"></i></button></div>
+                    <div class="meditation-genre-head"><strong><i class="fa-solid fa-layer-group"></i> 감상 장르 선택 <small id="meditationLibraryCount">고해상도 풍경 라이브러리</small></strong><button type="button" class="meditation-genre-close" onclick="toggleMeditationGenrePanel(false)" aria-label="장르 선택 닫기"><i class="fa-solid fa-xmark"></i></button></div>
+                    <button type="button" class="meditation-genre-option is-all" onclick="selectMeditationAllThemes()"><i class="fa-solid fa-shuffle"></i> 전체 테마 무작위 여행<small>지역·자연·명화를 모두 랜덤 순환</small></button>
                     <div class="meditation-genre-group">
                         <div class="meditation-genre-title"><i class="fa-solid fa-earth-asia"></i> 세계 풍경</div>
                         <div class="meditation-genre-grid" data-meditation-options="places"></div>
@@ -1969,8 +2480,6 @@
                 </div>
                 <div class="meditation-controls">
                     <button type="button" class="meditation-control-btn" onclick="toggleMeditationGenrePanel()"><i class="fa-solid fa-layer-group"></i> 장르 선택</button>
-                    <button type="button" class="meditation-control-btn" onclick="showNextMeditationScene()"><i class="fa-solid fa-shuffle"></i> 다른 풍경</button>
-                    <button type="button" class="meditation-control-btn" onclick="showNextMeditationSound()"><i class="fa-solid fa-music"></i> 다른 배경음</button>
                     <button type="button" id="meditationFullscreenBtn" class="meditation-control-btn" onclick="toggleMeditationFullscreen()" aria-pressed="false" title="명상 화면 전체화면 전환"><i class="fa-solid fa-expand"></i> 전체화면</button>
                     <button type="button" class="meditation-control-btn" onclick="stopMeditation()"><i class="fa-solid fa-xmark"></i> 명상 종료</button>
                 </div>
@@ -2072,13 +2581,20 @@
     let offsetX = 0;
     let offsetY = 0;
     let deadlineTargetId = null;
+
     let passwordTargetId = null;
     let unlockTargetId = null;
     let meditationTimer = null;
     let meditationSceneIndex = -1;
     let meditationSoundStatusTimer = null;
     let meditationIntroTimer = null;
-    let meditationGenre = 'places';
+    let meditationBreathPhaseTimer = null;
+    let meditationBreathClockTimer = null;
+    let meditationBreathPhaseStartedAt = 0;
+    let meditationFocusTimer = null;
+    let meditationCueIndex = -1;
+    let meditationGenre = 'all';
+    let meditationThemeFilter = 'all';
     let meditationMuted = false;
     let meditationCurrentSoundKey = '';
     let meditationAudioContext = null;
@@ -2091,6 +2607,234 @@
     let meditationCurrentSceneId = '';
     let meditationSoundRotation = 0;
     let meditationSoundGeneration = 0;
+    let meditationSessionSeed = '';
+    let meditationLibraryLoading = false;
+    let meditationProgramId = 'relax';
+    let meditationCycleCount = 0;
+    let meditationSessionStartedAt = 0;
+    let meditationSessionTimer = null;
+    let meditationQuoteTimer = null;
+    let meditationQuoteFadeTimer = null;
+    let meditationQuoteIndex = -1;
+    let meditationPostureIndex = -1;
+    let meditationPostureTimer = null;
+    let meditationOrbStyleIndex = 0;
+    let meditationMoveTimer = null;
+    let meditationMoveTickTimer = null;
+    let meditationMoveIndex = -1;
+    let meditationMoveActive = false;
+    // 명상이 실제로 켜져 있는 동안에만 소리를 낸다. 종료 뒤 늦게 도착한 콜백을 막는 기준값.
+    let meditationActive = false;
+    const meditationRemoteLoadedThemes = new Set();
+    const meditationRemoteLoadingThemes = new Map();
+    const MEDITATION_REMOTE_THEME_LIMIT = 36;
+    // 호흡법: 들숨-멈춤-날숨-쉼 리듬을 통째로 바꿔 끼울 수 있게 프로그램 단위로 정의한다.
+    const MEDITATION_BREATH_PROGRAMS = [
+        {id:'relax', label:'이완 호흡', pattern:'4-2-6-2', desc:'가장 편안한 기본 리듬', phases:[
+            {key:'inhale', title:'천천히 들이마세요', guide:'풍경의 빛과 공기를 가슴 안으로 부드럽게 받아들입니다.', duration:4},
+            {key:'hold', title:'잠시 머무르세요', guide:'사진 속 가장 편안한 지점에 시선을 가볍게 두세요.', duration:2},
+            {key:'exhale', title:'길게 내쉬세요', guide:'어깨와 턱의 힘이 풍경 속으로 천천히 풀려납니다.', duration:6},
+            {key:'rest', title:'고요를 느껴보세요', guide:'다음 호흡이 자연스럽게 찾아올 때까지 잠시 쉽니다.', duration:2}
+        ]},
+        {id:'box', label:'박스 호흡', pattern:'4-4-4-4', desc:'긴장을 가라앉히는 사각 호흡', phases:[
+            {key:'inhale', title:'네 박자로 들이마세요', guide:'사각형의 한 변을 따라 올라가듯 고르게 들이마십니다.', duration:4},
+            {key:'hold', title:'네 박자로 멈춥니다', guide:'가슴을 억지로 조이지 말고 그대로 머무릅니다.', duration:4},
+            {key:'exhale', title:'네 박자로 내쉬세요', guide:'같은 속도로 천천히 공기를 흘려보냅니다.', duration:4},
+            {key:'rest', title:'빈 채로 네 박자', guide:'숨이 비어 있는 고요함을 그대로 느껴 봅니다.', duration:4}
+        ]},
+        {id:'sleep', label:'4-7-8 호흡', pattern:'4-7-8', desc:'잠들기 전 신경을 진정', phases:[
+            {key:'inhale', title:'코로 4초 들이마세요', guide:'배가 먼저 부풀도록 부드럽게 들이마십니다.', duration:4},
+            {key:'hold', title:'7초 머무르세요', guide:'어깨는 내리고 턱의 힘은 풀어 둡니다.', duration:7},
+            {key:'exhale', title:'입으로 8초 내쉬세요', guide:'가느다란 실처럼 길고 얇게 내쉽니다.', duration:8},
+            {key:'rest', title:'한 박자 쉬어 갑니다', guide:'다음 들숨이 저절로 찾아오도록 기다립니다.', duration:1}
+        ]},
+        {id:'coherent', label:'코히런스 호흡', pattern:'5-5', desc:'심박과 호흡을 나란히', phases:[
+            {key:'inhale', title:'다섯을 세며 들이마세요', guide:'가슴 한가운데가 천천히 열리는 것을 느낍니다.', duration:5},
+            {key:'exhale', title:'다섯을 세며 내쉬세요', guide:'같은 길이로 내쉬며 심장 박동을 고릅니다.', duration:5}
+        ]},
+        {id:'wave', label:'파도 호흡', pattern:'6-2-8', desc:'긴 날숨으로 깊이 내려놓기', phases:[
+            {key:'inhale', title:'파도가 밀려오듯 들이마세요', guide:'발끝에서 정수리까지 숨이 차오른다고 상상합니다.', duration:6},
+            {key:'hold', title:'파도의 정점에서 멈춤', guide:'가장 높은 지점에서 잠시 고요히 머무릅니다.', duration:2},
+            {key:'exhale', title:'파도가 빠져나가듯 내쉬세요', guide:'몸의 무게가 모래 위로 스며든다고 느껴 봅니다.', duration:8}
+        ]},
+        {id:'vital', label:'활력 호흡', pattern:'3-1-3-1', desc:'무거운 오후에 생기를', phases:[
+            {key:'inhale', title:'짧고 시원하게 들이마세요', guide:'가슴 위쪽까지 맑은 공기를 채웁니다.', duration:3},
+            {key:'hold', title:'하나만 세고 멈춤', guide:'몸이 깨어나는 감각을 알아차립니다.', duration:1},
+            {key:'exhale', title:'가볍게 내쉬세요', guide:'묵은 피로를 밖으로 밀어냅니다.', duration:3},
+            {key:'rest', title:'한 박자 정돈', guide:'어깨를 펴고 다음 호흡을 준비합니다.', duration:1}
+        ]},
+        {id:'ground', label:'대지 호흡', pattern:'5-3-7-2', desc:'발바닥으로 무게를 내려놓기', phases:[
+            {key:'inhale', title:'땅에서 숨을 끌어올리세요', guide:'발바닥에서 척추를 따라 숨이 올라옵니다.', duration:5},
+            {key:'hold', title:'가슴에 머무르게 두세요', guide:'들어온 숨이 가슴 가운데 잠시 머뭅니다.', duration:3},
+            {key:'exhale', title:'무게를 땅으로 보내세요', guide:'긴장이 다리를 타고 바닥으로 빠져나갑니다.', duration:7},
+            {key:'rest', title:'대지에 기대어 쉬세요', guide:'몸을 지탱하는 바닥의 감각을 느껴 봅니다.', duration:2}
+        ]}
+    ];
+    const MEDITATION_BREATH_PHASES = MEDITATION_BREATH_PROGRAMS[0].phases;
+
+    // 시선 움직임: 빛 점이 그리는 궤적을 패턴으로 정의하고 화면에 선으로도 보여준다.
+    const MEDITATION_GAZE_PATTERNS = {
+        infinity: {
+            step: 340,
+            easing: 'linear',
+            points: Array.from({length: 26}, (unused, index) => {
+                const angle = (index / 26) * Math.PI * 2;
+                const denominator = 1 + Math.sin(angle) * Math.sin(angle);
+                return [50 + (27 * Math.cos(angle)) / denominator, 47 + (17 * Math.sin(angle) * Math.cos(angle)) / denominator];
+            })
+        },
+        circle: {
+            step: 380,
+            easing: 'linear',
+            points: Array.from({length: 20}, (unused, index) => {
+                const angle = (index / 20) * Math.PI * 2;
+                return [50 + 22 * Math.cos(angle), 47 + 15 * Math.sin(angle)];
+            })
+        },
+        spiral: {
+            step: 360,
+            easing: 'linear',
+            points: Array.from({length: 26}, (unused, index) => {
+                const angle = (index / 26) * Math.PI * 5;
+                const radius = 4 + index * 0.85;
+                return [50 + radius * Math.cos(angle), 47 + radius * 0.68 * Math.sin(angle)];
+            })
+        },
+        wave: {
+            step: 420,
+            easing: 'linear',
+            points: Array.from({length: 18}, (unused, index) => [22 + index * 3.4, 47 + 9 * Math.sin((index / 18) * Math.PI * 3)])
+        },
+        horizon: {step: 2200, easing: 'cubic-bezier(.36,0,.18,1)', points: [[24, 50], [50, 50], [76, 50], [50, 50]]},
+        depth: {step: 2400, easing: 'cubic-bezier(.36,0,.18,1)', points: [[50, 72], [50, 54], [50, 33], [50, 18]]},
+        square: {step: 2600, easing: 'cubic-bezier(.36,0,.18,1)', points: [[30, 32], [70, 32], [70, 62], [30, 62]]},
+        diagonal: {step: 2000, easing: 'cubic-bezier(.36,0,.18,1)', points: [[30, 30], [70, 64], [50, 47], [70, 30], [30, 64]]}
+    };
+
+    // 마음챙김 안내: 시선 · 몸 · 마음을 번갈아 짚어 준다.
+    const MEDITATION_MINDFUL_CUES = [
+        {kind:'gaze', icon:'fa-infinity', title:'무한대 시선 산책', text:'빛 점이 그리는 ∞ 궤적을 눈으로만 천천히 따라가 보세요.', gaze:'infinity'},
+        {kind:'body', icon:'fa-person', title:'자세 다시 세우기', text:'정수리가 하늘에 매달린 듯 등을 길게 펴 보세요.', posture:'sit-cross', motion:'breathe'},
+        {kind:'mind', icon:'fa-cloud', title:'생각 흘려보내기', text:'떠오르는 생각은 붙잡지 말고 구름처럼 지나가게 두세요.'},
+        {kind:'gaze', icon:'fa-circle-notch', title:'원을 그리는 시선', text:'빛 점을 따라 눈동자로 큰 원을 부드럽게 그려 보세요.', gaze:'circle'},
+        {kind:'body', icon:'fa-arrows-up-down', title:'어깨 내려놓기', text:'들이마실 때 어깨를 살짝 올리고, 내쉴 때 툭 내려놓으세요.', posture:'sit-cross', motion:'shrug'},
+        {kind:'mind', icon:'fa-heart', title:'지금 여기 머무르기', text:'지금 들리는 소리 하나와 몸의 감각 하나를 알아차려 보세요.'},
+        {kind:'gaze', icon:'fa-mountain-sun', title:'풍경의 깊이 보기', text:'가까운 곳, 먼 곳, 하늘 순서로 시선을 천천히 옮겨 보세요.', gaze:'depth'},
+        {kind:'body', icon:'fa-head-side-cough-slash', title:'목 옆선 늘이기', text:'내쉬며 귀를 어깨 쪽으로 천천히 기울여 보세요.', posture:'sit-cross', motion:'tilt'},
+        {kind:'mind', icon:'fa-seedling', title:'작은 감사 찾기', text:'오늘 고마웠던 작은 순간 하나를 조용히 떠올려 보세요.'},
+        {kind:'gaze', icon:'fa-vector-square', title:'사각 시선 호흡', text:'네 모서리를 따라 한 변마다 한 호흡씩 시선을 옮겨 보세요.', gaze:'square'},
+        {kind:'body', icon:'fa-hand', title:'손의 감각 느끼기', text:'두 손을 무릎 위에 올리고 손바닥의 온도를 느껴 보세요.', posture:'hands', motion:'breathe'},
+        {kind:'mind', icon:'fa-water', title:'감정에 이름 붙이기', text:'지금의 감정을 한 단어로 조용히 불러 주고 그대로 둡니다.'},
+        {kind:'gaze', icon:'fa-water', title:'물결 따라가기', text:'좌우로 흐르는 물결선을 시선으로 천천히 따라가 보세요.', gaze:'wave'},
+        {kind:'body', icon:'fa-arrows-left-right', title:'척추 비틀기', text:'내쉬며 상체를 한쪽으로 돌리고 시선은 어깨 너머로 보냅니다.', posture:'kneel', motion:'twist'},
+        {kind:'mind', icon:'fa-bell', title:'소리로 돌아오기', text:'가장 멀리서 들리는 소리 하나에 마음을 얹어 보세요.'},
+        {kind:'gaze', icon:'fa-arrows-left-right', title:'넓게 바라보기', text:'초점을 풀고 화면 전체를 한 번에 감싸듯 바라보세요.', gaze:'horizon'},
+        {kind:'body', icon:'fa-face-smile', title:'얼굴의 힘 풀기', text:'미간, 눈가, 턱의 힘이 차례로 풀리는 것을 느껴 보세요.', posture:'sit-lotus', motion:'breathe'},
+        {kind:'mind', icon:'fa-hourglass-half', title:'서두름 내려놓기', text:'다음에 할 일을 잠시 옆에 내려두고 이 순간만 남겨 둡니다.'},
+        {kind:'gaze', icon:'fa-spinner', title:'나선으로 넓히기', text:'가운데에서 밖으로 퍼지는 나선을 눈으로 따라가 보세요.', gaze:'spiral'},
+        {kind:'body', icon:'fa-shoe-prints', title:'발바닥 알아차리기', text:'바닥에 닿은 발의 무게와 온도를 천천히 느껴 보세요.', posture:'standing', motion:'sway'},
+        {kind:'mind', icon:'fa-moon', title:'몸을 스캔하기', text:'정수리에서 발끝까지 빛이 훑고 지나간다고 상상해 보세요.'},
+        {kind:'gaze', icon:'fa-arrows-turn-right', title:'대각선 풀기', text:'대각선을 따라 눈의 피로를 천천히 풀어 줍니다.', gaze:'diagonal'},
+        {kind:'body', icon:'fa-hands-praying', title:'가슴 열기', text:'들이마시며 가슴을 활짝 열고, 내쉬며 부드럽게 닫습니다.', posture:'hands', motion:'open'},
+        {kind:'mind', icon:'fa-feather-pointed', title:'한 문장만 남기기', text:'지금 마음에 남기고 싶은 한 문장을 조용히 떠올려 보세요.'}
+    ];
+    const MEDITATION_QUOTE_KICKERS = {mind:'마음을 다스리는 글귀', thought:'사색의 글귀', breath:'호흡과 몸의 글귀'};
+
+    // 사색 · 마음 다스리기 글귀 (고전 경구와 새담 명상노트)
+    const MEDITATION_QUOTES = [
+        {kind:'mind', text:'마음이 모든 것에 앞선다. 마음이 근본이고, 모든 것은 마음이 지어낸다.', author:'법구경'},
+        {kind:'mind', text:'지나간 일을 좇지 말고, 오지 않은 일을 미리 걱정하지 말라.', author:'초기 불교 경구'},
+        {kind:'mind', text:'남을 아는 사람은 지혜롭고, 자신을 아는 사람은 밝다.', author:'노자 도덕경'},
+        {kind:'mind', text:'가장 부드러운 것이 가장 단단한 것을 이긴다.', author:'노자 도덕경'},
+        {kind:'thought', text:'흐린 물도 가만히 두면 저절로 맑아진다.', author:'노자 도덕경'},
+        {kind:'thought', text:'자연은 서두르지 않지만 모든 것을 이룬다.', author:'노자 도덕경'},
+        {kind:'mind', text:'마음이 고요하면 온 세상이 고요하다.', author:'장자'},
+        {kind:'mind', text:'하루에 세 번 나 자신을 돌아본다.', author:'논어'},
+        {kind:'mind', text:'노여움을 남에게 옮기지 않는다.', author:'논어'},
+        {kind:'mind', text:'우리는 일어난 일이 아니라, 그 일에 대한 생각 때문에 흔들린다.', author:'에픽테토스'},
+        {kind:'mind', text:'바꿀 수 있는 것과 없는 것을 나누는 데서 평온이 시작된다.', author:'에픽테토스'},
+        {kind:'thought', text:'오늘 하루를 잘 사는 것, 그것으로 충분하다.', author:'마르쿠스 아우렐리우스'},
+        {kind:'mind', text:'네 마음속으로 물러나라. 그보다 고요한 안식처는 없다.', author:'마르쿠스 아우렐리우스 『명상록』'},
+        {kind:'mind', text:'우리는 현실보다 상상 속에서 더 자주 괴로워한다.', author:'세네카'},
+        {kind:'thought', text:'서두르는 사람에게는 언제나 시간이 모자란다.', author:'세네카'},
+        {kind:'thought', text:'단순하게, 더 단순하게.', author:'헨리 데이비드 소로 『월든』'},
+        {kind:'thought', text:'숲으로 간 것은 삶의 본질만을 마주하기 위해서였다.', author:'헨리 데이비드 소로 『월든』'},
+        {kind:'thought', text:'고요히 앉아 있으면 봄이 오고 풀은 저절로 자란다.', author:'선가의 시구'},
+        {kind:'thought', text:'산은 산이고, 물은 물이다.', author:'선가의 화두'},
+        {kind:'thought', text:'강물은 서두르지 않지만 끝내 바다에 이른다.', author:'옛 잠언'},
+        {kind:'thought', text:'침묵은 비어 있는 것이 아니라 가득 차 있는 것이다.', author:'옛 잠언'},
+        {kind:'mind', text:'흔들리지 않는 사람은 없다. 다만 흔들리며 중심으로 돌아올 뿐이다.', author:'새담 명상노트'},
+        {kind:'mind', text:'급할수록 일보다 호흡을 먼저 챙긴다.', author:'새담 명상노트'},
+        {kind:'mind', text:'내려놓는다는 것은 포기가 아니라 손의 힘을 푸는 일이다.', author:'새담 명상노트'},
+        {kind:'thought', text:'한 걸음의 고요가 하루의 방향을 바꾼다.', author:'새담 명상노트'},
+        {kind:'thought', text:'길을 잃었다고 느낄 때, 그 자리에 멈춰 서는 것도 길이다.', author:'새담 명상노트'},
+        {kind:'thought', text:'떨어지는 잎을 붙잡지 않으면 가을은 아름답기만 하다.', author:'새담 명상노트'},
+        {kind:'thought', text:'별을 오래 바라보면 마음의 지도가 넓어진다.', author:'새담 명상노트'},
+        {kind:'thought', text:'완전한 고요는 없다. 다만 소리와 함께 있는 법을 배울 뿐이다.', author:'새담 명상노트'},
+        {kind:'breath', text:'들숨은 세상을 받아들이고, 날숨은 나를 내려놓는다.', author:'새담 호흡노트'},
+        {kind:'breath', text:'호흡은 몸과 마음을 잇는 다리다.', author:'요가 전통 경구'},
+        {kind:'breath', text:'자세가 무너지면 호흡이 흔들리고, 호흡이 흔들리면 마음이 흔들린다.', author:'새담 호흡노트'},
+        {kind:'breath', text:'숨을 세는 동안에는 과거도 미래도 없다.', author:'새담 호흡노트'},
+        {kind:'breath', text:'날숨을 길게 하면 몸은 스스로 안전하다고 판단한다.', author:'새담 호흡노트'},
+        {kind:'breath', text:'어깨의 힘을 빼는 것만으로도 호흡은 두 배 깊어진다.', author:'새담 호흡노트'},
+        {kind:'mind', text:'오늘의 나는 어제의 생각이 데려온 자리다.', author:'법구경'}
+    ];
+
+    // 명상하는 몸자세: 선으로 그린 자세 그림과 짧은 체크포인트
+    const MEDITATION_POSTURES = [
+        {id:'sit-cross', name:'평좌 · 편안한 책상다리', guide:'가장 기본이 되는 앉은 자세입니다. 골반을 조금 높이면 허리가 편해집니다.',
+            steps:['방석 앞쪽에 앉아 무릎을 골반보다 낮게', '허리는 세우고 어깨는 뒤로 툭', '손은 무릎 위, 손바닥은 위 또는 아래'],
+            figure:'<circle class="mv-head" cx="50" cy="28" r="11"></circle><path d="M50 39 L50 72"></path><path d="M50 49 C38 54 32 64 36 73"></path><path d="M50 49 C62 54 68 64 64 73"></path><path d="M50 72 C28 75 20 98 40 98 L60 98 C80 98 72 75 50 72"></path>'},
+        {id:'sit-lotus', name:'반가부좌', guide:'한쪽 발등을 반대쪽 허벅지에 올려 좌우 균형을 잡는 자세입니다.',
+            steps:['오른발을 왼쪽 허벅지 위로', '무릎이 뜨면 방석을 더 높이기', '10분마다 좌우를 바꿔 주기'],
+            figure:'<circle class="mv-head" cx="50" cy="26" r="11"></circle><path d="M50 37 L50 70"></path><path d="M50 47 C37 52 31 63 35 72"></path><path d="M50 47 C63 52 69 63 65 72"></path><path d="M50 70 C26 74 22 98 44 98"></path><path d="M50 70 C74 74 78 92 58 90"></path><circle cx="58" cy="88" r="4.5"></circle>'},
+        {id:'kneel', name:'정좌 · 무릎 꿇기', guide:'허리를 곧게 세우기 쉬운 자세입니다. 발목이 불편하면 방석을 끼워 주세요.',
+            steps:['무릎을 어깨너비로, 엄지발가락은 포개기', '엉덩이와 발뒤꿈치 사이에 방석', '턱은 살짝 당기고 시선은 1.5m 앞'],
+            figure:'<circle class="mv-head" cx="50" cy="26" r="11"></circle><path d="M50 37 L50 70"></path><path d="M50 48 C38 54 34 62 36 70"></path><path d="M50 48 C62 54 66 62 64 70"></path><path d="M50 70 C34 72 28 90 34 98 L66 98 C72 90 66 72 50 70"></path>'},
+        {id:'chair', name:'의자 명상', guide:'사무실에서 가장 실용적인 자세입니다. 등받이에서 주먹 하나만큼 떨어져 앉습니다.',
+            steps:['두 발바닥을 바닥에 완전히 붙이기', '무릎은 90도, 손은 허벅지 위', '등받이에 기대지 말고 스스로 지탱'],
+            figure:'<path class="mv-prop" d="M36 74 L36 104 M36 74 L36 44 M36 74 L76 74 M76 74 L76 104"></path><circle class="mv-head" cx="48" cy="26" r="10"></circle><path d="M48 36 L48 72"></path><path d="M48 46 L38 64"></path><path d="M48 46 L60 66"></path><path d="M48 72 L70 72"></path><path d="M70 72 L70 100"></path><path d="M62 100 L78 100"></path>'},
+        {id:'standing', name:'입식 명상 · 산 자세', guide:'서서 하는 명상입니다. 발바닥 세 지점으로 무게를 고르게 나눕니다.',
+            steps:['발은 골반너비, 무릎은 아주 살짝만 굽히기', '꼬리뼈는 아래로, 정수리는 위로', '팔은 자연스럽게 몸 옆에'],
+            figure:'<circle class="mv-head" cx="50" cy="22" r="10"></circle><path d="M50 32 L50 68"></path><path d="M50 40 L38 62"></path><path d="M50 40 L62 62"></path><path d="M50 68 L43 104"></path><path d="M50 68 L57 104"></path>'},
+        {id:'walking', name:'걷기 명상', guide:'세 걸음에 들숨, 세 걸음에 날숨. 발바닥의 감각을 따라 걷습니다.',
+            steps:['평소보다 절반 속도로 천천히', '뒤꿈치 → 발바닥 → 발가락 순서로', '시선은 3m 앞 바닥에 부드럽게'],
+            figure:'<circle class="mv-head" cx="46" cy="22" r="10"></circle><path d="M46 32 L48 66"></path><path d="M46 40 L32 54"></path><path d="M46 40 L62 50"></path><path d="M48 66 L32 100"></path><path d="M48 66 L66 96"></path><path d="M26 100 L34 100"></path><path d="M66 96 L74 100"></path>'},
+        {id:'lying', name:'누워서 바디스캔', guide:'몸의 긴장을 가장 잘 알아차릴 수 있는 자세입니다. 졸리면 무릎을 세워 주세요.',
+            steps:['팔은 몸에서 조금 떨어뜨려 손바닥은 위로', '발끝은 자연스럽게 바깥으로', '정수리부터 발끝까지 천천히 훑어보기'],
+            figure:'<circle class="mv-head" cx="20" cy="88" r="10"></circle><path d="M30 92 L64 92"></path><path d="M64 92 L86 98"></path><path d="M42 94 L54 102"></path><path d="M30 84 L44 84"></path>'},
+        {id:'hands', name:'합장 · 감사 호흡', guide:'가슴 앞에서 두 손을 모아 마음의 초점을 한곳으로 모읍니다.',
+            steps:['손바닥은 가볍게, 엄지는 가슴뼈에', '팔꿈치는 힘을 빼고 아래로', '들숨에 가슴을 열고 날숨에 감사 한 가지'],
+            figure:'<circle class="mv-head" cx="50" cy="26" r="11"></circle><path d="M50 37 L50 74"></path><path d="M50 74 C28 77 20 100 40 100 L60 100 C80 100 72 77 50 74"></path><path d="M34 66 C40 54 45 48 50 46 C55 48 60 54 66 66"></path><path d="M50 46 L50 58"></path>'}
+    ];
+
+    // 몸 움직임 루틴: 자세 카드에서 순서대로 따라 하는 짧은 스트레칭
+    const MEDITATION_BODY_MOVES = [
+        {name:'목 옆선 늘이기', posture:'sit-cross', motion:'tilt', seconds:24, guide:'내쉬며 오른쪽으로 기울여 15초, 반대쪽도 같은 시간.',
+            steps:['어깨는 그대로 두고 귀만 어깨 쪽으로', '통증이 아니라 시원한 정도까지만']},
+        {name:'어깨 으쓱 내려놓기', posture:'sit-cross', motion:'shrug', seconds:22, guide:'들이마시며 어깨를 귀까지, 내쉬며 툭 떨어뜨립니다.',
+            steps:['5회 반복하며 매번 더 깊이 내려놓기', '떨어뜨린 뒤의 무게감을 느껴 보기']},
+        {name:'척추 비틀기', posture:'kneel', motion:'twist', seconds:26, guide:'내쉬며 상체를 한쪽으로 돌리고 시선은 어깨 너머로.',
+            steps:['골반은 정면에 고정한 채 상체만', '좌우 각각 세 호흡씩 머무르기']},
+        {name:'손목과 손가락 풀기', posture:'hands', motion:'sway', seconds:20, guide:'손목을 한 방향으로 다섯 바퀴, 반대로 다섯 바퀴.',
+            steps:['손가락을 활짝 폈다가 천천히 말아 쥐기', '팔뚝 안쪽이 부드러워지는 감각 느끼기']},
+        {name:'가슴 열기', posture:'standing', motion:'open', seconds:24, guide:'두 손을 뒤로 깍지 끼고 들이마시며 가슴을 활짝 엽니다.',
+            steps:['턱은 들지 말고 가슴만 앞으로', '내쉬며 천천히 풀어 주기']},
+        {name:'전신 이완', posture:'lying', motion:'breathe', seconds:30, guide:'모든 힘을 풀고 호흡이 저절로 오가도록 둡니다.',
+            steps:['발끝부터 정수리까지 힘을 확인하며 놓기', '아무것도 하지 않는 시간을 허락하기']}
+    ];
+
+    // 중앙 명상 아이콘 변주: 호흡 주기가 쌓이면 다음 스타일로 바뀐다.
+    const MEDITATION_ORB_STYLES = [
+        {id:'lotus', icon:'fa-spa', label:'연꽃'},
+        {id:'ripple', icon:'fa-water', label:'물결'},
+        {id:'flame', icon:'fa-fire', label:'촛불'},
+        {id:'moon', icon:'fa-moon', label:'달빛'},
+        {id:'leaf', icon:'fa-leaf', label:'새싹'},
+        {id:'star', icon:'fa-star', label:'별빛'}
+    ];
+    // 슬라이더의 체감 단위를 그대로 두고 명상 배경음 출력만 두 배로 보정한다.
+    const MEDITATION_VOLUME_BOOST = 2;
 
     // 알람 재생 요청 세대값: 정지 후 늦게 완료되는 audio.play()를 무효화합니다.
     let alarmPlayGeneration = 0;
@@ -2123,6 +2867,55 @@
         classicalMinuet: {name: '바흐 · 미뉴에트', type: 'synth'},
         meditation: {name: '명상 음악', type: 'synth'}
     };
+    const meditationSoundProfiles = {
+        ocean: {name:'파도와 해풍', noise:'ocean', base:110, sparkle:660, volumeScale:.58},
+        tide: {name:'밀려오는 잔물결', noise:'ocean', base:82.41, sparkle:493.88, volumeScale:.5},
+        coast: {name:'해안의 갈매기와 바람', noise:'ocean', base:123.47, sparkle:1760, volumeScale:.48},
+        forest: {name:'숲속의 아침', noise:'forest', base:174.61, sparkle:1760, volumeScale:.54},
+        pine: {name:'소나무 사이의 바람', noise:'wind', base:146.83, sparkle:1174.66, volumeScale:.47},
+        bamboo: {name:'대숲의 가벼운 흔들림', noise:'forest', base:220, sparkle:2093, volumeScale:.45},
+        stream: {name:'계곡과 새소리', noise:'stream', base:196, sparkle:1320, volumeScale:.56},
+        waterfall: {name:'폭포 아래의 물안개', noise:'stream', base:98, sparkle:987.77, volumeScale:.6},
+        lake: {name:'호숫가의 잔잔한 물결', noise:'stream', base:130.81, sparkle:587.33, volumeScale:.48},
+        rain: {name:'비와 먼 천둥', noise:'rain', base:130.81, sparkle:880, volumeScale:.52},
+        drizzle: {name:'창문 위의 가는 빗방울', noise:'rain', base:155.56, sparkle:1318.5, volumeScale:.42},
+        storm: {name:'멀리 지나가는 폭풍', noise:'rain', base:65.41, sparkle:659.25, volumeScale:.55},
+        night: {name:'별빛 풀벌레', noise:'night', base:146.83, sparkle:2637, volumeScale:.5},
+        dawn: {name:'새벽의 첫 새소리', noise:'forest', base:246.94, sparkle:2349, volumeScale:.43},
+        dusk: {name:'해 질 녘의 고요', noise:'night', base:116.54, sparkle:1975.53, volumeScale:.42},
+        alpine: {name:'산바람과 울림', noise:'wind', base:164.81, sparkle:987.77, volumeScale:.5},
+        glacier: {name:'빙하 계곡의 맑은 바람', noise:'wind', base:92.5, sparkle:783.99, volumeScale:.44},
+        meadow: {name:'초원을 스치는 바람', noise:'forest', base:196, sparkle:1567.98, volumeScale:.44},
+        city: {name:'멀리서 들리는 도시', noise:'city', base:130.81, sparkle:523.25, volumeScale:.44},
+        lantern: {name:'고요한 골목의 등불', noise:'city', base:174.61, sparkle:698.46, volumeScale:.38},
+        desert: {name:'모래바람과 풍경', noise:'wind', base:110, sparkle:783.99, volumeScale:.48},
+        canyon: {name:'협곡을 지나는 바람', noise:'wind', base:73.42, sparkle:440, volumeScale:.48},
+        snow: {name:'눈 내리는 정적', noise:'snow', base:138.59, sparkle:1046.5, volumeScale:.45},
+        frost: {name:'서리 낀 겨울 아침', noise:'snow', base:103.83, sparkle:1318.5, volumeScale:.39},
+        space: {name:'우주의 심장', noise:'space', base:73.42, sparkle:440, volumeScale:.43},
+        starlight: {name:'별 사이의 미세한 울림', noise:'space', base:55, sparkle:987.77, volumeScale:.36},
+        fire: {name:'모닥불과 숨소리', noise:'fireplace', base:98, sparkle:392, volumeScale:.52},
+        gallery: {name:'미술관의 잔향', noise:'gallery', base:174.61, sparkle:698.46, volumeScale:.42},
+        bell: {name:'먼 절의 은은한 종소리', noise:'gallery', base:196, sparkle:1046.5, volumeScale:.35},
+        breath: {name:'느린 호흡의 드론', noise:'space', base:87.31, sparkle:523.25, volumeScale:.32}
+    };
+
+    function getMeditationSoundDefinition(soundKey) {
+        if (meditationSounds[soundKey]) return meditationSounds[soundKey];
+        const parts = String(soundKey || '').split('|');
+        if (parts[0] !== 'ambient' || !meditationSoundProfiles[parts[1]]) return null;
+        const profile = meditationSoundProfiles[parts[1]];
+        const variation = Math.max(1, Number(parts[2] || 1));
+        return {
+            ...profile,
+            type: 'procedural',
+            profile: parts[1],
+            variation,
+            seed: parts[3] || soundKey,
+            name: `${profile.name} · 장면 변주 ${variation}`
+        };
+    }
+
     const meditationSceneThemes = [
         {id:'korea', genre:'places', label:'한국의 사계', description:'고즈넉한 산사와 한국 산의 사계절 풍경 속에서 천천히 마음을 가라앉혀 보세요.', sounds:['birds','stream','classicalSpring','musicboxLullaby','meditation'], images:[
             ['봄꽃 핀 산사의 아침','{{ url_for('static', filename='meditation/scenes/korea-spring.png') }}'],
@@ -2209,17 +3002,34 @@
             ['르누아르 · 뱃놀이 일행의 점심','https://commons.wikimedia.org/wiki/Special:FilePath/Pierre-Auguste_Renoir_-_Luncheon_of_the_Boating_Party.jpeg?width=2000'],
             ['르누아르 · 피아노 치는 소녀들','https://commons.wikimedia.org/wiki/Special:FilePath/Pierre-Auguste_Renoir_-_Young_Girls_at_the_Piano_-_Google_Art_Project.jpg?width=2000']
         ]},
-        {id:'klimt', genre:'art', label:'클림트', artwork:true, description:'황금빛 장식과 섬세한 문양이 돋보이는 구스타프 클림트의 작품을 감상해 보세요.', sounds:['musicbox','musicboxLullaby','classicalElise','classicalCanon'], images:[
-            ['클림트 · 키스','https://commons.wikimedia.org/wiki/Special:FilePath/Klimt_-_The_Kiss.jpg?width=2000'],
-            ['클림트 · 아델레 블로흐바우어의 초상','https://commons.wikimedia.org/wiki/Special:FilePath/Gustav_Klimt_046.jpg?width=2000'],
-            ['클림트 · 생명의 나무','https://commons.wikimedia.org/wiki/Special:FilePath/Gustav_Klimt_-_The_Tree_of_Life,_Stoclet_Frieze.jpg?width=2000']
-        ]},
         {id:'hokusai', genre:'art', label:'호쿠사이', artwork:true, description:'대담한 구도와 선명한 색으로 자연의 움직임을 담아낸 가쓰시카 호쿠사이의 작품입니다.', sounds:['ocean','musicboxDream','classicalOde','classicalMinuet'], images:[
             ['호쿠사이 · 가나가와 해변의 높은 파도 아래','https://commons.wikimedia.org/wiki/Special:FilePath/The_Great_Wave_off_Kanagawa.png?width=2000'],
             ['호쿠사이 · 개선풍 쾌청','https://commons.wikimedia.org/wiki/Special:FilePath/Red_Fuji_southern_wind_clear_morning.jpg?width=2000'],
             ['호쿠사이 · 스루가국 에지리','https://commons.wikimedia.org/wiki/Special:FilePath/Ejiri_in_Suruga_Province.jpg?width=2000']
-        ]}
+        ]},
+        {id:'norway', genre:'places', label:'노르웨이 피오르', description:'깊은 피오르와 협곡을 흐르는 찬 바람에 호흡을 맡겨보세요.', sounds:['stream','birds','classicalCanon'], images:[]},
+        {id:'iceland', genre:'places', label:'아이슬란드', description:'빙하와 화산, 폭포가 만나는 원시적인 대지의 울림입니다.', sounds:['stream','night','meditation'], images:[]},
+        {id:'patagonia', genre:'places', label:'파타고니아', description:'거친 봉우리와 넓은 호수가 만드는 남미 끝의 고요한 절경입니다.', sounds:['stream','piano','night'], images:[]},
+        {id:'waterfall-photo', genre:'photos', label:'폭포', description:'큰 물줄기가 흘러내리는 소리와 흐름에 복잡한 생각을 내려놓아 보세요.', sounds:['stream','birds','meditation'], images:[]},
+        {id:'desert-photo', genre:'photos', label:'사막', description:'끝없는 모래의 곡선과 부드러운 바람이 마음의 여백을 만듭니다.', sounds:['meditation','musicboxDream','classicalMoonlight'], images:[]},
+        {id:'meadow-photo', genre:'photos', label:'초원', description:'바람에 흔들리는 풀꽃과 넓은 하늘을 바라보며 긴장을 풀어보세요.', sounds:['birds','stream','piano'], images:[]},
+        {id:'cloud-photo', genre:'photos', label:'구름과 하늘', description:'천천히 흐르는 구름처럼 생각도 자연스럽게 흘려보냅니다.', sounds:['meditation','musicbox','piano'], images:[]},
+        {id:'lake-photo', genre:'photos', label:'호수', description:'거울처럼 잔잔한 물결을 바라보며 호흡의 속도를 느려보세요.', sounds:['stream','birds','piano'], images:[]},
+        {id:'rain-photo', genre:'photos', label:'빗소리', description:'창가에 부딪히는 빗방울과 함께 마음의 열을 차분히 식혀보세요.', sounds:['rain','piano','jazzNight'], images:[]},
+        {id:'cherry-photo', genre:'photos', label:'벚꽃', description:'봄바람을 타고 흐르는 벚꽃잎의 가벼운 움직임을 느껴보세요.', sounds:['birds','musicboxDream','classicalSpring'], images:[]}
     ];
+
+    const meditationThemeSoundProfiles = {
+        korea:['stream','pine','dawn','bell'], swiss:['alpine','glacier','lake','meadow'], paris:['city','lantern','dusk','rain'],
+        santorini:['ocean','tide','coast','dawn'], newyork:['city','lantern','rain','dusk'], kyoto:['bamboo','forest','bell','stream'],
+        maldives:['ocean','tide','coast','lake'], norway:['alpine','glacier','waterfall','lake'], iceland:['glacier','waterfall','storm','alpine'],
+        patagonia:['alpine','canyon','meadow','lake'], space:['space','starlight','breath','bell'], aurora:['space','starlight','frost','night'],
+        'forest-photo':['forest','pine','bamboo','dawn'], 'ocean-photo':['ocean','tide','coast','lake'], 'snow-photo':['snow','frost','fire','breath'],
+        'night-photo':['night','dusk','lantern','rain'], 'animal-photo':['forest','meadow','dawn','stream'], 'waterfall-photo':['waterfall','stream','pine','rain'],
+        'desert-photo':['desert','canyon','alpine','breath'], 'meadow-photo':['meadow','forest','dawn','lake'], 'cloud-photo':['alpine','glacier','breath','starlight'],
+        'lake-photo':['lake','stream','tide','dawn'], 'rain-photo':['rain','drizzle','storm','fire'], 'cherry-photo':['forest','bamboo','dawn','bell'],
+        vangogh:['gallery','bell','starlight','breath'], monet:['gallery','lake','stream','bell'], renoir:['gallery','lantern','dusk','bell'], hokusai:['ocean','tide','alpine','bell']
+    };
 
     function getMeditationDateKey() {
         const now = new Date();
@@ -2251,11 +3061,27 @@
         return shuffled;
     }
 
-    function refreshMeditationDailyScenes() {
+    function updateMeditationLibraryCount() {
+        const imageCount = meditationSceneThemes.reduce((total, theme) => total + theme.images.length, 0);
+        const libraryLabel = document.getElementById('meditationLibraryCount');
+        const sceneLabel = document.getElementById('meditationSceneCount');
+        const suffix = meditationLibraryLoading ? ' · 라이브러리 확장 중' : '';
+        if (libraryLabel) libraryLabel.textContent = `사진 ${imageCount.toLocaleString()}장 · 사진마다 14개 사운드스케이프${suffix}`;
+        if (sceneLabel) sceneLabel.textContent = `전체 ${imageCount.toLocaleString()}장`;
+    }
+
+    function refreshMeditationDailyScenes(force = false) {
         const dateKey = getMeditationDateKey();
-        if (meditationDailyKey === dateKey && meditationScenes.length) return;
+        if (!meditationSessionSeed) {
+            const randomValues = new Uint32Array(2);
+            if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(randomValues);
+            else { randomValues[0] = Date.now(); randomValues[1] = Math.floor(Math.random() * 4294967295); }
+            meditationSessionSeed = `${randomValues[0]}-${randomValues[1]}`;
+        }
+        if (!force && meditationDailyKey === dateKey && meditationScenes.length) return;
+        const previousSceneId = meditationCurrentSceneId;
         const expanded = meditationSceneThemes.flatMap(theme => theme.images.map((image, imageIndex) => ({
-            id: `${theme.id}-${imageIndex + 1}`,
+            id: `${theme.id}-${image[4] || imageIndex + 1}`,
             themeId: theme.id,
             genre: theme.genre,
             label: theme.label,
@@ -2263,23 +3089,99 @@
             url: image[1],
             description: image[2] || theme.description,
             sounds: theme.sounds,
+            soundProfile: meditationThemeSoundProfiles[theme.id] || 'forest',
+            sourceUrl: image[3] || '',
             artwork: Boolean(theme.artwork)
         })));
         meditationScenes = ['places', 'photos', 'art'].flatMap(genre =>
-            shuffleMeditationItems(expanded.filter(scene => scene.genre === genre), `${dateKey}:${genre}`)
+            shuffleMeditationItems(expanded.filter(scene => scene.genre === genre), `${dateKey}:${genre}:${meditationSessionSeed}`)
         );
         meditationDailyKey = dateKey;
-        meditationSceneIndex = -1;
+        meditationSceneIndex = previousSceneId ? meditationScenes.findIndex(scene => scene.id === previousSceneId) : -1;
         meditationImageFailureCount = 0;
-        meditationCurrentSceneId = '';
-        meditationSoundRotation = 0;
+        if (meditationSceneIndex < 0) {
+            meditationCurrentSceneId = '';
+            meditationSoundRotation = 0;
+        }
+        updateMeditationLibraryCount();
+    }
+
+    function getMeditationSceneSounds(scene) {
+        if (!scene) return ['meditation'];
+        const profiles = Array.isArray(scene.soundProfile) ? scene.soundProfile : [scene.soundProfile || 'forest'];
+        const procedural = Array.from({length: 12}, (_, index) => {
+            const profile = profiles[index % profiles.length];
+            return `ambient|${profile}|${index + 1}|${getMeditationHash(`${scene.id}:${profile}:${index}`)}`;
+        });
+        const originals = Array.isArray(scene.sounds) ? scene.sounds.slice(0, 2) : [];
+        return [...procedural, ...originals];
     }
 
     function getMeditationSceneSound(scene, offset = 0) {
-        const sounds = scene && Array.isArray(scene.sounds) ? scene.sounds : ['meditation'];
+        const sounds = getMeditationSceneSounds(scene);
         const dailyStart = getMeditationHash(`${meditationDailyKey}:${scene.id}:sound`) % sounds.length;
         const index = (dailyStart + Math.max(0, offset)) % sounds.length;
         return sounds[index];
+    }
+
+    async function fetchMeditationThemeLibrary(themeId) {
+        if (meditationRemoteLoadedThemes.has(themeId)) return 0;
+        if (meditationRemoteLoadingThemes.has(themeId)) return meditationRemoteLoadingThemes.get(themeId);
+        const theme = meditationSceneThemes.find(item => item.id === themeId);
+        // 명화는 검토된 고정 작품만 사용하여 공개 검색 결과에 섞일 수 있는 누드화를 차단한다.
+        if (theme && theme.genre === 'art') {
+            meditationRemoteLoadedThemes.add(themeId);
+            return 0;
+        }
+        const requestPromise = (async () => {
+            try {
+                const response = await fetch(`{{ url_for('memo.meditation_scenes') }}?theme=${encodeURIComponent(themeId)}`, {
+                    headers: {'Accept': 'application/json'},
+                    cache: 'force-cache'
+                });
+                const data = await readJsonResponse(response);
+                if (!theme) return 0;
+                const knownUrls = new Set(theme.images.map(image => image[1]));
+                (data.scenes || []).forEach(scene => {
+                    if (!scene.url || knownUrls.has(scene.url)) return;
+                    knownUrls.add(scene.url);
+                    theme.images.push([
+                        scene.name || theme.label,
+                        scene.url,
+                        theme.description,
+                        scene.source_url || '',
+                        `commons-${scene.id}`
+                    ]);
+                });
+                meditationRemoteLoadedThemes.add(themeId);
+                refreshMeditationDailyScenes(true);
+                renderMeditationGenreOptions();
+                return Number(data.count || 0);
+            } catch (_) {
+                return 0;
+            } finally {
+                meditationRemoteLoadingThemes.delete(themeId);
+            }
+        })();
+        meditationRemoteLoadingThemes.set(themeId, requestPromise);
+        return requestPromise;
+    }
+
+    async function warmMeditationLibrary() {
+        if (meditationLibraryLoading) return;
+        meditationLibraryLoading = true;
+        updateMeditationLibraryCount();
+        // Commons 검색 제한을 존중하면서도 초기 풀은 수백 장을 확보한다.
+        // 나머지 테마는 사용자가 선택할 때 즉시 추가로 불러온다.
+        const priorityThemes = ['korea','swiss','paris','santorini','newyork','norway','iceland','patagonia','forest-photo','ocean-photo'];
+        for (const themeId of priorityThemes) {
+            await fetchMeditationThemeLibrary(themeId);
+            await new Promise(resolve => setTimeout(resolve, 650));
+        }
+        meditationLibraryLoading = false;
+        updateMeditationLibraryCount();
+        renderMeditationGenreOptions();
+        showMeditationSoundStatus(`풍경 ${meditationScenes.length.toLocaleString()}장과 맞춤 사운드를 준비했습니다.`);
     }
 
     function openMemoModal(id) {
@@ -2485,9 +3387,9 @@
     }
 
     function getMeditationSoundVolume(soundKey, baseLevel = getMeditationVolumeLevel()) {
-        const sound = meditationSounds[soundKey];
+        const sound = getMeditationSoundDefinition(soundKey);
         const scale = Number(sound && sound.volumeScale ? sound.volumeScale : 1);
-        return Math.max(0, Math.min(1, baseLevel * scale));
+        return Math.max(0, Math.min(1, baseLevel * scale * MEDITATION_VOLUME_BOOST));
     }
 
     function updateMeditationMuteButton() {
@@ -2501,6 +3403,7 @@
     }
 
     function ensureMeditationAudioContext() {
+        if (!meditationActive) return null;
         if (!meditationAudioContext || meditationAudioContext.state === 'closed') {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
             if (!AudioContextClass) return null;
@@ -2541,6 +3444,77 @@
             try { oscillator.disconnect(); } catch (_) {}
             try { gain.disconnect(); } catch (_) {}
         };
+    }
+
+    function getMeditationSeededRandom(seedText) {
+        let state = getMeditationHash(String(seedText || 'meditation')) || 1;
+        return () => {
+            state ^= state << 13;
+            state ^= state >>> 17;
+            state ^= state << 5;
+            return (state >>> 0) / 4294967296;
+        };
+    }
+
+    function addProceduralAmbience(context, destination, sound) {
+        const random = getMeditationSeededRandom(sound.seed);
+        const length = context.sampleRate * 5;
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const channel = buffer.getChannelData(0);
+        let brown = 0;
+        for (let index = 0; index < length; index++) {
+            const white = random() * 2 - 1;
+            brown = Math.max(-1, Math.min(1, brown * .97 + white * .08));
+            if (['rain','ocean'].includes(sound.noise)) channel[index] = white * .42 + brown * .18;
+            else if (['stream','forest'].includes(sound.noise)) channel[index] = white * .16 + brown * .58;
+            else channel[index] = brown * .72;
+        }
+        const source = context.createBufferSource();
+        const filter = context.createBiquadFilter();
+        const gain = context.createGain();
+        source.buffer = buffer;
+        source.loop = true;
+        filter.type = ['rain','snow'].includes(sound.noise) ? 'highpass' : (sound.noise === 'stream' ? 'bandpass' : 'lowpass');
+        filter.frequency.value = sound.noise === 'rain' ? 1100 : sound.noise === 'stream' ? 1250 : sound.noise === 'space' ? 260 : 760 + random() * 520;
+        filter.Q.value = sound.noise === 'stream' ? .62 : .3;
+        const noiseLevels = {ocean:.105, forest:.035, stream:.09, rain:.075, night:.022, wind:.04, city:.025, snow:.018, space:.024, fireplace:.05, gallery:.012};
+        gain.gain.value = noiseLevels[sound.noise] || .03;
+        source.connect(filter).connect(gain).connect(destination);
+        source.start();
+        meditationSynthNodes.push(source);
+    }
+
+    function scheduleProceduralSoundscape(soundKey, sound) {
+        const context = meditationAudioContext;
+        const destination = meditationSynthGain;
+        if (!context || !destination) return;
+        const random = getMeditationSeededRandom(`${sound.seed}:${Math.floor(context.currentTime / 8)}`);
+        const start = context.currentTime + .08;
+        const base = sound.base * (.88 + random() * .24);
+        const mode = (Number(sound.variation || 1) - 1) % 4;
+        const waveforms = ['sine', 'triangle', 'sine', 'triangle'];
+        const intervals = mode === 0 ? [1, 1.5, 2] : mode === 1 ? [1, 1.25, 1.5] : mode === 2 ? [1, 1.333, 2] : [1, 1.2, 1.8];
+        const pulseSpacing = mode === 0 ? .18 : mode === 1 ? .36 : mode === 2 ? .52 : .72;
+        [1, 1.5, 2].forEach((ratio, index) => {
+            scheduleMeditationTone(context, destination, base * intervals[index], start + index * pulseSpacing, 5.8 + random() * 2.2, .017 - index * .003, index === 0 ? waveforms[mode] : 'sine');
+        });
+        const detailCount = 5 + (Number(sound.variation || 1) % 5) + (['forest','night','stream','rain'].includes(sound.noise) ? 3 : 0);
+        for (let index = 0; index < detailCount; index++) {
+            const highDetail = ['forest','night'].includes(sound.noise);
+            const frequency = highDetail
+                ? sound.sparkle * (.72 + random() * .72)
+                : sound.sparkle * (.7 + random() * .45);
+            const duration = highDetail ? .07 + random() * .3 : .28 + random() * 1.4;
+            const waveform = mode === 3 && !highDetail ? 'triangle' : 'sine';
+            scheduleMeditationTone(context, destination, frequency, start + .45 + random() * 7.1, duration, highDetail ? .006 + random() * .004 : .008 + random() * .007, waveform);
+        }
+        if (sound.noise === 'rain' && random() > .35) {
+            scheduleMeditationTone(context, destination, 48 + random() * 24, start + 3 + random() * 3, 2.8, .018, 'sine');
+        }
+        if (sound.noise === 'ocean' && mode >= 2) {
+            scheduleMeditationTone(context, destination, base * .5, start + 1.2, 4.6, .022, 'sine');
+        }
+        meditationSynthTimer = setTimeout(() => scheduleMeditationMusic(soundKey), 8000);
     }
 
     function addCafeNoise(context, destination) {
@@ -2607,6 +3581,11 @@
         const context = meditationAudioContext;
         const destination = meditationSynthGain;
         if (!context || !destination) return;
+        const sound = getMeditationSoundDefinition(soundKey);
+        if (sound && sound.type === 'procedural') {
+            scheduleProceduralSoundscape(soundKey, sound);
+            return;
+        }
         const start = context.currentTime + 0.06;
 
         if (soundKey === 'piano') {
@@ -2704,11 +3683,13 @@
 
     function startMeditationSynth(soundKey) {
         const context = ensureMeditationAudioContext();
+        const sound = getMeditationSoundDefinition(soundKey);
         if (!context) return false;
         stopMeditationSynth();
         meditationSynthGain = context.createGain();
         meditationSynthGain.gain.value = meditationMuted ? 0 : getMeditationSoundVolume(soundKey);
         meditationSynthGain.connect(context.destination);
+        if (sound && sound.type === 'procedural') addProceduralAmbience(context, meditationSynthGain, sound);
         if (soundKey === 'cafe') addCafeNoise(context, meditationSynthGain);
         if (['rain','stream','night','fireplace'].includes(soundKey)) addNatureNoise(context, meditationSynthGain, soundKey);
         scheduleMeditationMusic(soundKey);
@@ -2734,9 +3715,10 @@
 
     async function changeMeditationSound(soundKey) {
         const audio = document.getElementById('meditationAudio');
-        const sound = meditationSounds[soundKey];
+        const sound = getMeditationSoundDefinition(soundKey);
         const label = document.getElementById('meditationAutoSound');
         if (!sound || !audio) return;
+        if (!meditationActive) return;
         const alreadyPlaying = sound.type === 'file' ? !audio.paused : Boolean(meditationSynthGain);
         if (meditationCurrentSoundKey === soundKey && alreadyPlaying) {
             if (label) label.textContent = sound.name;
@@ -2759,6 +3741,11 @@
                 throw new Error('audio-context-unavailable');
             }
             if (requestGeneration !== meditationSoundGeneration) return;
+            if (!meditationActive) {
+                // 재생을 기다리는 사이에 명상이 끝났다면 소리를 남기지 않는다.
+                stopMeditationSound(true);
+                return;
+            }
             meditationCurrentSoundKey = soundKey;
             showMeditationSoundStatus(`${sound.name} 자동 재생 중`);
         } catch (_) {
@@ -2775,7 +3762,7 @@
             meditationSynthGain.gain.setTargetAtTime(meditationMuted ? 0 : getMeditationSoundVolume(meditationCurrentSoundKey), meditationAudioContext.currentTime, 0.04);
         }
         updateMeditationMuteButton();
-        showMeditationSoundStatus(meditationMuted ? '배경음 무음' : `${(meditationSounds[meditationCurrentSoundKey] || {}).name || '배경음'} 재생`);
+        showMeditationSoundStatus(meditationMuted ? '배경음 무음' : `${(getMeditationSoundDefinition(meditationCurrentSoundKey) || {}).name || '배경음'} 재생`);
     }
 
     function changeMeditationVolume(value) {
@@ -2792,7 +3779,7 @@
         document.querySelectorAll('[data-meditation-options]').forEach(container => {
             const genre = container.dataset.meditationOptions;
             container.innerHTML = meditationSceneThemes.filter(theme => theme.genre === genre).map(theme =>
-                `<button type="button" class="meditation-genre-option" data-theme-id="${theme.id}" onclick="selectMeditationTheme('${theme.id}')">${theme.label}<small>매일 랜덤 · ${theme.images.length}장</small></button>`
+                `<button type="button" class="meditation-genre-option" data-theme-id="${theme.id}" onclick="selectMeditationTheme('${theme.id}')">${theme.label}<small>${meditationRemoteLoadedThemes.has(theme.id) ? `랜덤 ${theme.images.length}장` : `온라인 사진 최대 ${MEDITATION_REMOTE_THEME_LIMIT}장`}</small></button>`
             ).join('');
         });
     }
@@ -2806,27 +3793,426 @@
 
     function resetMeditationSlideshow() {
         clearInterval(meditationTimer);
-        meditationTimer = setInterval(showNextMeditationScene, 16000);
+        // 호흡 흐름을 방해하지 않도록 풍경은 90초에 한 번만 부드럽게 바꾼다.
+        meditationTimer = setInterval(showNextMeditationScene, 90000);
     }
 
-    function selectMeditationTheme(themeId) {
+    function stopMeditationBreathing() {
+        clearTimeout(meditationBreathPhaseTimer);
+        clearInterval(meditationBreathClockTimer);
+        meditationBreathPhaseTimer = null;
+        meditationBreathClockTimer = null;
+        clearMeditationGaze();
+        const layer = document.getElementById('meditationLayer');
+        if (layer) delete layer.dataset.breath;
+    }
+
+    function clearMeditationGaze() {
+        clearTimeout(meditationFocusTimer);
+        meditationFocusTimer = null;
+        const layer = document.getElementById('meditationLayer');
+        const focusDot = document.getElementById('meditationFocusDot');
+        const gazeSvg = document.getElementById('meditationGazePath');
+        if (focusDot) focusDot.classList.remove('is-active');
+        if (gazeSvg) gazeSvg.classList.remove('is-active');
+        if (layer) layer.classList.remove('is-gazing');
+    }
+
+    // 빛 점이 궤적을 따라 계속 돌며 시선 운동을 이끈다. 궤적은 선으로도 함께 보여준다.
+    function runMeditationFocusPath(points, options = {}) {
+        clearTimeout(meditationFocusTimer);
+        const layer = document.getElementById('meditationLayer');
+        const focusDot = document.getElementById('meditationFocusDot');
+        const gazeSvg = document.getElementById('meditationGazePath');
+        const gazeLine = document.getElementById('meditationGazeLine');
+        if (!focusDot || !Array.isArray(points) || !points.length) return;
+
+        const step = options.step || 2400;
+        const easing = options.easing || 'cubic-bezier(.22,.65,.24,1)';
+        const loop = options.loop !== false;
+        if (gazeSvg && gazeLine) {
+            const drawn = loop ? points.concat([points[0]]) : points;
+            gazeLine.setAttribute('points', drawn.map(point => `${point[0].toFixed(2)},${point[1].toFixed(2)}`).join(' '));
+            gazeSvg.classList.add('is-active');
+        }
+        focusDot.style.transition = `left ${step}ms ${easing}, top ${step}ms ${easing}, opacity .5s ease, transform .5s ease`;
+        focusDot.classList.add('is-active');
+        if (layer) layer.classList.add('is-gazing');
+
+        let index = 0;
+        const move = () => {
+            const point = points[index % points.length];
+            focusDot.style.left = `${point[0]}%`;
+            focusDot.style.top = `${point[1]}%`;
+            index += 1;
+            if (!loop && index >= points.length) {
+                meditationFocusTimer = setTimeout(clearMeditationGaze, step + 600);
+                return;
+            }
+            meditationFocusTimer = setTimeout(move, step);
+        };
+        move();
+    }
+
+    function showMeditationMindfulCue() {
+        meditationCueIndex = (meditationCueIndex + 1) % MEDITATION_MINDFUL_CUES.length;
+        const cue = MEDITATION_MINDFUL_CUES[meditationCueIndex];
+        const cueElement = document.getElementById('meditationCue');
+        if (cueElement) {
+            cueElement.innerHTML = `<span class="meditation-cue-icon"><i class="fa-solid ${cue.icon}" aria-hidden="true"></i></span><span><strong>${cue.title}</strong><span>${cue.text}</span></span>`;
+        }
+        if (cue.kind === 'gaze') {
+            const pattern = MEDITATION_GAZE_PATTERNS[cue.gaze] || {points: cue.points || []};
+            runMeditationFocusPath(pattern.points, pattern);
+        } else {
+            clearMeditationGaze();
+        }
+        if (cue.posture) setMeditationPostureById(cue.posture, cue.motion);
+        if (cue.kind === 'mind') showNextMeditationQuote();
+    }
+
+    function startMeditationBreathing() {
+        stopMeditationBreathing();
+        const layer = document.getElementById('meditationLayer');
+        let phaseIndex = 0;
+        let firstPass = true;
+        const runPhase = () => {
+            const phases = getMeditationPhases();
+            const phase = phases[phaseIndex % phases.length];
+            const orb = document.getElementById('meditationBreathingOrb');
+            const title = document.getElementById('meditationBreathTitle');
+            const guide = document.getElementById('meditationBreathGuide');
+            const countdown = document.getElementById('meditationBreathCountdown');
+            const progress = document.getElementById('meditationBreathProgress');
+            if (!orb || !title || !guide || !countdown || !progress) return;
+
+            orb.classList.remove('is-inhale', 'is-hold', 'is-exhale', 'is-rest');
+            orb.classList.add(`is-${phase.key}`);
+            if (layer) layer.dataset.breath = phase.key;
+            if (phaseIndex === 0) {
+                if (!firstPass) meditationCycleCount += 1;
+                firstPass = false;
+                // 두 호흡마다 안내를 바꾸고, 여섯 호흡마다 중앙 아이콘의 모습을 바꾼다.
+                if (meditationCycleCount % 2 === 0) showMeditationMindfulCue();
+                if (meditationCycleCount > 0 && meditationCycleCount % 6 === 0) rotateMeditationOrbStyle();
+                updateMeditationSessionStat();
+            }
+            title.textContent = phase.title;
+            guide.textContent = phase.guide;
+            meditationBreathPhaseStartedAt = Date.now();
+            progress.style.transition = 'none';
+            progress.style.width = '0%';
+            requestAnimationFrame(() => {
+                progress.style.transition = `width ${phase.duration}s linear`;
+                progress.style.width = '100%';
+            });
+            const updateCountdown = () => {
+                const passed = (Date.now() - meditationBreathPhaseStartedAt) / 1000;
+                const remaining = Math.max(0, Math.ceil(phase.duration - passed));
+                countdown.textContent = `${phase.duration}초 중 ${remaining}초`;
+            };
+            updateCountdown();
+            clearInterval(meditationBreathClockTimer);
+            meditationBreathClockTimer = setInterval(updateCountdown, 220);
+            meditationBreathPhaseTimer = setTimeout(() => {
+                phaseIndex = (phaseIndex + 1) % phases.length;
+                runPhase();
+            }, phase.duration * 1000);
+        };
+        runPhase();
+    }
+
+    /* ===== 호흡법 ===== */
+    function getMeditationProgram() {
+        return MEDITATION_BREATH_PROGRAMS.find(program => program.id === meditationProgramId) || MEDITATION_BREATH_PROGRAMS[0];
+    }
+
+    function getMeditationPhases() {
+        return getMeditationProgram().phases;
+    }
+
+    function updateMeditationProgramChip() {
+        const program = getMeditationProgram();
+        const chip = document.getElementById('meditationProgramChip');
+        if (chip) chip.innerHTML = `<i class="fa-solid fa-wind"></i> ${program.label} · ${program.pattern}`;
+    }
+
+    /* 호흡 리듬은 명상을 켤 때마다 무작위로 정해지고, 그 세션 동안 유지된다. */
+    function pickRandomMeditationProgram() {
+        if (MEDITATION_BREATH_PROGRAMS.length) {
+            const index = Math.floor(Math.random() * MEDITATION_BREATH_PROGRAMS.length);
+            meditationProgramId = MEDITATION_BREATH_PROGRAMS[index].id;
+        }
+        updateMeditationProgramChip();
+    }
+
+    /* ===== 중앙 명상 아이콘 ===== */
+    function buildMeditationOrbPetals() {
+        const group = document.getElementById('meditationOrbPetals');
+        if (!group || group.childElementCount) return;
+        const petals = [];
+        for (let index = 0; index < 8; index += 1) {
+            petals.push(`<path d="M50 50 C42 32 44 16 50 7 C56 16 58 32 50 50 Z" transform="rotate(${index * 45} 50 50)"></path>`);
+        }
+        group.innerHTML = petals.join('');
+    }
+
+    function buildMeditationMotes() {
+        const container = document.getElementById('meditationMotes');
+        if (!container || container.childElementCount) return;
+        const motes = [];
+        for (let index = 0; index < 16; index += 1) {
+            const left = (4 + Math.random() * 92).toFixed(2);
+            const size = (3 + Math.random() * 5).toFixed(1);
+            const duration = (17 + Math.random() * 20).toFixed(1);
+            const delay = (Math.random() * 20).toFixed(1);
+            motes.push(`<span style="left:${left}%;width:${size}px;height:${size}px;animation-duration:${duration}s;animation-delay:-${delay}s"></span>`);
+        }
+        container.innerHTML = motes.join('');
+    }
+
+    function applyMeditationOrbStyle(index) {
+        const total = MEDITATION_ORB_STYLES.length;
+        meditationOrbStyleIndex = ((index % total) + total) % total;
+        const style = MEDITATION_ORB_STYLES[meditationOrbStyleIndex];
+        const orb = document.getElementById('meditationBreathingOrb');
+        if (!orb) return;
+        MEDITATION_ORB_STYLES.forEach(item => orb.classList.remove(`style-${item.id}`));
+        orb.classList.add(`style-${style.id}`);
+        const icon = orb.querySelector('i');
+        if (icon) icon.className = `fa-solid ${style.icon}`;
+    }
+
+    function rotateMeditationOrbStyle() {
+        applyMeditationOrbStyle(meditationOrbStyleIndex + 1);
+    }
+
+    /* ===== 세션 지표 ===== */
+    function updateMeditationSessionStat() {
+        const stat = document.getElementById('meditationSessionStat');
+        if (!stat) return;
+        const passed = meditationSessionStartedAt ? Math.floor((Date.now() - meditationSessionStartedAt) / 1000) : 0;
+        const minutes = String(Math.floor(passed / 60)).padStart(2, '0');
+        const seconds = String(passed % 60).padStart(2, '0');
+        stat.textContent = `${minutes}:${seconds} 명상 · 호흡 ${meditationCycleCount}회`;
+    }
+
+    /* 목록에서 무작위로 하나 고르되, 직전에 나온 것은 건너뛴다. */
+    function pickRandomMeditationIndex(total, current) {
+        if (total <= 1) return 0;
+        if (!(current >= 0 && current < total)) return Math.floor(Math.random() * total);
+        const next = Math.floor(Math.random() * (total - 1));
+        return next >= current ? next + 1 : next;
+    }
+
+    /* ===== 사색의 글귀 ===== */
+    function renderMeditationQuote(quote) {
+        const box = document.getElementById('meditationQuote');
+        const text = document.getElementById('meditationQuoteText');
+        const author = document.getElementById('meditationQuoteAuthor');
+        const kicker = document.getElementById('meditationQuoteKicker');
+        if (!box || !text || !author) return;
+        clearTimeout(meditationQuoteFadeTimer);
+        box.classList.remove('is-visible');
+        meditationQuoteFadeTimer = setTimeout(() => {
+            text.textContent = quote.text;
+            author.textContent = quote.author ? `— ${quote.author}` : '';
+            if (kicker) kicker.textContent = MEDITATION_QUOTE_KICKERS[quote.kind] || '사색의 글귀';
+            box.classList.add('is-visible');
+        }, 420);
+    }
+
+    function showNextMeditationQuote() {
+        if (!MEDITATION_QUOTES.length) return;
+        meditationQuoteIndex = pickRandomMeditationIndex(MEDITATION_QUOTES.length, meditationQuoteIndex);
+        renderMeditationQuote(MEDITATION_QUOTES[meditationQuoteIndex]);
+        clearInterval(meditationQuoteTimer);
+        meditationQuoteTimer = setInterval(() => showNextMeditationQuote(), 28000);
+    }
+
+    function startMeditationQuotes() {
+        meditationQuoteIndex = -1;
+        showNextMeditationQuote();
+    }
+
+    function stopMeditationQuotes() {
+        clearInterval(meditationQuoteTimer);
+        clearTimeout(meditationQuoteFadeTimer);
+        meditationQuoteTimer = null;
+        meditationQuoteFadeTimer = null;
+        const box = document.getElementById('meditationQuote');
+        if (box) box.classList.remove('is-visible');
+    }
+
+    /* ===== 명상 자세와 몸 움직임 ===== */
+    function renderMeditationPosture(posture, motion) {
+        const figure = document.getElementById('meditationPostureFigure');
+        const name = document.getElementById('meditationPostureName');
+        const guide = document.getElementById('meditationPostureGuide');
+        const steps = document.getElementById('meditationPostureSteps');
+        if (!figure || !name || !guide || !steps) return;
+        figure.className = `meditation-posture-figure${motion ? ` motion-${motion}` : ''}`;
+        figure.innerHTML = `<svg viewBox="0 0 100 120" aria-hidden="true"><g class="mv-body">${posture.figure}</g><line class="mv-ground" x1="12" y1="106" x2="88" y2="106"></line></svg>`;
+        name.textContent = posture.name;
+        guide.textContent = posture.guide;
+        steps.innerHTML = (posture.steps || []).map(step => `<li>${step}</li>`).join('');
+    }
+
+    function showMeditationPosture(index, motion) {
+        if (!MEDITATION_POSTURES.length) return;
+        const total = MEDITATION_POSTURES.length;
+        meditationPostureIndex = ((index % total) + total) % total;
+        renderMeditationPosture(MEDITATION_POSTURES[meditationPostureIndex], motion);
+    }
+
+    function showNextMeditationPosture() {
+        if (meditationMoveActive) stopMeditationBodyRoutine(false);
+        showMeditationPosture(pickRandomMeditationIndex(MEDITATION_POSTURES.length, meditationPostureIndex));
+    }
+
+    function startMeditationPostureRotation() {
+        clearInterval(meditationPostureTimer);
+        // 자세는 4분에 한 번 조용히 바뀐다. 몸 풀기 중에는 흐름을 끊지 않는다.
+        meditationPostureTimer = setInterval(() => {
+            if (!meditationActive || meditationMoveActive) return;
+            showMeditationPosture(pickRandomMeditationIndex(MEDITATION_POSTURES.length, meditationPostureIndex));
+        }, 240000);
+    }
+
+    function stopMeditationPostureRotation() {
+        clearInterval(meditationPostureTimer);
+        meditationPostureTimer = null;
+    }
+
+    function setMeditationPostureById(postureId, motion) {
+        if (meditationMoveActive) return;
+        const index = MEDITATION_POSTURES.findIndex(item => item.id === postureId);
+        if (index < 0) return;
+        showMeditationPosture(index, motion);
+    }
+
+    function toggleMeditationPostureCard(forceOpen) {
+        const card = document.getElementById('meditationPosture');
+        if (!card) return;
+        const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : card.hidden;
+        card.hidden = !shouldOpen;
+        if (!shouldOpen && meditationMoveActive) stopMeditationBodyRoutine(false);
+    }
+
+    function updateMeditationMoveRing(remaining, total) {
+        const ring = document.getElementById('meditationMoveRing');
+        const count = document.getElementById('meditationMoveCount');
+        if (!ring || !count) return;
+        ring.hidden = false;
+        const progress = total > 0 ? Math.max(0, Math.min(100, ((total - remaining) / total) * 100)) : 0;
+        ring.style.setProperty('--move-progress', progress.toFixed(1));
+        count.textContent = String(Math.ceil(remaining));
+    }
+
+    function updateMeditationMoveButton() {
+        const button = document.getElementById('meditationMoveBtn');
+        if (!button) return;
+        button.classList.toggle('is-active', meditationMoveActive);
+        button.innerHTML = meditationMoveActive
+            ? '<i class="fa-solid fa-stop"></i> 그만하기'
+            : '<i class="fa-solid fa-person-walking"></i> 몸 풀기';
+    }
+
+    function runMeditationBodyMove() {
+        meditationMoveIndex += 1;
+        if (meditationMoveIndex >= MEDITATION_BODY_MOVES.length) {
+            stopMeditationBodyRoutine(true);
+            return;
+        }
+        const move = MEDITATION_BODY_MOVES[meditationMoveIndex];
+        const posture = MEDITATION_POSTURES.find(item => item.id === move.posture) || MEDITATION_POSTURES[0];
+        renderMeditationPosture({
+            name: `${meditationMoveIndex + 1}/${MEDITATION_BODY_MOVES.length} · ${move.name}`,
+            guide: move.guide,
+            steps: move.steps,
+            figure: posture.figure
+        }, move.motion);
+
+        const startedAt = Date.now();
+        updateMeditationMoveRing(move.seconds, move.seconds);
+        clearInterval(meditationMoveTickTimer);
+        meditationMoveTickTimer = setInterval(() => {
+            const remaining = Math.max(0, move.seconds - (Date.now() - startedAt) / 1000);
+            updateMeditationMoveRing(remaining, move.seconds);
+        }, 200);
+        clearTimeout(meditationMoveTimer);
+        meditationMoveTimer = setTimeout(runMeditationBodyMove, move.seconds * 1000);
+    }
+
+    function startMeditationBodyRoutine() {
+        stopMeditationBodyRoutine(false);
+        toggleMeditationPostureCard(true);
+        meditationMoveActive = true;
+        meditationMoveIndex = -1;
+        updateMeditationMoveButton();
+        runMeditationBodyMove();
+        showMeditationSoundStatus('몸 풀기 루틴을 시작합니다. 무리하지 않는 범위에서 따라 해보세요.');
+    }
+
+    function stopMeditationBodyRoutine(completed) {
+        clearTimeout(meditationMoveTimer);
+        clearInterval(meditationMoveTickTimer);
+        meditationMoveTimer = null;
+        meditationMoveTickTimer = null;
+        const wasActive = meditationMoveActive;
+        meditationMoveActive = false;
+        meditationMoveIndex = -1;
+        const ring = document.getElementById('meditationMoveRing');
+        if (ring) {
+            ring.hidden = true;
+            ring.style.setProperty('--move-progress', '0');
+        }
+        updateMeditationMoveButton();
+        if (wasActive) showMeditationPosture(meditationPostureIndex);
+        if (completed) showMeditationSoundStatus('몸 풀기를 마쳤습니다. 이제 호흡에 집중해 보세요.');
+    }
+
+    function toggleMeditationBodyRoutine() {
+        if (meditationMoveActive) stopMeditationBodyRoutine(false);
+        else startMeditationBodyRoutine();
+    }
+
+    async function selectMeditationTheme(themeId) {
+        showMeditationSoundStatus('선택한 테마의 고해상도 풍경을 불러오는 중…');
+        await fetchMeditationThemeLibrary(themeId);
         refreshMeditationDailyScenes();
         const themeIndices = meditationScenes.map((scene, index) => scene.themeId === themeId ? index : -1).filter(index => index >= 0);
-        if (!themeIndices.length) return;
+        if (!themeIndices.length) {
+            showMeditationSoundStatus('이 테마의 사진을 불러오지 못했습니다. 다른 테마를 선택해주세요.');
+            return;
+        }
         const currentPosition = themeIndices.findIndex(index => meditationScenes[index].id === meditationCurrentSceneId);
         const index = themeIndices[(currentPosition + 1) % themeIndices.length];
         if (index < 0) return;
         meditationGenre = meditationScenes[index].genre;
+        meditationThemeFilter = themeId;
         toggleMeditationGenrePanel(false);
         showMeditationScene(index);
         resetMeditationSlideshow();
     }
 
+    function selectMeditationAllThemes() {
+        meditationGenre = 'all';
+        meditationThemeFilter = 'all';
+        toggleMeditationGenrePanel(false);
+        showNextMeditationScene();
+        resetMeditationSlideshow();
+    }
+
     function getNextMeditationIndex(fromIndex = meditationSceneIndex) {
-        const indices = meditationScenes.map((scene, index) => scene.genre === meditationGenre ? index : -1).filter(index => index >= 0);
+        const indices = meditationScenes.map((scene, index) => {
+            if (meditationThemeFilter !== 'all') return scene.themeId === meditationThemeFilter ? index : -1;
+            return meditationGenre === 'all' || scene.genre === meditationGenre ? index : -1;
+        }).filter(index => index >= 0);
         if (!indices.length) return 0;
-        const currentPosition = indices.indexOf(fromIndex);
-        return indices[(currentPosition + 1) % indices.length];
+        // 같은 풍경이 연달아 나오지 않도록 지금 것만 빼고 무작위로 고른다.
+        const pool = indices.length > 1 ? indices.filter(index => index !== fromIndex) : indices;
+        return pool[Math.floor(Math.random() * pool.length)];
     }
 
     function showMeditationScene(nextIndex) {
@@ -2835,6 +4221,8 @@
         const sceneImage = document.getElementById('meditationScene');
         const sceneName = document.getElementById('meditationSceneName');
         const sceneDescription = document.getElementById('meditationSceneDescription');
+        const sceneCount = document.getElementById('meditationSceneCount');
+        const credit = document.getElementById('meditationCredit');
         if (!layer || !sceneImage || !sceneName || !sceneDescription) return;
 
         const scene = meditationScenes[nextIndex];
@@ -2843,29 +4231,42 @@
 
         sceneImage.classList.remove('is-visible');
         preload.onload = () => {
+            if (!meditationActive) return;
             meditationImageFailureCount = 0;
             meditationSceneIndex = nextIndex;
-            meditationGenre = scene.genre;
-            if (meditationCurrentSceneId !== scene.id) meditationSoundRotation = 0;
+            if (meditationCurrentSceneId !== scene.id) {
+                const soundCount = getMeditationSceneSounds(scene).length;
+                meditationSoundRotation = soundCount > 1 ? Math.floor(Math.random() * soundCount) : 0;
+            }
             meditationCurrentSceneId = scene.id;
             sceneImage.src = scene.url;
             sceneImage.alt = scene.name;
             sceneName.textContent = scene.name;
             sceneDescription.textContent = scene.description;
+            if (sceneCount) {
+                const genreScenes = meditationScenes.filter(item => meditationThemeFilter === 'all' ? true : item.themeId === meditationThemeFilter);
+                const genrePosition = genreScenes.findIndex(item => item.id === scene.id) + 1;
+                sceneCount.textContent = `${genrePosition.toLocaleString()} / ${genreScenes.length.toLocaleString()}장`;
+            }
+            if (credit) {
+                credit.hidden = !scene.sourceUrl;
+                if (scene.sourceUrl) credit.href = scene.sourceUrl;
+            }
             sceneImage.classList.toggle('is-artwork', Boolean(scene.artwork));
             document.querySelectorAll('.meditation-genre-option').forEach(button => button.classList.toggle('is-active', button.dataset.themeId === scene.themeId));
             changeMeditationSound(getMeditationSceneSound(scene, meditationSoundRotation));
             requestAnimationFrame(() => sceneImage.classList.add('is-visible'));
         };
         preload.onerror = () => {
+            if (!meditationActive) return;
             meditationImageFailureCount += 1;
-            const genreSceneCount = meditationScenes.filter(item => item.genre === meditationGenre).length;
+            const genreSceneCount = meditationScenes.filter(item => meditationThemeFilter === 'all' || item.themeId === meditationThemeFilter).length;
             if (meditationImageFailureCount < genreSceneCount) {
                 showMeditationScene(getNextMeditationIndex(nextIndex));
                 return;
             }
             sceneName.textContent = '이미지를 불러오지 못했습니다.';
-            sceneDescription.textContent = '네트워크 연결을 확인한 뒤 다른 풍경을 선택해주세요.';
+            sceneDescription.textContent = '네트워크 연결을 확인해주세요. 잠시 뒤 다음 풍경으로 넘어갑니다.';
         };
         preload.src = scene.url;
     }
@@ -2873,13 +4274,6 @@
     function showNextMeditationScene() {
         refreshMeditationDailyScenes();
         showMeditationScene(getNextMeditationIndex());
-    }
-
-    function showNextMeditationSound() {
-        const scene = meditationScenes.find(item => item.id === meditationCurrentSceneId);
-        if (!scene || !scene.sounds || scene.sounds.length < 2) return;
-        meditationSoundRotation = (meditationSoundRotation + 1) % scene.sounds.length;
-        changeMeditationSound(getMeditationSceneSound(scene, meditationSoundRotation));
     }
 
     function getActiveFullscreenElement() {
@@ -2948,19 +4342,15 @@
         const button = document.getElementById('meditationToggleBtn');
         if (!layer) return;
 
-        const intro = layer.querySelector('.meditation-center');
         if (meditationIntroTimer) clearTimeout(meditationIntroTimer);
-        if (intro) {
-            intro.classList.remove('is-intro-hidden');
-            meditationIntroTimer = setTimeout(() => {
-                intro.classList.add('is-intro-hidden');
-            }, 5000);
-        }
+        meditationIntroTimer = null;
 
+        meditationActive = true;
         meditationMuted = false;
         updateMeditationMuteButton();
         refreshMeditationDailyScenes();
         renderMeditationGenreOptions();
+        warmMeditationLibrary();
         ensureMeditationAudioContext();
 
         layer.classList.add('is-active');
@@ -2969,17 +4359,40 @@
             button.classList.add('is-active');
             button.innerHTML = '<i class="fa-solid fa-leaf"></i> 명상 종료';
         }
+        buildMeditationOrbPetals();
+        buildMeditationMotes();
+        applyMeditationOrbStyle(meditationOrbStyleIndex);
+        pickRandomMeditationProgram();
+        meditationCycleCount = 0;
+        meditationSessionStartedAt = Date.now();
+        updateMeditationSessionStat();
+        clearInterval(meditationSessionTimer);
+        meditationSessionTimer = setInterval(updateMeditationSessionStat, 1000);
+        showMeditationPosture(Math.floor(Math.random() * MEDITATION_POSTURES.length));
+        toggleMeditationPostureCard(true);
+        startMeditationPostureRotation();
+        updateMeditationMoveButton();
+        startMeditationQuotes();
+
         showNextMeditationScene();
         resetMeditationSlideshow();
+        startMeditationBreathing();
     }
 
     async function stopMeditation() {
+        meditationActive = false;
         const layer = document.getElementById('meditationLayer');
         const button = document.getElementById('meditationToggleBtn');
         if (meditationIntroTimer) clearTimeout(meditationIntroTimer);
         meditationIntroTimer = null;
-        const intro = layer ? layer.querySelector('.meditation-center') : null;
-        if (intro) intro.classList.remove('is-intro-hidden');
+        stopMeditationBreathing();
+        stopMeditationBodyRoutine(false);
+        stopMeditationPostureRotation();
+        stopMeditationQuotes();
+        clearInterval(meditationSessionTimer);
+        meditationSessionTimer = null;
+        meditationSessionStartedAt = 0;
+        meditationCycleCount = 0;
         clearInterval(meditationTimer);
         meditationTimer = null;
         stopMeditationSound(true);
@@ -2991,7 +4404,8 @@
         meditationSceneIndex = -1;
         meditationCurrentSceneId = '';
         meditationSoundRotation = 0;
-        meditationGenre = 'places';
+        meditationGenre = 'all';
+        meditationThemeFilter = 'all';
         await leaveMeditationFullscreen();
         if (layer) {
             layer.classList.remove('is-active');

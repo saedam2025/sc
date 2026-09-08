@@ -85,11 +85,14 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         background: #f3f4f6;
         font-size: .85rem;
     }
+    /* 사진이 테두리에 꽉 차서 머리가 잘리던 문제: 10% 줄이고 위쪽을 기준으로 맞춘다.
+       메신저 목록·대화상대 선택창·안읽은메시지가 모두 이 클래스를 쓴다. */
     .chat-profile-image {
-        width: 100%;
-        height: 100%;
+        width: 90%;
+        height: 90%;
         display: block;
         object-fit: cover;
+        object-position: top;
         border-radius: inherit;
     }
     #orgChartModal .org-status-dot,
@@ -115,7 +118,27 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     #unreadMsgModal .org-name { color: var(--text-main, #0f172a); font-size: .8rem; font-weight: 700; }
     #orgChartModal .org-dept,
     #unreadMsgModal .org-dept { color: var(--text-muted, #94a3b8); font-size: .65rem; font-weight: 500; }
-    #orgChartModal .org-point-balance { color: var(--primary-color, #2563eb); font-size: .68rem; font-weight: 900; white-space: nowrap; }
+    #orgChartModal .org-point-balance { color: var(--primary-color, #2563eb); font-size: .68rem; font-weight: 500; white-space: nowrap; }
+    #orgChartModal .org-status-chip {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        max-width: 118px;
+        margin-right: 6px;
+        padding: 3px 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #ffffff;
+        color: #475569;
+        font-size: .66rem;
+        font-weight: 700;
+        line-height: 1.4;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    #orgChartModal .org-status-chip-icon { font-size: .85rem; line-height: 1; }
+    #orgChartModal .org-status-chip-text { overflow: hidden; text-overflow: ellipsis; }
     #orgChartModal .org-point-gift-button {
         flex: 0 0 auto;
         width: 28px;
@@ -153,6 +176,9 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             
             <div class="widget-icons" style="flex-shrink: 0; align-items: center; display: flex; gap: 8px;">
                 <i id="chatNotificationButton" class="fa-solid fa-bell" role="button" tabindex="0" aria-pressed="true" onclick="toggleChatAlerts()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleChatAlerts();}" title="메시지 알림음 켜짐 · 눌러서 끄기" style="font-size:1.05rem;color:var(--blue-primary);cursor:pointer;padding:5px;"></i>
+                <button id="chatDesktopButton" type="button" aria-pressed="false" onclick="toggleChatDesktopAlerts()" title="컴퓨터 알림 설정" style="appearance:none;border:0;background:transparent;color:#94a3b8;cursor:pointer;padding:5px;line-height:1;">
+                    <i id="chatDesktopButtonIcon" class="fa-regular fa-window-maximize" aria-hidden="true" style="font-size:1rem;"></i>
+                </button>
                 <button id="chatPushButton" type="button" aria-pressed="false" onclick="toggleChatPush()" title="휴대폰 푸시 알림 설정" style="appearance:none;border:0;background:transparent;color:#94a3b8;cursor:pointer;padding:5px;line-height:1;">
                     <i id="chatPushButtonIcon" class="fa-solid fa-mobile-screen" aria-hidden="true" style="font-size:1rem;"></i>
                 </button>
@@ -380,6 +406,24 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         if (a.is_pinned && b.is_pinned) return Number(a.pin_order || 0) - Number(b.pin_order || 0);
         return parseChatTime(b.date) - parseChatTime(a.date);
     }
+    function chatStatusChipMarkup(status) {
+        if (!status || !status.status) return '';
+        const label = String(status.label || '');
+        const memo = String(status.message || '').trim();
+        const color = String(status.color || '#94a3b8');
+        const text = memo ? `${label} · ${memo}` : label;
+        return `<span class="org-status-chip" style="border-color:${chatEscapeAttribute(color)}; color:${chatEscapeAttribute(color)};" title="${chatEscapeAttribute(text)}">`
+            + `<span class="org-status-chip-icon">${chatEscapeHtml(status.icon || '')}</span>`
+            + `<span class="org-status-chip-text">${chatEscapeHtml(text)}</span></span>`;
+    }
+
+    function applyOrgStatusChange(payload) {
+        if (!payload || !payload.user) return;
+        document.querySelectorAll(`.org-status-slot[data-user="${CSS.escape(payload.user)}"]`).forEach(slot => {
+            slot.innerHTML = chatStatusChipMarkup(payload);
+        });
+    }
+
     function chatAvatarMarkup(profilePath, fallbackIcon, altText) {
         const safePath = String(profilePath || '').trim();
         if (safePath.startsWith('/user/profile_img/')) {
@@ -507,13 +551,15 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
     }
 
     function openChat(partnerName) {
-        const popupWidth = 450; 
-        const popupHeight = 650;
+        // 기본 대화창 크기: 너비는 좁게, 높이는 길게
+        const popupWidth = 405;
+        const popupHeight = 715;
         const left = (window.screen.width / 2) - (popupWidth / 2);
         const top = (window.screen.height / 2) - (popupHeight / 2);
         
-        const chatWin = window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
+        chatPopupWindows[partnerName] = window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `popup=yes,width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,directories=no,titlebar=no,scrollbars=yes,resizable=yes`);
         
+        const chatWin = chatPopupWindows[partnerName];
         if (chatWin) {
             chatWin.onload = function() {
                 try {
@@ -531,6 +577,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                 } catch(e) {}
             };
         }
+        return chatWin;
     }
 
     // 조직도 그룹 체크박스 연동
@@ -666,6 +713,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             chatUnreadDetails = data.details || {};
 
             chatRoomsFromApi = Array.isArray(data.rooms) ? data.rooms : null;
+            notifyMissedChatMessages(chatRoomsFromApi);
             const tabBadge = document.getElementById('unreadBadge');
             if(tabBadge) {
                 tabBadge.innerText = totalUnread;
@@ -773,6 +821,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                     const icon = u.icon || '👤';
                     const pointBalance = Number(u.points || 0);
                     const canGift = name !== chatWidgetCurrentUser;
+                    const statusChip = chatStatusChipMarkup(u.status);
                     
                     html += `
                     <div class="org-status-item" style="margin-top:2px; display:flex; align-items:center;">
@@ -790,6 +839,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                                 <div class="org-dept" style="font-size:0.7rem; color:#9ca3af; font-weight:500; margin:0;">${chatEscapeHtml(dept)} / ${chatEscapeHtml(pos)}</div>
                             </div>
                         </div>
+                        <span class="org-status-slot" data-user="${chatEscapeAttribute(name)}">${statusChip}</span>
                         ${canGift ? `<button type="button" class="org-point-gift-button" data-recipient="${chatEscapeAttribute(name)}" onclick="openPointGiftModal(event, this)" title="${chatEscapeAttribute(name)}님에게 포인트 선물"><i class="fa-solid fa-gift"></i></button>` : ''}
                     </div>
                     `;
@@ -824,6 +874,223 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             && Notification.permission === 'default'
         ) {
             await Notification.requestPermission();
+        }
+    }
+
+    const chatPopupWindows = {};
+    // 대화방별로 '알림까지 마친 마지막 메시지 id'를 기억해 중복/누락을 막는다.
+    const chatNotifiedMessageIds = new Map();
+    // 소켓으로 이미 알린 대화방 표시. 뒤이은 주기조회 한 번을 건너뛰게 해 중복을 막는다.
+    // (그룹방은 소켓 message_id와 목록 last_id가 서로 달라 id 비교만으로는 중복을 못 막는다.)
+    const chatSocketNotifiedRooms = new Set();
+    let chatNotifyBaselineReady = false;
+
+    // 컴퓨터 알림은 기본으로 켜져 있고, 헤더의 창 아이콘으로 끌 수 있다.
+    const CHAT_DESKTOP_ALERT_KEY = 'saedam.chat.desktop.enabled';
+    let chatDesktopAlertInMemory = true;
+
+    function chatDesktopAlertsEnabled() {
+        try {
+            chatDesktopAlertInMemory = window.localStorage.getItem(CHAT_DESKTOP_ALERT_KEY) !== 'false';
+        } catch (error) {
+            // localStorage가 막힌 브라우저에서는 현재 화면의 설정을 그대로 쓴다.
+        }
+        return chatDesktopAlertInMemory;
+    }
+
+    function setChatDesktopAlertsEnabled(enabled) {
+        chatDesktopAlertInMemory = !!enabled;
+        try {
+            window.localStorage.setItem(CHAT_DESKTOP_ALERT_KEY, String(!!enabled));
+        } catch (error) {
+            // 저장소가 막힌 환경에서도 현재 화면에서는 그대로 동작한다.
+        }
+        updateChatDesktopButton();
+    }
+
+    // 알림 권한이 아직 정해지지 않았으면 화면을 처음 누를 때 한 번만 물어본다.
+    // (브라우저가 사용자 동작 없는 권한 요청을 막는 경우가 있어서 클릭에 맞춘다.)
+    function requestChatDesktopPermissionOnce() {
+        if (!('Notification' in window) || Notification.permission !== 'default') return;
+        const ask = () => {
+            document.removeEventListener('click', ask, true);
+            document.removeEventListener('keydown', ask, true);
+            try {
+                Notification.requestPermission();
+            } catch (error) {
+                console.warn('컴퓨터 알림 권한 요청 실패:', error);
+            }
+        };
+        document.addEventListener('click', ask, true);
+        document.addEventListener('keydown', ask, true);
+    }
+
+    // 그 사람과의 대화창이 떠 있으면 알림을 띄우지 않는다.
+    // (메인화면만 열려 있는 경우에는 화면을 보고 있더라도 작업표시줄에 알림을 띄운다.)
+    function isChatPopupOpen(partner) {
+        const win = chatPopupWindows[partner];
+        return !!(win && !win.closed);
+    }
+
+    const CHAT_NOTIFY_ICON = '/static/chat_notify_icon.png';
+    // 알림을 띄워둘 시간. 웹 표준에는 표시 시간 옵션이 없어서,
+    // 자동 사라짐(requireInteraction=false)을 끄고 이 시간 뒤에 직접 닫는다.
+    const CHAT_NOTIFY_DURATION_MS = 60000;
+    const chatNotifyCloseTimers = new Map();
+
+    // 같은 사람의 새 알림이 오면 이전 타이머를 취소하고 다시 1분을 센다.
+    function scheduleChatNotificationClose(tag, close) {
+        clearTimeout(chatNotifyCloseTimers.get(tag));
+        chatNotifyCloseTimers.set(tag, setTimeout(() => {
+            chatNotifyCloseTimers.delete(tag);
+            try { close(); } catch (error) { /* 이미 닫혔으면 무시 */ }
+        }, CHAT_NOTIFY_DURATION_MS));
+    }
+
+    // 서비스워커로 띄우면 회사 로고와 [답장하기]/[읽음 처리] 버튼을 넣을 수 있다.
+    // 서비스워커를 못 쓰는 환경(HTTP 접속 등)에서는 기본 알림으로 대체한다.
+    async function showChatDesktopNotification(title, body, partner) {
+        const tag = 'chat-' + partner;
+        const options = {
+            body: body,
+            icon: CHAT_NOTIFY_ICON,
+            badge: CHAT_NOTIFY_ICON,
+            tag: tag,
+            renotify: true,
+            requireInteraction: true,
+            data: { partner: partner, url: '/chat_popup/' + encodeURIComponent(partner) }
+        };
+        try {
+            if ('serviceWorker' in navigator) {
+                const registration = await navigator.serviceWorker.getRegistration('/');
+                if (registration) {
+                    await registration.showNotification(title, Object.assign({}, options, {
+                        actions: [
+                            { action: 'open', title: '답장하기' },
+                            { action: 'read', title: '읽음 처리' }
+                        ]
+                    }));
+                    scheduleChatNotificationClose(tag, async () => {
+                        const list = await registration.getNotifications({ tag: tag });
+                        list.forEach(item => item.close());
+                    });
+                    return;
+                }
+            }
+        } catch (error) {
+            console.warn('서비스워커 알림 실패, 기본 알림으로 표시합니다.', error);
+        }
+        const notification = new Notification(title, options);
+        notification.onclick = () => {
+            window.focus();
+            openChat(partner);
+            notification.close();
+        };
+        scheduleChatNotificationClose(tag, () => notification.close());
+    }
+
+    // 소켓과 대화창 팝업이 같은 메시지를 함께 전달해도 알림창은 한 번만 띄운다.
+    const chatDesktopNotifiedKeys = new Map();
+    const CHAT_DESKTOP_DEDUP_TTL_MS = 10000;
+
+    function claimDesktopNotification(key) {
+        const now = Date.now();
+        chatDesktopNotifiedKeys.forEach((stamp, existing) => {
+            if (now - stamp > CHAT_DESKTOP_DEDUP_TTL_MS) chatDesktopNotifiedKeys.delete(existing);
+        });
+        if (!key) return true;
+        if (chatDesktopNotifiedKeys.has(key)) return false;
+        chatDesktopNotifiedKeys.set(key, now);
+        return true;
+    }
+
+    // 대화창 팝업이 스스로 등록해, 메인화면을 새로고침해도 열린 창을 놓치지 않는다.
+    window.registerChatPopup = function(partner, win) {
+        if (!partner || !win) return;
+        chatPopupWindows[partner] = win;
+    };
+
+    // 소켓 이벤트를 놓쳤더라도 주기 조회 결과로 새 메시지를 알린다.
+    function notifyMissedChatMessages(rooms) {
+        if (!Array.isArray(rooms)) return;
+        if (!chatNotifyBaselineReady) {
+            // 화면을 처음 열 때 쌓여 있던 메시지로 알림이 쏟아지지 않게 기준선만 잡는다.
+            rooms.forEach(room => chatNotifiedMessageIds.set(String(room.partner), Number(room.last_id) || 0));
+            chatNotifyBaselineReady = true;
+            return;
+        }
+        rooms.forEach(room => {
+            const partner = String(room.partner);
+            const lastId = Number(room.last_id) || 0;
+            const seenId = chatNotifiedMessageIds.has(partner)
+                ? chatNotifiedMessageIds.get(partner)
+                : 0;
+            if (lastId <= seenId) return;
+            chatNotifiedMessageIds.set(partner, lastId);
+            if (chatSocketNotifiedRooms.delete(partner)) return;
+            if (!Number(room.unread_count)) return;
+            window.handleIncomingChatAlert({
+                type: 'message',
+                actor: room.display_name || partner,
+                partner: partner,
+                message_id: lastId,
+                content: room.last_message || ''
+            }, room);
+        });
+    }
+
+    function updateChatDesktopButton() {
+        const button = document.getElementById('chatDesktopButton');
+        const icon = document.getElementById('chatDesktopButtonIcon');
+        if (!button || !icon) return;
+        if (!('Notification' in window)) {
+            button.style.display = 'none';
+            return;
+        }
+        const permission = Notification.permission;
+        const enabled = permission === 'granted' && chatDesktopAlertsEnabled();
+        icon.className = enabled ? 'fa-solid fa-window-maximize' : 'fa-regular fa-window-maximize';
+        button.style.color = enabled ? 'var(--blue-primary)' : '#94a3b8';
+        button.setAttribute('aria-pressed', String(enabled));
+        if (permission === 'denied') {
+            button.title = '컴퓨터 알림이 브라우저에서 차단되어 있습니다 · 눌러서 해결 방법 보기';
+        } else if (permission === 'default') {
+            button.title = '컴퓨터 알림 꺼짐 · 눌러서 켜기';
+        } else {
+            button.title = enabled
+                ? '컴퓨터 알림 켜짐 · 눌러서 끄기'
+                : '컴퓨터 알림 꺼짐 · 눌러서 켜기';
+        }
+        button.setAttribute('aria-label', button.title);
+    }
+
+    async function toggleChatDesktopAlerts() {
+        if (!('Notification' in window)) {
+            alert('이 브라우저는 컴퓨터 알림을 지원하지 않습니다.');
+            return;
+        }
+        if (Notification.permission === 'denied') {
+            alert('브라우저에서 이 사이트의 알림이 차단되어 있습니다.\n\n주소창 왼쪽 자물쇠(또는 ⓘ) → 사이트 설정 → 알림 → 허용으로 바꾼 뒤 새로고침해주세요.');
+            return;
+        }
+        if (Notification.permission === 'default') {
+            const result = await Notification.requestPermission();
+            updateChatDesktopButton();
+            if (result !== 'granted') return;
+            setChatDesktopAlertsEnabled(true);
+            new Notification('새담 사내메신저', {
+                body: '이제 새 메시지가 오면 이렇게 알려드립니다.',
+                tag: 'saedam-chat-desktop-test'
+            });
+            return;
+        }
+        const next = !chatDesktopAlertsEnabled();
+        setChatDesktopAlertsEnabled(next);
+        if (next) {
+            new Notification('새담 사내메신저', {
+                body: '컴퓨터 알림을 켰습니다.',
+                tag: 'saedam-chat-desktop-test'
+            });
         }
     }
 
@@ -867,25 +1134,26 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
                 : null
         );
         const muted = !!(room && room.notifications_muted);
-        if (!window.ChatMessageAlerts || !window.ChatMessageAlerts.notifyIncoming(event, { muted })) {
-            return false;
+        if (window.ChatMessageAlerts) {
+            window.ChatMessageAlerts.notifyIncoming(event, { muted });
         }
+        // 알림음 설정과 창 알림은 별개로 둔다. (소리를 꺼도 알림창은 뜨게)
+        if (muted) return false;
+        const dedupKey = String(event.partner) + ':' + String(event.message_id || '');
+        if (!claimDesktopNotification(dedupKey)) return false;
 
         const webPushSubscribed = !!(window.SaedamChatPush && window.SaedamChatPush.isSubscribed());
         if (
             !webPushSubscribed
             && 'Notification' in window
             && Notification.permission === 'granted'
-            && document.visibilityState !== 'visible'
+            && chatDesktopAlertsEnabled()
+            && !isChatPopupOpen(event.partner)
         ) {
             const title = (room && room.display_name) || event.actor || '새담 사내메신저';
             const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');
-            const notification = new Notification(title, { body, tag: 'chat-' + event.partner });
-            notification.onclick = () => {
-                window.focus();
-                openChat(event.partner);
-                notification.close();
-            };
+            showChatDesktopNotification(title, body, String(event.partner));
+            chatSocketNotifiedRooms.add(String(event.partner));
         }
         return true;
     }
@@ -898,6 +1166,7 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             reconnection: true,
             reconnectionDelay: 1000
         });
+        chatWidgetSocket.on('chat_status', payload => applyOrgStatusChange(payload));
         chatWidgetSocket.on('chat_event', async event => {
             if (!event) return;
             await updateMessageBadge();
@@ -918,7 +1187,26 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         updateChatAlertButton();
         window.addEventListener('chat-alert-setting-changed', updateChatAlertButton);
         updateChatPushButton();
+        updateChatDesktopButton();
+        requestChatDesktopPermissionOnce();
         window.addEventListener('chat-push-state-changed', updateChatPushButton);
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', event => {
+                const data = event.data || {};
+                if (data.type === 'chat-read') {
+                    updateMessageBadge();
+                    return;
+                }
+                // 알림의 [답장하기]는 여기서 열어야 원래 대화창 크기로 뜬다.
+                // (서비스워커가 직접 열면 크기를 지정할 수 없어 전체 탭으로 열린다.)
+                if (data.type === 'chat-open' && data.partner) {
+                    window.focus();
+                    if (!openChat(data.partner)) {
+                        alert('브라우저가 대화창(팝업)을 차단했습니다.\n주소창 오른쪽의 차단 아이콘에서 이 사이트의 팝업을 허용해주세요.');
+                    }
+                }
+            });
+        }
         if (window.SaedamChatPush) {
             window.SaedamChatPush.init().then(updateChatPushButton).catch(error => console.warn('Web Push 초기화 실패:', error));
         }

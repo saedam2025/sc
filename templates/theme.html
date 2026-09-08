@@ -497,6 +497,7 @@
                     <button class="theme-category-btn" type="button" data-category="accent">포인트 컬러</button>
                     <button class="theme-category-btn" type="button" data-category="deep-color">딥 컬러</button>
                     <button class="theme-category-btn" type="button" data-category="seasonal">계절·기념일</button>
+                    <button class="theme-category-btn" type="button" data-category="system">시스템 테마</button>
                     <button class="theme-category-btn" type="button" data-category="custom">직접 제작</button>
                     <button class="theme-category-btn" type="button" data-category="hidden">숨김</button>
                 </nav>
@@ -566,7 +567,7 @@
         </form>
     </div>
 
-    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260824-theme-number"></script>
+    <script src="{{ url_for('static', filename='js/saedam_theme_catalog.js') }}?v=20260908-sitemap-theme"></script>
     <script>
         // === 엔진 설정 ===
         // 🌟 다크모드(사이버)를 제외하고 5가지 밝은 UI 스타일만 순환 적용
@@ -750,7 +751,8 @@
             ...SaedamThemeCatalog.createThemeCatalog('gallery', 2000),
             ...SaedamThemeCatalog.createAccentThemeCatalog(500),
             ...SaedamThemeCatalog.createDeepColorThemeCatalog(500),
-            ...SaedamThemeCatalog.createSeasonalThemeCatalog()
+            ...SaedamThemeCatalog.createSeasonalThemeCatalog(),
+            ...SaedamThemeCatalog.createSystemThemeCatalog()
         );
 
         // 3009번째 크리스마스 시즌2 테마 강제 추가

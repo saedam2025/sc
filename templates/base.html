@@ -8,7 +8,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/unified_search.css', v='20260830-1') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/unified_search.css', v='20260905-1') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sitemap.css', v='20260908-4') }}">
     
     <!-- === 로그인 테마 적용 스크립트 === -->
     <script>
@@ -1066,10 +1067,11 @@
                         <!-- 5. 업무공간 메뉴 (기존 유지) -->
                         {% if menu_access.get('workspace_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') or request.path.startswith('/manual') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/workspace') or request.path.startswith('/meeting') or request.path.startswith('/board') or request.path.startswith('/memo') or request.path.startswith('/gall2') or request.path.startswith('/manual') %}active{% endif %}">
                                 <i class="fa-solid fa-layer-group"></i> 업무공간
                             </a>
                             <div class="dropdown-content">
+                                {% if menu_access.get('meeting_main', true) %}<a href="{{ url_for('meeting.meeting_list') }}"><i class="fa-solid fa-users-rectangle"></i>회의센터</a>{% endif %}
                                 {% if menu_access.get('board_noti', true) %}<a href="/board/noti"><i class="fa-solid fa-clipboard-list"></i>사내 게시판</a>{% endif %}
                                 {% if menu_access.get('board_archive', true) %}<a href="/board/archive"><i class="fa-solid fa-folder-open"></i>사내 자료실</a>{% endif %}
                                 {% if menu_access.get('gallery_main', true) %}<a href="/gall2"><i class="fa-regular fa-images"></i>사내 갤러리</a>{% endif %}
@@ -1097,19 +1099,19 @@
                         <!-- 7. 통합관리 메뉴 -->
                         {% if menu_access.get('admin_group', false) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or (request.path.startswith('/user') and not request.path.startswith('/user/invite-sender')) or request.path.startswith('/ebook/books') %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if request.path.startswith('/admin') or request.path.startswith('/mydesk') or (request.path.startswith('/user') and not request.path.startswith('/user/invite-sender')) or request.path.startswith('/ebook/books') or request.path.startswith('/webtoon') or request.path.startswith('/photobook') %}active{% endif %}">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
-                                {% if menu_access.get('admin_people', false) %}<a href="/user"><i class="fa-solid fa-user-gear"></i>인사관리</a>{% endif %}
-                                {% if menu_access.get('admin_menu_permissions', false) %}<a href="/admin/menu-permissions"><i class="fa-solid fa-key"></i>메뉴 권한관리</a>{% endif %}
-                                {% if menu_access.get('admin_boards', false) %}<a href="/admin/boards"><i class="fa-solid fa-clipboard-list"></i>게시판관리</a>{% endif %}
-                                {% if menu_access.get('admin_disk', false) %}<a href="/admin/disk"><i class="fa-solid fa-hard-drive"></i>디스크관리</a>{% endif %}
+                                {% set can_access_system = menu_access.get('admin_people', false) or menu_access.get('admin_menu_permissions', false) or menu_access.get('admin_stats', false) or menu_access.get('admin_disk', false) or menu_access.get('admin_boards', false) or menu_access.get('admin_ai_settings', false) or menu_access.get('admin_settings', false) %}
+                                {% if can_access_system %}<a href="{{ url_for('admin.system') }}"><i class="fa-solid fa-gears"></i>시스템관리</a>{% endif %}
                                 {% if menu_access.get('admin_themes', false) %}<a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>{% endif %}
                                 {% if menu_access.get('ebook_library', false) %}<a href="{{ url_for('ebook.text_library') }}"><i class="fa-solid fa-book-open-reader"></i>eBook 관리</a>{% endif %}
-                                {% if menu_access.get('admin_stats', false) %}<a href="/admin/stats"><i class="fa-solid fa-chart-line"></i>이용통계</a>{% endif %}
-                                {% if menu_access.get('admin_ai_settings', false) %}<a href="/admin/ai-settings"><i class="fa-solid fa-robot"></i>AI api설정</a>{% endif %}
-                                {% if menu_access.get('admin_settings', false) %}<a href="/admin/settings"><i class="fa-solid fa-user-shield"></i>Admin설정</a>{% endif %}
+                                {% if menu_access.get('webtoon_main', false) %}<a href="{{ url_for('webtoon.library') }}"><i class="fa-solid fa-book-open"></i>Webtoon</a>{% endif %}
+                                {% if menu_access.get('photobook_main', false) %}<a href="{{ url_for('photobook.library') }}"><i class="fa-solid fa-images"></i>웹전자책</a>{% endif %}
+                                {% if menu_access.get('mydesk_main', false) %}<a href="{{ url_for('mydesk.index') }}"><i class="fa-solid fa-mug-hot"></i>마이데스크</a>{% endif %}
+                                <a href="#sitemap" data-sitemap-trigger><i class="fa-solid fa-wand-magic-sparkles"></i>사이트맵</a>
+                                <a href="#sitemap2" data-sitemap-trigger data-sitemap-variant="pastel"><i class="fa-solid fa-cloud-sun"></i>사이트맵2</a>
                             </div>
                         </li>
                         {% endif %}
@@ -1156,6 +1158,77 @@
             </div>
         </main>
     </div>
+
+    {% if session.get('emp_no') and not center_director_mode and request.endpoint not in ['expense.submit_expense_center', 'expense.submit_expense_instructor'] %}
+    <section class="sitemap-experience" id="sitemapExperience" aria-hidden="true">
+        <div class="sitemap-atmosphere" aria-hidden="true">
+            <span class="sitemap-aurora sitemap-aurora-one"></span>
+            <span class="sitemap-aurora sitemap-aurora-two"></span>
+            <span class="sitemap-grid-plane"></span>
+            <span class="sitemap-star-field"></span>
+        </div>
+
+        <div class="sitemap-elevator" aria-hidden="true">
+            <span class="sitemap-elevator-door sitemap-elevator-left"></span>
+            <span class="sitemap-elevator-door sitemap-elevator-right"></span>
+            <span class="sitemap-elevator-line"></span>
+        </div>
+
+        <div class="sitemap-console" role="dialog" aria-modal="true" aria-labelledby="sitemapTitle">
+            <span class="sitemap-console-glow" aria-hidden="true"></span>
+            <header class="sitemap-console-header">
+                <div class="sitemap-brand">
+                    <span class="sitemap-brand-mark"><i class="fa-solid fa-compass-drafting"></i></span>
+                    <span>
+                        <small>SAEDAM NAVIGATION SYSTEM</small>
+                        <strong id="sitemapTitle">사이트맵</strong>
+                    </span>
+                </div>
+                <button class="sitemap-close" type="button" data-sitemap-close aria-label="사이트맵 닫기">
+                    <span></span><span></span>
+                </button>
+            </header>
+
+            <div class="sitemap-console-core">
+                <div class="sitemap-intro">
+                    <span class="sitemap-status"><i></i> SYSTEM READY</span>
+                    <p>필요한 업무 공간으로 이동하세요.</p>
+                    <button class="sitemap-open-menu" type="button" data-sitemap-menu-toggle aria-expanded="false">
+                        <span class="sitemap-open-icon"><i class="fa-solid fa-bars-staggered"></i></span>
+                        <span class="sitemap-open-copy"><small>NAVIGATION</small><strong>메뉴 열기</strong></span>
+                        <i class="fa-solid fa-arrow-right sitemap-open-arrow"></i>
+                    </button>
+                </div>
+
+                <div class="sitemap-navigation" aria-hidden="true">
+                    <div class="sitemap-nav-heading">
+                        <div><small>SELECT SECTOR</small><strong>주메뉴를 선택하세요</strong></div>
+                        <span class="sitemap-progress"><i></i><i></i><i></i></span>
+                    </div>
+                    <div class="sitemap-groups" id="sitemapGroups"></div>
+                    <div class="sitemap-destination" id="sitemapDestination" aria-live="polite">
+                        <span class="sitemap-destination-orbit" aria-hidden="true"><i></i></span>
+                        <div>
+                            <small>DESTINATION</small>
+                            <strong>주메뉴를 선택하면 연결할 수 있는 화면이 나타납니다.</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <footer class="sitemap-console-footer">
+                <span><i class="fa-solid fa-shield-halved"></i> 현재 계정의 접근 권한이 자동 적용됩니다</span>
+                <span class="sitemap-clock" id="sitemapClock">00:00:00</span>
+            </footer>
+        </div>
+
+        <button class="sitemap-dock" type="button" data-sitemap-dock aria-label="사이트맵 다시 열기">
+            <span class="sitemap-dock-rings" aria-hidden="true"></span>
+            <i class="fa-solid fa-compass-drafting"></i>
+            <span class="sitemap-dock-copy"><small>SITEMAP</small><strong>메뉴 열기</strong></span>
+            <span class="sitemap-dock-pulse" aria-hidden="true"></span>
+        </button>
+    </section>
+    {% endif %}
 
 
 
@@ -2308,6 +2381,7 @@ if (currentMyInfo) {
 
         document.addEventListener('DOMContentLoaded', renderSavedLoginThemeEffects);
     </script>
+    <script src="{{ url_for('static', filename='js/sitemap.js', v='20260908-4') }}"></script>
     {% block scripts %}{% endblock %}
 
 </body>

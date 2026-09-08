@@ -1,0 +1,75 @@
+<style>
+    .system-management-nav {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+    .system-management-link {
+        min-width: 0;
+        min-height: 52px;
+        padding: 10px 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: 1px solid var(--border-color, #dbe3ef);
+        border-radius: 12px;
+        background: var(--card-bg, #fff);
+        color: var(--text-dark, #1e293b);
+        box-shadow: var(--dashboard-card-shadow, 0 7px 20px rgba(15,23,42,.05));
+        text-decoration: none;
+        font-size: .8rem;
+        font-weight: 850;
+        text-align: center;
+        word-break: keep-all;
+        transition: .17s ease;
+    }
+    .system-management-link i {
+        flex: 0 0 auto;
+        color: var(--primary-color, #4a90e2);
+        font-size: .95rem;
+    }
+    .system-management-link:hover {
+        border-color: color-mix(in srgb, var(--primary-color, #4a90e2) 58%, var(--border-color, #dbe3ef));
+        color: var(--primary-color, #4a90e2);
+        transform: translateY(-1px);
+    }
+    .system-management-link.is-active {
+        border-color: var(--primary-color, #4a90e2);
+        background: var(--primary-color, #4a90e2);
+        color: #fff;
+        box-shadow: 0 8px 20px color-mix(in srgb, var(--primary-color, #4a90e2) 24%, transparent);
+    }
+    .system-management-link.is-active i { color: #fff; }
+    @media (max-width: 980px) {
+        .system-management-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+        .system-management-nav { grid-template-columns: 1fr; }
+    }
+</style>
+
+<nav class="system-management-nav" aria-label="시스템관리 메뉴">
+    {% if menu_access.get('admin_people', false) %}
+    <a class="system-management-link{% if request.path.startswith('/user') %} is-active{% endif %}" href="{{ url_for('user_mgmt.index') }}"><i class="fa-solid fa-user-gear" aria-hidden="true"></i>인사관리</a>
+    {% endif %}
+    {% if menu_access.get('admin_menu_permissions', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/menu-permissions') %} is-active{% endif %}" href="{{ url_for('admin.menu_permissions') }}"><i class="fa-solid fa-key" aria-hidden="true"></i>메뉴 권한관리</a>
+    {% endif %}
+    {% if menu_access.get('admin_stats', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/stats') %} is-active{% endif %}" href="{{ url_for('admin.stats') }}"><i class="fa-solid fa-chart-line" aria-hidden="true"></i>이용통계</a>
+    {% endif %}
+    {% if menu_access.get('admin_disk', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/disk') %} is-active{% endif %}" href="{{ url_for('admin.disk') }}"><i class="fa-solid fa-hard-drive" aria-hidden="true"></i>디스크관리</a>
+    {% endif %}
+    {% if menu_access.get('admin_boards', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/boards') %} is-active{% endif %}" href="{{ url_for('admin.boards') }}"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>게시판관리</a>
+    {% endif %}
+    {% if menu_access.get('admin_ai_settings', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/ai-settings') %} is-active{% endif %}" href="{{ url_for('admin.ai_settings_page') }}"><i class="fa-solid fa-robot" aria-hidden="true"></i>AI api설정</a>
+    {% endif %}
+    {% if menu_access.get('admin_settings', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/settings') %} is-active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i>Admin설정</a>
+    {% endif %}
+</nav>

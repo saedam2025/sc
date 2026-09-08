@@ -348,11 +348,8 @@
     </div>
 
     {% else %}
-    <div class="mgmt-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <div>
-            <h2 style="margin: 0; font-size: 1.8em;"><i class="fa-solid fa-users-gear" style="color: #4a90e2;"></i> 구성원 관리 시스템</h2>
-            <p style="color: #868e96; margin-top: 6px;">사용자 승인 및 구성원 인적사항을 통합 관리합니다.</p>
-        </div>
+    {% include '_system_management_nav.html' %}
+    <div class="mgmt-header" style="display: flex; justify-content: flex-end; align-items: center; margin: 16px 0 24px;">
         <div style="display: flex; gap: 12px;">
             <button class="btn-top btn-position-top" onclick="openPositionManager()"><i class="fa-solid fa-layer-group"></i> 직급·레벨 관리</button>
             <button class="btn-top btn-direct-top" onclick="openDirectRegisterModal()"><i class="fa-solid fa-user-plus"></i> 직접 신청 등록</button>

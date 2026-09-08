@@ -659,10 +659,24 @@
     .school-chat-card .widget-icons { display: flex; gap: 12px; color: var(--text-muted); font-size: 1.05rem; }
     .school-chat-card .widget-icons i { cursor: pointer; transition: color 0.2s; }
     .school-chat-card .widget-icons i:hover { color: var(--blue-primary); }
+    /* 사내메신저 헤더는 '채팅' 탭과 아이콘 다섯 개를 담는데, 좁은 사이드 레일(282~330px)에서는
+       기본 간격 그대로면 한 줄에 들어가지 않는다. 카드가 overflow:hidden이라 그냥 두면 맨 오른쪽
+       + 버튼이 잘려 보이므로, 여기서만 간격과 아이콘 여백을 좁혀 한 줄에 맞춘다.
+       (아이콘 쪽 간격·여백은 chat_widget.html의 인라인 style이라 !important가 필요하다.)
+       그래도 모자라는 화면이 생기면 잘리는 대신 아랫줄로 내려간다. */
+    .school-chat-card .widget-header { flex-wrap: wrap; row-gap: 6px; gap: 6px !important; }
+    .school-chat-card .widget-header > div:last-child { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; gap: 6px !important; }
+    .school-chat-card .widget-icons { gap: 4px !important; }
+    .school-chat-card .widget-icons > i,
+    .school-chat-card .widget-icons > button { padding: 2px !important; }
+    /* 안읽음 배지가 뜨면 '채팅' 탭이 그만큼 넓어져 다시 줄이 넘어간다.
+       좁은 카드에서는 배지를 탭 모서리에 겹쳐 띄워 폭을 차지하지 않게 한다. */
+    .school-chat-card #unreadBadge { position: absolute; top: -7px; right: -4px; margin-left: 0;
+        box-shadow: 0 0 0 2px var(--card-bg, #ffffff); }
     .school-chat-card .cal-title-area { font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin: 0; display: flex; gap: 8px; align-items: center; letter-spacing: -0.3px; transition: color 0.2s; }
-    .school-chat-card .pill-tabs { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; background: var(--hover-bg); padding: 4px; border-radius: 8px; border: 1px solid var(--card-border, var(--widget-border-color)) !important; }
+    .school-chat-card .pill-tabs { display: flex; gap: 6px; flex-wrap: nowrap; overflow: visible; background: var(--hover-bg); padding: 4px; border-radius: 8px; border: 1px solid var(--card-border, var(--widget-border-color)) !important; }
     .school-chat-card .pill-tabs::-webkit-scrollbar { display: none; }
-    .school-chat-card .pill-btn { padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .school-chat-card .pill-btn { padding: 6px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
     .school-chat-card .blue-pill-active,
     .school-chat-card .white-pill-active { background: #ffffff; color: var(--blue-primary); box-shadow: none; }
     .school-chat-card .blue-pill-inactive,
@@ -2901,16 +2915,18 @@
         const isInstructorStatus = cat === 'open_class';
         const isWeeklyReport = cat === 'weekly_report';
         const isItemRequest = cat === 'item_request';
+        const defaultPostTitles = {
+            open_class: '(      )월 강사현황보고',
+            weekly_report: '(        )월   (       )주차 주간업무보고',
+            work_schedule: '[00초] (    )월 (센터장 / 안전코디 / 맞춤형코디) 근무표',
+            billing: '[00초] (    )월 (강사료 청구서 / 매출마감서 / 교구재비견적서)'
+        };
         setInstructorStatusWriteWidth(isInstructorStatus);
         showView('boardWriteView');
         $('#postForm').attr('action', "{{ url_for('school.add_post') }}");
         $('#postFormTitle').html(`<i class="fas fa-pen-nib" style="color:var(--school-blue);"></i> ${escapeHtml(activeCategoryName)} 게시글 작성`);
         $('#postCategory').val(cat);
-        $('#postTitle').val(
-            isInstructorStatus
-                ? '(      )월 강사현황보고'
-                : (isWeeklyReport ? '(        )월   (       )주차 주간업무보고' : '')
-        );
+        $('#postTitle').val(defaultPostTitles[cat] || '');
         $('#btnCancelWrite').show();
         $('#btnCancelEdit').hide();
         $('#btnSubmitPost').html('<i class="fas fa-save"></i> 저장하기').prop('disabled', false);

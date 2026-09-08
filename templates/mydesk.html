@@ -1,0 +1,1825 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+    /* =====================================================
+       마이데스크 - 개인 업무·생활 기록 공간
+       인트라넷 테마 변수를 그대로 따라간다.
+       ===================================================== */
+    .md-page {
+        --md-primary: var(--primary-color, #2563eb);
+        --md-primary-dark: var(--primary-dark, #1d4ed8);
+        --md-soft: var(--primary-light, #eff6ff);
+        --md-text: var(--text-dark, #0f172a);
+        --md-muted: var(--text-gray, #64748b);
+        --md-card: var(--card-bg, #ffffff);
+        --md-border: var(--card-border, var(--border-color, #e2e8f0));
+        --md-widget: var(--widget-bg, #f8fafc);
+        --md-hover: var(--widget-hover, #f1f5f9);
+        --md-input: var(--input-bg, #ffffff);
+        --md-shadow: var(--card-shadow, 0 10px 30px rgba(15, 23, 42, 0.07));
+        padding: 22px 0 60px;
+        color: var(--md-text);
+        font-family: 'Pretendard', sans-serif;
+    }
+    .md-page *, .md-page *::before, .md-page *::after { box-sizing: border-box; }
+
+    /* --- 상단 헤더 --- */
+    .md-hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid var(--md-border);
+        border-radius: 18px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+        background:
+            radial-gradient(circle at 96% 6%, color-mix(in srgb, var(--md-primary) 16%, transparent), transparent 34%),
+            var(--md-card);
+        box-shadow: var(--md-shadow);
+    }
+    .md-hero::before {
+        content: '';
+        position: absolute; inset: 0 auto 0 0; width: 5px;
+        background: linear-gradient(180deg, var(--md-primary), var(--md-primary-dark));
+    }
+    .md-hero-inner {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        gap: 18px; flex-wrap: wrap; padding-left: 12px;
+    }
+    .md-hero h2 {
+        margin: 0; font-size: 1.55rem; font-weight: 900;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .md-hero h2 i { color: var(--md-primary); }
+    .md-hero p { margin: 8px 0 0; color: var(--md-muted); font-size: 0.88rem; font-weight: 600; }
+    .md-hero-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+    .md-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 7px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 800;
+        background: var(--md-soft); color: var(--md-primary-dark);
+        border: 1px solid color-mix(in srgb, var(--md-primary) 25%, transparent);
+    }
+
+    /* --- 탭 --- */
+    .md-tabs {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        margin-bottom: 16px; padding: 8px;
+        background: var(--md-card); border: 1px solid var(--md-border);
+        border-radius: 14px; box-shadow: var(--md-shadow);
+    }
+    .md-tab {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 10px 14px; border: 1px solid transparent; border-radius: 10px;
+        background: transparent; color: var(--md-muted);
+        font-size: 0.85rem; font-weight: 800; cursor: pointer; transition: all .15s ease;
+    }
+    .md-tab:hover { background: var(--md-hover); color: var(--md-text); }
+    .md-tab.is-active {
+        background: var(--md-primary); border-color: var(--md-primary); color: #fff;
+        box-shadow: 0 6px 16px color-mix(in srgb, var(--md-primary) 32%, transparent);
+    }
+
+    /* --- 패널 / 카드 --- */
+    .md-panel { display: none; }
+    .md-panel.is-active { display: block; }
+    .md-card {
+        background: var(--md-card); border: 1px solid var(--md-border);
+        border-radius: 14px; margin-bottom: 16px; overflow: hidden;
+        box-shadow: var(--md-shadow);
+    }
+    .md-card-head {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap;
+        padding: 14px 18px; background: var(--md-widget);
+        border-bottom: 1px solid var(--md-border);
+    }
+    .md-card-head h3 {
+        margin: 0; font-size: 0.98rem; font-weight: 900;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .md-card-head h3 i { color: var(--md-primary); }
+    .md-card-head .md-sub { font-size: 0.78rem; font-weight: 700; color: var(--md-muted); }
+    .md-card-body { padding: 16px 18px; }
+
+    .md-grid { display: grid; gap: 16px; }
+    .md-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .md-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 900px) {
+        .md-grid.cols-2, .md-grid.cols-3 { grid-template-columns: 1fr; }
+    }
+
+    /* --- 폼 --- */
+    .md-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+    .md-form .md-grow { flex: 1 1 220px; min-width: 0; }
+    .md-page input[type="text"],
+    .md-page input[type="date"],
+    .md-page input[type="datetime-local"],
+    .md-page input[type="month"],
+    .md-page input[type="search"],
+    .md-page input[type="email"],
+    .md-page input[type="tel"],
+    .md-page select,
+    .md-page textarea {
+        width: 100%; padding: 10px 12px; border-radius: 10px;
+        border: 1px solid var(--md-border); background: var(--md-input);
+        color: var(--md-text); font-family: inherit; font-size: 0.86rem; font-weight: 600;
+    }
+    .md-page textarea { resize: vertical; min-height: 84px; line-height: 1.6; }
+    .md-page input:focus, .md-page select:focus, .md-page textarea:focus {
+        outline: none; border-color: var(--md-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent);
+    }
+    .md-field { display: flex; flex-direction: column; gap: 5px; }
+    .md-field > label { font-size: 0.76rem; font-weight: 800; color: var(--md-muted); }
+
+    .md-btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        padding: 10px 14px; border-radius: 10px; cursor: pointer;
+        border: 1px solid var(--md-border); background: var(--md-card); color: var(--md-text);
+        font-family: inherit; font-size: 0.83rem; font-weight: 800; transition: all .15s ease;
+        white-space: nowrap;
+    }
+    .md-btn:hover { background: var(--md-hover); }
+    .md-btn.primary { background: var(--md-primary); border-color: var(--md-primary); color: #fff; }
+    .md-btn.primary:hover { background: var(--md-primary-dark); border-color: var(--md-primary-dark); }
+    .md-btn.ghost { background: transparent; }
+    .md-btn.danger { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
+    .md-btn.danger:hover { background: #fee2e2; }
+    .md-btn[disabled] { opacity: .55; cursor: not-allowed; }
+    .md-icon-btn {
+        width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--md-border);
+        background: var(--md-card); color: var(--md-muted); cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;
+    }
+    .md-icon-btn:hover { background: var(--md-hover); color: var(--md-text); }
+    .md-icon-btn.danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+    .md-icon-btn.is-on { background: var(--md-soft); border-color: var(--md-primary); color: var(--md-primary-dark); }
+
+    .md-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .md-filter {
+        padding: 6px 12px; border-radius: 999px; border: 1px solid var(--md-border);
+        background: var(--md-card); color: var(--md-muted);
+        font-size: 0.78rem; font-weight: 800; cursor: pointer;
+    }
+    .md-filter.is-active { background: var(--md-primary); border-color: var(--md-primary); color: #fff; }
+
+    /* --- 브리핑 --- */
+    .md-brief {
+        white-space: pre-wrap; line-height: 1.75; font-size: 0.9rem; font-weight: 600;
+        min-height: 120px;
+    }
+    .md-brief-notice {
+        margin-top: 12px; padding: 9px 12px; border-radius: 9px;
+        background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+        font-size: 0.78rem; font-weight: 700;
+    }
+    .md-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 760px) { .md-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .md-stat {
+        padding: 14px; border-radius: 12px; border: 1px solid var(--md-border);
+        background: var(--md-widget); text-align: center;
+    }
+    .md-stat b { display: block; font-size: 1.5rem; font-weight: 900; color: var(--md-primary-dark); }
+    .md-stat span { font-size: 0.76rem; font-weight: 800; color: var(--md-muted); }
+
+    /* --- 리스트 --- */
+    .md-list { display: flex; flex-direction: column; gap: 8px; }
+    .md-item {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 12px 14px; border-radius: 11px;
+        border: 1px solid var(--md-border); background: var(--md-card);
+    }
+    .md-item:hover { background: var(--md-hover); }
+    .md-item .md-item-main { flex: 1; min-width: 0; }
+    .md-item .md-item-title { font-size: 0.88rem; font-weight: 800; word-break: break-all; }
+    .md-item .md-item-meta {
+        margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap;
+        font-size: 0.75rem; font-weight: 700; color: var(--md-muted);
+    }
+    .md-item .md-item-detail {
+        margin-top: 6px; font-size: 0.8rem; font-weight: 600; color: var(--md-muted);
+        white-space: pre-wrap; line-height: 1.6;
+    }
+    .md-item.is-done .md-item-title { text-decoration: line-through; color: var(--md-muted); }
+    .md-item-actions { display: flex; gap: 5px; align-items: center; }
+
+    .md-check {
+        width: 22px; height: 22px; margin-top: 1px; flex: 0 0 auto;
+        border-radius: 7px; border: 2px solid var(--md-border); background: var(--md-card);
+        cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+        color: transparent; font-size: 0.7rem;
+    }
+    .md-check.is-on { background: var(--md-primary); border-color: var(--md-primary); color: #fff; }
+
+    .md-tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800;
+        background: var(--md-soft); color: var(--md-primary-dark);
+    }
+    .md-tag.warn { background: #fef2f2; color: #b91c1c; }
+    .md-tag.today { background: #ecfdf5; color: #047857; }
+    .md-tag.plain { background: var(--md-widget); color: var(--md-muted); }
+
+    .md-empty {
+        padding: 30px 16px; text-align: center; color: var(--md-muted);
+        font-size: 0.84rem; font-weight: 700;
+    }
+    .md-empty i { display: block; font-size: 1.6rem; margin-bottom: 8px; opacity: .5; }
+
+    /* --- 메모 카드 --- */
+    .md-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+    .md-note {
+        display: flex; flex-direction: column; gap: 8px; min-height: 150px;
+        padding: 14px; border-radius: 12px; border: 1px solid rgba(15, 23, 42, .1);
+        color: #1f2937; box-shadow: 0 4px 14px rgba(15, 23, 42, .06);
+    }
+    .md-note h4 { margin: 0; font-size: 0.88rem; font-weight: 900; word-break: break-all; }
+    .md-note .md-note-body {
+        flex: 1; font-size: 0.8rem; font-weight: 600; line-height: 1.6;
+        white-space: pre-wrap; word-break: break-word;
+    }
+    .md-note .md-note-foot {
+        display: flex; align-items: center; justify-content: space-between; gap: 6px;
+        font-size: 0.7rem; font-weight: 800; color: rgba(31, 41, 55, .65);
+    }
+    .md-note .md-icon-btn { background: rgba(255, 255, 255, .7); border-color: rgba(15, 23, 42, .12); }
+
+    /* --- 달력 --- */
+    .md-cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .md-cal th {
+        padding: 8px 4px; font-size: 0.75rem; font-weight: 800; color: var(--md-muted);
+        border-bottom: 1px solid var(--md-border);
+    }
+    .md-cal td {
+        vertical-align: top; height: 92px; padding: 5px;
+        border: 1px solid var(--md-border); background: var(--md-card);
+    }
+    .md-cal td.is-empty { background: var(--md-widget); }
+    .md-cal td.is-today { background: var(--md-soft); }
+    .md-cal .md-cal-day { font-size: 0.75rem; font-weight: 800; color: var(--md-muted); }
+    .md-cal td.is-today .md-cal-day { color: var(--md-primary-dark); }
+    .md-cal .md-cal-ev {
+        display: block; margin-top: 3px; padding: 2px 5px; border-radius: 5px;
+        background: var(--md-soft); color: var(--md-primary-dark);
+        font-size: 0.68rem; font-weight: 800;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .md-cal .md-cal-sun { color: #dc2626; }
+    .md-cal .md-cal-sat { color: #2563eb; }
+
+    /* --- 사진 드래그&드롭 업로드 --- */
+    .md-drop {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 6px; padding: 28px 18px; text-align: center; cursor: pointer;
+        border: 2px dashed var(--md-border); border-radius: 14px;
+        background: var(--md-widget); color: var(--md-muted); transition: all .15s ease;
+    }
+    .md-drop:hover, .md-drop:focus-visible {
+        outline: none; border-color: var(--md-primary);
+        background: var(--md-soft); color: var(--md-primary-dark);
+    }
+    .md-drop.is-over {
+        border-color: var(--md-primary); border-style: solid;
+        background: var(--md-soft); color: var(--md-primary-dark);
+        box-shadow: inset 0 0 0 4px color-mix(in srgb, var(--md-primary) 12%, transparent);
+    }
+    .md-drop i { font-size: 1.8rem; color: var(--md-primary); }
+    .md-drop b { font-size: 0.92rem; font-weight: 900; }
+    .md-drop span { font-size: 0.78rem; font-weight: 700; }
+    .md-drop .md-drop-count:empty { display: none; }
+    .md-drop .md-drop-count {
+        margin-top: 2px; padding: 3px 10px; border-radius: 999px;
+        background: var(--md-primary); color: #fff; font-size: 0.74rem; font-weight: 800;
+    }
+
+    .md-drop-preview { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .md-drop-preview:empty { display: none; }
+    .md-drop-thumb { position: relative; width: 96px; }
+    .md-drop-thumb img {
+        display: block; width: 96px; height: 96px; object-fit: cover;
+        border-radius: 10px; border: 1px solid var(--md-border); background: var(--md-widget);
+    }
+    .md-drop-thumb .md-drop-name {
+        margin-top: 4px; font-size: 0.68rem; font-weight: 700; color: var(--md-muted);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .md-drop-thumb button {
+        position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+        border: 0; border-radius: 50%; cursor: pointer; font-size: 0.66rem;
+        background: rgba(15, 23, 42, .72); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .md-drop-thumb button:hover { background: #dc2626; }
+
+    /* --- 사진 --- */
+    .md-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+    .md-photo {
+        border: 1px solid var(--md-border); border-radius: 12px; overflow: hidden;
+        background: var(--md-card);
+    }
+    .md-photo img { width: 100%; height: 150px; object-fit: cover; display: block; background: var(--md-widget); }
+    .md-photo .md-photo-body { padding: 10px 12px; }
+    .md-photo .md-photo-date { font-size: 0.76rem; font-weight: 900; color: var(--md-primary-dark); }
+    .md-photo .md-photo-cap {
+        margin-top: 4px; font-size: 0.78rem; font-weight: 600; color: var(--md-muted);
+        line-height: 1.5; word-break: break-word;
+    }
+    .md-photo .md-photo-foot {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-top: 8px;
+    }
+
+    /* --- 용량 --- */
+    .md-quota { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .md-quota-bar {
+        flex: 1 1 180px; height: 8px; border-radius: 999px;
+        background: var(--md-hover); overflow: hidden; min-width: 120px;
+    }
+    .md-quota-bar span { display: block; height: 100%; background: var(--md-primary); width: 0; }
+
+    /* --- 토스트 --- */
+    #mdToast {
+        position: fixed; left: 50%; bottom: 34px; transform: translateX(-50%) translateY(20px);
+        z-index: 4000; padding: 12px 20px; border-radius: 10px;
+        background: #0f172a; color: #fff; font-size: 0.84rem; font-weight: 800;
+        opacity: 0; pointer-events: none; transition: all .22s ease;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, .3); max-width: 90vw;
+    }
+    #mdToast.is-on { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #mdToast.is-error { background: #b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="md-page" id="mdPage">
+
+    <div class="md-hero">
+        <div class="md-hero-inner">
+            <div>
+                <h2><i class="fa-solid fa-mug-hot"></i> 마이데스크</h2>
+                <p>나의 일과 생활을 계획하고 기록하는 개인 공간입니다. 여기에 남긴 자료는 나만 볼 수 있습니다.</p>
+            </div>
+            <div class="md-hero-meta">
+                <span class="md-chip"><i class="fa-solid fa-user"></i> {{ session.get('user_name', '') }}</span>
+                <span class="md-chip" id="mdTodayChip"><i class="fa-regular fa-calendar"></i> -</span>
+                <span class="md-chip" id="mdUsageChip"><i class="fa-solid fa-database"></i> - / {{ quota_text }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="md-tabs" id="mdTabs">
+        <button type="button" class="md-tab is-active" data-tab="brief"><i class="fa-solid fa-wand-magic-sparkles"></i> 브리핑</button>
+        <button type="button" class="md-tab" data-tab="tasks"><i class="fa-solid fa-list-check"></i> 할일</button>
+        <button type="button" class="md-tab" data-tab="notes"><i class="fa-regular fa-lightbulb"></i> 아이디어</button>
+        <button type="button" class="md-tab" data-tab="events"><i class="fa-regular fa-calendar-days"></i> 일정</button>
+        <button type="button" class="md-tab" data-tab="photos"><i class="fa-regular fa-image"></i> 데일리 포토</button>
+        <button type="button" class="md-tab" data-tab="people"><i class="fa-solid fa-cake-candles"></i> 인물·기념일</button>
+        <button type="button" class="md-tab" data-tab="journals"><i class="fa-solid fa-book"></i> 계획·기록</button>
+        <button type="button" class="md-tab" data-tab="files"><i class="fa-solid fa-box-archive"></i> 보관함</button>
+    </div>
+
+    <!-- ================= 브리핑 ================= -->
+    <section class="md-panel is-active" data-panel="brief">
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-solid fa-wand-magic-sparkles"></i> 오늘의 AI 브리핑</h3>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="md-sub" id="mdBriefMeta"></span>
+                    <button type="button" class="md-btn ghost" id="mdBriefRefresh">
+                        <i class="fa-solid fa-rotate"></i> 다시 브리핑
+                    </button>
+                </div>
+            </div>
+            <div class="md-card-body">
+                <div class="md-brief" id="mdBriefBody">브리핑을 준비하고 있습니다…</div>
+                <div class="md-brief-notice" id="mdBriefNotice" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-gauge-high"></i> 한눈에 보기</h3></div>
+            <div class="md-card-body">
+                <div class="md-stats">
+                    <div class="md-stat"><b id="mdStatEvents">0</b><span>오늘 일정</span></div>
+                    <div class="md-stat"><b id="mdStatTasks">0</b><span>남은 할일</span></div>
+                    <div class="md-stat"><b id="mdStatOverdue">0</b><span>기한 지남</span></div>
+                    <div class="md-stat"><b id="mdStatDone">0</b><span>오늘 완료</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="md-grid cols-2">
+            <div class="md-card">
+                <div class="md-card-head"><h3><i class="fa-regular fa-calendar-check"></i> 오늘 일정</h3></div>
+                <div class="md-card-body"><div class="md-list" id="mdTodayEvents"></div></div>
+            </div>
+            <div class="md-card">
+                <div class="md-card-head"><h3><i class="fa-solid fa-cake-candles"></i> 다가오는 기념일</h3></div>
+                <div class="md-card-body"><div class="md-list" id="mdUpcoming"></div></div>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-regular fa-images"></i> 최근 기록 사진</h3></div>
+            <div class="md-card-body"><div class="md-photos" id="mdRecentPhotos"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 할일 ================= -->
+    <section class="md-panel" data-panel="tasks">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-plus"></i> 할일 추가</h3></div>
+            <div class="md-card-body">
+                <form class="md-form" id="mdTaskForm">
+                    <div class="md-grow"><input type="text" name="title" placeholder="무엇을 해야 하나요?" maxlength="200" required></div>
+                    <select name="category" style="width:120px;">
+                        {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                    </select>
+                    <select name="priority" style="width:100px;">
+                        {% for value, label in priorities.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                    </select>
+                    <input type="date" name="due_date" style="width:160px;">
+                    <button type="submit" class="md-btn primary"><i class="fa-solid fa-plus"></i> 등록</button>
+                </form>
+                <div style="margin-top:8px;">
+                    <textarea name="detail" id="mdTaskDetail" placeholder="세부 내용 (선택)" maxlength="2000" style="min-height:60px;"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-solid fa-list-check"></i> 할일 목록</h3>
+                <div class="md-filters" id="mdTaskFilters">
+                    <button type="button" class="md-filter is-active" data-scope="open">미완료</button>
+                    <button type="button" class="md-filter" data-scope="done">완료</button>
+                    <button type="button" class="md-filter" data-scope="all">전체</button>
+                </div>
+            </div>
+            <div class="md-card-body"><div class="md-list" id="mdTaskList"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 아이디어 ================= -->
+    <section class="md-panel" data-panel="notes">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-regular fa-lightbulb"></i> 아이디어 메모</h3></div>
+            <div class="md-card-body">
+                <form id="mdNoteForm">
+                    <div class="md-form">
+                        <div class="md-grow"><input type="text" name="title" placeholder="아이디어 제목" maxlength="150"></div>
+                        <select name="category" style="width:120px;">
+                            {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                        </select>
+                        <select name="color" style="width:130px;">
+                            {% for color, color_label in note_colors %}<option value="{{ color }}">{{ color_label }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <textarea name="body" placeholder="떠오른 생각을 자유롭게 적어두세요." maxlength="5000"></textarea>
+                    </div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button type="submit" class="md-btn primary"><i class="fa-solid fa-plus"></i> 메모 저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-solid fa-note-sticky"></i> 저장된 아이디어</h3>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="mdNoteCategory" style="width:130px;">
+                        <option value="">전체 분야</option>
+                        {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                    </select>
+                    <input type="search" id="mdNoteSearch" placeholder="검색" style="width:160px;">
+                </div>
+            </div>
+            <div class="md-card-body"><div class="md-notes" id="mdNoteList"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 일정 ================= -->
+    <section class="md-panel" data-panel="events">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-plus"></i> 일정 등록</h3></div>
+            <div class="md-card-body">
+                <form id="mdEventForm">
+                    <div class="md-form">
+                        <div class="md-grow"><input type="text" name="title" placeholder="일정 제목" maxlength="200" required></div>
+                        <select name="category" style="width:120px;">
+                            {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                        </select>
+                        <label class="md-btn ghost" style="gap:8px;">
+                            <input type="checkbox" name="all_day" id="mdEventAllDay" style="width:auto;"> 종일
+                        </label>
+                    </div>
+                    <div class="md-form" style="margin-top:8px;">
+                        <div class="md-field md-grow">
+                            <label>시작</label>
+                            <input type="datetime-local" name="start_at" id="mdEventStart" required>
+                        </div>
+                        <div class="md-field md-grow">
+                            <label>종료 (선택)</label>
+                            <input type="datetime-local" name="end_at" id="mdEventEnd">
+                        </div>
+                        <div class="md-field md-grow">
+                            <label>장소 (선택)</label>
+                            <input type="text" name="place" maxlength="150" placeholder="장소">
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <textarea name="memo" placeholder="메모 (선택)" maxlength="2000" style="min-height:60px;"></textarea>
+                    </div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button type="submit" class="md-btn primary"><i class="fa-solid fa-plus"></i> 일정 저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-regular fa-calendar-days"></i> <span id="mdEventMonthLabel">월간 일정</span></h3>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <button type="button" class="md-icon-btn" id="mdEventPrev"><i class="fa-solid fa-chevron-left"></i></button>
+                    <input type="month" id="mdEventMonth" style="width:150px;">
+                    <button type="button" class="md-icon-btn" id="mdEventNext"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+            <div class="md-card-body" style="overflow-x:auto;">
+                <table class="md-cal">
+                    <thead>
+                        <tr>
+                            <th class="md-cal-sun">일</th><th>월</th><th>화</th><th>수</th>
+                            <th>목</th><th>금</th><th class="md-cal-sat">토</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mdCalBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-list"></i> 이번 달 일정 목록</h3></div>
+            <div class="md-card-body"><div class="md-list" id="mdEventList"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 데일리 포토 ================= -->
+    <section class="md-panel" data-panel="photos">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-camera"></i> 오늘의 기록 사진 올리기</h3></div>
+            <div class="md-card-body">
+                <form id="mdPhotoForm">
+                    <!-- 파일 선택창은 드롭존 밖에 둔다. 안에 두면 드롭존 클릭 → input 클릭이
+                         다시 드롭존으로 버블링돼 무한 반복이 된다. -->
+                    <input type="file" id="mdPhotoInput" accept="image/*" multiple hidden>
+                    <div class="md-drop" id="mdPhotoDrop" tabindex="0" role="button"
+                         aria-label="사진 파일을 끌어다 놓거나 클릭해서 선택">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <b>여기에 사진을 끌어다 놓으세요</b>
+                        <span>또는 클릭해서 선택 · 여러 장 한꺼번에 가능 · 한 장당 12.0MB 이하</span>
+                        <span class="md-drop-count" id="mdPhotoDropCount"></span>
+                    </div>
+                    <div class="md-drop-preview" id="mdPhotoPreview"></div>
+
+                    <div class="md-form" style="margin-top:10px;">
+                        <div class="md-field" style="width:170px;">
+                            <label>기록 날짜</label>
+                            <input type="date" name="photo_date" id="mdPhotoDate">
+                        </div>
+                        <div class="md-field" style="width:130px;">
+                            <label>분야</label>
+                            <select name="category">
+                                {% for key, label, icon in categories %}<option value="{{ key }}" {% if key == 'life' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <textarea name="caption" placeholder="오늘의 한 줄 (선택 · 여러 장을 올리면 모두 같은 내용으로 저장됩니다)" maxlength="300" style="min-height:60px;"></textarea>
+                    </div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button type="submit" class="md-btn primary"><i class="fa-solid fa-upload"></i> 사진 저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-regular fa-images"></i> 기록 사진</h3>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <input type="month" id="mdPhotoMonth" style="width:150px;">
+                    <button type="button" class="md-btn ghost" id="mdPhotoAll">전체 보기</button>
+                </div>
+            </div>
+            <div class="md-card-body"><div class="md-photos" id="mdPhotoList"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 인물 · 기념일 ================= -->
+    <section class="md-panel" data-panel="people">
+        <div class="md-grid cols-2">
+            <div class="md-card">
+                <div class="md-card-head"><h3><i class="fa-solid fa-user-plus"></i> 인물 등록</h3></div>
+                <div class="md-card-body">
+                    <form id="mdPersonForm">
+                        <div class="md-form">
+                            <div class="md-field md-grow"><label>이름</label><input type="text" name="name" maxlength="60" required></div>
+                            <div class="md-field" style="width:130px;"><label>관계</label><input type="text" name="relation" maxlength="40" placeholder="가족·친구 등"></div>
+                        </div>
+                        <div class="md-form" style="margin-top:8px;">
+                            <div class="md-field md-grow"><label>생일 (2026-01-31 또는 01-31)</label><input type="text" name="birthday" maxlength="10" placeholder="01-31"></div>
+                            <div class="md-field" style="width:110px;">
+                                <label>양·음력</label>
+                                <select name="birthday_type"><option value="solar">양력</option><option value="lunar">음력</option></select>
+                            </div>
+                        </div>
+                        <div class="md-form" style="margin-top:8px;">
+                            <div class="md-field md-grow"><label>연락처</label><input type="tel" name="phone" maxlength="40"></div>
+                            <div class="md-field md-grow"><label>이메일</label><input type="email" name="email" maxlength="120"></div>
+                        </div>
+                        <div class="md-field" style="margin-top:8px;"><label>주소</label><input type="text" name="address" maxlength="200"></div>
+                        <div style="margin-top:8px;">
+                            <textarea name="memo" placeholder="기억해 둘 내용 (선택)" maxlength="2000" style="min-height:60px;"></textarea>
+                        </div>
+                        <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                            <button type="submit" class="md-btn primary"><i class="fa-solid fa-plus"></i> 저장</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="md-card">
+                <div class="md-card-head"><h3><i class="fa-solid fa-heart"></i> 기념일 등록</h3></div>
+                <div class="md-card-body">
+                    <form id="mdAnnivForm">
+                        <div class="md-field"><label>기념일 이름</label><input type="text" name="title" maxlength="120" required placeholder="결혼기념일 등"></div>
+                        <div class="md-form" style="margin-top:8px;">
+                            <div class="md-field md-grow"><label>날짜 (2026-01-31 또는 01-31)</label><input type="text" name="anniv_date" maxlength="10" required placeholder="01-31"></div>
+                            <div class="md-field" style="width:150px;">
+                                <label>연결 인물 (선택)</label>
+                                <select name="person_id" id="mdAnnivPerson"><option value="">선택 안 함</option></select>
+                            </div>
+                        </div>
+                        <label class="md-btn ghost" style="margin-top:8px; gap:8px;">
+                            <input type="checkbox" name="repeat_yearly" checked style="width:auto;"> 매년 반복
+                        </label>
+                        <div style="margin-top:8px;">
+                            <textarea name="memo" placeholder="메모 (선택)" maxlength="1000" style="min-height:60px;"></textarea>
+                        </div>
+                        <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                            <button type="submit" class="md-btn primary"><i class="fa-solid fa-plus"></i> 저장</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-bell"></i> 90일 안의 생일·기념일</h3></div>
+            <div class="md-card-body"><div class="md-list" id="mdPeopleUpcoming"></div></div>
+        </div>
+
+        <div class="md-grid cols-2">
+            <div class="md-card">
+                <div class="md-card-head">
+                    <h3><i class="fa-solid fa-address-book"></i> 인물 목록</h3>
+                    <input type="search" id="mdPersonSearch" placeholder="이름·관계 검색" style="width:170px;">
+                </div>
+                <div class="md-card-body"><div class="md-list" id="mdPersonList"></div></div>
+            </div>
+            <div class="md-card">
+                <div class="md-card-head"><h3><i class="fa-solid fa-calendar-star"></i> 기념일 목록</h3></div>
+                <div class="md-card-body"><div class="md-list" id="mdAnnivList"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ================= 계획 · 기록 ================= -->
+    <section class="md-panel" data-panel="journals">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-pen-to-square"></i> 계획·기록 쓰기</h3></div>
+            <div class="md-card-body">
+                <form id="mdJournalForm">
+                    <div class="md-form">
+                        <div class="md-field" style="width:170px;"><label>날짜</label><input type="date" name="entry_date" id="mdJournalDate"></div>
+                        <div class="md-field" style="width:130px;">
+                            <label>분야</label>
+                            <select name="category">
+                                {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="md-field" style="width:120px;">
+                            <label>기분</label>
+                            <select name="mood">
+                                <option value="">선택 안 함</option>
+                                <option value="good">좋음</option>
+                                <option value="soso">보통</option>
+                                <option value="bad">힘듦</option>
+                            </select>
+                        </div>
+                        <div class="md-field md-grow"><label>제목</label><input type="text" name="title" maxlength="150" placeholder="오늘의 계획 / 기록"></div>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <textarea name="body" placeholder="업무, 생활, 운동, 취미, 가족, 여행… 무엇이든 남겨두세요." maxlength="8000" style="min-height:130px;"></textarea>
+                    </div>
+                    <div style="margin-top:8px; display:flex; justify-content:flex-end;">
+                        <button type="submit" class="md-btn primary"><i class="fa-solid fa-floppy-disk"></i> 기록 저장</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-solid fa-book"></i> 기록 모아보기</h3>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <select id="mdJournalCategory" style="width:130px;">
+                        <option value="">전체 분야</option>
+                        {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                    </select>
+                    <input type="search" id="mdJournalSearch" placeholder="검색" style="width:160px;">
+                </div>
+            </div>
+            <div class="md-card-body"><div class="md-list" id="mdJournalList"></div></div>
+        </div>
+    </section>
+
+    <!-- ================= 보관함 ================= -->
+    <section class="md-panel" data-panel="files">
+        <div class="md-card">
+            <div class="md-card-head"><h3><i class="fa-solid fa-cloud-arrow-up"></i> 파일 보관</h3></div>
+            <div class="md-card-body">
+                <form id="mdFileForm">
+                    <div class="md-form">
+                        <div class="md-field md-grow"><label>파일 (20.0MB 이하)</label><input type="file" name="file" required></div>
+                        <div class="md-field md-grow"><label>이름 (선택)</label><input type="text" name="title" maxlength="150" placeholder="비워두면 파일명 사용"></div>
+                        <div class="md-field" style="width:130px;">
+                            <label>분야</label>
+                            <select name="category">
+                                {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="md-btn primary" style="margin-top:22px;"><i class="fa-solid fa-upload"></i> 업로드</button>
+                    </div>
+                </form>
+                <div class="md-quota" style="margin-top:14px;">
+                    <span class="md-sub" id="mdQuotaText" style="font-size:0.78rem; font-weight:800; color:var(--md-muted);"></span>
+                    <span class="md-quota-bar"><span id="mdQuotaFill"></span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="md-card">
+            <div class="md-card-head">
+                <h3><i class="fa-solid fa-box-archive"></i> 보관된 파일</h3>
+                <select id="mdFileCategory" style="width:140px;">
+                    <option value="">전체 분야</option>
+                    {% for key, label, icon in categories %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="md-card-body"><div class="md-list" id="mdFileList"></div></div>
+        </div>
+    </section>
+</div>
+
+<div id="mdToast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    'use strict';
+
+    const CATEGORY_LABELS = {{ category_labels | tojson }};
+    const QUOTA_BYTES = {{ quota_bytes | tojson }};
+
+    // ---------- 공통 유틸 ----------
+    const $ = (selector, root) => (root || document).querySelector(selector);
+    const $$ = (selector, root) => Array.from((root || document).querySelectorAll(selector));
+
+    // form.title / form.name 은 HTMLElement 자체 속성과 겹치므로 항상 이 헬퍼로 입력값을 읽는다.
+    function field(form, name) { return form.elements.namedItem(name); }
+
+    function esc(value) {
+        return String(value === null || value === undefined ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    let toastTimer = null;
+    function toast(message, isError) {
+        const box = $('#mdToast');
+        box.textContent = message;
+        box.classList.toggle('is-error', Boolean(isError));
+        box.classList.add('is-on');
+        window.clearTimeout(toastTimer);
+        toastTimer = window.setTimeout(() => box.classList.remove('is-on'), 2600);
+    }
+
+    async function api(url, options) {
+        const config = Object.assign({ headers: {} }, options || {});
+        if (config.body && !(config.body instanceof FormData)) {
+            config.headers['Content-Type'] = 'application/json';
+            config.body = JSON.stringify(config.body);
+        }
+        const response = await fetch(url, config);
+        let data = {};
+        try { data = await response.json(); } catch (error) { data = {}; }
+        if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || '요청을 처리하지 못했습니다.');
+        }
+        return data;
+    }
+
+    function pad(value) { return String(value).padStart(2, '0'); }
+
+    function todayText() {
+        const now = new Date();
+        return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+    }
+
+    function monthText(dateValue) {
+        return dateValue.getFullYear() + '-' + pad(dateValue.getMonth() + 1);
+    }
+
+    function emptyBox(icon, message) {
+        return '<div class="md-empty"><i class="fa-solid ' + icon + '"></i>' + esc(message) + '</div>';
+    }
+
+    function categoryLabel(key) { return CATEGORY_LABELS[key] || '기타'; }
+
+    function dayCountLabel(days) {
+        if (days === null || days === undefined) return '';
+        if (days === 0) return 'D-DAY';
+        return days > 0 ? 'D-' + days : 'D+' + Math.abs(days);
+    }
+
+    function confirmDelete(message) { return window.confirm(message); }
+
+    // ---------- 탭 ----------
+    const loaded = {};
+    function activateTab(name) {
+        $$('#mdTabs .md-tab').forEach((button) => {
+            button.classList.toggle('is-active', button.dataset.tab === name);
+        });
+        $$('.md-panel').forEach((panel) => {
+            panel.classList.toggle('is-active', panel.dataset.panel === name);
+        });
+        if (!loaded[name] && LOADERS[name]) {
+            loaded[name] = true;
+            LOADERS[name]();
+        }
+    }
+
+    // ---------- 브리핑 ----------
+    async function loadBriefing(refresh) {
+        const body = $('#mdBriefBody');
+        const notice = $('#mdBriefNotice');
+        body.textContent = refresh ? 'AI가 다시 브리핑을 작성하고 있습니다…' : '브리핑을 준비하고 있습니다…';
+        notice.style.display = 'none';
+        try {
+            const data = await api('/mydesk/api/briefing' + (refresh ? '?refresh=1' : ''));
+            const brief = data.briefing || {};
+            body.textContent = brief.body || '표시할 브리핑이 없습니다.';
+            const sourceText = brief.source === 'ai'
+                ? 'AI 작성 · ' + (brief.model || '')
+                : '기본 브리핑';
+            $('#mdBriefMeta').textContent = sourceText + ' · ' + (brief.created_at || '');
+            if (brief.notice) {
+                notice.textContent = brief.notice;
+                notice.style.display = 'block';
+            }
+        } catch (error) {
+            body.textContent = '브리핑을 불러오지 못했습니다.';
+            toast(error.message, true);
+        }
+    }
+
+    function renderOverview(overview) {
+        $('#mdTodayChip').innerHTML = '<i class="fa-regular fa-calendar"></i> '
+            + esc(overview.today) + '(' + esc(overview.weekday) + ')';
+        $('#mdUsageChip').innerHTML = '<i class="fa-solid fa-database"></i> '
+            + esc(overview.usage_text) + ' / ' + esc(overview.quota_text);
+
+        $('#mdStatEvents').textContent = (overview.today_events || []).length;
+        $('#mdStatTasks').textContent = overview.open_task_count || 0;
+        $('#mdStatOverdue').textContent = (overview.overdue_tasks || []).length;
+        $('#mdStatDone').textContent = overview.done_today_count || 0;
+
+        const events = overview.today_events || [];
+        $('#mdTodayEvents').innerHTML = events.length
+            ? events.map((event) => `
+                <div class="md-item">
+                    <div class="md-item-main">
+                        <div class="md-item-title">${esc(event.title)}</div>
+                        <div class="md-item-meta">
+                            <span class="md-tag today">${esc(event.time || '종일')}</span>
+                            <span class="md-tag plain">${esc(event.category_label)}</span>
+                            ${event.place ? '<span>' + esc(event.place) + '</span>' : ''}
+                        </div>
+                    </div>
+                </div>`).join('')
+            : emptyBox('fa-mug-saucer', '오늘 등록된 일정이 없습니다.');
+
+        const upcoming = overview.anniversaries || [];
+        $('#mdUpcoming').innerHTML = upcoming.length
+            ? upcoming.map((item) => `
+                <div class="md-item">
+                    <div class="md-item-main">
+                        <div class="md-item-title">${esc(item.title)}</div>
+                        <div class="md-item-meta">
+                            <span class="md-tag${item.days_until === 0 ? ' warn' : ''}">${esc(dayCountLabel(item.days_until))}</span>
+                            <span>${esc(item.date)}</span>
+                            ${item.relation ? '<span>' + esc(item.relation) + '</span>' : ''}
+                        </div>
+                    </div>
+                </div>`).join('')
+            : emptyBox('fa-cake-candles', '30일 안에 다가오는 기념일이 없습니다.');
+
+        const photos = overview.recent_photos || [];
+        $('#mdRecentPhotos').innerHTML = photos.length
+            ? photos.map((photo) => `
+                <div class="md-photo">
+                    <img src="${esc(photo.image_url)}" alt="${esc(photo.caption || photo.photo_date)}" loading="lazy">
+                    <div class="md-photo-body">
+                        <div class="md-photo-date">${esc(photo.photo_date)}</div>
+                        <div class="md-photo-cap">${esc(photo.caption || '')}</div>
+                    </div>
+                </div>`).join('')
+            : emptyBox('fa-image', '아직 등록한 기록 사진이 없습니다.');
+    }
+
+    async function loadOverview() {
+        try {
+            const data = await api('/mydesk/api/overview');
+            renderOverview(data.overview || {});
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 할일 ----------
+    let taskScope = 'open';
+
+    function taskRow(task) {
+        const badges = [];
+        if (task.is_overdue) badges.push('<span class="md-tag warn">기한 지남</span>');
+        else if (task.is_today) badges.push('<span class="md-tag today">오늘 마감</span>');
+        if (task.due_date) badges.push('<span>' + esc(task.due_date) + '</span>');
+        badges.push('<span class="md-tag plain">' + esc(task.category_label) + '</span>');
+        if (task.priority > 0) badges.push('<span class="md-tag">' + esc(task.priority_label) + '</span>');
+
+        return `
+            <div class="md-item ${task.is_done ? 'is-done' : ''}">
+                <button type="button" class="md-check ${task.is_done ? 'is-on' : ''}"
+                        data-task-toggle="${task.id}" data-done="${task.is_done ? '1' : '0'}"
+                        title="완료 표시"><i class="fa-solid fa-check"></i></button>
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(task.title)}</div>
+                    <div class="md-item-meta">${badges.join('')}</div>
+                    ${task.detail ? '<div class="md-item-detail">' + esc(task.detail) + '</div>' : ''}
+                </div>
+                <div class="md-item-actions">
+                    <button type="button" class="md-icon-btn danger" data-task-delete="${task.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function loadTasks() {
+        try {
+            const data = await api('/mydesk/api/tasks?scope=' + encodeURIComponent(taskScope));
+            const items = data.items || [];
+            $('#mdTaskList').innerHTML = items.length
+                ? items.map(taskRow).join('')
+                : emptyBox('fa-clipboard-check', '표시할 할일이 없습니다.');
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 아이디어 ----------
+    function noteCard(note) {
+        return `
+            <div class="md-note" style="background:${esc(note.color)};">
+                <h4>${esc(note.title)}</h4>
+                <div class="md-note-body">${esc(note.body || '')}</div>
+                <div class="md-note-foot">
+                    <span>${esc(note.category_label)} · ${esc(String(note.updated_at || '').slice(0, 10))}</span>
+                    <span style="display:flex; gap:4px;">
+                        <button type="button" class="md-icon-btn ${note.is_pinned ? 'is-on' : ''}"
+                                data-note-pin="${note.id}" data-pinned="${note.is_pinned ? '1' : '0'}" title="고정">
+                            <i class="fa-solid fa-thumbtack"></i>
+                        </button>
+                        <button type="button" class="md-icon-btn danger" data-note-delete="${note.id}" title="삭제">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </span>
+                </div>
+            </div>`;
+    }
+
+    async function loadNotes() {
+        const params = new URLSearchParams();
+        const category = $('#mdNoteCategory').value;
+        const keyword = $('#mdNoteSearch').value.trim();
+        if (category) params.set('category', category);
+        if (keyword) params.set('q', keyword);
+        try {
+            const data = await api('/mydesk/api/notes?' + params.toString());
+            const items = data.items || [];
+            $('#mdNoteList').innerHTML = items.length
+                ? items.map(noteCard).join('')
+                : emptyBox('fa-lightbulb', '저장된 아이디어가 없습니다.');
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 일정 ----------
+    let eventMonth = monthText(new Date());
+
+    function renderCalendar(month, events) {
+        const [year, monthNumber] = month.split('-').map(Number);
+        const first = new Date(year, monthNumber - 1, 1);
+        const daysInMonth = new Date(year, monthNumber, 0).getDate();
+        const startWeekday = first.getDay();
+        const today = todayText();
+
+        const byDay = {};
+        events.forEach((event) => {
+            (byDay[event.date] = byDay[event.date] || []).push(event);
+        });
+
+        let html = '';
+        let dayNumber = 1;
+        for (let week = 0; week < 6 && dayNumber <= daysInMonth; week += 1) {
+            html += '<tr>';
+            for (let column = 0; column < 7; column += 1) {
+                if ((week === 0 && column < startWeekday) || dayNumber > daysInMonth) {
+                    html += '<td class="is-empty"></td>';
+                    continue;
+                }
+                const dateText = year + '-' + pad(monthNumber) + '-' + pad(dayNumber);
+                const dayEvents = byDay[dateText] || [];
+                const weekdayClass = column === 0 ? ' md-cal-sun' : (column === 6 ? ' md-cal-sat' : '');
+                html += '<td class="' + (dateText === today ? 'is-today' : '') + '">'
+                    + '<div class="md-cal-day' + weekdayClass + '">' + dayNumber + '</div>'
+                    + dayEvents.slice(0, 3).map((event) =>
+                        '<span class="md-cal-ev" title="' + esc(event.title) + '">'
+                        + esc((event.time ? event.time + ' ' : '') + event.title) + '</span>').join('')
+                    + (dayEvents.length > 3 ? '<span class="md-cal-ev">+' + (dayEvents.length - 3) + '</span>' : '')
+                    + '</td>';
+                dayNumber += 1;
+            }
+            html += '</tr>';
+        }
+        $('#mdCalBody').innerHTML = html;
+    }
+
+    function eventRow(event) {
+        return `
+            <div class="md-item">
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(event.title)}</div>
+                    <div class="md-item-meta">
+                        <span class="md-tag">${esc(event.date)}</span>
+                        <span class="md-tag plain">${esc(event.time || '종일')}</span>
+                        <span class="md-tag plain">${esc(event.category_label)}</span>
+                        ${event.place ? '<span>' + esc(event.place) + '</span>' : ''}
+                        ${event.end_at ? '<span>~ ' + esc(event.end_at) + '</span>' : ''}
+                    </div>
+                    ${event.memo ? '<div class="md-item-detail">' + esc(event.memo) + '</div>' : ''}
+                </div>
+                <div class="md-item-actions">
+                    <button type="button" class="md-icon-btn danger" data-event-delete="${event.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function loadEvents() {
+        $('#mdEventMonth').value = eventMonth;
+        $('#mdEventMonthLabel').textContent = eventMonth.replace('-', '년 ') + '월 일정';
+        try {
+            const data = await api('/mydesk/api/events?month=' + encodeURIComponent(eventMonth));
+            const items = data.items || [];
+            renderCalendar(eventMonth, items);
+            $('#mdEventList').innerHTML = items.length
+                ? items.map(eventRow).join('')
+                : emptyBox('fa-calendar-xmark', '이번 달에 등록된 일정이 없습니다.');
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    function shiftMonth(step) {
+        const [year, month] = eventMonth.split('-').map(Number);
+        const moved = new Date(year, month - 1 + step, 1);
+        eventMonth = monthText(moved);
+        loadEvents();
+    }
+
+    // ---------- 데일리 포토 ----------
+    let photoMonth = '';
+
+    function photoCard(photo) {
+        return `
+            <div class="md-photo">
+                <img src="${esc(photo.image_url)}" alt="${esc(photo.caption || photo.photo_date)}" loading="lazy">
+                <div class="md-photo-body">
+                    <div class="md-photo-date">${esc(photo.photo_date)}</div>
+                    <div class="md-photo-cap">${esc(photo.caption || '')}</div>
+                    <div class="md-photo-foot">
+                        <span class="md-tag plain">${esc(photo.category_label)}</span>
+                        <span style="display:flex; gap:4px;">
+                            <a class="md-icon-btn" href="${esc(photo.image_url)}" target="_blank" rel="noopener" title="크게 보기">
+                                <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                            </a>
+                            <button type="button" class="md-icon-btn danger" data-photo-delete="${photo.id}" title="삭제">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    async function loadPhotos() {
+        try {
+            const data = await api('/mydesk/api/photos' + (photoMonth ? '?month=' + encodeURIComponent(photoMonth) : ''));
+            const items = data.items || [];
+            $('#mdPhotoList').innerHTML = items.length
+                ? items.map(photoCard).join('')
+                : emptyBox('fa-camera', '등록된 기록 사진이 없습니다.');
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 인물 · 기념일 ----------
+    function personRow(person) {
+        const meta = [];
+        if (person.relation) meta.push('<span class="md-tag plain">' + esc(person.relation) + '</span>');
+        if (person.birthday) {
+            meta.push('<span class="md-tag">' + esc(person.birthday) + ' ' + esc(person.birthday_type_label) + '</span>');
+        }
+        if (person.days_until_birthday !== null && person.days_until_birthday !== undefined) {
+            meta.push('<span class="md-tag today">생일 ' + esc(dayCountLabel(person.days_until_birthday)) + '</span>');
+        }
+        if (person.phone) meta.push('<span>' + esc(person.phone) + '</span>');
+        if (person.email) meta.push('<span>' + esc(person.email) + '</span>');
+
+        return `
+            <div class="md-item">
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(person.name)}</div>
+                    <div class="md-item-meta">${meta.join('')}</div>
+                    ${person.address ? '<div class="md-item-detail">' + esc(person.address) + '</div>' : ''}
+                    ${person.memo ? '<div class="md-item-detail">' + esc(person.memo) + '</div>' : ''}
+                </div>
+                <div class="md-item-actions">
+                    <button type="button" class="md-icon-btn danger" data-person-delete="${person.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    function annivRow(item) {
+        const meta = ['<span class="md-tag">' + esc(item.anniv_date) + '</span>'];
+        if (item.repeat_yearly) meta.push('<span class="md-tag plain">매년</span>');
+        if (item.person_name) meta.push('<span>' + esc(item.person_name) + '</span>');
+        if (item.days_until !== null && item.days_until !== undefined) {
+            meta.push('<span class="md-tag today">' + esc(dayCountLabel(item.days_until)) + '</span>');
+        }
+        return `
+            <div class="md-item">
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(item.title)}</div>
+                    <div class="md-item-meta">${meta.join('')}</div>
+                    ${item.memo ? '<div class="md-item-detail">' + esc(item.memo) + '</div>' : ''}
+                </div>
+                <div class="md-item-actions">
+                    <button type="button" class="md-icon-btn danger" data-anniv-delete="${item.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function loadPeople() {
+        const keyword = $('#mdPersonSearch').value.trim();
+        try {
+            const data = await api('/mydesk/api/people' + (keyword ? '?q=' + encodeURIComponent(keyword) : ''));
+            const people = data.items || [];
+            const anniversaries = data.anniversaries || [];
+            const upcoming = data.upcoming || [];
+
+            $('#mdPersonList').innerHTML = people.length
+                ? people.map(personRow).join('')
+                : emptyBox('fa-user', '등록된 인물이 없습니다.');
+            $('#mdAnnivList').innerHTML = anniversaries.length
+                ? anniversaries.map(annivRow).join('')
+                : emptyBox('fa-heart', '등록된 기념일이 없습니다.');
+            $('#mdPeopleUpcoming').innerHTML = upcoming.length
+                ? upcoming.map((item) => `
+                    <div class="md-item">
+                        <div class="md-item-main">
+                            <div class="md-item-title">${esc(item.title)}</div>
+                            <div class="md-item-meta">
+                                <span class="md-tag${item.days_until === 0 ? ' warn' : ''}">${esc(dayCountLabel(item.days_until))}</span>
+                                <span>${esc(item.date)}</span>
+                                ${item.relation ? '<span>' + esc(item.relation) + '</span>' : ''}
+                                ${item.note ? '<span class="md-tag plain">' + esc(item.note) + '</span>' : ''}
+                            </div>
+                        </div>
+                    </div>`).join('')
+                : emptyBox('fa-bell', '90일 안에 다가오는 생일·기념일이 없습니다.');
+
+            const select = $('#mdAnnivPerson');
+            const current = select.value;
+            select.innerHTML = '<option value="">선택 안 함</option>'
+                + people.map((person) => '<option value="' + person.id + '">' + esc(person.name) + '</option>').join('');
+            select.value = current;
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 계획 · 기록 ----------
+    const MOOD_LABELS = { good: '좋음', soso: '보통', bad: '힘듦' };
+
+    function journalRow(entry) {
+        const meta = [
+            '<span class="md-tag">' + esc(entry.entry_date) + '</span>',
+            '<span class="md-tag plain">' + esc(entry.category_label) + '</span>',
+        ];
+        if (entry.mood) meta.push('<span class="md-tag today">' + esc(MOOD_LABELS[entry.mood] || entry.mood) + '</span>');
+        return `
+            <div class="md-item">
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(entry.title)}</div>
+                    <div class="md-item-meta">${meta.join('')}</div>
+                    ${entry.body ? '<div class="md-item-detail">' + esc(entry.body) + '</div>' : ''}
+                </div>
+                <div class="md-item-actions">
+                    <button type="button" class="md-icon-btn danger" data-journal-delete="${entry.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function loadJournals() {
+        const params = new URLSearchParams();
+        const category = $('#mdJournalCategory').value;
+        const keyword = $('#mdJournalSearch').value.trim();
+        if (category) params.set('category', category);
+        if (keyword) params.set('q', keyword);
+        try {
+            const data = await api('/mydesk/api/journals?' + params.toString());
+            const items = data.items || [];
+            $('#mdJournalList').innerHTML = items.length
+                ? items.map(journalRow).join('')
+                : emptyBox('fa-book', '저장된 기록이 없습니다.');
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    // ---------- 보관함 ----------
+    function fileRow(file) {
+        return `
+            <div class="md-item">
+                <div class="md-item-main">
+                    <div class="md-item-title">${esc(file.title)}</div>
+                    <div class="md-item-meta">
+                        <span class="md-tag plain">${esc(file.category_label)}</span>
+                        <span>${esc(file.original_name)}</span>
+                        <span>${esc(file.size_text)}</span>
+                        <span>${esc(String(file.created_at || '').slice(0, 16))}</span>
+                    </div>
+                </div>
+                <div class="md-item-actions">
+                    <a class="md-icon-btn" href="${esc(file.download_url)}" title="내려받기">
+                        <i class="fa-solid fa-download"></i>
+                    </a>
+                    <button type="button" class="md-icon-btn danger" data-file-delete="${file.id}" title="삭제">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    async function loadFiles() {
+        const category = $('#mdFileCategory').value;
+        try {
+            const data = await api('/mydesk/api/files' + (category ? '?category=' + encodeURIComponent(category) : ''));
+            const items = data.items || [];
+            $('#mdFileList').innerHTML = items.length
+                ? items.map(fileRow).join('')
+                : emptyBox('fa-folder-open', '보관된 파일이 없습니다.');
+            $('#mdQuotaText').textContent = '사용량 ' + data.usage_text + ' / ' + data.quota_text;
+            const ratio = Math.min(100, Math.round((data.usage_bytes / QUOTA_BYTES) * 100));
+            $('#mdQuotaFill').style.width = ratio + '%';
+        } catch (error) {
+            toast(error.message, true);
+        }
+    }
+
+    const LOADERS = {
+        brief: () => { loadOverview(); loadBriefing(false); },
+        tasks: loadTasks,
+        notes: loadNotes,
+        events: loadEvents,
+        photos: loadPhotos,
+        people: loadPeople,
+        journals: loadJournals,
+        files: loadFiles,
+    };
+
+    // ---------- 이벤트 연결 ----------
+    $('#mdTabs').addEventListener('click', (event) => {
+        const button = event.target.closest('.md-tab');
+        if (button) activateTab(button.dataset.tab);
+    });
+
+    $('#mdBriefRefresh').addEventListener('click', () => { loadBriefing(true); loadOverview(); });
+
+    // 할일
+    $('#mdTaskForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            title: field(form, 'title').value.trim(),
+            detail: $('#mdTaskDetail').value.trim(),
+            category: field(form, 'category').value,
+            priority: Number(field(form, 'priority').value),
+            due_date: field(form, 'due_date').value,
+        };
+        if (!payload.title) { toast('할일 제목을 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/tasks', { method: 'POST', body: payload });
+            form.reset();
+            $('#mdTaskDetail').value = '';
+            toast('할일을 등록했습니다.');
+            loadTasks();
+            loadOverview();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdTaskFilters').addEventListener('click', (event) => {
+        const button = event.target.closest('.md-filter');
+        if (!button) return;
+        taskScope = button.dataset.scope;
+        $$('#mdTaskFilters .md-filter').forEach((item) => item.classList.toggle('is-active', item === button));
+        loadTasks();
+    });
+
+    $('#mdTaskList').addEventListener('click', async (event) => {
+        const toggle = event.target.closest('[data-task-toggle]');
+        if (toggle) {
+            try {
+                await api('/mydesk/api/tasks/' + toggle.dataset.taskToggle, {
+                    method: 'PATCH',
+                    body: { is_done: toggle.dataset.done !== '1' },
+                });
+                loadTasks();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+            return;
+        }
+        const remove = event.target.closest('[data-task-delete]');
+        if (remove && confirmDelete('이 할일을 삭제할까요?')) {
+            try {
+                await api('/mydesk/api/tasks/' + remove.dataset.taskDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadTasks();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    // 아이디어
+    $('#mdNoteForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            title: field(form, 'title').value.trim(),
+            body: field(form, 'body').value.trim(),
+            category: field(form, 'category').value,
+            color: field(form, 'color').value,
+        };
+        if (!payload.title && !payload.body) { toast('제목이나 내용을 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/notes', { method: 'POST', body: payload });
+            form.reset();
+            toast('아이디어를 저장했습니다.');
+            loadNotes();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdNoteList').addEventListener('click', async (event) => {
+        const pin = event.target.closest('[data-note-pin]');
+        if (pin) {
+            try {
+                await api('/mydesk/api/notes/' + pin.dataset.notePin, {
+                    method: 'PATCH',
+                    body: { is_pinned: pin.dataset.pinned !== '1' },
+                });
+                loadNotes();
+            } catch (error) { toast(error.message, true); }
+            return;
+        }
+        const remove = event.target.closest('[data-note-delete]');
+        if (remove && confirmDelete('이 아이디어 메모를 삭제할까요?')) {
+            try {
+                await api('/mydesk/api/notes/' + remove.dataset.noteDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadNotes();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdNoteCategory').addEventListener('change', loadNotes);
+    let noteSearchTimer = null;
+    $('#mdNoteSearch').addEventListener('input', () => {
+        window.clearTimeout(noteSearchTimer);
+        noteSearchTimer = window.setTimeout(loadNotes, 280);
+    });
+
+    // 일정
+    $('#mdEventAllDay').addEventListener('change', (event) => {
+        const type = event.currentTarget.checked ? 'date' : 'datetime-local';
+        $('#mdEventStart').type = type;
+        $('#mdEventEnd').type = type;
+        $('#mdEventStart').value = '';
+        $('#mdEventEnd').value = '';
+    });
+
+    $('#mdEventForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            title: field(form, 'title').value.trim(),
+            category: field(form, 'category').value,
+            all_day: field(form, 'all_day').checked,
+            start_at: field(form, 'start_at').value,
+            end_at: field(form, 'end_at').value,
+            place: field(form, 'place').value.trim(),
+            memo: field(form, 'memo').value.trim(),
+        };
+        if (!payload.title || !payload.start_at) { toast('제목과 시작 일시를 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/events', { method: 'POST', body: payload });
+            form.reset();
+            $('#mdEventStart').type = 'datetime-local';
+            $('#mdEventEnd').type = 'datetime-local';
+            toast('일정을 저장했습니다.');
+            eventMonth = payload.start_at.slice(0, 7);
+            loadEvents();
+            loadOverview();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdEventList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-event-delete]');
+        if (remove && confirmDelete('이 일정을 삭제할까요?')) {
+            try {
+                await api('/mydesk/api/events/' + remove.dataset.eventDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadEvents();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdEventPrev').addEventListener('click', () => shiftMonth(-1));
+    $('#mdEventNext').addEventListener('click', () => shiftMonth(1));
+    $('#mdEventMonth').addEventListener('change', (event) => {
+        if (event.currentTarget.value) {
+            eventMonth = event.currentTarget.value;
+            loadEvents();
+        }
+    });
+
+    // 데일리 포토 - 드래그&드롭 업로드
+    const MAX_PHOTO_BYTES = 12 * 1024 * 1024;
+    let photoQueue = [];
+
+    function renderPhotoQueue() {
+        $('#mdPhotoPreview').innerHTML = photoQueue.map((item, index) => `
+            <div class="md-drop-thumb">
+                <img src="${esc(item.url)}" alt="${esc(item.file.name)}">
+                <button type="button" data-photo-remove="${index}" title="빼기">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="md-drop-name" title="${esc(item.file.name)}">${esc(item.file.name)}</div>
+            </div>`).join('');
+        $('#mdPhotoDropCount').textContent = photoQueue.length ? photoQueue.length + '장 선택됨' : '';
+    }
+
+    function addPhotoFiles(files) {
+        const rejected = [];
+        Array.from(files || []).forEach((file) => {
+            if (!String(file.type || '').startsWith('image/')) {
+                rejected.push(file.name + '(이미지 아님)');
+                return;
+            }
+            if (file.size > MAX_PHOTO_BYTES) {
+                rejected.push(file.name + '(12MB 초과)');
+                return;
+            }
+            const duplicated = photoQueue.some((item) =>
+                item.file.name === file.name && item.file.size === file.size);
+            if (duplicated) return;
+            photoQueue.push({ file, url: URL.createObjectURL(file) });
+        });
+        renderPhotoQueue();
+        if (rejected.length) toast('제외한 파일: ' + rejected.join(', '), true);
+    }
+
+    const photoDrop = $('#mdPhotoDrop');
+    const photoInput = $('#mdPhotoInput');
+
+    photoDrop.addEventListener('click', () => photoInput.click());
+    photoDrop.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            photoInput.click();
+        }
+    });
+    photoInput.addEventListener('change', () => {
+        addPhotoFiles(photoInput.files);
+        photoInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach((name) => {
+        photoDrop.addEventListener(name, (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+            photoDrop.classList.add('is-over');
+        });
+    });
+    ['dragleave', 'dragend'].forEach((name) => {
+        photoDrop.addEventListener(name, () => photoDrop.classList.remove('is-over'));
+    });
+    photoDrop.addEventListener('drop', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        photoDrop.classList.remove('is-over');
+        addPhotoFiles(event.dataTransfer && event.dataTransfer.files);
+    });
+
+    // 드롭존을 살짝 벗어나 놓았을 때 브라우저가 그 파일로 페이지를 벗어나지 않게 막는다.
+    ['dragover', 'drop'].forEach((name) => {
+        $('#mdPage').addEventListener(name, (event) => {
+            if (!event.target.closest('#mdPhotoDrop')) event.preventDefault();
+        });
+    });
+
+    $('#mdPhotoPreview').addEventListener('click', (event) => {
+        const remove = event.target.closest('[data-photo-remove]');
+        if (!remove) return;
+        const index = Number(remove.dataset.photoRemove);
+        if (!photoQueue[index]) return;
+        URL.revokeObjectURL(photoQueue[index].url);
+        photoQueue.splice(index, 1);
+        renderPhotoQueue();
+    });
+
+    $('#mdPhotoForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('button[type="submit"]');
+        if (!photoQueue.length) {
+            toast('올릴 사진을 끌어다 놓거나 클릭해서 선택해주세요.', true);
+            return;
+        }
+        const photoDate = field(form, 'photo_date').value;
+        const category = field(form, 'category').value;
+        const caption = field(form, 'caption').value.trim();
+
+        button.disabled = true;
+        const failed = [];
+        const remaining = [];
+        try {
+            for (const item of photoQueue.slice()) {
+                const body = new FormData();
+                body.append('photo', item.file, item.file.name);
+                body.append('photo_date', photoDate);
+                body.append('category', category);
+                body.append('caption', caption);
+                try {
+                    await api('/mydesk/api/photos', { method: 'POST', body });
+                    URL.revokeObjectURL(item.url);
+                } catch (error) {
+                    // 실패한 사진은 그대로 남겨 다시 시도할 수 있게 한다.
+                    failed.push(item.file.name + ': ' + error.message);
+                    remaining.push(item);
+                }
+            }
+        } finally {
+            button.disabled = false;
+        }
+
+        const saved = photoQueue.length - remaining.length;
+        photoQueue = remaining;
+        renderPhotoQueue();
+        if (saved) {
+            field(form, 'caption').value = '';
+            loadPhotos();
+            loadOverview();
+        }
+        if (failed.length) toast(failed[0], true);
+        else toast(saved + '장을 저장했습니다.');
+    });
+
+    $('#mdPhotoList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-photo-delete]');
+        if (remove && confirmDelete('이 사진을 삭제할까요? 되돌릴 수 없습니다.')) {
+            try {
+                await api('/mydesk/api/photos/' + remove.dataset.photoDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadPhotos();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdPhotoMonth').addEventListener('change', (event) => {
+        photoMonth = event.currentTarget.value;
+        loadPhotos();
+    });
+    $('#mdPhotoAll').addEventListener('click', () => {
+        photoMonth = '';
+        $('#mdPhotoMonth').value = '';
+        loadPhotos();
+    });
+
+    // 인물 · 기념일
+    $('#mdPersonForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            name: field(form, 'name').value.trim(),
+            relation: field(form, 'relation').value.trim(),
+            birthday: field(form, 'birthday').value.trim(),
+            birthday_type: field(form, 'birthday_type').value,
+            phone: field(form, 'phone').value.trim(),
+            email: field(form, 'email').value.trim(),
+            address: field(form, 'address').value.trim(),
+            memo: field(form, 'memo').value.trim(),
+        };
+        if (!payload.name) { toast('이름을 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/people', { method: 'POST', body: payload });
+            form.reset();
+            toast('인물 정보를 저장했습니다.');
+            loadPeople();
+            loadOverview();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdAnnivForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            title: field(form, 'title').value.trim(),
+            anniv_date: field(form, 'anniv_date').value.trim(),
+            person_id: field(form, 'person_id').value || null,
+            repeat_yearly: field(form, 'repeat_yearly').checked,
+            memo: field(form, 'memo').value.trim(),
+        };
+        if (!payload.title || !payload.anniv_date) { toast('기념일 이름과 날짜를 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/anniversaries', { method: 'POST', body: payload });
+            form.reset();
+            field(form, 'repeat_yearly').checked = true;
+            toast('기념일을 저장했습니다.');
+            loadPeople();
+            loadOverview();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdPersonList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-person-delete]');
+        if (remove && confirmDelete('이 인물 정보를 삭제할까요? 연결된 기념일은 남습니다.')) {
+            try {
+                await api('/mydesk/api/people/' + remove.dataset.personDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadPeople();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdAnnivList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-anniv-delete]');
+        if (remove && confirmDelete('이 기념일을 삭제할까요?')) {
+            try {
+                await api('/mydesk/api/anniversaries/' + remove.dataset.annivDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadPeople();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    let personSearchTimer = null;
+    $('#mdPersonSearch').addEventListener('input', () => {
+        window.clearTimeout(personSearchTimer);
+        personSearchTimer = window.setTimeout(loadPeople, 280);
+    });
+
+    // 계획 · 기록
+    $('#mdJournalForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const payload = {
+            entry_date: field(form, 'entry_date').value,
+            category: field(form, 'category').value,
+            mood: field(form, 'mood').value,
+            title: field(form, 'title').value.trim(),
+            body: field(form, 'body').value.trim(),
+        };
+        if (!payload.title && !payload.body) { toast('제목이나 내용을 입력해주세요.', true); return; }
+        try {
+            await api('/mydesk/api/journals', { method: 'POST', body: payload });
+            form.reset();
+            $('#mdJournalDate').value = todayText();
+            toast('기록을 저장했습니다.');
+            loadJournals();
+            loadOverview();
+        } catch (error) { toast(error.message, true); }
+    });
+
+    $('#mdJournalList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-journal-delete]');
+        if (remove && confirmDelete('이 기록을 삭제할까요?')) {
+            try {
+                await api('/mydesk/api/journals/' + remove.dataset.journalDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadJournals();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdJournalCategory').addEventListener('change', loadJournals);
+    let journalSearchTimer = null;
+    $('#mdJournalSearch').addEventListener('input', () => {
+        window.clearTimeout(journalSearchTimer);
+        journalSearchTimer = window.setTimeout(loadJournals, 280);
+    });
+
+    // 보관함
+    $('#mdFileForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = form.querySelector('button[type="submit"]');
+        const body = new FormData(form);
+        button.disabled = true;
+        try {
+            await api('/mydesk/api/files', { method: 'POST', body });
+            form.reset();
+            toast('파일을 보관했습니다.');
+            loadFiles();
+            loadOverview();
+        } catch (error) {
+            toast(error.message, true);
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    $('#mdFileList').addEventListener('click', async (event) => {
+        const remove = event.target.closest('[data-file-delete]');
+        if (remove && confirmDelete('이 파일을 삭제할까요? 되돌릴 수 없습니다.')) {
+            try {
+                await api('/mydesk/api/files/' + remove.dataset.fileDelete, { method: 'DELETE' });
+                toast('삭제했습니다.');
+                loadFiles();
+                loadOverview();
+            } catch (error) { toast(error.message, true); }
+        }
+    });
+
+    $('#mdFileCategory').addEventListener('change', loadFiles);
+
+    // ---------- 초기화 ----------
+    $('#mdPhotoDate').value = todayText();
+    $('#mdJournalDate').value = todayText();
+    $('#mdEventMonth').value = eventMonth;
+    loaded.brief = true;
+    LOADERS.brief();
+})();
+</script>
+{% endblock %}

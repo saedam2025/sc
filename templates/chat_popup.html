@@ -120,12 +120,15 @@
         .message-comments { display:flex; flex-direction:column; gap:3px; margin-top:4px; max-width:250px; }
         .message-comment-item { background:rgba(255,255,255,0.68); border:1px solid rgba(226,232,240,0.9); border-radius:8px; padding:4px 7px; font-size:0.74rem; color:#334155; }
         .message-comment-user { color:#475569; font-weight:700; margin-right:4px; }
-        .chat-file-retention-note { margin:0 4px 7px; color:#475569; font-size:0.75rem; line-height:1.4; }
-        .chat-file-retention-note i { color:#64748b; margin-right:4px; }
+        /* 클립 아이콘에 마우스를 올리면 바로 뜨는 보관 기간 안내 */
+        .chat-file-label { position:relative; }
+        .chat-file-label::after { content:attr(data-tip); position:absolute; left:-4px; bottom:calc(100% + 10px); z-index:20; width:max-content; max-width:min(250px, calc(100vw - 60px)); padding:7px 10px; border-radius:9px; background:#1e293b; color:#f8fafc; font-size:0.74rem; font-weight:600; line-height:1.45; white-space:normal; box-shadow:0 6px 16px rgba(15,23,42,0.22); opacity:0; visibility:hidden; pointer-events:none; transition:opacity 0.12s ease, visibility 0.12s ease; }
+        .chat-file-label::before { content:""; position:absolute; left:8px; bottom:calc(100% + 4px); z-index:20; border:6px solid transparent; border-top-color:#1e293b; opacity:0; visibility:hidden; pointer-events:none; transition:opacity 0.12s ease, visibility 0.12s ease; }
+        .chat-file-label:hover::after, .chat-file-label:hover::before, .chat-file-label:focus-visible::after, .chat-file-label:focus-visible::before { opacity:1; visibility:visible; }
         .chat-attachment-link { display:flex; align-items:center; gap:6px; min-width:0; margin-top:7px; padding:7px 9px; border-radius:7px; background:rgba(15,23,42,0.08); color:inherit; text-decoration:none; font-size:0.78rem; font-weight:700; }
         .chat-attachment-info { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
         .chat-attachment-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .chat-attachment-meta { color:#64748b; font-size:0.68rem; font-weight:500; line-height:1.3; white-space:nowrap; }
+        .chat-attachment-meta { color:#64748b; font-size:0.68rem; font-weight:500; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .chat-attachment-preview { display:block; max-width:100%; max-height:220px; border-radius:8px; cursor:pointer; object-fit:contain; background:rgba(255,255,255,0.35); }
         .chat-file-drop-overlay { position:fixed; inset:12px; z-index:4500; display:flex; align-items:center; justify-content:center; border:3px dashed var(--primary-color); border-radius:18px; background:rgba(239,246,255,0.94); color:var(--primary-color); opacity:0; visibility:hidden; pointer-events:none; transition:opacity 0.15s ease, visibility 0.15s ease; }
         .chat-file-drop-overlay-inner { display:flex; flex-direction:column; align-items:center; gap:8px; padding:28px 36px; text-align:center; font-weight:800; }
@@ -156,10 +159,100 @@
 .chat-bubble.other.only-file .chat-attachment-link {
     border: 1px solid #e2e8f0;
 }
+        /* === 대화창 상단 메뉴바 3종 (업무요청 / 설문·투표 / 상태표시) === */
+        .chat-menubar { display:flex; gap:7px; margin:-4px 0 10px; }
+        .chat-menubar-btn { flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 6px; border:1px solid var(--card-border); background:var(--card-bg); border-radius:10px; cursor:pointer; font-family:inherit; font-size:0.82rem; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; transition:background 0.15s, border-color 0.15s, color 0.15s; }
+        .chat-menubar-btn > span:not(.chat-menubar-badge):not(.chat-menubar-status-dot) { overflow:hidden; text-overflow:ellipsis; }
+        .chat-menubar-btn:hover { background:#eff6ff; border-color:#bfdbfe; }
+        .chat-menubar-btn.active { background:var(--primary-color); border-color:var(--primary-color); color:#fff; }
+        .chat-menubar-badge { display:none; min-width:17px; padding:1px 5px; border-radius:999px; background:#ef4444; color:#fff; font-size:0.66rem; font-weight:800; line-height:1.5; }
+        .chat-menubar-btn.active .chat-menubar-badge { background:#fff; color:var(--primary-color); }
+        .chat-menubar-status-dot { width:9px; height:9px; border-radius:50%; background:#cbd5e1; }
+        .chat-menubar-btn.active .chat-menubar-status-dot { box-shadow:0 0 0 2px rgba(255,255,255,0.9); }
+
+        .chat-panel { display:none; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:12px; margin-bottom:10px; max-height:300px; overflow-y:auto; box-shadow:0 6px 18px rgba(15,23,42,0.07); }
+        .chat-panel.open { display:block; }
+        .chat-panel-empty { text-align:center; padding:22px 0; color:#94a3b8; font-size:0.8rem; }
+        .chat-panel-tabs { display:flex; gap:6px; margin-bottom:10px; }
+        .chat-panel-tab { border:1px solid var(--card-border); background:#fff; border-radius:999px; padding:5px 12px; font-size:0.76rem; font-weight:700; color:#475569; cursor:pointer; font-family:inherit; }
+        .chat-panel-tab.active { background:#dbeafe; border-color:#93c5fd; color:#1d4ed8; }
+        .chat-panel-note { font-size:0.73rem; color:#64748b; line-height:1.5; }
+
+        .chat-task-picker { display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px dashed #bfdbfe; background:#f8fafc; border-radius:10px; margin-bottom:10px; }
+        .chat-task-picker-text { flex:1; min-width:0; font-size:0.76rem; color:#475569; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-task-item { border:1px solid var(--card-border); border-radius:10px; padding:10px; margin-bottom:8px; }
+        .chat-task-head { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px; font-size:0.72rem; color:#64748b; }
+        .chat-task-chip { border-radius:999px; padding:2px 8px; font-size:0.68rem; font-weight:800; }
+        .chat-task-chip.pending { background:#fef3c7; color:#b45309; }
+        .chat-task-chip.done { background:#dcfce7; color:#15803d; }
+        .chat-task-chip.canceled { background:#e2e8f0; color:#64748b; }
+        .chat-task-content { font-size:0.84rem; color:#1e293b; white-space:pre-wrap; word-break:break-word; }
+        .chat-task-response { margin-top:6px; padding:7px 9px; border-left:3px solid #34d399; background:#f0fdf4; border-radius:6px; font-size:0.78rem; color:#166534; white-space:pre-wrap; word-break:break-word; }
+        .chat-task-actions { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+
+        .chat-poll-form { border:1px solid var(--card-border); border-radius:10px; padding:10px; margin-bottom:10px; background:#f8fafc; }
+        .chat-poll-form input[type="text"] { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:8px; padding:8px; font-family:inherit; font-size:0.8rem; margin-bottom:6px; }
+        .chat-poll-form-options { display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+        .chat-poll-form-row { display:flex; gap:6px; align-items:center; }
+        .chat-poll-form-row input { margin-bottom:0 !important; }
+        .chat-poll-form-toggles { display:flex; gap:12px; font-size:0.74rem; color:#475569; margin-bottom:8px; }
+        .chat-poll-form-deadline { display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:0.74rem; color:#475569; margin-bottom:8px; }
+        .chat-poll-form-deadline input { border:1px solid #cbd5e1; border-radius:8px; padding:6px 8px; font-family:inherit; font-size:0.76rem; }
+        .chat-poll-card { border:1px solid var(--card-border); border-radius:10px; padding:10px; margin-bottom:8px; background:var(--card-bg); }
+        .chat-poll-card.in-chat { width:100%; box-sizing:border-box; margin:6px 0 0; border-color:#bfdbfe; box-shadow:0 3px 10px rgba(15,23,42,0.06); }
+        .chat-poll-deadline { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:1px 8px; font-size:0.68rem; font-weight:700; background:#fef3c7; color:#b45309; }
+        .chat-poll-deadline.closed { background:#e2e8f0; color:#64748b; }
+        .chat-poll-question { font-size:0.86rem; font-weight:800; color:#1e293b; margin-bottom:2px; word-break:break-word; }
+        .chat-poll-meta { font-size:0.7rem; color:#64748b; margin-bottom:8px; }
+        .chat-poll-option { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; font-size:0.8rem; color:#334155; }
+        .chat-poll-option input { flex:0 0 auto; }
+        .chat-poll-option-body { flex:1; min-width:0; }
+        .chat-poll-option-label { display:flex; justify-content:space-between; gap:8px; }
+        .chat-poll-option-label span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-poll-bar { display:block; height:6px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin-top:4px; }
+        .chat-poll-bar-fill { display:block; height:100%; background:var(--primary-color); border-radius:999px; }
+        .chat-poll-voters { display:block; font-size:0.68rem; color:#94a3b8; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-poll-actions { display:flex; gap:6px; margin-top:8px; }
+
+        .chat-status-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:7px; margin-bottom:10px; }
+        .chat-status-option { display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 4px; border:1px solid var(--card-border); background:#fff; border-radius:10px; cursor:pointer; font-family:inherit; font-size:0.74rem; font-weight:700; color:#475569; }
+        .chat-status-option:hover { background:#f1f5f9; }
+        .chat-status-option.active { border-width:2px; background:#eff6ff; color:#1d4ed8; }
+        .chat-status-option-icon { font-size:1.35rem; line-height:1; }
+        .chat-status-message-row { display:flex; gap:6px; margin-bottom:8px; }
+        .chat-status-message-row input { flex:1; min-width:0; border:1px solid #cbd5e1; border-radius:8px; padding:8px; font-family:inherit; font-size:0.78rem; }
+
+        .chat-status-banner { display:none; align-items:center; gap:14px; padding:13px 16px; margin-bottom:10px; border:1px solid #e2e8f0; border-left:6px solid #94a3b8; border-radius:12px; background:#fff; box-shadow:0 4px 14px rgba(15,23,42,0.06); }
+        .chat-status-banner.visible { display:flex; }
+        .chat-status-banner-icon { font-size:2.8rem; line-height:1; flex:0 0 auto; }
+        .chat-status-banner-body { min-width:0; }
+        .chat-status-banner-title { font-size:1rem; font-weight:900; color:#1e293b; }
+        .chat-status-banner-desc { font-size:0.76rem; color:#64748b; margin-top:2px; word-break:break-word; }
+        .chat-status-chips { display:none; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+        .chat-status-chips.visible { display:flex; }
+        .chat-status-chip { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:999px; background:#fff; border:1px solid var(--card-border); font-size:0.74rem; color:#475569; font-weight:700; }
+
+        .chat-selected .chat-bubble { outline:2px solid var(--primary-color); outline-offset:2px; }
+        .chat-attachment-gone { opacity:0.7; cursor:default; }
+        .chat-attachment-gone .chat-attachment-name { text-decoration:line-through; }
+
+        @media (max-width: 430px) {
+            .chat-menubar { gap:5px; }
+            .chat-menubar-btn { font-size:0.72rem; padding:8px 4px; gap:4px; }
+            .chat-menubar-btn i { font-size:0.8rem; }
+            .chat-status-banner { gap:10px; padding:11px 12px; }
+            .chat-status-banner-icon { font-size:2.2rem; }
+            .chat-status-banner-title { font-size:0.9rem; }
+        }
     </style>
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/chat_emoji.css') }}?v=7">
+    <script src="{{ url_for('static', filename='chat-emoji/catalog.js') }}?v=9"></script>
+    <script src="{{ url_for('static', filename='js/chat_emoji.js') }}?v=9"></script>
 </head>
 <body>
+    {% include 'components/chat_emoji_panel.html' %}
+    <main id="chatMain">
     <div id="chatFileDropOverlay" class="chat-file-drop-overlay" role="status" aria-live="polite">
         <div class="chat-file-drop-overlay-inner">
             <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -201,6 +294,23 @@
         </div>
     </div>
 
+    <div class="chat-menubar">
+        <button type="button" id="chatMenuTaskBtn" class="chat-menubar-btn" onclick="toggleChatPanel('task')" title="선택한 내 메시지를 업무요청으로 등록하고, 받은 업무에 응답합니다.">
+            <i class="fa-solid fa-clipboard-check"></i><span>업무요청</span>
+            <span id="chatTaskBadge" class="chat-menubar-badge">0</span>
+        </button>
+        <button type="button" id="chatMenuPollBtn" class="chat-menubar-btn" onclick="toggleChatPanel('poll')" title="단체 대화방 설문 및 투표">
+            <i class="fa-solid fa-square-poll-vertical"></i><span>설문/투표</span>
+        </button>
+        <button type="button" id="chatMenuStatusBtn" class="chat-menubar-btn" onclick="toggleChatPanel('status')" title="자리비움·회의중 등 내 상태 표시">
+            <span id="chatStatusDot" class="chat-menubar-status-dot"></span><span id="chatStatusBtnLabel">상태표시</span>
+        </button>
+    </div>
+
+    <div id="chatTaskPanel" class="chat-panel"></div>
+    <div id="chatPollPanel" class="chat-panel"></div>
+    <div id="chatStatusPanel" class="chat-panel"></div>
+
     <div id="chatSearchPanel" class="chat-search-panel">
         <div class="chat-search-row">
             <input id="chatSearchInput" type="search" placeholder="대화 내용 또는 첨부파일 검색" onkeydown="if(event.key==='Enter') searchChatMessages()">
@@ -210,6 +320,15 @@
         <div id="chatSearchResults" class="chat-search-results"></div>
     </div>
     
+    <div id="chatStatusBanner" class="chat-status-banner">
+        <div id="chatStatusBannerIcon" class="chat-status-banner-icon"></div>
+        <div class="chat-status-banner-body">
+            <div id="chatStatusBannerTitle" class="chat-status-banner-title"></div>
+            <div id="chatStatusBannerDesc" class="chat-status-banner-desc"></div>
+        </div>
+    </div>
+    <div id="chatStatusChips" class="chat-status-chips"></div>
+
     <div id="chatBox" style="flex:1; overflow-y:auto; background: var(--bg-color); border: none; padding:15px; border-radius:12px; display:flex; flex-direction:column; gap:12px; margin-bottom:15px;">
     </div>
 
@@ -220,31 +339,29 @@
         <button type="button" class="chat-toolbar-btn" onclick="cancelReply()" title="답장 취소"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
-    <div class="chat-file-retention-note"><i class="fa-regular fa-clock"></i>첨부파일을 올리면 최대 30일까지만 저장됩니다. (개당 10MB 미만)</div>
+    <div id="chatEmojiSelection" class="emoji-selection" hidden aria-live="polite">
+        <button id="emojiSelectionCancel" type="button" title="누르면 선택이 취소됩니다" aria-label="선택한 이모티콘 취소"><span id="emojiSelectionArt"></span></button>
+    </div>
 
     <div style="display:flex; gap:12px; align-items:center; position:relative; background: var(--card-bg); padding: 12px 15px; border-radius: 14px; border: 1px solid var(--card-border); box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
         
-        <label for="chatFile" class="action-icon" style="color:var(--primary-color); display:flex; align-items:center;">
+        <label for="chatFile" class="action-icon chat-file-label" style="color:var(--primary-color); display:flex; align-items:center;" data-tip="첨부파일을 올리면 최대 30일까지만 저장됩니다. (개당 10MB 미만)" aria-label="파일 첨부 · 첨부파일을 올리면 최대 30일까지만 저장됩니다. (개당 10MB 미만)">
             <i class="fa-solid fa-paperclip"></i>
         </label>
         <input type="file" id="chatFile" style="display:none;" onchange="showChatFileName(this)">
         
-        <div class="action-icon" style="color:#f59e0b; display:flex; align-items:center;" onclick="toggleEmojiPicker()">
+        <button id="emojiToggle" type="button" class="action-icon" style="color:#f59e0b; display:flex; align-items:center;" onclick="ChatEmoji.toggle()" aria-label="이모티콘 선택" aria-controls="chatEmojiPicker" aria-expanded="false">
             <i class="fa-regular fa-face-smile"></i>
-        </div>
-        
-        <div id="chatEmojiPicker" style="display:none; position:absolute; bottom:70px; left:10px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.15); width:320px; grid-template-columns:repeat(7, 1fr); gap:6px; z-index:2100; max-height:200px; overflow-y:auto;">
-            <span class="emoji-item" onclick="addEmoji('😀')">😀</span><span class="emoji-item" onclick="addEmoji('😂')">😂</span><span class="emoji-item" onclick="addEmoji('🥰')">🥰</span><span class="emoji-item" onclick="addEmoji('😎')">😎</span><span class="emoji-item" onclick="addEmoji('😭')">😭</span><span class="emoji-item" onclick="addEmoji('😡')">😡</span><span class="emoji-item" onclick="addEmoji('👍')">👍</span>
-            <span class="emoji-item" onclick="addEmoji('🙏')">🙏</span><span class="emoji-item" onclick="addEmoji('🎉')">🎉</span><span class="emoji-item" onclick="addEmoji('💖')">💖</span><span class="emoji-item" onclick="addEmoji('🔥')">🔥</span><span class="emoji-item" onclick="addEmoji('✨')">✨</span><span class="emoji-item" onclick="addEmoji('🤔')">🤔</span><span class="emoji-item" onclick="addEmoji('👏')">👏</span>
-        </div>
+        </button>
 
         <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center;">
             <div id="chatFileName" style="font-size:0.8rem; color:var(--primary-color); display:none; padding:2px 5px 0; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
             <textarea id="chatInput" class="chat-input-area" rows="1" placeholder="메시지를 입력하세요" autocomplete="off" aria-label="메시지 입력"></textarea>
         </div>
         
-        <button class="btn-primary" onclick="sendChatReply()"><i class="fa-solid fa-paper-plane" style="font-size: 1.1rem;"></i></button>
+        <button id="chatSendButton" class="btn-primary" onclick="sendChatReply()" aria-label="메시지 전송"><i class="fa-solid fa-paper-plane" style="font-size: 1.1rem;"></i></button>
     </div>
+    </main>
 
     <div id="orgChartModalPopup" class="modal" style="display:none; position:fixed; z-index:3000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter: blur(2px);">
         <div class="modal-content" style="margin:4% auto; padding:25px; width:360px; height: 500px; max-height: 80vh; position:relative; display:flex; flex-direction:column; background:var(--card-bg); border-radius: 16px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
@@ -271,7 +388,26 @@
                 <button type="button" class="chat-mini-btn" onclick="saveGroupName()">저장</button>
             </div>
             <div style="font-size:0.78rem; color:#64748b;">멤버 <span id="groupMemberCount">0</span>명</div>
+            <div id="groupSettingsNote" style="font-size:0.72rem; color:#94a3b8; line-height:1.5;"></div>
             <div id="groupSettingsMemberList" class="chat-settings-list"></div>
+        </div>
+    </div>
+
+    <div id="taskResponseModal" class="modal" style="display:none; position:fixed; z-index:3200; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(2px);">
+        <div style="margin:8% auto; padding:20px; width:min(400px, calc(100vw - 36px)); box-sizing:border-box; display:flex; flex-direction:column; gap:10px; background:#fff; border-radius:16px; box-shadow:0 12px 35px rgba(0,0,0,0.22);">
+            <div style="display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:1.02rem;"><i class="fa-solid fa-clipboard-check" style="color:#2563eb; margin-right:7px;"></i>업무요청 응답</h3>
+                <button type="button" class="chat-toolbar-btn" onclick="closeTaskResponseModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="taskResponseTarget" class="chat-panel-note" style="padding:8px 10px; background:#f8fafc; border:1px solid var(--card-border); border-radius:8px;"></div>
+            <textarea id="taskResponseText" rows="4" maxlength="1000" placeholder="업무 처리 결과를 입력하세요" style="border:1px solid #cbd5e1; border-radius:9px; padding:10px; font-family:inherit; font-size:0.85rem; resize:none; outline:none;"></textarea>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <label for="taskResponseFile" class="chat-mini-btn" style="cursor:pointer;"><i class="fa-solid fa-paperclip"></i> 파일 첨부</label>
+                <input type="file" id="taskResponseFile" style="display:none;" onchange="showTaskResponseFileName()">
+                <span class="chat-panel-note">10MB 미만 · 30일 보관</span>
+            </div>
+            <div id="taskResponseFileName" style="display:none; font-size:0.78rem; color:var(--primary-color); font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></div>
+            <button type="button" class="btn-primary" style="width:100%;" onclick="submitTaskResponse()"><i class="fa-solid fa-paper-plane"></i> 응답 보내기</button>
         </div>
     </div>
 
@@ -301,6 +437,17 @@
         let typingStopTimer = null;
         let typingDisplayTimer = null;
         let lastTypingSentAt = 0;
+        let chatOpenPanel = '';
+        let selectedMessageId = null;
+        let taskBox = 'received';
+        let taskRequests = [];
+        let taskPendingCount = 0;
+        let chatPolls = [];
+        let pollByMessageUid = {};
+        let taskResponseId = null;
+        let statusPresets = [];
+        let myStatus = null;
+        let memberStatuses = {};
 
         const reactionOptions = [
             { key: 'heart', label: '&#10084;&#65039;' },
@@ -382,7 +529,8 @@
             const editButton = isMe && !message.is_deleted ? '<button type="button" class="chat-context-action" onclick="editChatMessage(' + messageId + ')"><i class="fa-regular fa-pen-to-square" style="color:#0f766e;"></i>수정</button>' : '';
             const deleteMineButton = '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ',\'me\')"><i class="fa-regular fa-eye-slash" style="color:#64748b;"></i>나에게만 삭제</button>';
             const deleteAllButton = isMe && !message.is_deleted ? '<button type="button" class="chat-context-action" onclick="deleteChatMessage(' + messageId + ',\'all\')"><i class="fa-regular fa-trash-can" style="color:#ef4444;"></i>모두에게 삭제</button>' : '';
-            menu.innerHTML = reactions + replyButton + commentButton + editButton + deleteMineButton + deleteAllButton;
+            const taskButton = isMe && !message.is_deleted ? '<button type="button" class="chat-context-action" onclick="createTaskRequest(' + messageId + ')"><i class="fa-solid fa-clipboard-check" style="color:#2563eb;"></i>업무요청 등록</button>' : '';
+            menu.innerHTML = reactions + replyButton + commentButton + taskButton + editButton + deleteMineButton + deleteAllButton;
             menu.style.display = 'block';
             const rect = menu.getBoundingClientRect();
             const left = Math.min(Math.max(8, event.clientX), window.innerWidth - rect.width - 8);
@@ -573,6 +721,20 @@
             notifyOpenerUnreadChanged();
         }
 
+        function registerWithOpener() {
+            try {
+                if (
+                    window.opener
+                    && !window.opener.closed
+                    && typeof window.opener.registerChatPopup === 'function'
+                ) {
+                    window.opener.registerChatPopup(partnerName, window);
+                }
+            } catch (error) {
+                // 다른 창 접근이 막히면 등록만 건너뛴다.
+            }
+        }
+
         function notifyIncomingChatMessage(event) {
             if (!event || event.actor === currentUser || roomInfo.notifications_muted) return;
             const room = {
@@ -580,6 +742,7 @@
                 display_name: roomInfo.display_name || partnerName,
                 notifications_muted: !!roomInfo.notifications_muted
             };
+            registerWithOpener();
             try {
                 if (
                     window.opener
@@ -614,16 +777,20 @@
             document.getElementById('groupNameEditor').style.display = roomInfo.is_admin ? 'flex' : 'none';
             const members = Array.isArray(roomInfo.members) ? roomInfo.members : [];
             document.getElementById('groupMemberCount').textContent = members.length;
+            const isAdmin = !!roomInfo.is_admin;
             document.getElementById('groupSettingsMemberList').innerHTML = members.map(member => {
                 const name = typeof member === 'string' ? member : member.name;
                 const role = typeof member === 'string' ? 'member' : member.role;
                 const encodedName = encodeURIComponent(name).replace(/'/g, '%27');
-                const adminBadge = role === 'admin' ? '<span class="chat-settings-badge">관리자</span>' : '';
-                const controls = roomInfo.is_admin && name !== currentUser
-                    ? `<button type="button" class="chat-mini-btn" onclick="makeGroupAdmin('${encodedName}')">관리자 지정</button><button type="button" class="chat-mini-btn" style="color:#dc2626;" onclick="removeGroupMember('${encodedName}')">내보내기</button>`
+                const adminBadge = role === 'admin' ? '<span class="chat-settings-badge">방장</span>' : '';
+                const controls = isAdmin && name !== currentUser
+                    ? `<button type="button" class="chat-mini-btn" onclick="makeGroupAdmin('${encodedName}')">방장 넘기기</button><button type="button" class="chat-mini-btn" style="color:#dc2626; border-color:#fecaca;" onclick="removeGroupMember('${encodedName}')">내보내기</button>`
                     : '';
                 return `<div class="chat-settings-member"><span class="chat-header-avatar">${profileAvatarContent(name)}</span><span class="chat-settings-member-name">${escapeHtml(name)}</span>${adminBadge}${controls}</div>`;
             }).join('');
+            document.getElementById('groupSettingsNote').textContent = isAdmin
+                ? '방장은 대화방 이름 변경, 멤버 초대·내보내기, 방장 넘기기를 할 수 있습니다. 방장이 방을 나가면 가장 오래 참여한 멤버가 방장이 됩니다.'
+                : '대화방 이름 변경과 멤버 초대·내보내기는 방장만 할 수 있습니다.';
         }
 
         async function saveGroupName() {
@@ -642,21 +809,21 @@
 
         async function makeGroupAdmin(encodedName) {
             const name = decodeURIComponent(encodedName);
-            if (!confirm(`${name}님을 새 그룹 관리자로 지정할까요?`)) return;
+            if (!confirm(`${name}님에게 방장을 넘길까요?\n넘긴 뒤에는 내가 다시 가져올 수 없습니다.`)) return;
             const res = await fetch('/api/chat/room/admin', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ partner: partnerName, admin_user: name })
             });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) return alert(data.message || '관리자를 변경하지 못했습니다.');
+            if (!res.ok) return alert(data.message || '방장을 넘기지 못했습니다.');
             applyRoomInfo(data.room);
             renderGroupSettings();
         }
 
         async function removeGroupMember(encodedName) {
             const name = decodeURIComponent(encodedName);
-            if (!confirm(`${name}님을 그룹에서 내보낼까요?`)) return;
+            if (!confirm(`${name}님을 이 단톡방에서 내보낼까요?\n내보낸 뒤에는 이 방의 대화를 볼 수 없습니다.`)) return;
             const res = await fetch('/api/chat/room/remove-member', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -788,8 +955,6 @@
                 if(res.ok) { if(window.opener && typeof window.opener.updateMessageBadge === 'function') window.opener.updateMessageBadge(); window.close(); }
             } catch(e) { console.error(e); }
         }
-        function toggleEmojiPicker() { const picker = document.getElementById('chatEmojiPicker'); picker.style.display = picker.style.display === 'none' || !picker.style.display ? 'grid' : 'none'; }
-        function addEmoji(emoji) { const input = document.getElementById('chatInput'); input.value += emoji; input.focus(); document.getElementById('chatEmojiPicker').style.display = 'none'; }
         function showChatFileName(input) {
             const nameDiv = document.getElementById('chatFileName');
             if(input.files && input.files.length > 0) {
@@ -896,8 +1061,10 @@
             lastMessageId = loadedMessages.length ? Number(loadedMessages[loadedMessages.length - 1].id) : 0;
         }
 
-        function renderLoadedMessages() {
+        function renderLoadedMessages(options = {}) {
             const box = document.getElementById('chatBox');
+            const keepTop = box.scrollTop;
+            const wasNearBottom = box.scrollHeight - keepTop - box.clientHeight < 90;
             box.innerHTML = '';
             if (hasOlderMessages && oldestMessageId) {
                 const olderButton = document.createElement('button');
@@ -933,10 +1100,16 @@
                     const ext = c.filename.split('.').pop().toLowerCase();
                     const attachmentUrl = '/chat/attachment/' + encodeURIComponent(c.id);
                     const safeFilename = escapeHtml(c.filename);
-                    const fileMeta = escapeHtml(formatChatFileSize(c.file_size) + ' · ' + formatChatFileExpiry(c.expires_at));
-                    const downloadLink = `<a class="chat-attachment-link" href="${attachmentUrl}?download=1" title="${safeFilename}"><i class="fa-solid fa-paperclip"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span><i class="fa-solid fa-download" style="margin-left:auto;"></i></a>`;
-                    fileHtml = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)
-                        ? `<div style="margin-top:8px;"><img src="${attachmentUrl}" alt="${safeFilename}" class="chat-attachment-preview" onclick="window.open('${attachmentUrl}', '_blank')">${downloadLink}</div>`
+                    // 서버가 용량 0을 주면 실제 파일을 찾지 못한 것이므로 깨진 이미지 대신 상태를 알린다.
+                    const isMissing = !Number(c.file_size);
+                    const fileMeta = escapeHtml(isMissing
+                        ? '보관기간이 지났거나 삭제된 파일입니다'
+                        : formatChatFileSize(c.file_size) + ' · ' + formatChatFileExpiry(c.expires_at));
+                    const downloadLink = isMissing
+                        ? `<span class="chat-attachment-link chat-attachment-gone" title="${safeFilename}"><i class="fa-solid fa-link-slash"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span></span>`
+                        : `<a class="chat-attachment-link" href="${attachmentUrl}?download=1" title="${safeFilename}"><i class="fa-solid fa-paperclip"></i><span class="chat-attachment-info"><span class="chat-attachment-name">${safeFilename}</span><span class="chat-attachment-meta">${fileMeta}</span></span><i class="fa-solid fa-download" style="margin-left:auto;"></i></a>`;
+                    fileHtml = (!isMissing && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
+                        ? `<div style="margin-top:8px;"><img src="${attachmentUrl}" alt="${safeFilename}" class="chat-attachment-preview" onerror="this.style.display='none';" onclick="window.open('${attachmentUrl}', '_blank')">${downloadLink}</div>`
                         : downloadLink;
                 }
                 const replyHtml = c.reply
@@ -946,7 +1119,8 @@
                 const commentsHtml = c.is_deleted ? '' : renderMessageComments(c.comments || []);
                 const messageContent = c.is_deleted
                     ? '<span class="chat-deleted-message">삭제된 메시지입니다.</span>'
-                    : escapeHtml(c.content || '').replace(/\n/g, '<br>');
+                    : ChatEmoji.renderText(c.content || '');
+                const stickerBubbleClass = !c.is_deleted && ChatEmoji.hasSticker(c.content || '') ? ' has-sticker' : '';
                 const attachmentBubbleClass = c.filename ? ' has-attachment' : '';
                 const fileOnlyBubbleClass = c.filename && !String(c.content || '').trim() ? ' only-file' : '';
                 const msgDiv = document.createElement('div');
@@ -956,6 +1130,8 @@
                 msgDiv.style.alignItems = isMe ? 'flex-end' : 'flex-start';
                 msgDiv.style.marginBottom = '12px';
                 msgDiv.oncontextmenu = event => openMessageContextMenu(event, c.id, isMe);
+                msgDiv.onclick = event => selectChatMessage(c.id, event);
+                if (isMe && Number(selectedMessageId) === Number(c.id)) msgDiv.classList.add('chat-selected');
 
                 const bubbleHtml = `${replyHtml}${messageContent}${fileHtml}`;
                 if (isMe) {
@@ -963,7 +1139,7 @@
                         <div class="chat-message-row me">
                             <div class="message-meta me">${unreadHtml}<span style="font-size:0.7rem;color:#64748b;">${timeStr}${editedHtml}</span></div>
                             <div class="chat-bubble-wrap${attachmentBubbleClass}">
-                                <div class="chat-bubble me${attachmentBubbleClass}${fileOnlyBubbleClass}">${bubbleHtml}</div>
+                                <div class="chat-bubble me${attachmentBubbleClass}${fileOnlyBubbleClass}${stickerBubbleClass}">${bubbleHtml}</div>
                                 ${reactionHtml}${commentsHtml}
                             </div>
                         </div>`;
@@ -975,7 +1151,7 @@
                                 <div style="font-size:0.85rem;color:#64748b;margin-bottom:3px;font-weight:bold;">${escapeHtml(c.sender)}</div>
                                 <div style="display:flex;align-items:flex-end;">
                                     <div class="chat-bubble-wrap${attachmentBubbleClass}">
-                                        <div class="chat-bubble other${attachmentBubbleClass}${fileOnlyBubbleClass}">${bubbleHtml}</div>
+                                        <div class="chat-bubble other${attachmentBubbleClass}${fileOnlyBubbleClass}${stickerBubbleClass}">${bubbleHtml}</div>
                                         ${reactionHtml}${commentsHtml}
                                     </div>
                                     <div class="message-meta other">${unreadHtml}<span style="font-size:0.7rem;color:#64748b;">${timeStr}${editedHtml}</span></div>
@@ -983,8 +1159,21 @@
                             </div>
                         </div>`;
                 }
+                const poll = pollByMessageUid[c.message_uid];
+                if (poll) {
+                    const pollWrap = document.createElement('div');
+                    pollWrap.style.cssText = 'width:100%;';
+                    pollWrap.innerHTML = renderPollCard(poll);
+                    msgDiv.appendChild(pollWrap);
+                }
                 box.appendChild(msgDiv);
             });
+
+            if (options.preserveScroll) {
+                requestAnimationFrame(function() {
+                    box.scrollTop = wasNearBottom ? box.scrollHeight : keepTop;
+                });
+            }
         }
 
         async function loadChatMessages(options = {}) {
@@ -1037,12 +1226,17 @@
             return loadChatMessages({ afterId: lastMessageId });
         }
 
-        async function sendChatReply() {
+        let chatSendInProgress = false;
+        async function sendChatReply(options = {}) {
+            if (chatSendInProgress) return;
             const input = document.getElementById('chatInput');
             const fileInput = document.getElementById('chatFile');
-            const content = input.value.trim();
-            if(!content && fileInput.files.length === 0) return;
-            if(fileInput.files.length > 0 && fileInput.files[0].size >= CHAT_MAX_FILE_BYTES) {
+            const stickerOnly = options && options.stickerOnly === true;
+            const inputSnapshot = input.value;
+            const selectedFile = stickerOnly ? null : fileInput.files[0];
+            const content = ChatEmoji.compose(stickerOnly ? '' : inputSnapshot.trim());
+            if(!content && !selectedFile) return;
+            if(selectedFile && selectedFile.size >= CHAT_MAX_FILE_BYTES) {
                 showChatFileName(fileInput);
                 return;
             }
@@ -1052,23 +1246,30 @@
             formData.append('receiver', partnerName);
             formData.append('content', content);
             if (replyTarget) formData.append('reply_to_id', String(replyTarget.id));
-            if(fileInput.files.length > 0) formData.append('file', fileInput.files[0]);
+            if(selectedFile) formData.append('file', selectedFile);
 
+            chatSendInProgress = true;
+            document.getElementById('chatSendButton').disabled = true;
             try {
                 const res = await fetch('/send_message', { method: 'POST', body: formData });
                 if(res.ok) { 
-                    input.value = ''; fileInput.value = '';
+                    if (!stickerOnly && input.value === inputSnapshot) input.value = '';
+                    if (!stickerOnly) fileInput.value = '';
+                    ChatEmoji.sent(content);
                     resizeChatInput(input);
                     showChatFileName(fileInput);
-                    document.getElementById('chatEmojiPicker').style.display = 'none';
                     cancelReply();
-                    sendTypingState(false);
+                    if (!stickerOnly) sendTypingState(false);
                     await refreshChatBox();
                 } else {
                     const error = await res.json().catch(() => ({}));
                     alert(error.message || '메시지를 전송하지 못했습니다.');
                 }
             } catch (e) { alert("메시지 전송 중 오류가 발생했습니다."); }
+            finally {
+                chatSendInProgress = false;
+                document.getElementById('chatSendButton').disabled = false;
+            }
         }
 
         function handleChatInputKeydown(event) {
@@ -1106,6 +1307,517 @@
             typingStopTimer = setTimeout(() => sendTypingState(false), 1800);
         }
 
+        /* ===== 대화창 상단 메뉴바 3종: 업무요청 / 설문·투표 / 상태표시 ===== */
+
+        function formatChatDateTime(value) {
+            if (!value) return '';
+            let dateValue = String(value);
+            if (!dateValue.endsWith('Z')) dateValue = dateValue.replace(' ', 'T') + 'Z';
+            const parsed = new Date(dateValue);
+            if (Number.isNaN(parsed.getTime())) return String(value);
+            return parsed.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function roomMemberNames() {
+            const members = Array.isArray(roomInfo.members) ? roomInfo.members : [];
+            return members
+                .map(member => (typeof member === 'string' ? member : (member && member.name) || ''))
+                .filter(name => name && name !== currentUser);
+        }
+
+        function toggleChatPanel(name) {
+            chatOpenPanel = chatOpenPanel === name ? '' : name;
+            [['task', 'chatTaskPanel', 'chatMenuTaskBtn'],
+             ['poll', 'chatPollPanel', 'chatMenuPollBtn'],
+             ['status', 'chatStatusPanel', 'chatMenuStatusBtn']].forEach(function(entry) {
+                const isOpen = chatOpenPanel === entry[0];
+                document.getElementById(entry[1]).classList.toggle('open', isOpen);
+                document.getElementById(entry[2]).classList.toggle('active', isOpen);
+            });
+            if (chatOpenPanel === 'task') loadTaskRequests();
+            if (chatOpenPanel === 'poll') renderPollPanel();
+            if (chatOpenPanel === 'status') { renderStatusPanel(); loadChatStatuses(); }
+        }
+
+        function selectChatMessage(messageId, event) {
+            if (event && event.target && event.target.closest('a, img, button, input, label, .message-reaction-chip, .chat-poll-card')) return;
+            const message = loadedMessages.find(item => Number(item.id) === Number(messageId));
+            if (!message || message.sender !== currentUser || message.is_deleted) return;
+            selectedMessageId = Number(selectedMessageId) === Number(messageId) ? null : Number(messageId);
+            document.querySelectorAll('#chatBox [data-message-id]').forEach(function(node) {
+                node.classList.toggle('chat-selected', Number(node.dataset.messageId) === Number(selectedMessageId));
+            });
+            if (chatOpenPanel === 'task') renderTaskPanel();
+        }
+
+        /* --- 1. 업무요청 --- */
+
+        function updateTaskBadge(count) {
+            taskPendingCount = Math.max(0, parseInt(count, 10) || 0);
+            const badge = document.getElementById('chatTaskBadge');
+            badge.textContent = taskPendingCount > 99 ? '99+' : String(taskPendingCount);
+            badge.style.display = taskPendingCount > 0 ? 'inline-block' : 'none';
+        }
+
+        async function loadTaskRequests(box) {
+            if (box) taskBox = box;
+            try {
+                const res = await fetch('/api/chat/task-requests?box=' + encodeURIComponent(taskBox));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || '업무요청을 불러오지 못했습니다.');
+                taskRequests = Array.isArray(data.requests) ? data.requests : [];
+                updateTaskBadge(data.pending_received);
+            } catch (error) {
+                taskRequests = [];
+                console.error(error);
+            }
+            if (chatOpenPanel === 'task') renderTaskPanel();
+        }
+
+        async function refreshTaskBadge() {
+            try {
+                const res = await fetch('/api/chat/task-requests?box=received');
+                const data = await res.json();
+                if (res.ok) updateTaskBadge(data.pending_received);
+            } catch (error) { /* 배지는 실패해도 대화에는 영향 없음 */ }
+        }
+
+        function taskStatusChip(status) {
+            if (status === 'done') return '<span class="chat-task-chip done">완료</span>';
+            if (status === 'canceled') return '<span class="chat-task-chip canceled">취소됨</span>';
+            return '<span class="chat-task-chip pending">진행중</span>';
+        }
+
+        function renderTaskPanel() {
+            const panel = document.getElementById('chatTaskPanel');
+            const selected = loadedMessages.find(item => Number(item.id) === Number(selectedMessageId));
+            const canRegister = !!(selected && selected.sender === currentUser && !selected.is_deleted);
+            const preview = selected
+                ? (selected.content || (selected.filename ? '📎 ' + selected.filename : '')).replace(/\n/g, ' ')
+                : '';
+            const picker = `
+                <div class="chat-task-picker">
+                    <i class="fa-regular fa-hand-pointer" style="color:#2563eb;"></i>
+                    <span class="chat-task-picker-text">${canRegister ? '선택한 메시지 · ' + escapeHtml(preview) : '내가 보낸 말풍선을 클릭하면 업무요청으로 등록할 수 있습니다.'}</span>
+                    <button type="button" class="chat-mini-btn" ${canRegister ? '' : 'disabled style="opacity:0.45;cursor:default;"'} onclick="createTaskRequest()">업무요청 등록</button>
+                </div>`;
+
+            const tabs = `
+                <div class="chat-panel-tabs">
+                    <button type="button" class="chat-panel-tab ${taskBox === 'received' ? 'active' : ''}" onclick="loadTaskRequests('received')">받은 요청${taskPendingCount > 0 ? ' (' + taskPendingCount + ')' : ''}</button>
+                    <button type="button" class="chat-panel-tab ${taskBox === 'sent' ? 'active' : ''}" onclick="loadTaskRequests('sent')">보낸 요청</button>
+                </div>`;
+
+            const items = taskRequests.length
+                ? taskRequests.map(function(task) {
+                    const isReceived = task.direction === 'received';
+                    const canRespond = isReceived && task.status === 'pending';
+                    const canCancel = !isReceived && task.status === 'pending';
+                    const canOpen = task.message_id && task.room_key === partnerName;
+                    const responseHtml = task.response_text
+                        ? `<div class="chat-task-response"><b>응답</b> · ${escapeHtml(formatChatDateTime(task.responded_at))}<br>${escapeHtml(task.response_text)}</div>`
+                        : '';
+                    const actions = [
+                        canRespond ? `<button type="button" class="chat-mini-btn" onclick="respondTaskRequest(${task.id})"><i class="fa-solid fa-reply"></i> 응답</button>` : '',
+                        canCancel ? `<button type="button" class="chat-mini-btn" onclick="cancelTaskRequest(${task.id})">요청 취소</button>` : '',
+                        canOpen ? `<button type="button" class="chat-mini-btn" onclick="openSearchResult(${task.message_id})">원본 메시지</button>` : ''
+                    ].filter(Boolean).join('');
+                    return `
+                        <div class="chat-task-item">
+                            <div class="chat-task-head">
+                                ${taskStatusChip(task.status)}
+                                <span>${escapeHtml(task.requester)} → ${escapeHtml(task.assignee)}</span>
+                                <span style="margin-left:auto;">${escapeHtml(formatChatDateTime(task.created_at))}</span>
+                            </div>
+                            <div class="chat-task-content">${escapeHtml(task.content)}</div>
+                            ${responseHtml}
+                            ${actions ? '<div class="chat-task-actions">' + actions + '</div>' : ''}
+                        </div>`;
+                }).join('')
+                : '<div class="chat-panel-empty">표시할 업무요청이 없습니다.</div>';
+
+            panel.innerHTML = picker + tabs + items;
+        }
+
+        async function createTaskRequest(messageId) {
+            const targetId = messageId || selectedMessageId;
+            if (!targetId) return alert('업무요청으로 등록할 내 메시지를 먼저 선택해주세요.');
+            hideMessageContextMenu();
+            const res = await fetch('/api/chat/task-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message_id: Number(targetId) })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '업무요청을 등록하지 못했습니다.');
+            alert((data.created || []).join(', ') + '님의 업무요청함에 등록했습니다.');
+            selectedMessageId = null;
+            renderLoadedMessages();
+            taskBox = 'sent';
+            if (chatOpenPanel !== 'task') toggleChatPanel('task');
+            else loadTaskRequests('sent');
+        }
+
+        function respondTaskRequest(requestId) {
+            const task = taskRequests.find(item => Number(item.id) === Number(requestId));
+            taskResponseId = Number(requestId);
+            document.getElementById('taskResponseTarget').textContent = '요청 내용 · ' + ((task && task.content) || '');
+            document.getElementById('taskResponseText').value = '';
+            document.getElementById('taskResponseFile').value = '';
+            showTaskResponseFileName();
+            document.getElementById('taskResponseModal').style.display = 'block';
+            document.getElementById('taskResponseText').focus();
+        }
+
+        function closeTaskResponseModal() {
+            taskResponseId = null;
+            document.getElementById('taskResponseModal').style.display = 'none';
+        }
+
+        function showTaskResponseFileName() {
+            const input = document.getElementById('taskResponseFile');
+            const nameDiv = document.getElementById('taskResponseFileName');
+            if (input.files && input.files.length > 0) {
+                const file = input.files[0];
+                if (file.size >= CHAT_MAX_FILE_BYTES) {
+                    alert('첨부파일은 개당 10MB 미만만 업로드할 수 있습니다.');
+                    input.value = '';
+                    nameDiv.style.display = 'none';
+                    return;
+                }
+                nameDiv.textContent = '📎 ' + file.name + ' (' + (file.size / (1024 * 1024)).toFixed(2) + 'MB · 30일 보관)';
+                nameDiv.style.display = 'block';
+                return;
+            }
+            nameDiv.textContent = '';
+            nameDiv.style.display = 'none';
+        }
+
+        async function submitTaskResponse() {
+            if (!taskResponseId) return;
+            const text = String(document.getElementById('taskResponseText').value || '').trim();
+            const fileInput = document.getElementById('taskResponseFile');
+            const hasFile = fileInput.files && fileInput.files.length > 0;
+            if (!text && !hasFile) return alert('응답 내용이나 첨부파일을 입력해주세요.');
+            if (hasFile && fileInput.files[0].size >= CHAT_MAX_FILE_BYTES) {
+                showTaskResponseFileName();
+                return;
+            }
+            const formData = new FormData();
+            formData.append('content', text);
+            if (hasFile) formData.append('file', fileInput.files[0]);
+            const res = await fetch('/api/chat/task-request/' + taskResponseId + '/respond', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '응답을 전송하지 못했습니다.');
+            closeTaskResponseModal();
+            await loadTaskRequests();
+            await loadChatMessages({ reset: true });
+        }
+
+        async function cancelTaskRequest(requestId) {
+            if (!confirm('이 업무요청을 취소할까요?')) return;
+            const res = await fetch('/api/chat/task-request/' + requestId + '/cancel', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '업무요청을 취소하지 못했습니다.');
+            await loadTaskRequests();
+        }
+
+        /* --- 2. 설문/투표 --- */
+
+        function renderPollPanel() {
+            const panel = document.getElementById('chatPollPanel');
+            if (panel.dataset.ready === '1') return;
+            panel.innerHTML = roomInfo.is_group
+                ? `
+                <div class="chat-poll-form">
+                    <input type="text" id="pollQuestionInput" maxlength="200" placeholder="질문을 입력하세요 (예: 회식 날짜 투표)">
+                    <div class="chat-poll-form-options" id="pollOptionInputs">
+                        <div class="chat-poll-form-row"><input type="text" class="chat-poll-option-input" maxlength="100" placeholder="보기 1"></div>
+                        <div class="chat-poll-form-row"><input type="text" class="chat-poll-option-input" maxlength="100" placeholder="보기 2"></div>
+                    </div>
+                    <div class="chat-poll-form-deadline">
+                        <label for="pollDeadlineInput"><i class="fa-regular fa-clock"></i> 마감기한</label>
+                        <input type="datetime-local" id="pollDeadlineInput">
+                        <button type="button" class="chat-mini-btn" onclick="document.getElementById('pollDeadlineInput').value='';">기한 없음</button>
+                    </div>
+                    <div class="chat-poll-form-toggles">
+                        <label><input type="checkbox" id="pollAllowMultiple"> 복수 선택</label>
+                        <label><input type="checkbox" id="pollAnonymous"> 익명 투표</label>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" class="chat-mini-btn" onclick="addPollOptionInput()"><i class="fa-solid fa-plus"></i> 보기 추가</button>
+                        <button type="button" class="chat-mini-btn" style="margin-left:auto; background:#2563eb; color:#fff; border-color:#2563eb;" onclick="submitChatPoll()">설문 만들기</button>
+                    </div>
+                </div>
+                <div class="chat-panel-note">만든 설문/투표는 대화창에 카드로 표시됩니다. 참여와 마감은 대화창에서 하세요.</div>`
+                : '<div class="chat-panel-note">설문/투표는 단체 대화방에서만 만들 수 있습니다.</div>';
+            panel.dataset.ready = '1';
+        }
+
+        function addPollOptionInput() {
+            const box = document.getElementById('pollOptionInputs');
+            if (!box) return;
+            const count = box.querySelectorAll('.chat-poll-option-input').length;
+            if (count >= 10) return alert('보기는 최대 10개까지 등록할 수 있습니다.');
+            const row = document.createElement('div');
+            row.className = 'chat-poll-form-row';
+            row.innerHTML = `<input type="text" class="chat-poll-option-input" maxlength="100" placeholder="보기 ${count + 1}">
+                <button type="button" class="chat-mini-btn" onclick="this.parentNode.remove()"><i class="fa-solid fa-xmark"></i></button>`;
+            box.appendChild(row);
+            row.querySelector('input').focus();
+        }
+
+        async function loadChatPolls(options = {}) {
+            try {
+                const res = await fetch('/api/chat/polls?partner=' + encodeURIComponent(partnerName));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || '설문을 불러오지 못했습니다.');
+                chatPolls = Array.isArray(data.polls) ? data.polls : [];
+            } catch (error) {
+                chatPolls = [];
+                console.error(error);
+            }
+            pollByMessageUid = {};
+            chatPolls.forEach(function(poll) {
+                if (poll.message_uid) pollByMessageUid[poll.message_uid] = poll;
+            });
+            if (!options.skipRender) renderLoadedMessages({ preserveScroll: true });
+        }
+
+        function pollDeadlineHtml(poll) {
+            if (poll.status !== 'open') {
+                return '<span class="chat-poll-deadline closed"><i class="fa-regular fa-circle-check"></i>마감됨</span>';
+            }
+            if (!poll.deadline) return '';
+            return `<span class="chat-poll-deadline"><i class="fa-regular fa-clock"></i>${escapeHtml(formatChatDateTime(poll.deadline))}까지</span>`;
+        }
+
+        function renderPollCard(poll) {
+            const isOpen = poll.status === 'open';
+            const total = poll.options.reduce(function(sum, option) { return sum + option.count; }, 0);
+            const inputType = poll.allow_multiple ? 'checkbox' : 'radio';
+            const options = poll.options.map(function(option) {
+                const percent = total > 0 ? Math.round((option.count / total) * 100) : 0;
+                const checked = poll.my_votes.includes(option.index) ? 'checked' : '';
+                const voters = (!poll.is_anonymous && option.voters.length)
+                    ? `<span class="chat-poll-voters">${escapeHtml(option.voters.join(', '))}</span>`
+                    : '';
+                const input = isOpen
+                    ? `<input type="${inputType}" name="poll-${poll.id}" value="${option.index}" ${checked}>`
+                    : '';
+                return `
+                    <label class="chat-poll-option">
+                        ${input}
+                        <span class="chat-poll-option-body">
+                            <span class="chat-poll-option-label"><span>${escapeHtml(option.text)}</span><span style="color:#2563eb;font-weight:800;">${option.count}표 · ${percent}%</span></span>
+                            <span class="chat-poll-bar"><span class="chat-poll-bar-fill" style="width:${percent}%;"></span></span>
+                            ${voters}
+                        </span>
+                    </label>`;
+            }).join('');
+            const actions = [
+                isOpen ? `<button type="button" class="chat-mini-btn" style="background:#2563eb;color:#fff;border-color:#2563eb;" onclick="submitPollVote(${poll.id})">투표하기</button>` : '',
+                (isOpen && poll.can_close) ? `<button type="button" class="chat-mini-btn" onclick="closeChatPoll(${poll.id})">지금 마감</button>` : ''
+            ].filter(Boolean).join('');
+            return `
+                <div class="chat-poll-card in-chat">
+                    <div class="chat-poll-question">📊 ${escapeHtml(poll.question)}</div>
+                    <div class="chat-poll-meta">${escapeHtml(poll.creator)} · ${poll.allow_multiple ? '복수선택' : '단일선택'}${poll.is_anonymous ? ' · 익명' : ''} · ${poll.total_voters}명 참여 ${pollDeadlineHtml(poll)}</div>
+                    ${options}
+                    ${actions ? '<div class="chat-poll-actions">' + actions + '</div>' : ''}
+                </div>`;
+        }
+
+        async function submitChatPoll() {
+            const question = String(document.getElementById('pollQuestionInput').value || '').trim();
+            const options = Array.from(document.querySelectorAll('.chat-poll-option-input'))
+                .map(input => String(input.value || '').trim())
+                .filter(Boolean);
+            if (!question) return alert('질문을 입력해주세요.');
+            if (options.length < 2) return alert('보기를 2개 이상 입력해주세요.');
+            const deadlineValue = String(document.getElementById('pollDeadlineInput').value || '').trim();
+            let deadline = '';
+            if (deadlineValue) {
+                const parsed = new Date(deadlineValue);
+                if (Number.isNaN(parsed.getTime())) return alert('마감기한을 다시 선택해주세요.');
+                if (parsed.getTime() <= Date.now()) return alert('마감기한은 현재 시각 이후로 정해주세요.');
+                deadline = parsed.toISOString();
+            }
+            const res = await fetch('/api/chat/poll', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    partner: partnerName,
+                    question: question,
+                    options: options,
+                    deadline: deadline,
+                    allow_multiple: document.getElementById('pollAllowMultiple').checked,
+                    is_anonymous: document.getElementById('pollAnonymous').checked
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '설문을 만들지 못했습니다.');
+            document.getElementById('pollQuestionInput').value = '';
+            document.getElementById('pollOptionInputs').innerHTML =
+                '<div class="chat-poll-form-row"><input type="text" class="chat-poll-option-input" maxlength="100" placeholder="보기 1"></div>' +
+                '<div class="chat-poll-form-row"><input type="text" class="chat-poll-option-input" maxlength="100" placeholder="보기 2"></div>';
+            document.getElementById('pollAllowMultiple').checked = false;
+            document.getElementById('pollAnonymous').checked = false;
+            document.getElementById('pollDeadlineInput').value = '';
+            toggleChatPanel('poll');
+            await loadChatPolls({ skipRender: true });
+            await refreshChatBox();
+        }
+
+        async function submitPollVote(pollId) {
+            const selected = Array.from(document.querySelectorAll('input[name="poll-' + pollId + '"]:checked'))
+                .map(input => Number(input.value));
+            if (!selected.length) return alert('선택한 보기가 없습니다.');
+            const res = await fetch('/api/chat/poll/' + pollId + '/vote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ options: selected })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '투표하지 못했습니다.');
+            await loadChatPolls();
+        }
+
+
+        async function closeChatPoll(pollId) {
+            if (!confirm('이 설문을 마감할까요?')) return;
+            const res = await fetch('/api/chat/poll/' + pollId + '/close', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '설문을 마감하지 못했습니다.');
+            await loadChatPolls();
+        }
+
+        /* --- 3. 상태표시 --- */
+
+        async function loadChatStatuses() {
+            const targets = roomInfo.is_group ? roomMemberNames() : [partnerName];
+            try {
+                const res = await fetch('/api/chat/status?users=' + encodeURIComponent(targets.join(',')));
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || '');
+                statusPresets = Array.isArray(data.presets) ? data.presets : statusPresets;
+                myStatus = data.my_status || null;
+                memberStatuses = data.statuses || {};
+            } catch (error) {
+                console.error('상태 정보를 불러오지 못했습니다.', error);
+            }
+            updateStatusButton();
+            renderStatusBanner();
+            if (chatOpenPanel === 'status') renderStatusPanel();
+        }
+
+        function updateStatusButton() {
+            const dot = document.getElementById('chatStatusDot');
+            const label = document.getElementById('chatStatusBtnLabel');
+            const button = document.getElementById('chatMenuStatusBtn');
+            label.textContent = '상태표시';
+            if (myStatus && myStatus.status) {
+                dot.style.background = myStatus.color || '#94a3b8';
+                button.title = `내 상태: ${myStatus.icon} ${myStatus.label}` + (myStatus.message ? ` (${myStatus.message})` : '');
+            } else {
+                dot.style.background = '#cbd5e1';
+                button.title = '자리비움·회의중 등 내 상태 표시';
+            }
+        }
+
+        function renderStatusPanel() {
+            const panel = document.getElementById('chatStatusPanel');
+            const current = (myStatus && myStatus.status) || '';
+            const options = statusPresets.map(function(preset) {
+                return `<button type="button" class="chat-status-option ${preset.key === current ? 'active' : ''}" style="${preset.key === current ? 'border-color:' + preset.color + ';' : ''}" onclick="setMyChatStatus('${preset.key}')">
+                    <span class="chat-status-option-icon">${preset.icon}</span><span>${escapeHtml(preset.label)}</span>
+                </button>`;
+            }).join('');
+            const memberRows = Object.keys(memberStatuses)
+                .filter(name => memberStatuses[name] && memberStatuses[name].status)
+                .map(name => `<div class="chat-status-chip"><span>${memberStatuses[name].icon}</span>${escapeHtml(name)} · ${escapeHtml(memberStatuses[name].label)}${memberStatuses[name].message ? ' (' + escapeHtml(memberStatuses[name].message) + ')' : ''}</div>`)
+                .join('');
+            panel.innerHTML = `
+                <div class="chat-panel-note" style="margin-bottom:8px;">내 상태를 선택하면 나와 대화하는 사람의 대화창에 상태 아이콘이 표시됩니다. (상대는 계속 메시지를 보낼 수 있습니다.)</div>
+                <div class="chat-status-grid">${options}</div>
+                <div class="chat-status-message-row">
+                    <input type="text" id="chatStatusMessageInput" maxlength="60" placeholder="상태 메모 (예: 15시 복귀)" value="${escapeHtml((myStatus && myStatus.message) || '')}">
+                    <button type="button" class="chat-mini-btn" onclick="setMyChatStatus((myStatus && myStatus.status) || '')">메모 저장</button>
+                </div>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button type="button" class="chat-mini-btn" onclick="setMyChatStatus('')"><i class="fa-solid fa-rotate-left"></i> 상태 해제</button>
+                </div>
+                ${memberRows ? '<div style="font-size:0.74rem;color:#64748b;margin-bottom:5px;">대화 상대 상태</div><div class="chat-status-chips visible">' + memberRows + '</div>' : ''}`;
+        }
+
+        async function setMyChatStatus(statusKey) {
+            const input = document.getElementById('chatStatusMessageInput');
+            const message = input ? String(input.value || '').trim() : '';
+            const res = await fetch('/api/chat/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: statusKey || '', message: message })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return alert(data.message || '상태를 변경하지 못했습니다.');
+            myStatus = data.my_status || null;
+            updateStatusButton();
+            renderStatusPanel();
+        }
+
+        function renderStatusBanner() {
+            const banner = document.getElementById('chatStatusBanner');
+            const chips = document.getElementById('chatStatusChips');
+            const active = Object.keys(memberStatuses)
+                .map(name => memberStatuses[name])
+                .filter(status => status && status.status);
+
+            if (!roomInfo.is_group) {
+                chips.classList.remove('visible');
+                const status = memberStatuses[partnerName];
+                if (partnerName !== currentUser && status && status.status) {
+                    document.getElementById('chatStatusBannerIcon').textContent = status.icon;
+                    document.getElementById('chatStatusBannerTitle').textContent = `${status.user}님은 지금 "${status.label}" 상태입니다.`;
+                    document.getElementById('chatStatusBannerDesc').textContent =
+                        (status.message ? status.message + ' · ' : '') + '메시지는 그대로 보낼 수 있으며, 확인 후 답장이 올 수 있습니다.';
+                    banner.style.borderLeftColor = status.color || '#94a3b8';
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+                return;
+            }
+
+            banner.classList.remove('visible');
+            if (!active.length) {
+                chips.classList.remove('visible');
+                chips.innerHTML = '';
+                return;
+            }
+            chips.innerHTML = active.map(status =>
+                `<span class="chat-status-chip" style="border-color:${status.color};"><span style="font-size:1rem;">${status.icon}</span>${escapeHtml(status.user)} · ${escapeHtml(status.label)}${status.message ? ' (' + escapeHtml(status.message) + ')' : ''}</span>`
+            ).join('');
+            chips.classList.add('visible');
+        }
+
+        function applyChatStatusEvent(payload) {
+            if (!payload || !payload.user) return;
+            if (payload.user === currentUser) {
+                myStatus = payload;
+                updateStatusButton();
+                if (chatOpenPanel === 'status') renderStatusPanel();
+                return;
+            }
+            const targets = roomInfo.is_group ? roomMemberNames() : [partnerName];
+            if (!targets.includes(payload.user)) return;
+            memberStatuses[payload.user] = payload;
+            renderStatusBanner();
+            if (chatOpenPanel === 'status') renderStatusPanel();
+        }
+
         function initializeChatSocket() {
             if (typeof io !== 'function') return;
             chatSocket = io('/chat', {
@@ -1125,15 +1837,25 @@
                     await refreshChatBox();
                 } else if (['message_changed', 'message_hidden'].includes(event.type)) {
                     await loadChatMessages({ reset: true, preserveScroll: true });
+                } else if (event.type === 'poll_changed') {
+                    await loadChatPolls();
                 } else if (event.type === 'room_changed') {
                     await loadRoomInfo();
+                    await loadChatStatuses();
                     if (document.getElementById('groupSettingsModal').style.display === 'block') renderGroupSettings();
                     notifyOpenerUnreadChanged();
                 } else if (event.type === 'room_removed') {
-                    alert('그룹 관리자에 의해 채팅방에서 제외되었습니다.');
+                    alert('방장에 의해 대화방에서 내보내졌습니다.');
                     window.close();
                 }
             });
+            chatSocket.on('chat_side_event', async event => {
+                if (!event) return;
+                if (['task_request_created', 'task_request_done', 'task_request_canceled'].includes(event.type)) {
+                    await loadTaskRequests();
+                }
+            });
+            chatSocket.on('chat_status', payload => applyChatStatusEvent(payload));
             chatSocket.on('chat_typing', event => {
                 if (!event || event.user === currentUser) return;
                 const indicator = document.getElementById('chatTypingIndicator');
@@ -1152,12 +1874,16 @@
         });
 
         window.onload = async function() {
+            registerWithOpener();
             initHeader();
             initializeChatFileDrop();
             document.getElementById('chatInput').addEventListener('input', handleChatInput);
             document.getElementById('chatInput').addEventListener('keydown', handleChatInputKeydown);
             resizeChatInput(document.getElementById('chatInput'));
+            await loadChatPolls({ skipRender: true });
             await loadChatMessages({ reset: true });
+            await loadChatStatuses();
+            refreshTaskBadge();
             initializeChatSocket();
             document.getElementById('chatInput').focus();
         };
