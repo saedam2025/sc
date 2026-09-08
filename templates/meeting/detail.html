@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+{% block title %}{{ meeting.title }} · 안건과 자료{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260905-compact">
+{% endblock %}
+{% block content %}
+<div class="mt-page mt-narrow">
+
+  <section class="mt-topbar">
+    <div class="mt-topbar-main">
+      <a class="mt-icon-btn" href="{{ url_for('meeting.meeting_list') }}" title="회의 목록">
+        <i class="fa-solid fa-chevron-left"></i>
+      </a>
+      <div class="mt-topbar-title">
+        <h1>{{ meeting.title }}</h1>
+        <p>
+          <span class="mt-badge {{ meeting.status }}">{{ status_labels.get(meeting.status, meeting.status) }}</span>
+          {{ meeting.meeting_date }}
+          {%- if meeting.start_time %} {{ meeting.start_time }}{% if meeting.end_time %}~{{ meeting.end_time }}{% endif %}{% endif %}
+          · {{ meeting.place or '장소 미정' }}
+        </p>
+      </div>
+    </div>
+    <div class="mt-topbar-actions">
+      <a class="mt-btn sm warn" href="{{ url_for('meeting.live_meeting', meeting_id=meeting.id) }}">
+        <i class="fa-solid fa-tv"></i> 진행하기
+      </a>
+      <a class="mt-btn sm" href="{{ url_for('meeting.minutes_view', meeting_id=meeting.id) }}">
+        <i class="fa-solid fa-file-lines"></i> 회의록
+      </a>
+    </div>
+  </section>
+
+  <nav class="mt-steps slim">
+    <a class="mt-step is-done" href="{{ url_for('meeting.edit_meeting', meeting_id=meeting.id) }}"><b>1</b> 회의 생성</a>
+    <span class="mt-step is-on"><b>2</b> 안건·자료</span>
+    <a class="mt-step" href="{{ url_for('meeting.live_meeting', meeting_id=meeting.id) }}"><b>3</b> 진행</a>
+    <a class="mt-step" href="{{ url_for('meeting.live_meeting', meeting_id=meeting.id) }}"><b>4</b> 결정</a>
+    <a class="mt-step" href="{{ url_for('meeting.minutes_view', meeting_id=meeting.id) }}"><b>5</b> 회의록</a>
+  </nav>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="mt-two-col">
+
+    <!-- 왼쪽 : 안건 -->
+    <main class="mt-main-col">
+      <div class="mt-panel compact">
+        <div class="mt-panel-head">
+          <h2><i class="fa-solid fa-list-check"></i> 안건 <em>{{ agendas|length }}</em>건</h2>
+          {% if can_join %}
+          <button class="mt-btn sm primary" type="button" id="mtNewAgendaBtn">
+            <i class="fa-solid fa-plus"></i> 안건 추가
+          </button>
+          {% endif %}
+        </div>
+
+        {% if can_join %}
+        <form class="mt-quick-form" id="mtNewAgendaForm" hidden method="post"
+              action="{{ url_for('meeting.create_agenda', meeting_id=meeting.id) }}"
+              enctype="multipart/form-data">
+          <div class="mt-quick-row">
+            <input type="text" name="title" maxlength="200" required
+                   placeholder="안건 제목 (예: 상반기 프로그램 운영계획(안))">
+            <select name="owner_emp_no" title="담당자">
+              {% for person in attendees %}
+              <option value="{{ person.emp_no }}"
+                {% if person.emp_no|string == session.get('emp_no')|string %}selected{% endif %}>{{ person.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <textarea name="summary" maxlength="4000" rows="2"
+                    placeholder="안건 설명 · 결정이 필요한 사항 (선택)"></textarea>
+          <label class="mt-file-line" id="mtAgDrop">
+            <i class="fa-solid fa-paperclip"></i>
+            <span id="mtAgDropText">자료 첨부 · 끌어다 놓아도 됩니다</span>
+            <small>이미지·PDF 자동 변환 / 50MB</small>
+            <input id="mtAgFiles" type="file" name="materials" multiple>
+          </label>
+          <div class="mt-quick-actions">
+            <button class="mt-btn sm" type="button" id="mtNewAgendaCancel">취소</button>
+            <button class="mt-btn sm primary" type="submit"><i class="fa-solid fa-check"></i> 등록</button>
+          </div>
+        </form>
+        {% endif %}
+
+        {% for item in agendas %}
+        {% set agenda = item.row %}
+        <article class="mt-agenda" id="agenda-{{ agenda.id }}">
+          <div class="mt-agenda-head">
+            <span class="mt-agenda-no">{{ agenda.position }}</span>
+            <h3>{{ agenda.title }}</h3>
+            <span class="mt-badge {{ agenda.decision_status }}">{{ decision_labels.get(agenda.decision_status, '대기') }}</span>
+            <span class="mt-agenda-tools">
+              {% if can_manage %}
+              <form class="mt-inline-form" method="post" action="{{ url_for('meeting.move_agenda', meeting_id=meeting.id, agenda_id=agenda.id) }}">
+                <input type="hidden" name="direction" value="up">
+                <button class="mt-icon-btn" type="submit" title="위로" {% if loop.first %}disabled{% endif %}><i class="fa-solid fa-arrow-up"></i></button>
+              </form>
+              <form class="mt-inline-form" method="post" action="{{ url_for('meeting.move_agenda', meeting_id=meeting.id, agenda_id=agenda.id) }}">
+                <input type="hidden" name="direction" value="down">
+                <button class="mt-icon-btn" type="submit" title="아래로" {% if loop.last %}disabled{% endif %}><i class="fa-solid fa-arrow-down"></i></button>
+              </form>
+              {% endif %}
+              {% if item.can_edit %}
+              <button class="mt-icon-btn" type="button" title="수정" data-edit="agenda-edit-{{ agenda.id }}"><i class="fa-solid fa-pen"></i></button>
+              <form class="mt-inline-form" method="post"
+                    action="{{ url_for('meeting.delete_agenda', meeting_id=meeting.id, agenda_id=agenda.id) }}"
+                    onsubmit="return confirm('‘{{ agenda.title }}’ 안건을 삭제할까요? 첨부 자료도 함께 지워집니다.');">
+                <button class="mt-icon-btn danger" type="submit" title="삭제"><i class="fa-solid fa-trash"></i></button>
+              </form>
+              {% endif %}
+            </span>
+          </div>
+
+          <div class="mt-agenda-body">
+            <p class="mt-agenda-meta">
+              <i class="fa-solid fa-user"></i> {{ agenda.owner_name or '담당 미지정' }}
+              {%- if item.materials %} &nbsp;·&nbsp; <i class="fa-solid fa-paperclip"></i> 자료 {{ item.materials|length }}개{% endif %}
+            </p>
+            {% if agenda.summary %}<p class="mt-agenda-desc">{{ agenda.summary }}</p>{% endif %}
+
+            {% if item.materials %}
+            <div class="mt-preview-strip">
+              {% for material in item.materials %}
+                {% for page in material.pages %}
+                <a class="mt-preview" title="{{ material.filename }} {{ page.page_no }}쪽"
+                   href="{{ url_for('meeting.serve_material_page', meeting_id=meeting.id, material_id=material.id, page_no=page.page_no) }}"
+                   target="_blank" rel="noopener">
+                  <img loading="lazy" alt="{{ material.filename }} {{ page.page_no }}쪽"
+                       src="{{ url_for('meeting.serve_material_page', meeting_id=meeting.id, material_id=material.id, page_no=page.page_no, size='thumb') }}">
+                </a>
+                {% endfor %}
+                {% if not material.pages %}
+                <a class="mt-file sm" href="{{ url_for('meeting.serve_material', meeting_id=meeting.id, material_id=material.id) }}"
+                   target="_blank" rel="noopener" title="{{ material.filename }}">
+                  <i class="fa-solid fa-file-arrow-down"></i><span>{{ material.filename }}</span>
+                </a>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if agenda.decision %}
+            <p class="mt-agenda-decision"><b>결정</b> {{ agenda.decision }}</p>
+            {% endif %}
+          </div>
+
+          {% if item.can_edit %}
+          <div class="mt-agenda-edit" id="agenda-edit-{{ agenda.id }}" hidden>
+            <form method="post" action="{{ url_for('meeting.edit_agenda', meeting_id=meeting.id, agenda_id=agenda.id) }}"
+                  enctype="multipart/form-data">
+              <div class="mt-quick-row">
+                <input type="text" name="title" maxlength="200" value="{{ agenda.title }}">
+                <select name="owner_emp_no" title="담당자">
+                  {% for person in attendees %}
+                  <option value="{{ person.emp_no }}"
+                    {% if person.emp_no|string == agenda.owner_emp_no|string %}selected{% endif %}>{{ person.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <textarea name="summary" maxlength="4000" rows="2" placeholder="안건 설명">{{ agenda.summary }}</textarea>
+              <label class="mt-file-line">
+                <i class="fa-solid fa-paperclip"></i>
+                <span>자료 추가</span>
+                <input type="file" name="materials" multiple>
+              </label>
+              <div class="mt-quick-actions">
+                <button class="mt-btn sm" type="button" data-close="agenda-edit-{{ agenda.id }}">닫기</button>
+                <button class="mt-btn sm primary" type="submit"><i class="fa-solid fa-check"></i> 저장</button>
+              </div>
+            </form>
+            {% if item.materials %}
+            <div class="mt-file-chips">
+              <span class="mt-hint">누르면 그 자료를 삭제합니다</span>
+              {% for material in item.materials %}
+              <form class="mt-inline-form" method="post"
+                    action="{{ url_for('meeting.delete_material', meeting_id=meeting.id, material_id=material.id) }}"
+                    onsubmit="return confirm('‘{{ material.filename }}’ 자료를 삭제할까요?');">
+                <button class="mt-chip-del" type="submit">
+                  <i class="fa-solid fa-xmark"></i>{{ material.filename }}
+                  {% if material.pages %}<small>{{ material.pages|length }}쪽</small>{% endif %}
+                </button>
+              </form>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+        </article>
+        {% else %}
+        <div class="mt-empty slim">
+          <i class="fa-regular fa-rectangle-list"></i>
+          <h2>등록된 안건이 없습니다.</h2>
+          <p>{% if can_join %}위 [안건 추가]로 안건과 자료를 올려 주세요.{% else %}참석자가 안건을 등록할 수 있습니다.{% endif %}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </main>
+
+    <!-- 오른쪽 : 회의 정보 -->
+    <aside class="mt-side-col">
+      <div class="mt-panel compact">
+        <div class="mt-panel-head">
+          <h2><i class="fa-solid fa-circle-info"></i> 회의 정보</h2>
+          {% if can_manage %}
+          <a class="mt-icon-btn" href="{{ url_for('meeting.edit_meeting', meeting_id=meeting.id) }}" title="회의 정보 수정">
+            <i class="fa-solid fa-pen"></i>
+          </a>
+          {% endif %}
+        </div>
+        <dl class="mt-info">
+          <dt>일시</dt>
+          <dd>{{ meeting.meeting_date }}
+            {%- if meeting.start_time %} {{ meeting.start_time }}{% if meeting.end_time %}~{{ meeting.end_time }}{% endif %}{% endif %}</dd>
+          <dt>장소</dt><dd>{{ meeting.place or '미정' }}</dd>
+          <dt>주재</dt><dd>{{ meeting.host_name or meeting.created_by }}</dd>
+        </dl>
+        {% if meeting.purpose %}
+        <p class="mt-agenda-desc" style="margin-top:10px;">{{ meeting.purpose }}</p>
+        {% endif %}
+      </div>
+
+      <div class="mt-panel compact">
+        <div class="mt-panel-head">
+          <h2><i class="fa-solid fa-users"></i> 참석자 <em>{{ attendees|length }}</em>명</h2>
+        </div>
+        <div class="mt-attendees">
+          {% for person in attendees %}
+          <span class="mt-attendee {% if person.role == '주재자' %}host{% endif %}">
+            {% if person.role == '주재자' %}<i class="fa-solid fa-user-tie"></i>{% endif %}{{ person.name }}
+          </span>
+          {% else %}
+          <span class="mt-hint">등록된 참석자가 없습니다.</span>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="mt-panel compact">
+        <div class="mt-panel-head">
+          <h2><i class="fa-solid fa-paperclip"></i> 공용 자료</h2>
+        </div>
+        {% if shared_materials %}
+        <div class="mt-file-chips">
+          {% for material in shared_materials %}
+          <a class="mt-file sm" href="{{ url_for('meeting.serve_material', meeting_id=meeting.id, material_id=material.id) }}"
+             target="_blank" rel="noopener" title="{{ material.filename }}">
+            <i class="fa-solid fa-file"></i><span>{{ material.filename }}</span>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="mt-hint">안건에 속하지 않는 자료(지난 회의록·일정표 등)를 올립니다.</p>
+        {% endif %}
+        {% if can_join %}
+        <form method="post" action="{{ url_for('meeting.upload_shared_materials', meeting_id=meeting.id) }}"
+              enctype="multipart/form-data" class="mt-shared-form">
+          <label class="mt-file-line">
+            <i class="fa-solid fa-plus"></i><span id="mtSharedText">파일 고르기</span>
+            <input type="file" name="materials" id="mtSharedFiles" multiple>
+          </label>
+          <button class="mt-btn sm" type="submit"><i class="fa-solid fa-upload"></i> 올리기</button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if can_manage %}
+      <div class="mt-panel compact">
+        <form method="post" action="{{ url_for('meeting.delete_meeting', meeting_id=meeting.id) }}"
+              onsubmit="return confirm('‘{{ meeting.title }}’ 회의를 정말 삭제할까요? 안건·자료·녹음이 모두 지워집니다.');">
+          <button class="mt-btn sm danger" type="submit" style="width:100%;">
+            <i class="fa-solid fa-trash"></i> 회의 삭제
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  // 안건 추가 폼은 필요할 때만 펼친다(기본은 안건 목록이 바로 보이도록).
+  const newBtn = document.getElementById('mtNewAgendaBtn');
+  const newForm = document.getElementById('mtNewAgendaForm');
+  const newCancel = document.getElementById('mtNewAgendaCancel');
+  if (newBtn && newForm) {
+    const toggle = open => {
+      newForm.hidden = !open;
+      newBtn.hidden = open;
+      if (open) newForm.querySelector('input[name=title]').focus();
+    };
+    newBtn.addEventListener('click', () => toggle(true));
+    if (newCancel) newCancel.addEventListener('click', () => toggle(false));
+  }
+
+  // 안건별 수정 영역 열고 닫기
+  document.querySelectorAll('[data-edit]').forEach(button => {
+    button.addEventListener('click', () => {
+      const box = document.getElementById(button.dataset.edit);
+      if (box) box.hidden = !box.hidden;
+    });
+  });
+  document.querySelectorAll('[data-close]').forEach(button => {
+    button.addEventListener('click', () => {
+      const box = document.getElementById(button.dataset.close);
+      if (box) box.hidden = true;
+    });
+  });
+
+  // 첨부 줄 : 고른 개수 표시 + 드래그&드롭
+  function bindFileLine(inputId, textId, idle) {
+    const input = document.getElementById(inputId);
+    const text = document.getElementById(textId);
+    if (!input || !text) return;
+    input.addEventListener('change', () => {
+      const count = (input.files || []).length;
+      text.textContent = count ? `파일 ${count}개 선택됨` : idle;
+    });
+    const drop = input.closest('.mt-file-line');
+    if (!drop) return;
+    ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault(); drop.classList.add('is-over');
+    }));
+    ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault(); drop.classList.remove('is-over');
+    }));
+    drop.addEventListener('drop', event => {
+      if (event.dataTransfer && event.dataTransfer.files.length) {
+        input.files = event.dataTransfer.files;
+        input.dispatchEvent(new Event('change'));
+      }
+    });
+  }
+  bindFileLine('mtAgFiles', 'mtAgDropText', '자료 첨부 · 끌어다 놓아도 됩니다');
+  bindFileLine('mtSharedFiles', 'mtSharedText', '파일 고르기');
+})();
+</script>
+{% endblock %}

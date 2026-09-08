@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}회의센터{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260905-meeting">
+{% endblock %}
+{% block content %}
+<div class="mt-page">
+
+  <section class="mt-hero">
+    <div>
+      <span class="mt-eyebrow"><i class="fa-solid fa-users-rectangle"></i> MEETING CENTER</span>
+      <h1>회의센터</h1>
+      <p>회의 생성 → 안건·자료 등록 → 실시간 진행 → 안건 결정 → AI 회의록까지 한 곳에서 처리합니다.</p>
+    </div>
+    <div class="mt-hero-actions">
+      <a class="mt-btn primary" href="{{ url_for('meeting.create_meeting') }}">
+        <i class="fa-solid fa-plus"></i> 새 회의 만들기
+      </a>
+    </div>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form class="mt-tools" method="get" action="{{ url_for('meeting.meeting_list') }}">
+    <a class="mt-chip {% if scope == 'mine' %}is-on{% endif %}"
+       href="{{ url_for('meeting.meeting_list', scope='mine', status=status, q=query) }}">내 회의</a>
+    <a class="mt-chip {% if scope == 'all' %}is-on{% endif %}"
+       href="{{ url_for('meeting.meeting_list', scope='all', status=status, q=query) }}">전체 회의</a>
+    <span style="width:1px; height:22px; background:var(--mt-line);"></span>
+    <a class="mt-chip {% if not status %}is-on{% endif %}"
+       href="{{ url_for('meeting.meeting_list', scope=scope, q=query) }}">모든 상태</a>
+    {% for key, label in status_labels.items() %}
+    <a class="mt-chip {% if status == key %}is-on{% endif %}"
+       href="{{ url_for('meeting.meeting_list', scope=scope, status=key, q=query) }}">{{ label }}</a>
+    {% endfor %}
+    <span class="mt-search">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      <input type="hidden" name="status" value="{{ status }}">
+      <input class="mt-input" type="text" name="q" value="{{ query }}" placeholder="회의 제목·장소·목적 검색">
+      <button class="mt-btn" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </span>
+  </form>
+
+  {% if meetings %}
+  <div class="mt-list">
+    {% for row in meetings %}
+    <article class="mt-card">
+      <div class="mt-card-date">
+        <span class="mt-yr">{{ row.meeting_date[:4] }}</span>
+        <span class="mt-md">{{ row.meeting_date[5:] }}</span>
+        <span class="mt-tm">{{ row.start_time or '시간 미정' }}</span>
+      </div>
+      <div class="mt-card-main">
+        <h2>
+          <a href="{{ url_for('meeting.meeting_detail', meeting_id=row.id) }}">{{ row.title }}</a>
+        </h2>
+        <div class="mt-meta">
+          <span class="mt-badge {{ row.status }}">{{ status_labels.get(row.status, row.status) }}</span>
+          <span><i class="fa-solid fa-location-dot"></i> {{ row.place or '장소 미정' }}</span>
+          <span><i class="fa-solid fa-user-tie"></i> {{ row.host_name or row.created_by }}</span>
+          <span><i class="fa-solid fa-users"></i> 참석 {{ row.attendee_count }}명</span>
+          <span><i class="fa-solid fa-list-check"></i> 안건 {{ row.agenda_count }}건
+            {% if row.agenda_count %}(결정 {{ row.decided_count }}){% endif %}</span>
+          {% if row.minutes_json %}<span style="color:var(--mt-ok);"><i class="fa-solid fa-file-lines"></i> 회의록 작성됨</span>{% endif %}
+        </div>
+      </div>
+      <div class="mt-card-actions">
+        <a class="mt-btn sm" href="{{ url_for('meeting.meeting_detail', meeting_id=row.id) }}">
+          <i class="fa-solid fa-list-check"></i> 안건·자료
+        </a>
+        <a class="mt-btn sm warn" href="{{ url_for('meeting.live_meeting', meeting_id=row.id) }}">
+          <i class="fa-solid fa-tv"></i> 진행화면
+        </a>
+        <a class="mt-btn sm" href="{{ url_for('meeting.minutes_view', meeting_id=row.id) }}">
+          <i class="fa-solid fa-file-lines"></i> 회의록
+        </a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="mt-empty">
+    <i class="fa-regular fa-calendar-check"></i>
+    <h2>{% if query or status %}조건에 맞는 회의가 없습니다.{% else %}아직 등록된 회의가 없습니다.{% endif %}</h2>
+    <p>회의를 만들면 참석자들이 각자 자기 PC에서 안건과 자료를 미리 올릴 수 있습니다.</p>
+    <a class="mt-btn primary" href="{{ url_for('meeting.create_meeting') }}">
+      <i class="fa-solid fa-plus"></i> 새 회의 만들기
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

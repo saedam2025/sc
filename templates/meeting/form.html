@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}{% if meeting %}회의 정보 수정{% else %}새 회의 만들기{% endif %}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260905-meeting">
+{% endblock %}
+{% block content %}
+<div class="mt-page">
+
+  <section class="mt-hero">
+    <div>
+      <span class="mt-eyebrow"><i class="fa-solid fa-users-rectangle"></i> MEETING CENTER</span>
+      <h1>{% if meeting %}회의 정보 수정{% else %}새 회의 만들기{% endif %}</h1>
+      <p>1단계입니다. 일시·장소·제목·참석자를 정하면 참석자들이 안건과 자료를 올릴 수 있습니다.</p>
+    </div>
+    <div class="mt-hero-actions">
+      <a class="mt-btn" href="{% if meeting %}{{ url_for('meeting.meeting_detail', meeting_id=meeting.id) }}{% else %}{{ url_for('meeting.meeting_list') }}{% endif %}">
+        <i class="fa-solid fa-chevron-left"></i> 취소
+      </a>
+    </div>
+  </section>
+
+  <div class="mt-steps">
+    <span class="mt-step is-on"><b>1</b> 회의 생성</span>
+    <span class="mt-step"><b>2</b> 안건·자료 등록</span>
+    <span class="mt-step"><b>3</b> 실시간 진행</span>
+    <span class="mt-step"><b>4</b> 안건 결정</span>
+    <span class="mt-step"><b>5</b> AI 회의록</span>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="mt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post"
+        action="{% if meeting %}{{ url_for('meeting.edit_meeting', meeting_id=meeting.id) }}{% else %}{{ url_for('meeting.create_meeting') }}{% endif %}">
+
+    <div class="mt-panel">
+      <h2><i class="fa-solid fa-circle-info" style="color:var(--mt-accent);"></i> 회의 기본 정보</h2>
+      <p class="mt-help">회의 제목과 날짜는 반드시 입력해 주세요.</p>
+
+      <div class="mt-field">
+        <label for="mtTitle">회의 제목<span class="req">*</span></label>
+        <input id="mtTitle" type="text" name="title" maxlength="150" required
+               value="{{ form.title }}" placeholder="예) 2026년 3월 정기 운영회의">
+      </div>
+
+      <div class="mt-row">
+        <div class="mt-field">
+          <label for="mtDate">회의 날짜<span class="req">*</span></label>
+          <input id="mtDate" type="date" name="meeting_date" required value="{{ form.meeting_date }}">
+        </div>
+        <div class="mt-field">
+          <label for="mtStart">시작 시각</label>
+          <input id="mtStart" type="time" name="start_time" value="{{ form.start_time }}">
+        </div>
+        <div class="mt-field">
+          <label for="mtEnd">종료 시각</label>
+          <input id="mtEnd" type="time" name="end_time" value="{{ form.end_time }}">
+        </div>
+      </div>
+
+      <div class="mt-field">
+        <label for="mtPlace">장소</label>
+        <input id="mtPlace" type="text" name="place" maxlength="120"
+               value="{{ form.place }}" placeholder="예) 본부 3층 대회의실 / 화상회의(Zoom)">
+      </div>
+
+      <div class="mt-field">
+        <label for="mtPurpose">회의 목적 · 안내</label>
+        <textarea id="mtPurpose" name="purpose" maxlength="2000"
+                  placeholder="어떤 결정을 하기 위한 회의인지 적어 주세요. 참석자에게 그대로 보입니다.">{{ form.purpose }}</textarea>
+      </div>
+    </div>
+
+    <div class="mt-panel">
+      <h2><i class="fa-solid fa-users" style="color:var(--mt-warn);"></i> 참석자</h2>
+      <p class="mt-help">체크한 직원이 안건·자료를 등록하고 진행 화면을 열 수 있습니다.
+        <b>주재자</b>는 회의 정보 수정, 안건 순서 변경, 회의 종료, AI 회의록 작성을 할 수 있습니다.</p>
+
+      <div class="mt-field">
+        <label for="mtHost">주재자</label>
+        <select id="mtHost" name="host_emp_no">
+          {% for person in staff %}
+          <option value="{{ person.emp_no }}" {% if person.emp_no|string == host_emp_no|string %}selected{% endif %}>
+            {{ person.name }}{% if person.position %} · {{ person.position }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="mt-hint">주재자는 참석자 명단에 자동으로 포함됩니다.</p>
+      </div>
+
+      <div class="mt-field">
+        <label>참석자 선택 <span id="mtPickedCount" class="mt-hint" style="display:inline;"></span></label>
+        <div class="mt-people" id="mtPeople">
+          {% for person in staff %}
+          <label class="mt-person {% if person.emp_no|string in selected|map('string')|list %}is-on{% endif %}">
+            <input type="checkbox" name="attendees" value="{{ person.emp_no }}"
+                   {% if person.emp_no|string in selected|map('string')|list %}checked{% endif %}>
+            <span>{{ person.name }}<br><small>{{ person.position or person.department or '' }}</small></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if not staff %}
+        <p class="mt-hint">등록된 직원이 없습니다. 인사관리에서 직원을 먼저 등록해 주세요.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="mt-form-actions">
+      <a class="mt-btn" href="{% if meeting %}{{ url_for('meeting.meeting_detail', meeting_id=meeting.id) }}{% else %}{{ url_for('meeting.meeting_list') }}{% endif %}">취소</a>
+      <button class="mt-btn primary" type="submit">
+        <i class="fa-solid fa-check"></i> {% if meeting %}수정 저장{% else %}회의 만들기{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const people = document.getElementById('mtPeople');
+  const counter = document.getElementById('mtPickedCount');
+  const host = document.getElementById('mtHost');
+  if (!people) return;
+
+  function sync() {
+    const boxes = [...people.querySelectorAll('input[type=checkbox]')];
+    boxes.forEach(box => box.closest('.mt-person').classList.toggle('is-on', box.checked));
+    if (counter) counter.textContent = '· ' + boxes.filter(box => box.checked).length + '명 선택';
+  }
+
+  people.addEventListener('change', sync);
+  // 주재자를 바꾸면 그 사람은 참석자에 자동으로 체크해 둔다.
+  if (host) {
+    host.addEventListener('change', () => {
+      const target = people.querySelector(`input[value="${CSS.escape(host.value)}"]`);
+      if (target) target.checked = true;
+      sync();
+    });
+  }
+  sync();
+})();
+</script>
+{% endblock %}
