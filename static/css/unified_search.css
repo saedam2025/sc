@@ -1,7 +1,7 @@
 .global-search {
     position: relative;
-    width: clamp(220px, 22vw, 360px);
-    flex: 0 1 360px;
+    width: clamp(165px, 16.5vw, 270px);
+    flex: 0 1 270px;
     z-index: 1250;
 }
 
@@ -258,18 +258,18 @@
 .global-search-empty span { font-size: .75rem; line-height: 1.5; }
 
 @media (max-width: 1500px) {
-    .global-search { width: clamp(190px, 18vw, 280px); flex-basis: 280px; }
+    .global-search { width: clamp(143px, 13.5vw, 210px); flex-basis: 210px; }
     .global-search-shortcut { display: none; }
 }
 
 @media (max-width: 1180px) {
-    .global-search { width: 190px; flex-basis: 190px; }
+    .global-search { width: 143px; flex-basis: 143px; }
     .global-search-box { padding-left: 10px; }
     .global-search-panel { position: fixed; top: 74px; right: 14px; }
 }
 
 @media (max-width: 760px) {
-    .global-search { width: min(52vw, 240px); flex-basis: min(52vw, 240px); }
+    .global-search { width: min(39vw, 180px); flex-basis: min(39vw, 180px); }
     .global-search-panel { top: 66px; right: 8px; width: calc(100vw - 16px); max-height: calc(100vh - 82px); }
     .global-search-results { max-height: calc(100vh - 131px); }
     .global-search-result-date { display: none; }

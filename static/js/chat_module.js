@@ -23,11 +23,12 @@ function openMsgModalWithReceiver(targetUser, currentUser) {
 }
 
 function openChat(partnerName) {
-    const popupWidth = 450; 
-    const popupHeight = 650;
+    // 기본 대화창 크기: 너비는 좁게, 높이는 길게
+    const popupWidth = 405;
+    const popupHeight = 715;
     const left = (window.screen.width / 2) - (popupWidth / 2);
     const top = (window.screen.height / 2) - (popupHeight / 2);
-    window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no`);
+    window.open(`/chat_popup/${encodeURIComponent(partnerName)}`, `chat_${partnerName}`, `popup=yes,width=${popupWidth},height=${popupHeight},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,directories=no,titlebar=no,scrollbars=yes,resizable=yes`);
 }
 
 async function sendNewMessage() {

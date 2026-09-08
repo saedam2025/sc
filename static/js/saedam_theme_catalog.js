@@ -10,13 +10,14 @@
 
     // 테마관리 화면의 고정 번호 체계:
     // 0 기본, 1 e리플렛, 2~2001 기본 갤러리, 2002~2501 포인트 컬러,
-    // 2502~3001 딥 컬러, 3002~ 계절·기념일.
+    // 2502~3001 딥 컬러, 3002~ 계절·기념일, 4001~ 시스템 테마.
     const themeCatalogDisplayOffsets = Object.freeze({
         gallery: 1,
         accent: 2001,
         deepColor: 2501,
         'deep-color': 2501,
-        seasonal: 3001
+        seasonal: 3001,
+        system: 4000
     });
 
     function getThemeDisplayNumber(theme, fallbackIndex = 0) {
@@ -637,6 +638,58 @@
         return seasonalThemes.map((_, index) => createSeasonalTheme(index));
     }
 
+    const systemThemes = [
+        {
+            name: '[네온/사이트맵] 퀀텀 네비게이션',
+            type: 'neonGeometryFlow',
+            vars: {
+                '--body-bg': 'linear-gradient(135deg, #030616 0%, #07142e 42%, #100a2f 76%, #030616 100%)',
+                '--app-bg': '#05091b',
+                '--main-bg': '#05091b',
+                '--nav-bg': 'rgba(7, 13, 34, 0.9)',
+                '--nav-shadow': '0 14px 42px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(103, 232, 249, 0.14)',
+                '--primary-color': '#67e8f9',
+                '--primary-light': 'rgba(103, 232, 249, 0.14)',
+                '--primary-dark': '#22d3ee',
+                '--text-dark': '#f8fbff',
+                '--text-gray': '#9fb1ca',
+                '--border-color': 'rgba(125, 211, 252, 0.24)',
+                '--border-light': 'rgba(148, 163, 184, 0.14)',
+                '--theme-line-color': 'rgba(103, 232, 249, 0.28)',
+                '--dashboard-top-line': 'linear-gradient(90deg, #67e8f9 0%, #60a5fa 46%, #a78bfa 100%)',
+                '--card-bg': 'rgba(12, 20, 48, 0.76)',
+                '--card-border': 'rgba(103, 232, 249, 0.28)',
+                '--card-backdrop': 'blur(24px) saturate(1.25)',
+                '--card-shadow': '0 20px 54px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 30px rgba(96, 165, 250, 0.08)',
+                '--input-bg': 'rgba(7, 14, 36, 0.78)',
+                '--input-text': '#f8fbff',
+                '--widget-bg': 'rgba(15, 27, 61, 0.72)',
+                '--widget-hover': 'rgba(30, 58, 110, 0.62)',
+                '--widget-border': 'rgba(125, 211, 252, 0.22)',
+                '--tooltip-bg': 'rgba(3, 6, 22, 0.96)',
+                '--tooltip-text': '#e6fbff',
+                '--effect-color1': '#67e8f9',
+                '--effect-color2': '#60a5fa',
+                '--effect-color3': '#a78bfa'
+            }
+        }
+    ];
+
+    function createSystemTheme(index) {
+        const theme = systemThemes[index % systemThemes.length];
+        return {
+            name: theme.name,
+            type: theme.type,
+            vars: { ...theme.vars },
+            catalog: 'system',
+            catalogIndex: index + 1
+        };
+    }
+
+    function createSystemThemeCatalog() {
+        return systemThemes.map((_, index) => createSystemTheme(index));
+    }
+
     function shuffleThemes(themes, seedText) {
         const rng = seededRandom(seedText);
         for (let i = themes.length - 1; i > 0; i--) {
@@ -662,6 +715,8 @@
         createDeepColorThemeCatalog,
         createSeasonalTheme,
         createSeasonalThemeCatalog,
+        createSystemTheme,
+        createSystemThemeCatalog,
         getThemeDisplayNumber,
         shuffleThemes
     };
