@@ -42,6 +42,9 @@ def main():
             return value
 
         buttons = approved.get("buttons") or []
+        # 템플릿에 저장된 대체발송 문구는 제목이 비어 있어 LMS 접수(1010)에서 거절된다.
+        # 발송 페이로드가 제목 있는 대체문자를 직접 싣고 있는지 확인한다.
+        fallback = (message.get("replacements") or [{}])[0]
         checks = {
             "approved": approved.get("status") == "APPROVED",
             "name_resolved": replace(approved.get("content", "")).startswith("테스트계약자님"),
@@ -49,8 +52,14 @@ def main():
             "mobile_link_matches": bool(buttons) and replace(buttons[0].get("linkMo", "")) == link,
             "pc_link_matches": bool(buttons) and replace(buttons[0].get("linkPc", "")) == link,
             "template_fields_preserved": "text" not in message and "buttons" not in message["kakaoOptions"],
+            "fallback_subject_supplied": bool(str(fallback.get("subject") or "").strip()),
+            "fallback_link_resolved": link in str(fallback.get("text") or ""),
         }
-        print(json.dumps({"live_template_checks": checks, "messages_sent": 0}, ensure_ascii=False))
+        print(json.dumps({
+            "live_template_checks": checks,
+            "template_fallback_subject": ((approved.get("replacements") or [{}])[0]).get("subject"),
+            "messages_sent": 0,
+        }, ensure_ascii=False))
         if not all(checks.values()):
             raise RuntimeError("승인 템플릿과 발송 변수가 일치하지 않습니다.")
         return
