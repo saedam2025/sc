@@ -43,6 +43,10 @@ VERIFIED_CONTRACT_FIELDS = (
     "pdf_sha256",
     "invite_mail_status",
     "invite_mail_error",
+    "invite_channel",
+    "invite_message_id",
+    "otp_channel",
+    "otp_message_id",
     "completion_mail_status",
     "completion_mail_error",
     "created_by",
@@ -58,7 +62,7 @@ def ensure_verified_contract_schema(conn) -> None:
             school_name TEXT NOT NULL DEFAULT '',
             department TEXT NOT NULL DEFAULT '',
             signer_name TEXT NOT NULL,
-            signer_email TEXT NOT NULL,
+            signer_email TEXT NOT NULL DEFAULT '',
             signer_phone TEXT NOT NULL DEFAULT '',
             signer_address TEXT NOT NULL DEFAULT '',
             signer_rrn_encrypted TEXT NOT NULL DEFAULT '',
@@ -90,6 +94,10 @@ def ensure_verified_contract_schema(conn) -> None:
             pdf_sha256 TEXT,
             invite_mail_status TEXT NOT NULL DEFAULT 'waiting',
             invite_mail_error TEXT,
+            invite_channel TEXT NOT NULL DEFAULT '',
+            invite_message_id TEXT,
+            otp_channel TEXT NOT NULL DEFAULT '',
+            otp_message_id TEXT,
             completion_mail_status TEXT,
             completion_mail_error TEXT,
             created_by TEXT,
@@ -112,6 +120,17 @@ def ensure_verified_contract_schema(conn) -> None:
                 f"ALTER TABLE verified_contracts "
                 f"ADD COLUMN {column} TEXT NOT NULL DEFAULT ''"
             )
+    optional_columns = {
+        "invite_channel": "TEXT NOT NULL DEFAULT ''",
+        "invite_message_id": "TEXT",
+        "otp_channel": "TEXT NOT NULL DEFAULT ''",
+        "otp_message_id": "TEXT",
+    }
+    for column, definition in optional_columns.items():
+        if column not in existing_columns:
+            conn.execute(
+                f"ALTER TABLE verified_contracts ADD COLUMN {column} {definition}"
+            )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS verified_contract_events (
@@ -133,6 +152,10 @@ def ensure_verified_contract_schema(conn) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_verified_contract_email "
         "ON verified_contracts(signer_email)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_verified_contract_phone "
+        "ON verified_contracts(signer_phone)"
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_verified_contract_event "

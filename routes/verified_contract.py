@@ -61,6 +61,15 @@ from .verified_contract_repository import (
     insert_verified_contract,
     update_verified_contract,
 )
+from .solapi_settings import (
+    CONTRACT_PUBLIC_ORIGIN,
+    format_phone,
+    get_settings as get_solapi_settings,
+    mask_phone,
+    normalize_phone,
+    send_alimtalk,
+    send_sms_otp,
+)
 from .secure_files import (
     delete_file,
     encrypted_response,
@@ -731,17 +740,12 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def _request_scheme() -> str:
-    forwarded = request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip()
-    return forwarded or request.scheme
-
-
 def _external_url(token: str) -> str:
-    return url_for(
+    # 운영 프록시의 내부 Host/HTTP 값이 계약자에게 전달되지 않게 한다.
+    return CONTRACT_PUBLIC_ORIGIN + url_for(
         "verified_contract.public_contract",
         token=token,
-        _external=True,
-        _scheme=_request_scheme(),
+        _external=False,
     )
 
 
@@ -782,6 +786,30 @@ def _mask_email(email: str) -> str:
     return f"{visible}{'*' * max(2, len(local) - len(visible))}@{domain}"
 
 
+def _delivery_recipient(row) -> tuple[str, str, str]:
+    """전화번호가 있으면 알림톡/SMS, 없으면 이메일을 선택한다."""
+    phone = normalize_phone(row["signer_phone"])
+    if phone:
+        return "alimtalk", phone, mask_phone(phone)
+    email = str(row["signer_email"] or "").strip().lower()
+    if email:
+        return "email", email, _mask_email(email)
+    raise RuntimeError("계약대상자의 휴대폰번호 또는 이메일주소가 없습니다.")
+
+
+def _send_invitation(row, invitation_url: str) -> tuple[str, str, str]:
+    channel, recipient, _masked = _delivery_recipient(row)
+    if channel == "alimtalk":
+        result = send_alimtalk(
+            recipient,
+            signer_name=row["signer_name"],
+            invitation_url=invitation_url,
+        )
+        return channel, recipient, str(result.get("message_id") or "")
+    _invitation_mail(row, invitation_url)
+    return channel, recipient, ""
+
+
 def _row_for_view(row) -> dict:
     item = dict(row)
     try:
@@ -820,6 +848,14 @@ def _row_for_view(row) -> dict:
         "superseded": "변경계약",
     }
     item["status_label"] = status_map.get(item.get("status"), item.get("status"))
+    try:
+        item["signer_phone_display"] = format_phone(item.get("signer_phone"))
+    except ValueError:
+        item["signer_phone_display"] = str(item.get("signer_phone") or "")
+    channel_labels = {"alimtalk": "카카오 알림톡", "email": "이메일"}
+    item["invite_channel_label"] = channel_labels.get(
+        item.get("invite_channel"), item.get("invite_channel") or "미발송"
+    )
     return item
 
 
@@ -849,7 +885,7 @@ def _invitation_html(row, invitation_url: str) -> str:
     <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7;color:#1f2937">
       <h2 style="color:#123b6d">새담 인증전자계약 요청</h2>
       <p><b>{escape(row['signer_name'])}</b>님, {escape(row['title_snapshot'])} 확인과 서명을 요청드립니다.</p>
-      <p>아래 버튼을 누른 후 이메일 인증번호를 확인하면 계약서를 작성할 수 있습니다.</p>
+      <p>아래 버튼을 누른 후 본인 인증번호를 확인하면 계약서를 작성할 수 있습니다.</p>
       <p style="margin:28px 0">
         <a href="{escape(invitation_url)}" style="background:#123b6d;color:#fff;padding:13px 24px;border-radius:7px;text-decoration:none;font-weight:bold">계약서 확인하기</a>
       </p>
@@ -890,6 +926,11 @@ def _normalized_excel_records(frame: pd.DataFrame) -> list[dict[str, str]]:
         "계약자명": "성명",
         "이메일": "email",
         "계약자이메일": "email",
+        "휴대폰": "핸드폰번호",
+        "휴대폰번호": "핸드폰번호",
+        "전화번호": "핸드폰번호",
+        "연락처": "핸드폰번호",
+        "계약자핸드폰번호": "핸드폰번호",
         "학교명": "수탁학교명",
         "부서": "부서명",
         "담당업무": "부서명",
@@ -957,9 +998,9 @@ def admin_page():
         params.append(f"%{name_filter}%")
     if query:
         where.append(
-            "(signer_name LIKE ? OR signer_email LIKE ? OR school_name LIKE ? OR department LIKE ?)"
+            "(signer_name LIKE ? OR signer_email LIKE ? OR signer_phone LIKE ? OR school_name LIKE ? OR department LIKE ?)"
         )
-        params.extend([f"%{query}%"] * 4)
+        params.extend([f"%{query}%"] * 5)
     where_sql = f"WHERE {' AND '.join(where)}" if where else ""
     sort_columns = {
         "id": "id",
@@ -969,6 +1010,7 @@ def admin_page():
         "dept": "department",
         "name": "signer_name",
         "email": "signer_email",
+        "phone": "signer_phone",
         "status": "status",
         "created": "created_at",
         "signed": "signed_at",
@@ -1151,12 +1193,18 @@ def create_contract():
     contract_type = str(data.get("contract_type", "")).strip()
     signer_name = str(data.get("signer_name", "")).strip()
     signer_email = str(data.get("signer_email", "")).strip().lower()
+    try:
+        signer_phone = normalize_phone(data.get("signer_phone"))
+    except ValueError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
     if contract_type not in _categories():
         return jsonify({"status": "error", "message": "올바른 계약구분을 선택해 주세요."}), 400
     if not signer_name or not re.fullmatch(r"[^@\s]{1,80}", signer_name):
         return jsonify({"status": "error", "message": "계약자 성명을 확인해 주세요."}), 400
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", signer_email):
+    if signer_email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", signer_email):
         return jsonify({"status": "error", "message": "계약자 이메일을 확인해 주세요."}), 400
+    if not signer_phone and not signer_email:
+        return jsonify({"status": "error", "message": "휴대폰번호 또는 이메일주소를 입력해 주세요."}), 400
 
     profile = _company_snapshot(str(data.get("company_profile_id", "")).strip() or None)
     terms1, terms2 = _read_terms(contract_type)
@@ -1169,6 +1217,7 @@ def create_contract():
         "부서명": str(data.get("department", "")).strip(),
         "성명": signer_name,
         "email": signer_email,
+        "연락처": signer_phone,
     }
     for key in (
         "수수료",
@@ -1213,6 +1262,7 @@ def create_contract():
         "department": contract_data["부서명"],
         "signer_name": signer_name,
         "signer_email": signer_email,
+        "signer_phone": signer_phone,
         "contract_data_json": json.dumps(contract_data, ensure_ascii=False),
         "status": "pending",
         "title_snapshot": _contract_title(contract_type, profile["company_name"]),
@@ -1239,13 +1289,16 @@ def create_contract():
         conn.close()
 
     invitation_url = _external_url(token)
-    mail_status = "sent"
-    mail_error = ""
+    delivery_status = "sent"
+    delivery_error = ""
+    delivery_channel = "alimtalk" if signer_phone else "email"
+    delivery_recipient = signer_phone or signer_email
+    message_id = ""
     try:
-        _invitation_mail(row, invitation_url)
+        delivery_channel, delivery_recipient, message_id = _send_invitation(row, invitation_url)
     except Exception as exc:
-        mail_status = "failed"
-        mail_error = str(exc)[:500]
+        delivery_status = "failed"
+        delivery_error = str(exc)[:500]
 
     conn = get_db()
     try:
@@ -1253,24 +1306,32 @@ def create_contract():
             conn,
             contract_id,
             {
-                "invitation_sent_at": _iso() if mail_status == "sent" else None,
-                "invite_mail_status": mail_status,
-                "invite_mail_error": mail_error,
+                "invitation_sent_at": _iso() if delivery_status == "sent" else None,
+                "invite_mail_status": delivery_status,
+                "invite_mail_error": delivery_error,
+                "invite_channel": delivery_channel,
+                "invite_message_id": message_id,
             },
         )
         _record_event(
             conn,
             contract_id,
-            "INVITATION_SENT" if mail_status == "sent" else "INVITATION_FAILED",
-            {"recipient": signer_email, "error": mail_error},
+            "INVITATION_SENT" if delivery_status == "sent" else "INVITATION_FAILED",
+            {
+                "channel": delivery_channel,
+                "recipient": mask_phone(delivery_recipient) if delivery_channel == "alimtalk" else _mask_email(delivery_recipient),
+                "message_id": message_id,
+                "error": delivery_error,
+            },
         )
         conn.commit()
     finally:
         conn.close()
 
-    message = "계약을 등록하고 인증 링크를 이메일로 발송했습니다."
-    if mail_status == "failed":
-        message = f"계약은 등록했지만 메일 발송에 실패했습니다: {mail_error}"
+    channel_label = "카카오 알림톡" if delivery_channel == "alimtalk" else "이메일"
+    message = f"계약을 등록하고 인증 링크의 {channel_label} 발송을 접수했습니다."
+    if delivery_status == "failed":
+        message = f"계약은 등록했지만 {channel_label} 발송에 실패했습니다: {delivery_error}"
     if duplicate_ids:
         message += (
             f"\n\n⚠ 동일 인물·계약구분·학교·부서 조합의 기존 계약이 {len(duplicate_ids)}건 있습니다."
@@ -1278,7 +1339,7 @@ def create_contract():
         )
     return jsonify(
         {
-            "status": "success" if mail_status == "sent" else "warning",
+            "status": "success" if delivery_status == "sent" else "warning",
             "message": message,
             "contract_id": contract_id,
             "invitation_url": invitation_url,
@@ -1288,9 +1349,7 @@ def create_contract():
     )
 
 
-@verified_contract_bp.route("/admin/excel-template")
-@menu_permission_required("verified_contract_admin")
-def download_excel_template():
+def _build_excel_workbook(*, include_samples: bool) -> Workbook:
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "계약자 일괄등록"
@@ -1298,6 +1357,7 @@ def download_excel_template():
         "계약구분",
         "성명",
         "email",
+        "핸드폰번호",
         "수탁학교명",
         "부서명",
         "계약기간",
@@ -1313,27 +1373,52 @@ def download_excel_template():
         "비고4",
         "회사정보",
     ]
-    sample = [
-        _categories()[0],
-        "홍길동",
-        "hong@example.com",
-        "새담초등학교",
-        "수학",
-        "2026.03.01 ~ 2027.02.28",
-        "50000",
-        "",
-        "",
-        "",
-        "",
-        "주 2회",
-        "",
-        "",
-        "",
-        "",
-        _company_profile().get("label", "기본 회사"),
-    ]
     sheet.append(headers)
-    sheet.append(sample)
+    if include_samples:
+        sheet.append(
+            [
+                _categories()[0],
+                "홍길동",
+                "",
+                "010-1234-5678",
+                "새담초등학교",
+                "수학",
+                "2026.03.01 ~ 2027.02.28",
+                "50000",
+                "",
+                "",
+                "",
+                "",
+                "주 2회",
+                "",
+                "",
+                "",
+                "",
+                _company_profile().get("label", "기본 회사"),
+            ]
+        )
+        sheet.append(
+            [
+                _categories()[0],
+                "김새담",
+                "contract@example.com",
+                "",
+                "새담중학교",
+                "행정",
+                "2026.03.01 ~ 2027.02.28",
+                "45000",
+                "",
+                "",
+                "",
+                "",
+                "주 3회",
+                "",
+                "",
+                "",
+                "",
+                _company_profile().get("label", "기본 회사"),
+            ]
+        )
     header_fill = PatternFill("solid", fgColor="173F6A")
     for cell in sheet[1]:
         cell.fill = header_fill
@@ -1343,20 +1428,21 @@ def download_excel_template():
         "A": 18,
         "B": 14,
         "C": 28,
-        "D": 24,
-        "E": 22,
-        "F": 27,
-        "G": 14,
+        "D": 18,
+        "E": 24,
+        "F": 22,
+        "G": 27,
         "H": 14,
         "I": 14,
         "J": 14,
         "K": 14,
-        "L": 18,
+        "L": 14,
         "M": 18,
         "N": 18,
         "O": 18,
         "P": 18,
-        "Q": 20,
+        "Q": 18,
+        "R": 20,
     }
     for column, width in widths.items():
         sheet.column_dimensions[column].width = width
@@ -1364,7 +1450,8 @@ def download_excel_template():
 
     guide = workbook.create_sheet("작성안내")
     guide_rows = [
-        ("필수 열", "계약구분, 성명, email"),
+        ("필수 열", "계약구분, 성명, 핸드폰번호 또는 email 중 하나"),
+        ("발송 방법", "핸드폰번호가 있으면 카카오 알림톡, 없고 email만 있으면 이메일로 계약링크 발송"),
         ("학교·업무", "수탁학교명, 부서명(담당업무·강의과목·직책)"),
         ("회사정보", "비우면 현재 기본 회사정보 사용. 등록된 구분명·회사명도 입력 가능"),
         ("민감정보 입력", "주민번호·은행·계좌번호는 계약자가 계약 작성 화면에서 직접 입력합니다."),
@@ -1379,6 +1466,12 @@ def download_excel_template():
     for cell in guide["A"]:
         cell.font = Font(bold=True, color="173F6A")
 
+    return workbook
+
+
+def _excel_download(*, include_samples: bool, filename: str):
+    workbook = _build_excel_workbook(include_samples=include_samples)
+
     memory = io.BytesIO()
     workbook.save(memory)
     memory.seek(0)
@@ -1386,7 +1479,27 @@ def download_excel_template():
         memory,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
-        download_name="인증전자계약_일괄등록_양식.xlsx",
+        download_name=filename,
+    )
+
+
+@verified_contract_bp.route("/admin/excel-template")
+@menu_permission_required("verified_contract_admin")
+def download_excel_template():
+    """현재 등록 열 구성을 반영한 빈 업로드 양식을 요청 시 생성한다."""
+    return _excel_download(
+        include_samples=False,
+        filename="인증전자계약_일괄등록_양식.xlsx",
+    )
+
+
+@verified_contract_bp.route("/admin/sample-excel")
+@menu_permission_required("verified_contract_admin")
+def download_sample_excel():
+    """Render 배포 환경에서도 요청할 때마다 최신 열 구성으로 샘플을 자동 생성한다."""
+    return _excel_download(
+        include_samples=True,
+        filename="인증전자계약_샘플엑셀.xlsx",
     )
 
 
@@ -1416,7 +1529,7 @@ def upload_excel():
     try:
         for existing in conn.execute(
             """
-            SELECT contract_type, signer_name, signer_email, school_name, department
+            SELECT contract_type, signer_name, signer_email, signer_phone, school_name, department
             FROM verified_contracts WHERE status IN ('draft','pending')
             """
         ).fetchall():
@@ -1425,6 +1538,7 @@ def upload_excel():
                     existing["contract_type"],
                     existing["signer_name"],
                     existing["signer_email"].lower(),
+                    existing["signer_phone"],
                     existing["school_name"],
                     existing["department"],
                 )
@@ -1441,21 +1555,37 @@ def upload_excel():
             contract_type = _excel_text(record.get("계약구분"))
             signer_name = _excel_text(record.get("성명"))
             signer_email = _excel_text(record.get("email")).lower()
+            raw_phone = record.get("핸드폰번호")
+            try:
+                signer_phone = normalize_phone(raw_phone)
+            except ValueError as exc:
+                signer_phone = ""
+                row_errors = [str(exc)]
+            else:
+                row_errors = []
             school_name = _excel_text(record.get("수탁학교명"))
             department = _excel_text(record.get("부서명"))
-            row_errors = []
             if contract_type not in categories:
                 row_errors.append(f"등록되지 않은 계약구분: {contract_type or '빈 값'}")
             if not signer_name or len(signer_name) > 80:
                 row_errors.append("성명 확인 필요")
-            if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", signer_email):
+            if signer_email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", signer_email):
                 row_errors.append("이메일 형식 확인 필요")
+            if not signer_phone and not signer_email:
+                row_errors.append("핸드폰번호 또는 이메일 중 하나 필요")
             try:
                 profile = _resolve_company_snapshot(record.get("회사정보"))
             except ValueError as exc:
                 profile = None
                 row_errors.append(str(exc))
-            key = (contract_type, signer_name, signer_email, school_name, department)
+            key = (
+                contract_type,
+                signer_name,
+                signer_email,
+                signer_phone,
+                school_name,
+                department,
+            )
             # 같은 파일 안에서의 완전 중복 행만 막고, 이미 등록된 서명대기/등록대기 건은
             # 재계약(폐기·변경계약) 시나리오일 수 있으므로 차단하지 않고 등록 후 안내한다.
             if key in seen_keys:
@@ -1478,6 +1608,7 @@ def upload_excel():
                 "부서명": department,
                 "성명": signer_name,
                 "email": signer_email,
+                "연락처": signer_phone,
             }
             for field in (
                 "수수료",
@@ -1502,6 +1633,7 @@ def upload_excel():
                     "department": department,
                     "signer_name": signer_name,
                     "signer_email": signer_email,
+                    "signer_phone": signer_phone,
                     "contract_data_json": json.dumps(contract_data, ensure_ascii=False),
                     "status": "draft",
                     "title_snapshot": _contract_title(contract_type, profile["company_name"]),
@@ -1512,6 +1644,7 @@ def upload_excel():
                     "invitation_token_hash": _token_hash(placeholder_token),
                     "invitation_expires_at": _iso(),
                     "invite_mail_status": "not_sent",
+                    "invite_channel": "alimtalk" if signer_phone else "email",
                     "created_by": created_by,
                 },
             )
@@ -1622,42 +1755,82 @@ def bulk_send_invitations():
 
     sent_count = 0
     failed = []
-    settings = _mail_settings()
     smtp = None
-    setup_error = ""
-    try:
-        if not settings["MAIL_USERNAME"] or not settings["MAIL_PASSWORD"]:
-            raise RuntimeError("인증전자계약 전용 메일 계정이 설정되지 않았습니다.")
-        smtp = yagmail.SMTP(settings["MAIL_USERNAME"], settings["MAIL_PASSWORD"])
-    except Exception as exc:
-        setup_error = str(exc)[:500]
+    smtp_setup_error = ""
+    solapi_config = None
 
     conn = get_db()
     try:
         for row, token, invitation_url in queued:
-            error = setup_error
-            if smtp is not None:
+            channel = "alimtalk" if str(row["signer_phone"] or "").strip() else "email"
+            recipient = row["signer_phone"] if channel == "alimtalk" else row["signer_email"]
+            masked_recipient = "-"
+            message_id = ""
+            error = ""
+            try:
+                channel, recipient, masked_recipient = _delivery_recipient(row)
+            except (ValueError, RuntimeError) as exc:
+                error = str(exc)[:500]
+            if not error and channel == "alimtalk":
                 try:
-                    smtp.send(
-                        to=row["signer_email"],
-                        subject=f"[전자계약 요청] {row['title_snapshot']}",
-                        contents=_invitation_html(row, invitation_url),
+                    if solapi_config is None:
+                        solapi_config = get_solapi_settings()
+                    result = send_alimtalk(
+                        recipient,
+                        signer_name=row["signer_name"],
+                        invitation_url=invitation_url,
+                        settings=solapi_config,
                     )
-                    error = ""
+                    message_id = str(result.get("message_id") or "")
                 except Exception as exc:
                     error = str(exc)[:500]
+            elif not error:
+                if smtp is None and not smtp_setup_error:
+                    try:
+                        settings = _mail_settings()
+                        if not settings["MAIL_USERNAME"] or not settings["MAIL_PASSWORD"]:
+                            raise RuntimeError("인증전자계약 전용 메일 계정이 설정되지 않았습니다.")
+                        smtp = yagmail.SMTP(settings["MAIL_USERNAME"], settings["MAIL_PASSWORD"])
+                    except Exception as exc:
+                        smtp_setup_error = str(exc)[:500]
+                error = smtp_setup_error
+                if smtp is not None:
+                    try:
+                        smtp.send(
+                            to=recipient,
+                            subject=f"[전자계약 요청] {row['title_snapshot']}",
+                            contents=_invitation_html(row, invitation_url),
+                        )
+                    except Exception as exc:
+                        error = str(exc)[:500]
             if error:
-                failed.append({"id": row["id"], "name": row["signer_name"], "reason": error})
+                failed.append(
+                    {
+                        "id": row["id"],
+                        "name": row["signer_name"],
+                        "channel": channel,
+                        "reason": error,
+                    }
+                )
                 update_verified_contract(
                     conn,
                     row["id"],
-                    {"invite_mail_status": "failed", "invite_mail_error": error},
+                    {
+                        "invite_mail_status": "failed",
+                        "invite_mail_error": error,
+                        "invite_channel": channel,
+                        "invite_message_id": message_id,
+                    },
                 )
                 _record_event(
                     conn,
                     row,
                     "INVITATION_FAILED",
-                    {"recipient": row["signer_email"], "error": error},
+                    {
+                        "channel": channel,
+                        "recipient": masked_recipient,
+                        "error": error,
+                    },
                 )
             else:
                 sent_count += 1
@@ -1668,13 +1841,20 @@ def bulk_send_invitations():
                         "invitation_sent_at": _iso(),
                         "invite_mail_status": "sent",
                         "invite_mail_error": "",
+                        "invite_channel": channel,
+                        "invite_message_id": message_id,
                     },
                 )
                 _record_event(
                     conn,
                     row,
                     "INVITATION_SENT",
-                    {"recipient": row["signer_email"], "bulk": True},
+                    {
+                        "channel": channel,
+                        "recipient": masked_recipient,
+                        "message_id": message_id,
+                        "bulk": True,
+                    },
                 )
         conn.commit()
     finally:
@@ -1682,7 +1862,7 @@ def bulk_send_invitations():
     return jsonify(
         {
             "status": "warning" if failed else "success",
-            "message": f"{sent_count}명 발송 완료" + (f", {len(failed)}명 실패" if failed else ""),
+            "message": f"{sent_count}명 발송 접수" + (f", {len(failed)}명 실패" if failed else ""),
             "sent": sent_count,
             "failed": failed,
         }
@@ -1896,6 +2076,7 @@ def resend_invitation(contract_id: int):
                 "verified_at": None,
                 "invite_mail_status": "waiting",
                 "invite_mail_error": "",
+                "invite_message_id": "",
             },
         )
         conn.commit()
@@ -1906,8 +2087,13 @@ def resend_invitation(contract_id: int):
         conn.close()
 
     invitation_url = _external_url(token)
+    channel = "alimtalk" if str(row["signer_phone"] or "").strip() else "email"
+    recipient = row["signer_phone"] if channel == "alimtalk" else row["signer_email"]
+    masked_recipient = "-"
+    message_id = ""
     try:
-        _invitation_mail(row, invitation_url)
+        channel, recipient, masked_recipient = _delivery_recipient(row)
+        channel, recipient, message_id = _send_invitation(row, invitation_url)
         status, error = "sent", ""
     except Exception as exc:
         status, error = "failed", str(exc)[:500]
@@ -1920,13 +2106,20 @@ def resend_invitation(contract_id: int):
                 "invitation_sent_at": _iso() if status == "sent" else None,
                 "invite_mail_status": status,
                 "invite_mail_error": error,
+                "invite_channel": channel,
+                "invite_message_id": message_id,
             },
         )
         _record_event(
             conn,
             contract_id,
             "INVITATION_RESENT" if status == "sent" else "INVITATION_FAILED",
-            {"recipient": row["signer_email"], "error": error},
+            {
+                "channel": channel,
+                "recipient": masked_recipient,
+                "message_id": message_id,
+                "error": error,
+            },
         )
         conn.commit()
     finally:
@@ -1934,7 +2127,11 @@ def resend_invitation(contract_id: int):
     return jsonify(
         {
             "status": "success" if status == "sent" else "warning",
-            "message": "새 인증 링크를 발송했습니다." if status == "sent" else f"메일 발송 실패: {error}",
+            "message": (
+                f"새 인증 링크의 {'카카오 알림톡' if channel == 'alimtalk' else '이메일'} 발송을 접수했습니다."
+                if status == "sent"
+                else f"{'카카오 알림톡' if channel == 'alimtalk' else '이메일'} 발송 실패: {error}"
+            ),
             "invitation_url": invitation_url,
         }
     )
@@ -2353,7 +2550,7 @@ def public_contract(token: str):
         conn.close()
     if not available:
         return render_template("verified_contract/public.html", state="error", message=message), 410
-    if row["status"] == "completed":
+    if row["status"] == "completed" and _public_verified(row, token):
         return render_template(
             "verified_contract/public.html",
             state="completed",
@@ -2362,11 +2559,21 @@ def public_contract(token: str):
             can_download=_public_verified(row, token),
         )
     if not _public_verified(row, token):
+        try:
+            delivery_channel, _, masked_recipient = _delivery_recipient(row)
+        except (ValueError, RuntimeError):
+            return render_template(
+                "verified_contract/public.html",
+                state="error",
+                message="등록된 연락처를 확인할 수 없습니다. 계약 담당자에게 문의해 주세요.",
+            ), 500
+        verification_channel = "휴대폰" if delivery_channel == "alimtalk" else "이메일"
         return render_template(
             "verified_contract/public.html",
             state="verify",
             data=_row_for_view(row),
-            masked_email=_mask_email(row["signer_email"]),
+            verification_channel=verification_channel,
+            masked_recipient=masked_recipient,
             token=token,
             csrf_token=_csrf_token(),
         )
@@ -2394,11 +2601,16 @@ def send_otp(token: str):
     try:
         row = _load_by_token(conn, token)
         available, message = _contract_available(row)
-        if not available or row["status"] != "pending":
+        if not available or row["status"] not in {"pending", "completed"}:
             return jsonify({"status": "error", "message": message or "인증할 수 없는 계약입니다."}), 410
         sent_at = _parse_iso(row["otp_sent_at"])
         if sent_at and (_now() - sent_at).total_seconds() < 60:
             return jsonify({"status": "error", "message": "인증번호는 1분 후 다시 요청할 수 있습니다."}), 429
+        try:
+            delivery_channel, recipient, masked_recipient = _delivery_recipient(row)
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+        otp_channel = "sms" if delivery_channel == "alimtalk" else "email"
         code = f"{secrets.randbelow(900000) + 100000:06d}"
         update_verified_contract(
             conn,
@@ -2413,28 +2625,61 @@ def send_otp(token: str):
         conn.commit()
     finally:
         conn.close()
+    message_id = ""
     try:
-        _send_mail(
-            row["signer_email"],
-            "[새담 인증전자계약] 이메일 인증번호",
-            f"""
-            <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7">
-              <h2>이메일 인증번호</h2>
-              <p>{escape(row['signer_name'])}님의 인증번호는 다음과 같습니다.</p>
-              <div style="font-size:30px;font-weight:bold;letter-spacing:8px;color:#123b6d">{code}</div>
-              <p>5분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
-            </div>
-            """,
-        )
+        if otp_channel == "sms":
+            result = send_sms_otp(
+                recipient, signer_name=row["signer_name"], code=code
+            )
+            message_id = str(result.get("message_id") or "")
+        else:
+            _send_mail(
+                recipient,
+                "[새담 인증전자계약] 이메일 인증번호",
+                f"""
+                <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7">
+                  <h2>이메일 인증번호</h2>
+                  <p>{escape(row['signer_name'])}님의 인증번호는 다음과 같습니다.</p>
+                  <div style="font-size:30px;font-weight:bold;letter-spacing:8px;color:#123b6d">{code}</div>
+                  <p>5분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
+                </div>
+                """,
+            )
     except Exception as exc:
-        return jsonify({"status": "error", "message": f"인증번호 메일 발송 실패: {str(exc)[:200]}"}), 500
+        conn = get_db()
+        try:
+            update_verified_contract(
+                conn,
+                row["id"],
+                {"otp_hash": None, "otp_expires_at": None, "otp_sent_at": None},
+            )
+            _record_event(
+                conn,
+                row,
+                "OTP_SEND_FAILED",
+                {"channel": otp_channel, "recipient": masked_recipient, "error": str(exc)[:200]},
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return jsonify({"status": "error", "message": f"인증번호 발송 실패: {str(exc)[:200]}"}), 500
     conn = get_db()
     try:
-        _record_event(conn, row, "OTP_SENT", {"recipient": _mask_email(row["signer_email"])})
+        update_verified_contract(
+            conn,
+            row["id"],
+            {"otp_channel": otp_channel, "otp_message_id": message_id},
+        )
+        _record_event(
+            conn,
+            row,
+            "OTP_SENT",
+            {"channel": otp_channel, "recipient": masked_recipient, "message_id": message_id},
+        )
         conn.commit()
     finally:
         conn.close()
-    return jsonify({"status": "success", "message": f"{_mask_email(row['signer_email'])}로 인증번호를 보냈습니다."})
+    return jsonify({"status": "success", "message": f"{masked_recipient}로 인증번호를 보냈습니다."})
 
 
 @verified_contract_bp.route("/sign/<string:token>/verify-code", methods=["POST"])
@@ -2445,7 +2690,7 @@ def verify_otp(token: str):
     try:
         row = _load_by_token(conn, token)
         available, message = _contract_available(row)
-        if not available or row["status"] != "pending":
+        if not available or row["status"] not in {"pending", "completed"}:
             return jsonify({"status": "error", "message": message or "인증할 수 없는 계약입니다."}), 410
         expiry = _parse_iso(row["otp_expires_at"])
         if not row["otp_hash"] or not expiry or expiry < _now():
@@ -2473,7 +2718,7 @@ def verify_otp(token: str):
         access = {}
     access[str(row["id"])] = _token_hash(token)[:24]
     session["verified_contract_access"] = access
-    return jsonify({"status": "success", "message": "본인 이메일 인증이 완료되었습니다."})
+    return jsonify({"status": "success", "message": "본인 인증이 완료되었습니다."})
 
 
 def _public_values(row, contract_data: dict, company: dict) -> dict[str, str]:
@@ -2641,7 +2886,7 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
       </div>
       {f'<div style="page-break-before:always"></div><div class="terms">{content2}</div>' if content2.strip() else ''}
       <div class="evidence"><b>전자계약 확인기록</b><ul>{agreement_html}</ul>
-        <p>이메일 인증 완료: {escape(_format_kst(row['verified_at']))}<br>
+        <p>본인 인증 완료: {escape(_format_kst(row['verified_at']))}<br>
         전자서명 완료: {signed_at.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S KST')}<br>
         계약서 버전: {int(row['version'])}</p>
       </div>
@@ -2694,7 +2939,7 @@ def complete_contract(token: str):
     if not available or row["status"] != "pending":
         return jsonify({"status": "error", "message": message or "완료할 수 없는 계약입니다."}), 410
     if not _public_verified(row, token):
-        return jsonify({"status": "error", "message": "이메일 인증을 먼저 완료해 주세요."}), 403
+        return jsonify({"status": "error", "message": "본인 인증을 먼저 완료해 주세요."}), 403
 
     agreement_keys = {item["key"] for item in json.loads(row["agreement_snapshot_json"] or "[]")}
     accepted = {
@@ -2711,9 +2956,17 @@ def complete_contract(token: str):
         expected_name.encode("utf-8"),
     ):
         return jsonify({"status": "error", "message": "직접 입력한 성명이 계약자 성명과 일치하지 않습니다."}), 400
-    phone = str(data.get("phone", "")).strip()
+    try:
+        phone = normalize_phone(data.get("phone"), required=True)
+    except ValueError as exc:
+        return jsonify({"status": "error", "message": str(exc)}), 400
+    registered_phone = normalize_phone(row["signer_phone"])
+    if registered_phone and not hmac.compare_digest(registered_phone, phone):
+        return jsonify(
+            {"status": "error", "message": "계약 링크를 받은 휴대폰번호와 입력한 연락처가 일치하지 않습니다."}
+        ), 400
     address = str(data.get("address", "")).strip()
-    if not phone or len(phone) > 50 or not address or len(address) > 300:
+    if not address or len(address) > 300:
         return jsonify({"status": "error", "message": "연락처와 주소를 정확히 입력해 주세요."}), 400
     try:
         resident_number = _normalize_rrn(data.get("resident_number"))
@@ -2808,29 +3061,36 @@ def complete_contract(token: str):
     finally:
         conn.close()
 
-    sender = _mail_settings()["MAIL_USERNAME"]
-    recipients = [row["signer_email"]]
-    if sender and sender.lower() != row["signer_email"].lower():
-        recipients.append(sender)
+    signer_email = str(row["signer_email"] or "").strip().lower()
     try:
-        with temporary_decrypted_path(pdf_path, pdf_path.name) as mail_pdf_path:
-            _send_mail(
-                recipients,
-                f"[계약완료] {row['title_snapshot']}",
-                (
-                    f"{row['signer_name']}님의 인증전자계약이 완료되었습니다.<br>"
-                    "첨부된 최종 계약서를 확인해 주세요.<br><br>"
-                    "계약서 위변조 확인용 고유번호(SHA-256): "
-                    f"<span style='font-family:monospace'>{pdf_hash}</span><br>"
-                    "<span style='font-size:12px;color:#64748b'>"
-                    "첨부 계약서가 이후 변경되지 않았는지 확인할 때 사용하는 번호이며, "
-                    "별도로 입력하실 필요는 없습니다.</span>"
-                ),
-                attachments=mail_pdf_path,
-            )
-        mail_status, mail_error = "sent", ""
-    except Exception as exc:
-        mail_status, mail_error = "failed", str(exc)[:500]
+        sender = _mail_settings()["MAIL_USERNAME"]
+    except Exception:
+        sender = ""
+    recipients = [signer_email] if signer_email else []
+    if sender and sender.lower() not in recipients:
+        recipients.append(sender.lower())
+    if not recipients:
+        mail_status, mail_error = "not_applicable", ""
+    else:
+        try:
+            with temporary_decrypted_path(pdf_path, pdf_path.name) as mail_pdf_path:
+                _send_mail(
+                    recipients,
+                    f"[계약완료] {row['title_snapshot']}",
+                    (
+                        f"{row['signer_name']}님의 인증전자계약이 완료되었습니다.<br>"
+                        "첨부된 최종 계약서를 확인해 주세요.<br><br>"
+                        "계약서 위변조 확인용 고유번호(SHA-256): "
+                        f"<span style='font-family:monospace'>{pdf_hash}</span><br>"
+                        "<span style='font-size:12px;color:#64748b'>"
+                        "첨부 계약서가 이후 변경되지 않았는지 확인할 때 사용하는 번호이며, "
+                        "별도로 입력하실 필요는 없습니다.</span>"
+                    ),
+                    attachments=mail_pdf_path,
+                )
+            mail_status, mail_error = "sent", ""
+        except Exception as exc:
+            mail_status, mail_error = "failed", str(exc)[:500]
     conn = get_db()
     try:
         update_verified_contract(
@@ -2844,7 +3104,13 @@ def complete_contract(token: str):
         _record_event(
             conn,
             row,
-            "COMPLETION_MAIL_SENT" if mail_status == "sent" else "COMPLETION_MAIL_FAILED",
+            (
+                "COMPLETION_MAIL_SENT"
+                if mail_status == "sent"
+                else "COMPLETION_MAIL_SKIPPED"
+                if mail_status == "not_applicable"
+                else "COMPLETION_MAIL_FAILED"
+            ),
             {"error": mail_error},
         )
         conn.commit()
@@ -2856,7 +3122,9 @@ def complete_contract(token: str):
             "status": "success",
             "message": (
                 "계약이 완료되었고 최종본을 이메일로 발송했습니다."
-                if mail_status == "sent"
+                if mail_status == "sent" and signer_email
+                else "계약이 완료되었습니다. 화면에서 최종 계약서를 내려받아 보관해 주세요."
+                if mail_status == "not_applicable" or not signer_email
                 else "계약은 완료되었지만 최종본 이메일 발송에 실패했습니다. 화면에서 내려받을 수 있습니다."
             ),
         }
