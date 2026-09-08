@@ -24,6 +24,8 @@ from .security import load_credential_secret
 SETTINGS_KEY = "solapi_settings"
 SOLAPI_SEND_URL = "https://api.solapi.com/messages/v4/send-many/detail"
 CONTRACT_PUBLIC_ORIGIN = "https://works.saedam.org"
+# 알림톡 실패 시 나가는 대체문자 제목. LMS는 제목이 비면 접수되지 않는다.
+ALIMTALK_FALLBACK_SUBJECT = "새담 전자계약 안내"
 
 
 def _fernet() -> Fernet:
@@ -396,12 +398,14 @@ def send_alimtalk(
         raise ValueError("계약 링크는 https://works.saedam.org의 인증전자계약 주소여야 합니다.")
     # 승인 버튼 주소는 https://#{url}. 변수에는 스킴을 제외해야 한다.
     # 본문·강조문구·버튼(targetOut 포함)은 SOLAPI의 승인 템플릿을 그대로 사용한다.
+    # 대체발송 문구는 템플릿에 저장된 값(제목이 빈 문자열)을 쓰면 안 된다. 계약 링크가 붙어
+    # 90바이트를 넘는 순간 LMS로 전환되는데, 제목이 비어 있으면 1010(필수 입력 값 미입력)으로
+    # 접수 자체가 거절된다. 발송할 때마다 제목이 있는 대체문자를 직접 실어 보낸다.
     return _send_message(
         {
             "to": phone,
             "from": active["from_number"],
             "type": "ATA",
-            "subject": "새담 전자계약 안내",
             "kakaoOptions": {
                 "pfId": active["pf_id"],
                 "templateId": active["template_id"],
@@ -411,6 +415,16 @@ def send_alimtalk(
                     "#{url}": link.removeprefix("https://"),
                 },
             },
+            "replacements": [
+                {
+                    "from": active["from_number"],
+                    "subject": ALIMTALK_FALLBACK_SUBJECT,
+                    "text": (
+                        f"[새담 인증전자계약] {name}님, 전자계약서가 도착했습니다.\n"
+                        f"아래 주소에서 계약을 진행해 주세요.\n{link}"
+                    ),
+                }
+            ],
         },
         active,
     )
