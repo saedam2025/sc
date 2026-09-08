@@ -925,13 +925,6 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
         document.addEventListener('keydown', ask, true);
     }
 
-    // 그 사람과의 대화창이 떠 있으면 알림을 띄우지 않는다.
-    // (메인화면만 열려 있는 경우에는 화면을 보고 있더라도 작업표시줄에 알림을 띄운다.)
-    function isChatPopupOpen(partner) {
-        const win = chatPopupWindows[partner];
-        return !!(win && !win.closed);
-    }
-
     const CHAT_NOTIFY_ICON = '/static/chat_notify_icon.png';
     // 알림을 띄워둘 시간. 웹 표준에는 표시 시간 옵션이 없어서,
     // 자동 사라짐(requireInteraction=false)을 끄고 이 시간 뒤에 직접 닫는다.
@@ -1148,7 +1141,6 @@ window.SAEDAM_CHAT_PUSH_CONFIG = {
             && 'Notification' in window
             && Notification.permission === 'granted'
             && chatDesktopAlertsEnabled()
-            && !isChatPopupOpen(event.partner)
         ) {
             const title = (room && room.display_name) || event.actor || '새담 사내메신저';
             const body = event.content || (event.filename ? '📎 ' + event.filename : '새 메시지가 도착했습니다.');

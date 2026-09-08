@@ -1,7 +1,7 @@
 <style>
     .system-management-nav {
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
+        grid-template-columns: repeat(8, minmax(0, 1fr));
         gap: 8px;
         width: 100%;
     }
@@ -68,6 +68,9 @@
     {% endif %}
     {% if menu_access.get('admin_ai_settings', false) %}
     <a class="system-management-link{% if request.path.startswith('/admin/ai-settings') %} is-active{% endif %}" href="{{ url_for('admin.ai_settings_page') }}"><i class="fa-solid fa-robot" aria-hidden="true"></i>AI api설정</a>
+    {% endif %}
+    {% if menu_access.get('admin_solapi_settings', false) %}
+    <a class="system-management-link{% if request.path.startswith('/admin/solapi-settings') %} is-active{% endif %}" href="{{ url_for('admin.solapi_settings_page') }}"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i>솔라피설정</a>
     {% endif %}
     {% if menu_access.get('admin_settings', false) %}
     <a class="system-management-link{% if request.path.startswith('/admin/settings') %} is-active{% endif %}" href="{{ url_for('admin.settings') }}"><i class="fa-solid fa-user-shield" aria-hidden="true"></i>Admin설정</a>

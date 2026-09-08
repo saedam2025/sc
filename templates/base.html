@@ -1103,7 +1103,7 @@
                                 <i class="fa-solid fa-screwdriver-wrench"></i>통합관리
                             </a>
                             <div class="dropdown-content">
-                                {% set can_access_system = menu_access.get('admin_people', false) or menu_access.get('admin_menu_permissions', false) or menu_access.get('admin_stats', false) or menu_access.get('admin_disk', false) or menu_access.get('admin_boards', false) or menu_access.get('admin_ai_settings', false) or menu_access.get('admin_settings', false) %}
+                                {% set can_access_system = menu_access.get('admin_people', false) or menu_access.get('admin_menu_permissions', false) or menu_access.get('admin_stats', false) or menu_access.get('admin_disk', false) or menu_access.get('admin_boards', false) or menu_access.get('admin_ai_settings', false) or menu_access.get('admin_solapi_settings', false) or menu_access.get('admin_settings', false) %}
                                 {% if can_access_system %}<a href="{{ url_for('admin.system') }}"><i class="fa-solid fa-gears"></i>시스템관리</a>{% endif %}
                                 {% if menu_access.get('admin_themes', false) %}<a href="/admin/theme"><i class="fa-solid fa-palette"></i>테마관리</a>{% endif %}
                                 {% if menu_access.get('ebook_library', false) %}<a href="{{ url_for('ebook.text_library') }}"><i class="fa-solid fa-book-open-reader"></i>eBook 관리</a>{% endif %}
