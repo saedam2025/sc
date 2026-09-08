@@ -1,0 +1,31 @@
+{
+  "name": "새담걸",
+  "pack": "saedamgirl",
+  "folder": "girl-em",
+  "fallback": "👩🏻‍💼",
+  "stickers": [
+    {"id": "g01", "file": "g01.png", "label": "오케이"},
+    {"id": "g02", "file": "g02.png", "label": "화남"},
+    {"id": "g03", "file": "g03.png", "label": "ㅋㅋㅋ"},
+    {"id": "g04", "file": "g04.png", "label": "보고할게요"},
+    {"id": "g05", "file": "g05.png", "label": "휴식 중"},
+    {"id": "g06", "file": "g06.png", "label": "죄송합니다"},
+    {"id": "g07", "file": "g07.png", "label": "완벽해요"},
+    {"id": "g08", "file": "g08.png", "label": "화이팅"},
+    {"id": "g09", "file": "g09.png", "label": "흑흑"},
+    {"id": "g10", "file": "g10.png", "label": "퇴근"},
+    {"id": "g11", "file": "g11.png", "label": "졸려요"},
+    {"id": "g12", "file": "g12.png", "label": "하트"},
+    {"id": "g13", "file": "g13.png", "label": "확인해볼게요"},
+    {"id": "g14", "file": "g14.png", "label": "업무 중"},
+    {"id": "g15", "file": "g15.png", "label": "회의 중입니다"},
+    {"id": "g16", "file": "g16.png", "label": "급해요"},
+    {"id": "g17", "file": "g17.png", "label": "수고하셨습니다"},
+    {"id": "g18", "file": "g18.png", "label": "축하해요"},
+    {"id": "g19", "file": "g19.png", "label": "부탁드려요"},
+    {"id": "g20", "file": "g20.png", "label": "감사합니다"},
+    {"id": "g21", "file": "g21.png", "label": "확인했습니다"},
+    {"id": "g22", "file": "g22.png", "label": "곧 연락드릴게요"},
+    {"id": "g23", "file": "g23.png", "label": "점심 먹고 올게요"}
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "사무용품",
+  "pack": "office",
+  "folder": "office",
+  "fallback": "📎",
+  "stickers": [
+    {"id": "o01", "file": "컴퓨터.png", "label": "컴퓨터", "emoji": "🖥️"},
+    {"id": "o02", "file": "모니터.png", "label": "모니터", "emoji": "🖥️"},
+    {"id": "o03", "file": "키보드.png", "label": "키보드", "emoji": "⌨️"},
+    {"id": "o04", "file": "마우스.png", "label": "마우스", "emoji": "🖱️"},
+    {"id": "o05", "file": "스피커.png", "label": "스피커", "emoji": "🔊"},
+    {"id": "o06", "file": "TV.png", "label": "TV", "emoji": "📺"},
+    {"id": "o07", "file": "책상.png", "label": "책상", "emoji": "🪑"},
+    {"id": "o08", "file": "의자.png", "label": "의자", "emoji": "🪑"},
+    {"id": "o09", "file": "수첩.png", "label": "수첩", "emoji": "📒"},
+    {"id": "o10", "file": "연필.png", "label": "연필", "emoji": "✏️"},
+    {"id": "o11", "file": "지우개.png", "label": "지우개", "emoji": "🧽"},
+    {"id": "o12", "file": "커터칼.png", "label": "커터칼", "emoji": "🔪"},
+    {"id": "o13", "file": "눈금자.png", "label": "눈금자", "emoji": "📏"},
+    {"id": "o14", "file": "스탬플러.png", "label": "스탬플러", "emoji": "📎"},
+    {"id": "o15", "file": "집게.png", "label": "집게", "emoji": "🖇️"},
+    {"id": "o16", "file": "투명테잎.png", "label": "투명테잎", "emoji": "🩹"},
+    {"id": "o17", "file": "복사용지.png", "label": "복사용지", "emoji": "📄"},
+    {"id": "o18", "file": "커피잔.png", "label": "커피잔", "emoji": "☕"}
+  ]
+}

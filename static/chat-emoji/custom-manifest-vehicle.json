@@ -1,0 +1,23 @@
+{
+  "name": "탈것",
+  "pack": "vehicle",
+  "folder": "vehicle",
+  "fallback": "🚗",
+  "stickers": [
+    {"id": "v01", "file": "자동차.png", "label": "자동차", "emoji": "🚗"},
+    {"id": "v02", "file": "버스.png", "label": "버스", "emoji": "🚌"},
+    {"id": "v03", "file": "오토바이.png", "label": "오토바이", "emoji": "🏍️"},
+    {"id": "v04", "file": "자전거.png", "label": "자전거", "emoji": "🚲"},
+    {"id": "v05", "file": "기차.png", "label": "기차", "emoji": "🚂"},
+    {"id": "v06", "file": "고속전철.png", "label": "고속전철", "emoji": "🚄"},
+    {"id": "v07", "file": "비행기.png", "label": "비행기", "emoji": "✈️"},
+    {"id": "v08", "file": "헬리콥터.png", "label": "헬리콥터", "emoji": "🚁"},
+    {"id": "v09", "file": "행글라이더.png", "label": "행글라이더", "emoji": "🪂"},
+    {"id": "v10", "file": "선박.png", "label": "선박", "emoji": "🚢"},
+    {"id": "v11", "file": "모터보트.png", "label": "모터보트", "emoji": "🚤"},
+    {"id": "v12", "file": "카누.png", "label": "카누", "emoji": "🛶"},
+    {"id": "v13", "file": "잠수함.png", "label": "잠수함", "emoji": "🤿"},
+    {"id": "v14", "file": "우주선.png", "label": "우주선", "emoji": "🚀"},
+    {"id": "v15", "file": "위성.png", "label": "위성", "emoji": "🛰️"}
+  ]
+}
