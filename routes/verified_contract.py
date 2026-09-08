@@ -786,6 +786,14 @@ def _mask_email(email: str) -> str:
     return f"{visible}{'*' * max(2, len(local) - len(visible))}@{domain}"
 
 
+def _normalized_email(value: object) -> str:
+    """공개 계약 화면에서 입력받은 이메일을 정규화한다. 형식이 틀리면 빈 문자열."""
+    email = str(value or "").strip().lower()
+    if len(email) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        return ""
+    return email
+
+
 def _delivery_recipient(row) -> tuple[str, str, str]:
     """전화번호가 있으면 알림톡/SMS, 없으면 이메일을 선택한다."""
     phone = normalize_phone(row["signer_phone"])
@@ -2567,13 +2575,13 @@ def public_contract(token: str):
                 state="error",
                 message="등록된 연락처를 확인할 수 없습니다. 계약 담당자에게 문의해 주세요.",
             ), 500
-        verification_channel = "휴대폰" if delivery_channel == "alimtalk" else "이메일"
         return render_template(
             "verified_contract/public.html",
             state="verify",
             data=_row_for_view(row),
-            verification_channel=verification_channel,
+            sms_available=delivery_channel == "alimtalk",
             masked_recipient=masked_recipient,
+            registered_email=str(row["signer_email"] or "").strip().lower(),
             token=token,
             csrf_token=_csrf_token(),
         )
@@ -2597,6 +2605,13 @@ def public_contract(token: str):
 @verified_contract_bp.route("/sign/<string:token>/send-code", methods=["POST"])
 @_csrf_required
 def send_otp(token: str):
+    # 계약 등록 때 휴대폰번호만 아는 경우가 많아, 계약자가 이 화면에서 최종 계약서를 받을
+    # 이메일 주소를 직접 입력하고 그 주소로 인증번호를 받는다. 입력한 주소는 인증에
+    # 성공한 뒤에야 계약에 반영한다(verify_otp).
+    requested = str((request.get_json(silent=True) or {}).get("email", "")).strip()
+    entered_email = _normalized_email(requested)
+    if requested and not entered_email:
+        return jsonify({"status": "error", "message": "이메일 주소 형식을 확인해 주세요."}), 400
     conn = get_db()
     try:
         row = _load_by_token(conn, token)
@@ -2606,11 +2621,16 @@ def send_otp(token: str):
         sent_at = _parse_iso(row["otp_sent_at"])
         if sent_at and (_now() - sent_at).total_seconds() < 60:
             return jsonify({"status": "error", "message": "인증번호는 1분 후 다시 요청할 수 있습니다."}), 429
-        try:
-            delivery_channel, recipient, masked_recipient = _delivery_recipient(row)
-        except (ValueError, RuntimeError) as exc:
-            return jsonify({"status": "error", "message": str(exc)}), 400
-        otp_channel = "sms" if delivery_channel == "alimtalk" else "email"
+        if entered_email:
+            otp_channel = "email"
+            recipient = entered_email
+            masked_recipient = _mask_email(entered_email)
+        else:
+            try:
+                delivery_channel, recipient, masked_recipient = _delivery_recipient(row)
+            except (ValueError, RuntimeError) as exc:
+                return jsonify({"status": "error", "message": str(exc)}), 400
+            otp_channel = "sms" if delivery_channel == "alimtalk" else "email"
         code = f"{secrets.randbelow(900000) + 100000:06d}"
         update_verified_contract(
             conn,
@@ -2679,6 +2699,14 @@ def send_otp(token: str):
         conn.commit()
     finally:
         conn.close()
+    pending = session.get("verified_contract_email")
+    if not isinstance(pending, dict):
+        pending = {}
+    if entered_email:
+        pending[str(row["id"])] = entered_email
+    else:
+        pending.pop(str(row["id"]), None)
+    session["verified_contract_email"] = pending
     return jsonify({"status": "success", "message": f"{masked_recipient}로 인증번호를 보냈습니다."})
 
 
@@ -2704,15 +2732,26 @@ def verify_otp(token: str):
             conn.commit()
             return jsonify({"status": "error", "message": "인증번호가 일치하지 않습니다."}), 400
         verified_at = _iso()
-        update_verified_contract(
-            conn,
-            row["id"],
-            {"verified_at": verified_at, "otp_hash": None, "otp_expires_at": None},
+        updates = {"verified_at": verified_at, "otp_hash": None, "otp_expires_at": None}
+        # 인증번호를 받은 주소가 곧 최종 계약서를 받을 주소다. 인증에 성공한 지금
+        # 계약에 반영해야 완료 메일이 그 주소로 나간다.
+        pending = session.get("verified_contract_email")
+        entered_email = _normalized_email(
+            pending.get(str(row["id"])) if isinstance(pending, dict) else ""
         )
+        if entered_email and entered_email != str(row["signer_email"] or "").strip().lower():
+            updates["signer_email"] = entered_email
+        update_verified_contract(conn, row["id"], updates)
         _record_event(conn, row, "OTP_VERIFIED")
+        if updates.get("signer_email"):
+            _record_event(
+                conn, row, "SIGNER_EMAIL_UPDATED", {"email": _mask_email(entered_email)}
+            )
         conn.commit()
     finally:
         conn.close()
+    if isinstance(pending, dict) and pending.pop(str(row["id"]), None):
+        session["verified_contract_email"] = pending
     access = session.get("verified_contract_access", {})
     if not isinstance(access, dict):
         access = {}
