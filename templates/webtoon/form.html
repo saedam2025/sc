@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}{% if book %}웹툰 정보 수정{% else %}새 웹툰 등록{% endif %}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+{% set value = form if form else book %}
+<div class="wt-page wt-form-wrap">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="wt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post"
+        action="{% if book %}{{ url_for('webtoon.edit_webtoon', webtoon_id=book.id) }}{% else %}{{ url_for('webtoon.create_webtoon') }}{% endif %}"
+        enctype="multipart/form-data">
+
+    <div class="wt-panel">
+      <h2><i class="fa-solid fa-book-open" style="color:#6366f1;"></i>
+        {% if book %}웹툰 정보 수정{% else %}새 웹툰 등록{% endif %}</h2>
+      <p class="wt-help">웹툰 1편의 기본 정보입니다. 등록 후 회차(1화, 2화 …)를 따로 올립니다.</p>
+
+      <div class="wt-row">
+        <div class="wt-field">
+          <label for="wtTitle">제목<span class="req">*</span></label>
+          <input id="wtTitle" type="text" name="title" maxlength="120" required
+                 value="{{ value.title if value else '' }}" placeholder="예) 새담 출근 일지">
+        </div>
+        <div class="wt-field">
+          <label for="wtAuthor">저자</label>
+          <input id="wtAuthor" type="text" name="author" maxlength="60"
+                 value="{{ value.author if value else '' }}" placeholder="예) 홍길동">
+        </div>
+      </div>
+
+      <div class="wt-field">
+        <label for="wtGenre">장르</label>
+        <input id="wtGenre" type="text" name="genre" maxlength="40" list="wtGenreList"
+               value="{{ value.genre if value else '' }}" placeholder="목록에서 고르거나 직접 입력">
+        <datalist id="wtGenreList">
+          {% for item in genres %}<option value="{{ item }}"></option>{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="wt-field">
+        <label for="wtDesc">소개</label>
+        <textarea id="wtDesc" name="description" maxlength="2000"
+                  placeholder="작품 소개를 적어 주세요.">{{ value.description if value else '' }}</textarea>
+      </div>
+
+      <div class="wt-field">
+        <label for="wtCover">표지 이미지{% if not book %}<span class="req">*</span>{% endif %}</label>
+        <div class="wt-drop" id="wtCoverDrop">
+          <i class="fa-regular fa-image"></i>
+          <p>표지 이미지를 선택하세요</p>
+          <span>JPG · PNG · WEBP · GIF / 12MB 이하 (세로 3:4 비율 권장)</span>
+          <input id="wtCover" type="file" name="cover" accept="image/*" {% if not book %}required{% endif %}>
+        </div>
+        <img id="wtCoverPreview" class="wt-cover-preview {% if book %}show{% endif %}" alt="표지 미리보기"
+             src="{% if book %}{{ url_for('webtoon.serve_cover', webtoon_id=book.id) }}{% endif %}">
+        {% if book %}<p class="wt-hint">새 파일을 고르지 않으면 기존 표지를 그대로 사용합니다.</p>{% endif %}
+      </div>
+    </div>
+
+    <div class="wt-panel">
+      <h2><i class="fa-solid fa-lock" style="color:#ec4899;"></i> 열람 비밀번호</h2>
+      <p class="wt-help">비밀번호를 정하면 이 웹툰의 회차 목록과 이미지가 비밀번호 확인 후에만 열립니다.
+        등록자 본인과 최고관리자(admin) 계정만 비밀번호 없이 바로 열람합니다.</p>
+
+      {% if book %}
+      <div class="wt-field">
+        <label>현재 상태 :
+          {% if book.password_hash %}<span style="color:#be185d;">비밀번호 설정됨</span>
+          {% else %}<span style="color:#059669;">공개</span>{% endif %}
+        </label>
+        <div class="wt-seg" style="display:flex; gap:8px; margin-bottom:12px;">
+          <label class="wt-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="keep" checked> 그대로 두기</label>
+          <label class="wt-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="set"> 새로 설정</label>
+          <label class="wt-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="clear"> 잠금 해제</label>
+        </div>
+        <input type="password" name="password" maxlength="60" autocomplete="new-password"
+               placeholder="새 비밀번호 (2자 이상)">
+      </div>
+      {% else %}
+      <div class="wt-field">
+        <label for="wtPw">비밀번호 (선택)</label>
+        <input id="wtPw" type="password" name="password" maxlength="60" autocomplete="new-password"
+               placeholder="비워두면 사내 누구나 볼 수 있습니다">
+        <p class="wt-hint">2자 이상. 잊어버렸다면 등록자나 관리자가 [정보 수정] 화면에서 다시 설정하거나 해제할 수 있습니다.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="wt-form-actions">
+      <a class="wt-btn" href="{% if book %}{{ url_for('webtoon.episodes', webtoon_id=book.id) }}{% else %}{{ url_for('webtoon.library') }}{% endif %}">취소</a>
+      <button class="wt-btn primary" type="submit">
+        <i class="fa-solid fa-check"></i> {% if book %}수정 저장{% else %}등록하기{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const drop = document.getElementById('wtCoverDrop');
+  const input = document.getElementById('wtCover');
+  const preview = document.getElementById('wtCoverPreview');
+  if (!drop || !input) return;
+
+  drop.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.add('is-over');
+  }));
+  ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.remove('is-over');
+  }));
+  drop.addEventListener('drop', event => {
+    if (event.dataTransfer && event.dataTransfer.files.length) {
+      input.files = event.dataTransfer.files;
+      input.dispatchEvent(new Event('change'));
+    }
+  });
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    preview.src = URL.createObjectURL(file);
+    preview.classList.add('show');
+    drop.querySelector('p').textContent = file.name;
+  });
+
+  // 비밀번호 모드를 고르면 입력칸을 필요한 때만 활성화한다.
+  const pwInput = document.querySelector('input[name="password"]');
+  const modes = document.querySelectorAll('input[name="password_mode"]');
+  function syncMode() {
+    const mode = document.querySelector('input[name="password_mode"]:checked');
+    if (!mode || !pwInput) return;
+    pwInput.disabled = mode.value !== 'set';
+    pwInput.style.opacity = pwInput.disabled ? '.45' : '1';
+    if (mode.value === 'set') pwInput.focus();
+  }
+  modes.forEach(radio => radio.addEventListener('change', syncMode));
+  syncMode();
+})();
+</script>
+{% endblock %}

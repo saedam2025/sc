@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% block title %}웹전자책 서재{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photobook.css') }}">
+{% endblock %}
+{% block content %}
+<div class="pb-page">
+
+  <section class="pb-hero">
+    <div>
+      <span class="pb-eyebrow"><i class="fa-solid fa-images"></i> SAEDAM PHOTOBOOK</span>
+      <h1>웹전자책 서재</h1>
+      <p>사진을 올리면 왼쪽 한 장 · 오른쪽 한 장으로 펼쳐지고, 실제 책장을 넘기듯 넘겨 볼 수 있습니다.</p>
+    </div>
+    <a class="pb-btn primary" href="{{ url_for('photobook.create_book') }}">
+      <i class="fa-solid fa-plus"></i> 새 전자책 등록
+    </a>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="pb-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="pb-toolbar">
+    <div class="pb-count"><strong>{{ books|length }}</strong>권의 전자책</div>
+    <form method="get" class="pb-search">
+      <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+      <input name="q" value="{{ query }}" placeholder="제목 · 촬영자 · 소개 검색" aria-label="전자책 검색">
+      <select name="theme" aria-label="주제 선택" onchange="this.form.submit()">
+        <option value="">전체 주제</option>
+        {% for item in themes %}
+        <option value="{{ item }}" {% if item == theme %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+      <select name="sort" aria-label="정렬 선택" onchange="this.form.submit()">
+        {% for key, label in sorts %}
+        <option value="{{ key }}" {% if key == sort %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="pb-btn sm primary" type="submit">검색</button>
+      {% if query or theme or sort != 'recent' %}
+      <a class="pb-btn sm" href="{{ url_for('photobook.library') }}" title="검색·정렬 초기화"><i class="fa-solid fa-xmark"></i></a>
+      {% endif %}
+    </form>
+  </div>
+
+  <form id="pbBulkForm" method="post" action="{{ url_for('photobook.delete_books') }}">
+    {% if can_bulk_delete %}
+    <div class="pb-bulkbar" id="pbBulkBar">
+      <button class="pb-btn sm" type="button" id="pbPickToggle">
+        <i class="fa-regular fa-square-check"></i> <span id="pbPickLabel">선택 삭제</span>
+      </button>
+      <div class="pb-bulk-tools" id="pbBulkTools" hidden>
+        <label class="pb-bulk-all">
+          <input type="checkbox" id="pbSelectAll"> 전체 선택
+        </label>
+        <span class="pb-bulk-count" id="pbBulkCount">0권 선택됨</span>
+        <button class="pb-btn sm danger" type="submit" id="pbBulkDelete" disabled>
+          <i class="fa-solid fa-trash"></i> 선택한 전자책 삭제
+        </button>
+      </div>
+    </div>
+    {% endif %}
+
+    <section class="pb-grid" id="pbGrid">
+      {% for book in books %}
+      {% set locked = locked_map.get(book.id) %}
+      {% set manageable = can_manage_map.get(book.id) %}
+      <article class="pb-card">
+        {% if manageable %}
+        <label class="pb-pick" title="선택">
+          <input type="checkbox" name="photobook_ids" value="{{ book.id }}"
+                 data-title="{{ book.title }}" data-pages="{{ book.page_count }}"
+                 aria-label="{{ book.title }} 선택">
+          <span></span>
+        </label>
+        {% endif %}
+        <a class="pb-cover {% if locked %}locked{% endif %}" href="{{ url_for('photobook.read_book', photobook_id=book.id, **browse_args) }}" aria-label="{{ book.title }} 열기">
+          <img src="{{ url_for('photobook.serve_cover', photobook_id=book.id) }}" alt="{{ book.title }} 표지" loading="lazy">
+          {% if book.theme %}<span class="pb-badge">{{ book.theme }}</span>{% endif %}
+          <span class="pb-badge right">{{ book.page_count }}장</span>
+          {% if locked %}
+          <span class="pb-cover-lock"><i class="fa-solid fa-lock"></i> 비밀번호 필요</span>
+          {% endif %}
+        </a>
+        <div class="pb-card-body">
+          <h2><a href="{{ url_for('photobook.read_book', photobook_id=book.id, **browse_args) }}">{{ book.title }}</a></h2>
+          <div class="pb-meta">
+            <span class="pb-meta-by" title="{{ book.author or book.created_by or '촬영자 미상' }}">
+              <i class="fa-solid fa-camera"></i> {{ book.author or book.created_by or '촬영자 미상' }}
+            </span>
+            <span class="pb-meta-views"><i class="fa-regular fa-eye"></i> {{ book.view_count }}</span>
+            {% if book.password_hash %}<i class="fa-solid fa-lock" title="비공개"></i>{% endif %}
+          </div>
+          <div class="pb-card-actions">
+            <a class="pb-btn sm primary" style="flex:1;" href="{{ url_for('photobook.read_book', photobook_id=book.id, **browse_args) }}">
+              <i class="fa-solid fa-book-open"></i> 넘겨 보기
+            </a>
+            {% if manageable %}
+            <a class="pb-btn sm" href="{{ url_for('photobook.manage_pages', photobook_id=book.id) }}" title="사진 관리"><i class="fa-solid fa-images"></i></a>
+            <a class="pb-btn sm" href="{{ url_for('photobook.edit_book', photobook_id=book.id) }}" title="전자책 정보 수정"><i class="fa-solid fa-pen"></i></a>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% else %}
+      <div class="pb-empty">
+        <i class="fa-regular fa-images"></i>
+        <h2>{% if query or theme %}검색 결과가 없습니다.{% else %}아직 등록된 전자책이 없습니다.{% endif %}</h2>
+        <p>제목과 사진 여러 장을 올리면 바로 펼쳐 보는 전자책이 만들어집니다.</p>
+      </div>
+      {% endfor %}
+    </section>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  // 서재에서 여러 권을 골라 한 번에 지운다(사진 · 표지 파일까지 함께 삭제).
+  const form = document.getElementById('pbBulkForm');
+  const bar = document.getElementById('pbBulkBar');
+  if (!form || !bar) return;
+
+  const grid = document.getElementById('pbGrid');
+  const tools = document.getElementById('pbBulkTools');
+  const toggle = document.getElementById('pbPickToggle');
+  const toggleLabel = document.getElementById('pbPickLabel');
+  const selectAll = document.getElementById('pbSelectAll');
+  const countLabel = document.getElementById('pbBulkCount');
+  const deleteButton = document.getElementById('pbBulkDelete');
+  const boxes = [...form.querySelectorAll('input[name="photobook_ids"]')];
+
+  function checked() {
+    return boxes.filter(box => box.checked);
+  }
+
+  function sync() {
+    const picked = checked();
+    countLabel.textContent = picked.length + '권 선택됨';
+    deleteButton.disabled = picked.length === 0;
+    selectAll.checked = boxes.length > 0 && picked.length === boxes.length;
+    selectAll.indeterminate = picked.length > 0 && picked.length < boxes.length;
+    boxes.forEach(box => box.closest('.pb-card').classList.toggle('is-picked', box.checked));
+  }
+
+  function setPickMode(on) {
+    grid.classList.toggle('is-picking', on);
+    tools.hidden = !on;
+    toggle.classList.toggle('primary', on);
+    toggleLabel.textContent = on ? '선택 취소' : '선택 삭제';
+    if (!on) {
+      boxes.forEach(box => { box.checked = false; });
+      sync();
+    }
+  }
+
+  toggle.addEventListener('click', () => setPickMode(tools.hidden));
+
+  selectAll.addEventListener('change', () => {
+    boxes.forEach(box => { box.checked = selectAll.checked; });
+    sync();
+  });
+
+  boxes.forEach(box => box.addEventListener('change', sync));
+
+  form.addEventListener('submit', event => {
+    const picked = checked();
+    if (!picked.length) {
+      event.preventDefault();
+      return;
+    }
+    const titles = picked.slice(0, 5).map(box => '· ' + box.dataset.title).join('\n');
+    const more = picked.length > 5 ? '\n· 외 ' + (picked.length - 5) + '권' : '';
+    const photos = picked.reduce((sum, box) => sum + (parseInt(box.dataset.pages, 10) || 0), 0);
+    const message = '아래 전자책 ' + picked.length + '권을 삭제합니다.\n\n' + titles + more +
+      '\n\n올린 사진 ' + photos + '장과 표지 파일까지 모두 지워지며 되돌릴 수 없습니다.\n삭제할까요?';
+    if (!confirm(message)) event.preventDefault();
+  });
+
+  setPickMode(false);
+})();
+</script>
+{% endblock %}

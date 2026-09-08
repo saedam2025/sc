@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · 회차 목록{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+<div class="wt-page">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="wt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section class="wt-detail-head">
+    <img src="{{ url_for('webtoon.serve_cover', webtoon_id=book.id) }}" alt="{{ book.title }} 표지">
+    <div class="wt-detail-info">
+      <div class="wt-tags">
+        {% if book.genre %}<span class="wt-tag">{{ book.genre }}</span>{% endif %}
+        <span class="wt-tag">{{ episodes|length }}화</span>
+        <span class="wt-tag"><i class="fa-regular fa-eye"></i> {{ book.view_count }}</span>
+        {% if book.password_hash %}<span class="wt-tag"><i class="fa-solid fa-lock"></i> 비밀번호</span>{% endif %}
+      </div>
+      <h1>{{ book.title }}</h1>
+      <div style="font-size:.85rem; opacity:.8; font-weight:700;">
+        <i class="fa-solid fa-pen-nib"></i> {{ book.author or book.created_by or '작자미상' }}
+      </div>
+      {% if book.description %}<p class="wt-desc">{{ book.description }}</p>{% endif %}
+      <div class="wt-detail-actions">
+        {% if resume_id %}
+        <a class="wt-btn primary" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=resume_id) }}">
+          <i class="fa-solid fa-play"></i> 이어보기
+        </a>
+        {% elif episodes %}
+        <a class="wt-btn primary" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=episodes[0].id) }}">
+          <i class="fa-solid fa-play"></i> 첫화부터 보기
+        </a>
+        {% endif %}
+        <a class="wt-btn ghost" href="{{ url_for('webtoon.create_episode', webtoon_id=book.id) }}">
+          <i class="fa-solid fa-plus"></i> 회차 등록
+        </a>
+        {% if can_manage %}
+        <a class="wt-btn ghost" href="{{ url_for('webtoon.edit_webtoon', webtoon_id=book.id) }}">
+          <i class="fa-solid fa-pen"></i> 정보 수정
+        </a>
+        <form method="post" action="{{ url_for('webtoon.delete_webtoon', webtoon_id=book.id) }}"
+              onsubmit="return confirm('웹툰과 모든 회차 이미지를 삭제합니다. 계속할까요?');">
+          <button class="wt-btn ghost" type="submit"><i class="fa-solid fa-trash"></i> 삭제</button>
+        </form>
+        {% endif %}
+        <a class="wt-btn ghost" href="{{ url_for('webtoon.library') }}"><i class="fa-solid fa-list"></i> 서재</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="wt-ep-toolbar">
+    <div class="wt-count"><strong>{{ episodes|length }}</strong>개 회차</div>
+    <div style="display:flex; gap:6px;">
+      <button class="wt-btn sm" type="button" id="wtSortBtn"><i class="fa-solid fa-arrow-down-1-9"></i> 최신화부터</button>
+    </div>
+  </div>
+
+  <div class="wt-ep-list" id="wtEpList">
+    {% for ep in episodes %}
+    <a class="wt-ep" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=ep.id) }}">
+      {% if ep.thumb_page_id %}
+      <img class="wt-ep-thumb" loading="lazy" alt=""
+           src="{{ url_for('webtoon.serve_page', webtoon_id=book.id, episode_id=ep.id, page_id=ep.thumb_page_id) }}">
+      {% else %}
+      <span class="wt-ep-thumb" style="display:flex;align-items:center;justify-content:center;color:#94a3b8;">
+        <i class="fa-regular fa-image"></i>
+      </span>
+      {% endif %}
+      <div class="wt-ep-main">
+        <div class="wt-ep-no">{{ ep.episode_no }}화{% if ep.title %} <span style="font-weight:700;color:#475569;">{{ ep.title }}</span>{% endif %}</div>
+        <div class="wt-ep-sub">
+          {{ ep.page_count }}장 · <i class="fa-regular fa-eye"></i> {{ ep.view_count }} · {{ (ep.created_at or '')[:10] }}
+          {% if ep.created_by %} · {{ ep.created_by }}{% endif %}
+        </div>
+        {% set done = progress.get(ep.id, 0) %}
+        {% if done > 0 %}
+        <div class="wt-ep-progress"><i style="width: {{ done }}%;"></i></div>
+        <div class="wt-ep-sub" style="margin-top:3px;">{{ done }}% 읽음</div>
+        {% endif %}
+      </div>
+      <div class="wt-ep-side">
+        {% if can_manage or ep.created_by_emp_no == session.get('emp_no') %}
+        <span class="wt-btn sm" onclick="event.preventDefault();location.href='{{ url_for('webtoon.edit_pages', webtoon_id=book.id, episode_id=ep.id) }}';" title="컷 순서 편집">
+          <i class="fa-solid fa-arrows-up-down-left-right"></i>
+        </span>
+        <span class="wt-btn sm" onclick="event.preventDefault();location.href='{{ url_for('webtoon.edit_episode', webtoon_id=book.id, episode_id=ep.id) }}';" title="회차 수정">
+          <i class="fa-solid fa-pen"></i>
+        </span>
+        {% endif %}
+        <i class="fa-solid fa-chevron-right" style="color:#cbd5e1;"></i>
+      </div>
+    </a>
+    {% else %}
+    <div class="wt-empty">
+      <i class="fa-regular fa-file-image"></i>
+      <h2>아직 등록된 회차가 없습니다.</h2>
+      <p>[회차 등록]을 눌러 웹툰 이미지 여러 장을 한 번에 올려 보세요.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  // 회차 정렬은 화면에서만 뒤집는다(서버 부하 없이 즉시 반응).
+  const list = document.getElementById('wtEpList');
+  const button = document.getElementById('wtSortBtn');
+  if (!list || !button) return;
+  let descending = false;
+  button.addEventListener('click', () => {
+    const items = Array.from(list.querySelectorAll('.wt-ep'));
+    if (!items.length) return;
+    items.reverse().forEach(item => list.appendChild(item));
+    descending = !descending;
+    button.innerHTML = descending
+      ? '<i class="fa-solid fa-arrow-up-1-9"></i> 1화부터'
+      : '<i class="fa-solid fa-arrow-down-1-9"></i> 최신화부터';
+  });
+})();
+</script>
+{% endblock %}

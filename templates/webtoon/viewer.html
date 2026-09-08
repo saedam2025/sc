@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} {{ episode.episode_no }}화{% endblock %}
+{% block body_class %}wt-viewer-body{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+<div class="wt-viewer" id="wtViewer" data-theme="black"
+     data-progress-url="{{ url_for('webtoon.save_progress', webtoon_id=book.id, episode_id=episode.id) }}"
+     data-resume="{{ resume_ratio }}"
+     data-key="wt-{{ book.id }}">
+
+  <div class="wt-progressbar" id="wtProgress"></div>
+  <div class="wt-dim" id="wtDim"></div>
+
+  <header class="wt-vbar top">
+    <a class="wt-vbtn" href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}" title="회차 목록">
+      <i class="fa-solid fa-chevron-left"></i>
+    </a>
+    <div class="wt-vbar-title">
+      <strong>{{ book.title }}</strong>
+      <span>{{ episode.episode_no }}화{% if episode.title %} · {{ episode.title }}{% endif %} · {{ pages|length }}장</span>
+    </div>
+    <select id="wtEpisodeSelect" aria-label="회차 이동">
+      {% for item in siblings %}
+      <option value="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=item.id) }}"
+              {% if item.id == episode.id %}selected{% endif %}>
+        {{ item.episode_no }}화{% if item.title %} · {{ item.title }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    {% if can_manage %}
+    <a class="wt-vbtn" href="{{ url_for('webtoon.edit_pages', webtoon_id=book.id, episode_id=episode.id) }}" title="컷 순서 편집">
+      <i class="fa-solid fa-arrows-up-down-left-right"></i>
+    </a>
+    <a class="wt-vbtn" href="{{ url_for('webtoon.edit_episode', webtoon_id=book.id, episode_id=episode.id) }}" title="회차 수정">
+      <i class="fa-solid fa-pen"></i>
+    </a>
+    {% endif %}
+    <button class="wt-vbtn" type="button" id="wtSettingsBtn" title="보기 설정 (S)">
+      <i class="fa-solid fa-sliders"></i>
+    </button>
+    <button class="wt-vbtn" type="button" id="wtFullBtn" title="전체화면 (F)">
+      <i class="fa-solid fa-expand"></i>
+    </button>
+  </header>
+
+  <div class="wt-strip" id="wtStrip">
+    {% for page in pages %}
+    <img src="{{ url_for('webtoon.serve_page', webtoon_id=book.id, episode_id=episode.id, page_id=page.id) }}"
+         alt="{{ episode.episode_no }}화 {{ page.page_no }}컷" loading="lazy" decoding="async"
+         {% if page.width and page.height %}width="{{ page.width }}" height="{{ page.height }}"{% endif %}>
+    {% else %}
+    <div class="wt-endcard" style="margin-top:120px;">
+      <p>이 회차에는 등록된 이미지가 없습니다.</p>
+      <div class="wt-endrow">
+        <a class="wt-btn primary" href="{{ url_for('webtoon.edit_episode', webtoon_id=book.id, episode_id=episode.id) }}">이미지 올리기</a>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if pages %}
+    <div class="wt-endcard" style="margin-top:34px;">
+      <p><i class="fa-solid fa-flag-checkered"></i> {{ episode.episode_no }}화 끝</p>
+      <div class="wt-endrow">
+        {% if prev_episode %}
+        <a class="wt-btn" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=prev_episode.id) }}">
+          <i class="fa-solid fa-backward-step"></i> {{ prev_episode.episode_no }}화
+        </a>
+        {% endif %}
+        <a class="wt-btn" href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}">
+          <i class="fa-solid fa-list"></i> 목록
+        </a>
+        {% if next_episode %}
+        <a class="wt-btn primary" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=next_episode.id) }}">
+          {{ next_episode.episode_no }}화 <i class="fa-solid fa-forward-step"></i>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="wt-fabs">
+    <button class="wt-fab" type="button" id="wtTopBtn" title="맨 위로 (T)"><i class="fa-solid fa-arrow-up"></i></button>
+    <button class="wt-fab" type="button" id="wtBottomBtn" title="맨 아래로 (B)"><i class="fa-solid fa-arrow-down"></i></button>
+  </div>
+
+  <aside class="wt-panelbox" id="wtSettings">
+    <h3>보기 설정 <button class="close" type="button" id="wtSettingsClose"><i class="fa-solid fa-xmark"></i></button></h3>
+
+    <div class="wt-ctrl">
+      <label>화면 폭 <b id="wtWidthValue">100%</b></label>
+      <input type="range" id="wtWidth" min="40" max="100" step="5" value="100">
+    </div>
+
+    <div class="wt-ctrl">
+      <label>밝기 <b id="wtBrightValue">100%</b></label>
+      <input type="range" id="wtBright" min="30" max="100" step="5" value="100">
+    </div>
+
+    <div class="wt-ctrl">
+      <label>배경</label>
+      <div class="wt-seg" id="wtThemeSeg">
+        <button type="button" data-theme="black" class="on">블랙</button>
+        <button type="button" data-theme="dark">다크</button>
+        <button type="button" data-theme="light">화이트</button>
+        <button type="button" data-theme="sepia">세피아</button>
+      </div>
+    </div>
+
+    <div class="wt-ctrl">
+      <label>자동 스크롤 속도 <b id="wtSpeedValue">3</b></label>
+      <input type="range" id="wtSpeed" min="1" max="10" step="1" value="3">
+    </div>
+
+    <div class="wt-ctrl">
+      <label>컷 사이 간격</label>
+      <div class="wt-seg" id="wtGapSeg">
+        <button type="button" data-gap="0" class="on">붙여서</button>
+        <button type="button" data-gap="1">띄워서</button>
+      </div>
+    </div>
+
+    <p style="margin:0; font-size:.7rem; color:#94a3b8; line-height:1.6;">
+      단축키 · <b>Space</b> 자동스크롤 · <b>←/→</b> 이전·다음화 · <b>↑/↓</b> 스크롤 ·
+      <b>T/B</b> 맨위·맨아래 · <b>F</b> 전체화면 · <b>H</b> 메뉴 숨기기 · <b>S</b> 설정
+    </p>
+  </aside>
+
+  <footer class="wt-vbar bottom">
+    {% if prev_episode %}
+    <a class="wt-vbtn" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=prev_episode.id) }}">
+      <i class="fa-solid fa-backward-step"></i> 이전화
+    </a>
+    {% else %}
+    <button class="wt-vbtn" type="button" disabled><i class="fa-solid fa-backward-step"></i> 이전화</button>
+    {% endif %}
+
+    <button class="wt-vbtn" type="button" id="wtAutoBtn" title="자동 스크롤 (Space)">
+      <i class="fa-solid fa-play"></i> 자동
+    </button>
+    <button class="wt-vbtn" type="button" id="wtHideBtn" title="메뉴 숨기기 (H)">
+      <i class="fa-solid fa-eye-slash"></i>
+    </button>
+
+    {% if next_episode %}
+    <a class="wt-vbtn" href="{{ url_for('webtoon.viewer', webtoon_id=book.id, episode_id=next_episode.id) }}">
+      다음화 <i class="fa-solid fa-forward-step"></i>
+    </a>
+    {% else %}
+    <button class="wt-vbtn" type="button" disabled>다음화 <i class="fa-solid fa-forward-step"></i></button>
+    {% endif %}
+  </footer>
+
+  <div class="wt-toast" id="wtToast"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const viewer = document.getElementById('wtViewer');
+  if (!viewer) return;
+  const strip = document.getElementById('wtStrip');
+  const bar = document.getElementById('wtProgress');
+  const toast = document.getElementById('wtToast');
+  const settings = document.getElementById('wtSettings');
+  const prefsKey = 'webtoon-prefs';
+
+  // ---------- 알림 ----------
+  let toastTimer;
+  function notify(message) {
+    clearTimeout(toastTimer);
+    toast.textContent = message;
+    toast.classList.add('show');
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+  }
+
+  // ---------- 보기 설정(브라우저에 기억) ----------
+  const defaults = { width: 100, bright: 100, theme: 'black', speed: 3, gap: 0 };
+  let prefs = Object.assign({}, defaults);
+  try {
+    prefs = Object.assign(prefs, JSON.parse(localStorage.getItem(prefsKey) || '{}'));
+  } catch (_) { /* 저장소를 못 쓰는 환경에서는 기본값을 쓴다. */ }
+
+  function savePrefs() {
+    try { localStorage.setItem(prefsKey, JSON.stringify(prefs)); } catch (_) {}
+  }
+
+  const widthInput = document.getElementById('wtWidth');
+  const brightInput = document.getElementById('wtBright');
+  const speedInput = document.getElementById('wtSpeed');
+
+  function applyPrefs() {
+    strip.style.setProperty('--wt-max', Math.round(1200 * prefs.width / 100) + 'px');
+    viewer.style.setProperty('--wt-dim', (1 - prefs.bright / 100).toFixed(2));
+    strip.classList.toggle('gap', Number(prefs.gap) === 1);
+    viewer.dataset.theme = prefs.theme;
+    document.body.style.background = getComputedStyle(viewer).backgroundColor;
+    widthInput.value = prefs.width;
+    brightInput.value = prefs.bright;
+    speedInput.value = prefs.speed;
+    document.getElementById('wtWidthValue').textContent = prefs.width + '%';
+    document.getElementById('wtBrightValue').textContent = prefs.bright + '%';
+    document.getElementById('wtSpeedValue').textContent = prefs.speed;
+    document.querySelectorAll('#wtThemeSeg button').forEach(button =>
+      button.classList.toggle('on', button.dataset.theme === prefs.theme));
+    document.querySelectorAll('#wtGapSeg button').forEach(button =>
+      button.classList.toggle('on', Number(button.dataset.gap) === Number(prefs.gap)));
+  }
+
+  widthInput.addEventListener('input', () => { prefs.width = Number(widthInput.value); applyPrefs(); savePrefs(); });
+  brightInput.addEventListener('input', () => { prefs.bright = Number(brightInput.value); applyPrefs(); savePrefs(); });
+  speedInput.addEventListener('input', () => { prefs.speed = Number(speedInput.value); applyPrefs(); savePrefs(); });
+  document.querySelectorAll('#wtThemeSeg button').forEach(button =>
+    button.addEventListener('click', () => { prefs.theme = button.dataset.theme; applyPrefs(); savePrefs(); }));
+  document.querySelectorAll('#wtGapSeg button').forEach(button =>
+    button.addEventListener('click', () => { prefs.gap = Number(button.dataset.gap); applyPrefs(); savePrefs(); }));
+  applyPrefs();
+
+  // ---------- 설정 패널 ----------
+  function toggleSettings(force) {
+    const show = force === undefined ? !settings.classList.contains('show') : force;
+    settings.classList.toggle('show', show);
+  }
+  document.getElementById('wtSettingsBtn').addEventListener('click', () => toggleSettings());
+  document.getElementById('wtSettingsClose').addEventListener('click', () => toggleSettings(false));
+
+  // ---------- 메뉴 숨기기 ----------
+  function toggleChrome(force) {
+    const hide = force === undefined ? !viewer.classList.contains('chrome-hidden') : force;
+    viewer.classList.toggle('chrome-hidden', hide);
+    if (hide) toggleSettings(false);
+  }
+  document.getElementById('wtHideBtn').addEventListener('click', () => {
+    toggleChrome(true);
+    notify('화면 가운데를 누르면 메뉴가 다시 나옵니다.');
+  });
+  strip.addEventListener('click', event => {
+    if (event.target.closest('a, button')) return;
+    toggleChrome();
+  });
+
+  // ---------- 이동 ----------
+  const prevUrl = {{ (url_for('webtoon.viewer', webtoon_id=book.id, episode_id=prev_episode.id) if prev_episode else '')|tojson }};
+  const nextUrl = {{ (url_for('webtoon.viewer', webtoon_id=book.id, episode_id=next_episode.id) if next_episode else '')|tojson }};
+
+  document.getElementById('wtEpisodeSelect').addEventListener('change', event => {
+    if (event.target.value) location.href = event.target.value;
+  });
+  document.getElementById('wtTopBtn').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  document.getElementById('wtBottomBtn').addEventListener('click', () =>
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+
+  document.getElementById('wtFullBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  });
+
+  // ---------- 자동 스크롤 ----------
+  const autoButton = document.getElementById('wtAutoBtn');
+  let autoTimer = null;
+  function setAuto(on) {
+    if (on && !autoTimer) {
+      autoTimer = setInterval(() => {
+        const before = window.scrollY;
+        window.scrollBy(0, prefs.speed);
+        if (window.scrollY === before) setAuto(false);  // 바닥에 닿으면 스스로 멈춘다.
+      }, 16);
+      autoButton.classList.add('active');
+      autoButton.innerHTML = '<i class="fa-solid fa-pause"></i> 정지';
+      notify('자동 스크롤 시작 (속도 ' + prefs.speed + ')');
+    } else if (!on && autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      autoButton.classList.remove('active');
+      autoButton.innerHTML = '<i class="fa-solid fa-play"></i> 자동';
+    }
+  }
+  autoButton.addEventListener('click', () => setAuto(!autoTimer));
+  window.addEventListener('wheel', () => setAuto(false), { passive: true });
+  window.addEventListener('touchstart', () => setAuto(false), { passive: true });
+
+  // ---------- 진행률 · 이어보기 ----------
+  function scrollRatio() {
+    const total = document.documentElement.scrollHeight - window.innerHeight;
+    if (total <= 0) return 1;
+    return Math.min(Math.max(window.scrollY / total, 0), 1);
+  }
+
+  let saveTimer = null;
+  let lastSaved = -1;
+  function saveProgress() {
+    const ratio = scrollRatio();
+    if (Math.abs(ratio - lastSaved) < 0.02) return;
+    lastSaved = ratio;
+    fetch(viewer.dataset.progressUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ratio: ratio }),
+      keepalive: true,
+    }).catch(() => { /* 저장 실패는 열람을 막지 않는다. */ });
+  }
+
+  function onScroll() {
+    bar.style.width = (scrollRatio() * 100).toFixed(1) + '%';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveProgress, 900);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('beforeunload', saveProgress);
+  onScroll();
+
+  const resume = parseFloat(viewer.dataset.resume || '0');
+  if (resume > 0.02 && resume < 0.98) {
+    setTimeout(() => {
+      const target = (document.documentElement.scrollHeight - window.innerHeight) * resume;
+      notify('지난번 ' + Math.round(resume * 100) + '% 지점부터 이어봅니다.');
+      window.scrollTo({ top: target, behavior: 'smooth' });
+    }, 450);
+  }
+
+  // ---------- 단축키 ----------
+  document.addEventListener('keydown', event => {
+    const tag = (event.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    switch (event.key) {
+      case ' ':
+        event.preventDefault(); setAuto(!autoTimer); break;
+      case 'ArrowLeft':
+        if (prevUrl) location.href = prevUrl; break;
+      case 'ArrowRight':
+        if (nextUrl) location.href = nextUrl; break;
+      case 'ArrowUp':
+        event.preventDefault(); window.scrollBy({ top: -window.innerHeight * 0.85, behavior: 'smooth' }); break;
+      case 'ArrowDown':
+        event.preventDefault(); window.scrollBy({ top: window.innerHeight * 0.85, behavior: 'smooth' }); break;
+      case 't': case 'T': case 'ㅅ':
+        window.scrollTo({ top: 0, behavior: 'smooth' }); break;
+      case 'b': case 'B': case 'ㅠ':
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); break;
+      case 'f': case 'F': case 'ㄹ':
+        document.getElementById('wtFullBtn').click(); break;
+      case 'h': case 'H': case 'ㅗ':
+        toggleChrome(); break;
+      case 's': case 'S': case 'ㄴ':
+        toggleSettings(); break;
+      default:
+        break;
+    }
+  });
+
+  // 첫 장이 준비되면 회차 길이에 맞춰 진행률을 다시 계산한다.
+  strip.querySelectorAll('img').forEach(image => image.addEventListener('load', onScroll));
+})();
+</script>
+{% endblock %}

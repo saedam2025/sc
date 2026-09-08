@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · {% if episode %}회차 수정{% else %}회차 등록{% endif %}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+<div class="wt-page wt-form-wrap">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="wt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post"
+        action="{% if episode %}{{ url_for('webtoon.edit_episode', webtoon_id=book.id, episode_id=episode.id) }}{% else %}{{ url_for('webtoon.create_episode', webtoon_id=book.id) }}{% endif %}"
+        enctype="multipart/form-data">
+
+    <div class="wt-panel">
+      <h2><i class="fa-solid fa-layer-group" style="color:#6366f1;"></i>
+        {{ book.title }} · {% if episode %}{{ episode.episode_no }}화 수정{% else %}새 회차 등록{% endif %}</h2>
+      <p class="wt-help">이미지 여러 장을 올리면 <b>파일 이름 순서대로</b> 위에서 아래로 이어지는 한 편의 웹툰이 됩니다.</p>
+
+      <div class="wt-row">
+        <div class="wt-field">
+          <label for="wtEpNo">회차 번호<span class="req">*</span></label>
+          <input id="wtEpNo" type="number" name="episode_no" min="1" max="99999" required
+                 value="{{ form.episode_no if form.episode_no else next_no }}">
+          <p class="wt-hint">숫자만 입력합니다. 예) 1 → 1화</p>
+        </div>
+        <div class="wt-field">
+          <label for="wtEpTitle">회차 제목</label>
+          <input id="wtEpTitle" type="text" name="title" maxlength="120"
+                 value="{{ form.title if form.title else (episode.title if episode else '') }}"
+                 placeholder="예) 첫 출근">
+        </div>
+      </div>
+
+      <div class="wt-field">
+        <label for="wtPages">웹툰 이미지{% if not episode %}<span class="req">*</span>{% endif %}</label>
+        <div class="wt-drop" id="wtDrop">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>이미지를 여기에 끌어놓거나 클릭해서 선택하세요</p>
+          <span>JPG · PNG · WEBP · GIF / 장당 25MB 이하 / 한 회차 최대 300장</span>
+          <input id="wtPages" type="file" name="page_images" accept="image/*" multiple
+                 {% if not episode %}required{% endif %}>
+        </div>
+        {% if episode %}
+        <p class="wt-hint">새 이미지를 고르면 이 회차의 기존 {{ episode.page_count }}장이 <b>모두 교체</b>됩니다.
+          비워 두면 번호·제목만 수정합니다.</p>
+        <p class="wt-hint" style="margin-top:10px;">
+          이미 올린 컷의 <b>순서만</b> 바꾸려면
+          <a href="{{ url_for('webtoon.edit_pages', webtoon_id=book.id, episode_id=episode.id) }}"
+             style="color:var(--wt-accent); font-weight:800;">컷 순서 편집</a>을 이용하세요.
+        </p>
+        {% endif %}
+
+        <div class="wt-preview" id="wtPreview">
+          <div class="wt-preview-head">
+            <span><i class="fa-solid fa-list-ol"></i> 이어지는 순서 <b id="wtPreviewCount">0</b>장</span>
+            <span style="color:#64748b; font-weight:700;">파일명 숫자 기준 정렬</span>
+          </div>
+          <div class="wt-preview-list" id="wtPreviewList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wt-form-actions">
+      <a class="wt-btn" href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}">취소</a>
+      {% if episode %}
+      <button class="wt-btn danger" type="button"
+              onclick="if(confirm('{{ episode.episode_no }}화를 삭제할까요?')) document.getElementById('wtDeleteForm').submit();">
+        <i class="fa-solid fa-trash"></i> 회차 삭제
+      </button>
+      {% endif %}
+      <button class="wt-btn primary" type="submit">
+        <i class="fa-solid fa-check"></i> {% if episode %}수정 저장{% else %}회차 등록{% endif %}
+      </button>
+    </div>
+  </form>
+
+  {% if episode %}
+  <form id="wtDeleteForm" method="post"
+        action="{{ url_for('webtoon.delete_episode', webtoon_id=book.id, episode_id=episode.id) }}"></form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const drop = document.getElementById('wtDrop');
+  const input = document.getElementById('wtPages');
+  const preview = document.getElementById('wtPreview');
+  const list = document.getElementById('wtPreviewList');
+  const count = document.getElementById('wtPreviewCount');
+  if (!drop || !input) return;
+
+  // 서버와 같은 규칙(파일명 안의 숫자를 숫자로 비교)으로 미리보기 순서를 맞춘다.
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+  const sortFiles = files => Array.from(files).sort((a, b) => collator.compare(a.name, b.name));
+
+  drop.addEventListener('click', () => input.click());
+  ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.add('is-over');
+  }));
+  ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.remove('is-over');
+  }));
+  drop.addEventListener('drop', event => {
+    if (event.dataTransfer && event.dataTransfer.files.length) {
+      input.files = event.dataTransfer.files;
+      input.dispatchEvent(new Event('change'));
+    }
+  });
+
+  input.addEventListener('change', () => {
+    list.innerHTML = '';
+    const files = sortFiles(input.files || []);
+    count.textContent = files.length;
+    preview.classList.toggle('show', files.length > 0);
+    files.forEach((file, index) => {
+      const item = document.createElement('div');
+      item.className = 'wt-preview-item';
+      const image = document.createElement('img');
+      image.src = URL.createObjectURL(file);
+      image.alt = file.name;
+      image.onload = () => URL.revokeObjectURL(image.src);
+      const label = document.createElement('span');
+      label.textContent = index + 1;
+      item.append(image, label);
+      list.appendChild(item);
+    });
+    drop.querySelector('p').textContent = files.length
+      ? files.length + '장을 선택했습니다.'
+      : '이미지를 여기에 끌어놓거나 클릭해서 선택하세요';
+  });
+})();
+</script>
+{% endblock %}

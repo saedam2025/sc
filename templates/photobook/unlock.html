@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · 비밀번호 확인{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photobook.css') }}">
+{% endblock %}
+{% block content %}
+<div class="pb-page">
+  <div class="pb-lock-wrap">
+    <img class="pb-lock-cover" src="{{ url_for('photobook.serve_cover', photobook_id=book.id) }}" alt="">
+    <h1><i class="fa-solid fa-lock" style="color:#b45309;"></i> {{ book.title }}</h1>
+    <p>비밀번호가 걸린 전자책입니다. 열람 비밀번호를 입력해 주세요.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="pb-flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('photobook.unlock', photobook_id=book.id) }}" class="pb-panel">
+      <div class="pb-field">
+        <label for="pbUnlockPw">열람 비밀번호</label>
+        <input id="pbUnlockPw" type="password" name="password" maxlength="60"
+               autocomplete="off" autofocus required placeholder="비밀번호 입력">
+      </div>
+      <div class="pb-form-actions">
+        <a class="pb-btn" href="{{ url_for('photobook.library') }}">서재로</a>
+        <button class="pb-btn primary" type="submit"><i class="fa-solid fa-unlock"></i> 열람하기</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

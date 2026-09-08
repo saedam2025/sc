@@ -1,0 +1,476 @@
+{% extends 'base.html' %}
+{% block title %}{% if book %}전자책 정보 수정{% else %}새 전자책 등록{% endif %}{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photobook.css') }}">
+{% endblock %}
+{% block content %}
+{% set value = form if form else book %}
+<div class="pb-page pb-form-wrap">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="pb-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form method="post"
+        action="{% if book %}{{ url_for('photobook.edit_book', photobook_id=book.id) }}{% else %}{{ url_for('photobook.create_book') }}{% endif %}"
+        enctype="multipart/form-data">
+
+    <div class="pb-panel">
+      <h2><i class="fa-solid fa-images" style="color:#0f766e;"></i>
+        {% if book %}전자책 정보 수정{% else %}새 전자책 등록{% endif %}</h2>
+      <p class="pb-help">전자책 한 권의 기본 정보입니다.
+        {% if book %}사진 추가·삭제·순서 변경은 [사진 관리]에서 할 수 있습니다.{% else %}사진과 PDF는 아래에서 한 번에 올립니다.{% endif %}</p>
+
+      <div class="pb-row">
+        <div class="pb-field">
+          <label for="pbTitle">제목<span class="req">*</span></label>
+          <input id="pbTitle" type="text" name="title" maxlength="120" required
+                 value="{{ value.title if value else '' }}" placeholder="예) 2026 새담 여름캠프">
+          <p class="pb-hint" data-folder-only hidden>
+            <i class="fa-solid fa-circle-info"></i> 폴더를 끌어다 놓아서 <b>폴더 이름</b>이 제목으로 등록됩니다.</p>
+        </div>
+        <div class="pb-field">
+          <label for="pbAuthor">촬영자 · 담당</label>
+          <input id="pbAuthor" type="text" name="author" maxlength="60"
+                 value="{{ value.author if value else '' }}" placeholder="예) 홍길동">
+        </div>
+      </div>
+
+      <div class="pb-field">
+        <label for="pbTheme">주제</label>
+        <input id="pbTheme" type="text" name="theme" maxlength="40" list="pbThemeList"
+               value="{{ value.theme if value else '' }}" placeholder="목록에서 고르거나 직접 입력">
+        <datalist id="pbThemeList">
+          {% for item in themes %}<option value="{{ item }}"></option>{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="pb-field">
+        <label for="pbDesc">소개</label>
+        <textarea id="pbDesc" name="description" maxlength="2000"
+                  placeholder="언제, 어디서 찍은 사진인지 적어 주세요.">{{ value.description if value else '' }}</textarea>
+      </div>
+    </div>
+
+    {% if not book %}
+    <div class="pb-panel">
+      <h2><i class="fa-regular fa-images" style="color:#b45309;"></i> 사진 · PDF 올리기<span class="req">*</span></h2>
+      <p class="pb-help">여러 개를 한 번에 선택하세요. <b>파일 이름 순서</b>대로 1페이지부터 채워지고,
+        넓은 화면에서는 왼쪽 · 오른쪽 두 장씩 펼쳐집니다.<br>
+        <b>PDF를 올리면</b> 쪽마다 한 장씩 자동으로 나뉘어 담기고, 사진과 섞어서 올려도 됩니다.<br>
+        <b>폴더를 끌어다 놓으면</b> 폴더 하나가 전자책 한 권이 됩니다. 여러 폴더를 한꺼번에 놓아도 되고,
+        폴더 이름이 제목, 폴더 안 첫 장이 표지가 됩니다.</p>
+      <div class="pb-drop" id="pbPhotoDrop">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        <p>사진 · PDF나 폴더를 여기로 끌어다 놓으세요</p>
+        <span>JPG · PNG · WEBP · GIF · PDF / 사진 25MB · PDF 200MB 이하 · 한 권당 최대 300장 · 폴더는 한 번에 30개까지</span>
+        <input id="pbPhotos" type="file" name="photos" accept="image/*,application/pdf,.pdf" multiple required>
+      </div>
+      <div class="pb-thumbs" id="pbPhotoThumbs"></div>
+    </div>
+
+    <div class="pb-panel" id="pbFolderPanel" hidden>
+      <h2><i class="fa-solid fa-folder-tree" style="color:#b45309;"></i> 폴더별로 만들 전자책
+        <span class="pb-folder-count" id="pbFolderCount"></span></h2>
+      <p class="pb-help">폴더 이름이 그대로 제목이 되고 폴더 안 <b>첫 번째 장</b>(PDF면 그 첫 쪽)이 표지가 됩니다.
+        제목은 아래에서 바로 고칠 수 있고, 필요 없는 폴더는 <i class="fa-solid fa-xmark"></i> 로 뺄 수 있습니다.
+        아래 <b>촬영자 · 주제 · 소개 · 열람 비밀번호</b>는 여기서 만드는 모든 전자책에 똑같이 적용됩니다.</p>
+      <div class="pb-folder-list" id="pbFolderList"></div>
+      <p class="pb-hint" id="pbFolderNote" hidden></p>
+    </div>
+    <input type="hidden" name="folder_batch" id="pbFolderBatch"
+           data-batch-action="{{ url_for('photobook.create_books_batch') }}">
+    {% endif %}
+
+    <div class="pb-panel" id="pbCoverPanel">
+      <h2><i class="fa-regular fa-image" style="color:#0f766e;"></i> 표지 (선택)</h2>
+      <p class="pb-help">표지를 따로 올리지 않으면 <b>첫 번째 장</b>이 서재의 표지가 됩니다.
+        PDF를 고르면 그 <b>첫 쪽</b>이 표지가 됩니다.</p>
+      <p class="pb-folder-only pb-hint" data-folder-only hidden>
+        <i class="fa-solid fa-circle-info"></i> 폴더를 끌어다 놓았습니다.
+        표지는 폴더마다 첫 번째 장으로 자동 지정되므로 이 표지 파일은 사용하지 않습니다.</p>
+      <div class="pb-drop" id="pbCoverDrop">
+        <i class="fa-regular fa-image"></i>
+        <p>표지 이미지나 PDF를 선택하세요</p>
+        <span>JPG · PNG · WEBP · GIF / 12MB 이하 (세로 3:4 비율 권장) · PDF는 첫 쪽 사용</span>
+        <input id="pbCover" type="file" name="cover" accept="image/*,application/pdf,.pdf">
+      </div>
+      <img id="pbCoverPreview" class="pb-cover-preview {% if book %}show{% endif %}" alt="표지 미리보기"
+           src="{% if book %}{{ url_for('photobook.serve_cover', photobook_id=book.id) }}{% endif %}">
+      {% if book %}<p class="pb-hint">새 파일을 고르지 않으면 기존 표지를 그대로 사용합니다.</p>{% endif %}
+    </div>
+
+    <div class="pb-panel">
+      <h2><i class="fa-solid fa-lock" style="color:#b45309;"></i> 열람 비밀번호</h2>
+      <p class="pb-help">비밀번호를 정하면 이 전자책의 내용이 비밀번호 확인 후에만 열립니다.
+        등록자 본인과 최고관리자(admin) 계정만 비밀번호 없이 바로 열람합니다.</p>
+
+      {% if book %}
+      <div class="pb-field">
+        <label>현재 상태 :
+          {% if book.password_hash %}<span style="color:#b45309;">비밀번호 설정됨</span>
+          {% else %}<span style="color:#059669;">공개</span>{% endif %}
+        </label>
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <label class="pb-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="keep" checked> 그대로 두기</label>
+          <label class="pb-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="set"> 새로 설정</label>
+          <label class="pb-btn sm" style="flex:1;"><input type="radio" name="password_mode" value="clear"> 잠금 해제</label>
+        </div>
+        <input type="password" name="password" maxlength="60" autocomplete="new-password"
+               placeholder="새 비밀번호 (2자 이상)">
+      </div>
+      {% else %}
+      <div class="pb-field">
+        <label for="pbPw">비밀번호 (선택)</label>
+        <input id="pbPw" type="password" name="password" maxlength="60" autocomplete="new-password"
+               placeholder="비워두면 사내 누구나 볼 수 있습니다">
+        <p class="pb-hint">2자 이상. 잊어버렸다면 등록자나 관리자가 [정보 수정] 화면에서 다시 설정하거나 해제할 수 있습니다.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="pb-form-actions">
+      <a class="pb-btn" href="{% if book %}{{ url_for('photobook.manage_pages', photobook_id=book.id) }}{% else %}{{ url_for('photobook.library') }}{% endif %}">취소</a>
+      <button class="pb-btn primary" type="submit" id="pbSubmit">
+        <i class="fa-solid fa-check"></i>
+        <span id="pbSubmitLabel">{% if book %}수정 저장{% else %}등록하기{% endif %}</span>
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const PAGE_EXT = /\.(jpe?g|png|webp|gif|pdf)$/i;
+  const PDF_EXT = /\.pdf$/i;
+  const MAX_PAGES = 300;
+  const MAX_FOLDERS = 30;
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+  const isPdf = file => PDF_EXT.test((file && file.name) || '');
+
+  // PDF는 미리보기 이미지를 만들 수 없으므로 같은 크기의 표식 타일로 대신한다.
+  function pdfTile(name, className) {
+    const box = document.createElement('div');
+    box.className = className;
+    box.title = name;
+    const icon = document.createElement('i');
+    icon.className = 'fa-solid fa-file-pdf';
+    const label = document.createElement('span');
+    label.textContent = name;
+    box.append(icon, label);
+    return box;
+  }
+
+  // 파일 선택 영역(표지 · 사진)을 드래그&드롭으로도 쓸 수 있게 한다.
+  // onDropped가 true를 돌려주면 그 drop은 이미 처리된 것으로 보고 기본 동작을 건너뛴다.
+  function bindDrop(dropId, inputId, onPicked, onDropped) {
+    const drop = document.getElementById(dropId);
+    const input = document.getElementById(inputId);
+    if (!drop || !input) return;
+    ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault(); drop.classList.add('is-over');
+    }));
+    ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+      event.preventDefault(); drop.classList.remove('is-over');
+    }));
+    drop.addEventListener('drop', event => {
+      if (onDropped && onDropped(event, input, drop)) return;
+      if (event.dataTransfer && event.dataTransfer.files.length) {
+        input.files = event.dataTransfer.files;
+        input.dispatchEvent(new Event('change'));
+      }
+    });
+    input.addEventListener('change', () => onPicked(input, drop));
+  }
+
+  bindDrop('pbCoverDrop', 'pbCover', (input, drop) => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const preview = document.getElementById('pbCoverPreview');
+    if (isPdf(file)) {
+      // PDF 표지는 서버가 첫 쪽을 이미지로 만들어 준다.
+      preview.classList.remove('show');
+      preview.removeAttribute('src');
+      drop.querySelector('p').textContent = file.name + ' (첫 쪽을 표지로 사용)';
+      return;
+    }
+    preview.src = URL.createObjectURL(file);
+    preview.classList.add('show');
+    drop.querySelector('p').textContent = file.name;
+  });
+
+  // ---------------------------------------------------------------------
+  // 폴더 드롭 : 폴더 하나 = 전자책 한 권
+  // ---------------------------------------------------------------------
+  const photoDrop = document.getElementById('pbPhotoDrop');
+  const photoInput = document.getElementById('pbPhotos');
+  const photoThumbs = document.getElementById('pbPhotoThumbs');
+  const folderPanel = document.getElementById('pbFolderPanel');
+  const folderList = document.getElementById('pbFolderList');
+  const folderNote = document.getElementById('pbFolderNote');
+  const folderCount = document.getElementById('pbFolderCount');
+  const folderBatch = document.getElementById('pbFolderBatch');
+  const titleInput = document.getElementById('pbTitle');
+  const coverInput = document.getElementById('pbCover');
+  const coverPanel = document.getElementById('pbCoverPanel');
+  const submitLabel = document.getElementById('pbSubmitLabel');
+  const photoForm = photoInput ? photoInput.form : null;
+  const singleAction = photoForm ? photoForm.getAttribute('action') : '';
+  const batchAction = folderBatch ? folderBatch.dataset.batchAction : '';
+  const DROP_IDLE = '사진 · PDF나 폴더를 여기로 끌어다 놓으세요';
+
+  let folders = [];            // [{ title, entries: [{ file, path }] }]
+  let previewUrls = [];
+
+  function setDropText(text) {
+    if (photoDrop) photoDrop.querySelector('p').textContent = text;
+  }
+
+  function showNote(lines) {
+    if (!folderNote) return;
+    folderNote.innerHTML = lines.join('<br>');
+    folderNote.hidden = !lines.length;
+  }
+
+  // 폴더 모드에서는 제목·표지 대신 폴더 이름·첫 사진이 쓰이므로 입력을 잠근다.
+  function setFolderMode(on) {
+    if (!photoForm) return;
+    photoForm.setAttribute('action', on ? batchAction : singleAction);
+    if (titleInput) {
+      titleInput.required = !on;
+      titleInput.disabled = on;
+    }
+    if (coverInput) coverInput.disabled = on;
+    if (coverPanel) coverPanel.classList.toggle('is-muted', on);
+    document.querySelectorAll('[data-folder-only]').forEach(el => { el.hidden = !on; });
+    if (submitLabel) {
+      submitLabel.textContent = on ? '전자책 ' + folders.length + '권 등록하기' : '등록하기';
+    }
+  }
+
+  function readEntries(reader) {
+    return new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+  }
+
+  // 폴더 안을 재귀로 훑어 사진 · PDF 파일과 상대경로를 모은다.
+  async function walk(entry, prefix, bucket) {
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      if (PAGE_EXT.test(file.name)) bucket.push({ file, path: prefix + file.name });
+      return;
+    }
+    const reader = entry.createReader();
+    // readEntries는 한 번에 최대 100개만 주므로 빈 배열이 올 때까지 반복해서 읽는다.
+    for (;;) {
+      const batch = await readEntries(reader);
+      if (!batch.length) break;
+      for (const child of batch) {
+        await walk(child, prefix + entry.name + '/', bucket);
+      }
+    }
+  }
+
+  function renderFolders() {
+    if (!folderList) return;
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    previewUrls = [];
+    folderList.innerHTML = '';
+
+    folders.forEach((group, index) => {
+      const item = document.createElement('div');
+      item.className = 'pb-folder-item';
+
+      const first = group.entries[0].file;
+      let thumb;
+      if (isPdf(first)) {
+        thumb = pdfTile(first.name, 'pb-folder-pdf');
+      } else {
+        thumb = document.createElement('img');
+        const url = URL.createObjectURL(first);
+        previewUrls.push(url);
+        thumb.src = url;
+        thumb.alt = group.title + ' 표지';
+        thumb.loading = 'lazy';
+      }
+
+      const main = document.createElement('div');
+      main.className = 'pb-folder-main';
+
+      const title = document.createElement('input');
+      title.type = 'text';
+      title.maxLength = 120;
+      title.value = group.title;
+      title.setAttribute('aria-label', '전자책 제목');
+      title.addEventListener('input', () => { group.title = title.value; });
+
+      const sub = document.createElement('p');
+      sub.className = 'pb-folder-sub';
+      const coverName = group.entries[0].path.split('/').pop();
+      sub.textContent = '파일 ' + group.entries.length + '개 · 표지 : ' + coverName;
+      if (group.entries.length > MAX_PAGES) {
+        sub.classList.add('is-over');
+        sub.textContent += ' (한 권 최대 ' + MAX_PAGES + '장 초과)';
+      }
+      main.append(title, sub);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'pb-btn sm';
+      remove.title = '이 폴더 빼기';
+      remove.setAttribute('aria-label', group.title + ' 폴더 빼기');
+      remove.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      remove.addEventListener('click', () => {
+        folders.splice(index, 1);
+        renderFolders();
+        syncFolderFiles();
+      });
+
+      item.append(thumb, main, remove);
+      folderList.appendChild(item);
+    });
+
+    if (folderCount) folderCount.textContent = folders.length ? folders.length + '권' : '';
+    if (folderPanel) folderPanel.hidden = folders.length === 0;
+    if (!folders.length) {
+      showNote([]);
+      setDropText(DROP_IDLE);
+    }
+    setFolderMode(folders.length > 0);
+  }
+
+  // 폴더 순서 그대로 사진을 파일 입력에 다시 담는다(서버가 같은 순서로 나눈다).
+  function syncFolderFiles() {
+    if (!photoInput) return;
+    const transfer = new DataTransfer();
+    folders.forEach(group => group.entries.forEach(entry => transfer.items.add(entry.file)));
+    photoInput.files = transfer.files;
+    if (photoThumbs) photoThumbs.innerHTML = '';
+    if (folders.length) {
+      const total = folders.reduce((sum, group) => sum + group.entries.length, 0);
+      setDropText('폴더 ' + folders.length + '개 · 파일 ' + total + '개 (폴더마다 전자책 한 권)');
+    }
+  }
+
+  function handlePhotoDrop(event, input, drop) {
+    const transfer = event.dataTransfer;
+    if (!transfer || !folderPanel || !transfer.items) return false;
+    // webkitGetAsEntry()는 drop 이벤트가 끝나면 못 쓰므로 지금 바로 모아 둔다.
+    const entries = [...transfer.items]
+      .map(item => (item.webkitGetAsEntry ? item.webkitGetAsEntry() : null))
+      .filter(Boolean);
+    const directories = entries.filter(entry => entry.isDirectory);
+    if (!directories.length) return false;
+
+    drop.querySelector('p').textContent = '폴더를 읽는 중입니다…';
+    collectFolders(directories, entries.length - directories.length);
+    return true;
+  }
+
+  async function collectFolders(directories, looseCount) {
+    const notes = [];
+    const empty = [];
+    const duplicated = [];
+    let skipped = 0;
+
+    for (const directory of directories) {
+      if (folders.length >= MAX_FOLDERS) { skipped += 1; continue; }
+      const bucket = [];
+      try {
+        await walk(directory, '', bucket);
+      } catch (error) {
+        notes.push('‘' + directory.name + '’ 폴더를 읽지 못했습니다.');
+        continue;
+      }
+      if (!bucket.length) { empty.push(directory.name); continue; }
+      if (folders.some(group => group.title === directory.name)) {
+        duplicated.push(directory.name);
+        continue;
+      }
+      bucket.sort((a, b) => collator.compare(a.path, b.path));
+      folders.push({ title: directory.name, entries: bucket });
+    }
+
+    if (looseCount) {
+      notes.push('폴더에 들어 있지 않은 파일 ' + looseCount + '개는 제외했습니다. ' +
+                 '낱장으로 한 권을 만들려면 폴더를 모두 뺀 뒤 사진 · PDF만 올려 주세요.');
+    }
+    if (empty.length) notes.push('사진 · PDF가 없는 폴더는 건너뛰었습니다 : ' + empty.join(', '));
+    if (duplicated.length) notes.push('이미 목록에 있는 폴더는 건너뛰었습니다 : ' + duplicated.join(', '));
+    if (skipped) notes.push('한 번에 최대 ' + MAX_FOLDERS + '개 폴더까지만 담을 수 있어 ' + skipped + '개를 건너뛰었습니다.');
+
+    renderFolders();
+    syncFolderFiles();
+    showNote(notes);
+  }
+
+  bindDrop('pbPhotoDrop', 'pbPhotos', (input, drop) => {
+    // 파일을 직접 고르거나 낱장 사진을 놓으면 기존(한 권 등록) 방식으로 돌아간다.
+    if (folders.length) {
+      folders = [];
+      renderFolders();
+    }
+    if (folderBatch) folderBatch.value = '';
+    const files = [...(input.files || [])];
+    const thumbs = document.getElementById('pbPhotoThumbs');
+    if (!thumbs) return;
+    thumbs.innerHTML = '';
+    const pdfCount = files.filter(isPdf).length;
+    drop.querySelector('p').textContent = files.length
+      ? '파일 ' + files.length + '개 선택됨 (파일 이름 순서로 배치)' +
+        (pdfCount ? ' · PDF ' + pdfCount + '개는 쪽마다 나뉩니다' : '')
+      : DROP_IDLE;
+    files.slice(0, 24).forEach(file => {
+      if (isPdf(file)) {
+        thumbs.appendChild(pdfTile(file.name, 'pb-thumb-pdf'));
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.alt = file.name;
+      thumbs.appendChild(img);
+    });
+    if (files.length > 24) {
+      const more = document.createElement('div');
+      more.className = 'pb-hint';
+      more.style.gridColumn = '1 / -1';
+      more.textContent = '외 ' + (files.length - 24) + '개';
+      thumbs.appendChild(more);
+    }
+  }, handlePhotoDrop);
+
+  // 보낼 때 폴더별 제목·상대경로를 숨은 필드에 담아 서버가 같은 순서로 나누게 한다.
+  if (photoForm && folderBatch) {
+    photoForm.addEventListener('submit', event => {
+      if (!folders.length) { folderBatch.value = ''; return; }
+      const over = folders.find(group => group.entries.length > MAX_PAGES);
+      if (over) {
+        event.preventDefault();
+        alert('‘' + over.title + '’ 폴더의 파일이 ' + MAX_PAGES + '개를 넘습니다. 파일 수를 줄여 주세요.');
+        return;
+      }
+      folderBatch.value = JSON.stringify(folders.map(group => ({
+        title: (group.title || '').trim() || group.entries[0].path.split('/')[0] || '제목 없는 폴더',
+        paths: group.entries.map(entry => entry.path),
+      })));
+    });
+  }
+
+  // 비밀번호 모드를 고르면 입력칸을 필요한 때만 활성화한다.
+  const pwInput = document.querySelector('input[name="password"]');
+  const modes = document.querySelectorAll('input[name="password_mode"]');
+  function syncMode() {
+    const mode = document.querySelector('input[name="password_mode"]:checked');
+    if (!mode || !pwInput) return;
+    pwInput.disabled = mode.value !== 'set';
+    pwInput.style.opacity = pwInput.disabled ? '.45' : '1';
+    if (mode.value === 'set') pwInput.focus();
+  }
+  modes.forEach(radio => radio.addEventListener('change', syncMode));
+  syncMode();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Webtoon 서재{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+<div class="wt-page">
+
+  <section class="wt-hero">
+    <div>
+      <span class="wt-eyebrow"><i class="fa-solid fa-book-open"></i> SAEDAM WEBTOON</span>
+      <h1>사내 웹툰 서재</h1>
+      <p>표지를 눌러 회차 목록으로 들어가고, 회차를 열면 이미지가 위에서 아래로 이어집니다.</p>
+    </div>
+    <a class="wt-btn primary" href="{{ url_for('webtoon.create_webtoon') }}">
+      <i class="fa-solid fa-plus"></i> 새 웹툰 등록
+    </a>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="wt-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="wt-toolbar">
+    <div class="wt-count"><strong>{{ books|length }}</strong>편의 웹툰</div>
+    <form method="get" class="wt-search">
+      <i class="fa-solid fa-magnifying-glass" style="color:#94a3b8;"></i>
+      <input name="q" value="{{ query }}" placeholder="제목 · 저자 · 소개 검색" aria-label="웹툰 검색">
+      <select name="genre" aria-label="장르 선택" onchange="this.form.submit()">
+        <option value="">전체 장르</option>
+        {% for item in genres %}
+        <option value="{{ item }}" {% if item == genre %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button class="wt-btn sm primary" type="submit">검색</button>
+      {% if query or genre %}
+      <a class="wt-btn sm" href="{{ url_for('webtoon.library') }}" title="검색 초기화"><i class="fa-solid fa-xmark"></i></a>
+      {% endif %}
+    </form>
+  </div>
+
+  <section class="wt-grid">
+    {% for book in books %}
+    {% set locked = locked_map.get(book.id) %}
+    <article class="wt-card">
+      <a class="wt-cover {% if locked %}locked{% endif %}" href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}" aria-label="{{ book.title }} 열기">
+        <img src="{{ url_for('webtoon.serve_cover', webtoon_id=book.id) }}" alt="{{ book.title }} 표지" loading="lazy">
+        {% if book.genre %}<span class="wt-badge">{{ book.genre }}</span>{% endif %}
+        <span class="wt-badge right">{{ book.episode_count }}화</span>
+        {% if locked %}
+        <span class="wt-cover-lock"><i class="fa-solid fa-lock"></i> 비밀번호 필요</span>
+        {% endif %}
+      </a>
+      <div class="wt-card-body">
+        <h2><a href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}">{{ book.title }}</a></h2>
+        <div class="wt-meta">
+          <i class="fa-solid fa-pen-nib"></i> {{ book.author or book.created_by or '작자미상' }}
+        </div>
+        <div class="wt-meta">
+          <i class="fa-regular fa-eye"></i> {{ book.view_count }}
+          {% if book.password_hash %}<i class="fa-solid fa-lock" style="margin-left:6px;"></i> 비공개{% endif %}
+        </div>
+        <div class="wt-card-actions">
+          <a class="wt-btn sm primary" style="flex:1;" href="{{ url_for('webtoon.episodes', webtoon_id=book.id) }}">
+            <i class="fa-solid fa-book-open-reader"></i> 보기
+          </a>
+          {% if can_manage_map.get(book.id) %}
+          <a class="wt-btn sm" href="{{ url_for('webtoon.edit_webtoon', webtoon_id=book.id) }}" title="웹툰 정보 수정"><i class="fa-solid fa-pen"></i></a>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+    {% else %}
+    <div class="wt-empty">
+      <i class="fa-regular fa-images"></i>
+      <h2>{% if query or genre %}검색 결과가 없습니다.{% else %}아직 등록된 웹툰이 없습니다.{% endif %}</h2>
+      <p>제목 · 저자 · 장르 · 표지를 등록한 뒤 회차 이미지를 올려 보세요.</p>
+    </div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

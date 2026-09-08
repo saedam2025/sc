@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · 웹전자책{% endblock %}
+{% block body_class %}pb-viewer-body{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photobook.css') }}?v=20260905-fullscreen">
+{% endblock %}
+{% block content %}
+<div class="pb-viewer" id="pbViewer">
+
+  <button type="button" class="pb-immersive-exit" id="pbImmersiveExit" title="전체화면 나가기" aria-label="전체화면 나가기">
+    <i class="fa-solid fa-compress"></i>
+  </button>
+
+  <header class="pb-vbar">
+    <a class="pb-vbtn" href="{{ url_for('photobook.library', **browse_args) }}" title="서재로">
+      <i class="fa-solid fa-chevron-left"></i><span>서재</span>
+    </a>
+    {% if prev_book %}
+    <a class="pb-vbtn pb-vbook" href="{{ url_for('photobook.read_book', photobook_id=prev_book.id, **browse_args) }}"
+       title="이전 전자책 : {{ prev_book.title }}">
+      <i class="fa-solid fa-angles-left"></i><span>이전 권</span>
+    </a>
+    {% endif %}
+    <div class="pb-vbar-title">
+      <span>웹전자책</span>
+      <h1>{{ book.title }}</h1>
+    </div>
+    {% if next_book %}
+    <a class="pb-vbtn pb-vbook" href="{{ url_for('photobook.read_book', photobook_id=next_book.id, **browse_args) }}"
+       title="다음 전자책 : {{ next_book.title }}">
+      <i class="fa-solid fa-angles-right"></i><span>다음 권</span>
+    </a>
+    {% endif %}
+    {% if can_manage %}
+    <a class="pb-vbtn" href="{{ url_for('photobook.manage_pages', photobook_id=book.id) }}" title="사진 관리">
+      <i class="fa-solid fa-images"></i><span>사진 관리</span>
+    </a>
+    {% endif %}
+    <button type="button" class="pb-vbtn" id="pbFullscreen" title="전체화면">
+      <i class="fa-solid fa-expand"></i><span>전체화면</span>
+    </button>
+  </header>
+
+  {% if pages %}
+  <section class="pb-stage" id="pbStage">
+    <button type="button" class="pb-turn prev" id="pbPrev" aria-label="이전 장"><i class="fa-solid fa-chevron-left"></i></button>
+    <div class="pb-book" id="pbBook">
+      <div class="pb-sheet left" id="pbLeft"></div>
+      <div class="pb-sheet right" id="pbRight"></div>
+      <div class="pb-spine" aria-hidden="true"></div>
+    </div>
+    <button type="button" class="pb-turn next" id="pbNext" aria-label="다음 장"><i class="fa-solid fa-chevron-right"></i></button>
+    <div class="pb-toast" id="pbToast" role="status" aria-live="polite"></div>
+    <div class="pb-rotate-hint" aria-hidden="true">
+      <i class="fa-solid fa-mobile-screen-button"></i> 가로로 돌리면 더 크게 볼 수 있어요
+    </div>
+  </section>
+
+  {% if prev_book or next_book %}
+  <div class="pb-endnav" id="pbEndNav" aria-live="polite">
+    {% if prev_book %}
+    <a class="pb-endprev" href="{{ url_for('photobook.read_book', photobook_id=prev_book.id, **browse_args) }}"
+       title="이전 권 : {{ prev_book.title }}">
+      <i class="fa-solid fa-angles-left"></i>
+      <span>이전 권 보기</span>
+    </a>
+    {% endif %}
+    {% if next_book %}
+    <a class="pb-nextbook" href="{{ url_for('photobook.read_book', photobook_id=next_book.id, **browse_args) }}">
+      <img src="{{ url_for('photobook.serve_cover', photobook_id=next_book.id) }}" alt="" loading="lazy">
+      <span>
+        <small>마지막 장입니다 · 다음 전자책 이어 보기</small>
+        <b>{{ next_book.title }}</b>
+      </span>
+      <i class="fa-solid fa-angles-right"></i>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <footer class="pb-controls">
+    <input id="pbRange" type="range" min="1" max="{{ pages|length }}" value="1" aria-label="페이지 이동">
+    <div class="pb-status"><strong id="pbCurrent">1</strong> / {{ pages|length }}장</div>
+  </footer>
+  {% else %}
+  <div class="pb-viewer-empty">
+    <i class="fa-regular fa-images"></i>
+    <h2>아직 사진이 없는 전자책입니다.</h2>
+    {% if can_manage %}
+    <p><a class="pb-vbtn" href="{{ url_for('photobook.manage_pages', photobook_id=book.id) }}">사진 올리러 가기</a></p>
+    {% endif %}
+    {% if next_book %}
+    <p><a class="pb-vbtn" href="{{ url_for('photobook.read_book', photobook_id=next_book.id, **browse_args) }}">
+      다음 전자책 «{{ next_book.title }}» 보기 <i class="fa-solid fa-angles-right"></i></a></p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<script id="pbPageData" type="application/json">[
+{% for page in pages %}{{ {'no': page.page_no, 'url': url_for('photobook.serve_page_image', photobook_id=book.id, page_id=page.id), 'w': page.width, 'h': page.height}|tojson }}{% if not loop.last %},{% endif %}{% endfor %}
+]</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/photobook_fold.js') }}?v=20260905-fullscreen"></script>
+<script src="{{ url_for('static', filename='js/photobook_viewer.js') }}?v=20260905-fullscreen"></script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · 비밀번호 확인{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/webtoon.css') }}">
+{% endblock %}
+{% block content %}
+<div class="wt-page">
+  <div class="wt-lock-wrap">
+    <img class="wt-lock-cover" src="{{ url_for('webtoon.serve_cover', webtoon_id=book.id) }}" alt="">
+    <h1><i class="fa-solid fa-lock" style="color:#ec4899;"></i> {{ book.title }}</h1>
+    <p>비밀번호가 걸린 웹툰입니다. 열람 비밀번호를 입력해 주세요.</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="wt-flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" action="{{ url_for('webtoon.unlock', webtoon_id=book.id) }}" class="wt-panel">
+      <div class="wt-field">
+        <label for="wtUnlockPw">열람 비밀번호</label>
+        <input id="wtUnlockPw" type="password" name="password" maxlength="60"
+               autocomplete="off" autofocus required placeholder="비밀번호 입력">
+      </div>
+      <div class="wt-form-actions">
+        <a class="wt-btn" href="{{ url_for('webtoon.library') }}">서재로</a>
+        <button class="wt-btn primary" type="submit"><i class="fa-solid fa-unlock"></i> 열람하기</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

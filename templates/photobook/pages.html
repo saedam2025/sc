@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}{{ book.title }} · 사진 관리{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/photobook.css') }}">
+{% endblock %}
+{% block content %}
+<div class="pb-page pb-form-wrap">
+
+  <section class="pb-hero">
+    <div>
+      <span class="pb-eyebrow"><i class="fa-solid fa-images"></i> PHOTOBOOK</span>
+      <h1>{{ book.title }}</h1>
+      <p>{{ pages|length }}장 · 최대 {{ max_pages }}장까지 담을 수 있습니다.</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="pb-btn" href="{{ url_for('photobook.library') }}"><i class="fa-solid fa-chevron-left"></i> 서재</a>
+      <a class="pb-btn" href="{{ url_for('photobook.edit_book', photobook_id=book.id) }}"><i class="fa-solid fa-pen"></i> 정보 수정</a>
+      <a class="pb-btn primary" href="{{ url_for('photobook.read_book', photobook_id=book.id) }}"><i class="fa-solid fa-book-open"></i> 넘겨 보기</a>
+    </div>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="pb-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <form class="pb-panel" method="post"
+        action="{{ url_for('photobook.manage_pages', photobook_id=book.id) }}"
+        enctype="multipart/form-data">
+    <h2><i class="fa-solid fa-cloud-arrow-up" style="color:#0f766e;"></i> 사진 · PDF 추가</h2>
+    <p class="pb-help">선택한 파일이 <b>파일 이름 순서</b>대로 맨 뒤에 이어 붙습니다.
+      PDF는 쪽마다 한 장씩 나뉘어 담깁니다.</p>
+    <div class="pb-drop" id="pbPhotoDrop">
+      <i class="fa-solid fa-cloud-arrow-up"></i>
+      <p>사진 · PDF를 선택하거나 여기로 끌어다 놓으세요</p>
+      <span>JPG · PNG · WEBP · GIF · PDF / 사진 25MB · PDF 200MB 이하</span>
+      <input id="pbPhotos" type="file" name="photos" accept="image/*,application/pdf,.pdf" multiple required>
+    </div>
+    <div class="pb-form-actions">
+      <button class="pb-btn primary" type="submit"><i class="fa-solid fa-plus"></i> 추가하기</button>
+    </div>
+  </form>
+
+  <div class="pb-panel">
+    <h2><i class="fa-regular fa-images" style="color:#b45309;"></i> 페이지 목록</h2>
+    <p class="pb-help">번호가 곧 페이지 순서입니다. 화살표로 앞뒤 장과 자리를 바꿀 수 있습니다.</p>
+
+    {% if pages %}
+    <div class="pb-manage-grid">
+      {% for page in pages %}
+      <div class="pb-manage-item">
+        <img src="{{ url_for('photobook.serve_page_image', photobook_id=book.id, page_id=page.id) }}"
+             alt="{{ page.page_no }}페이지" loading="lazy">
+        <div class="pb-manage-bar">
+          <span class="pb-manage-no">{{ page.page_no }}p</span>
+          <span style="display:flex; gap:4px;">
+            <form method="post" action="{{ url_for('photobook.move_page', photobook_id=book.id, page_id=page.id) }}">
+              <input type="hidden" name="direction" value="up">
+              <button class="pb-icon-btn" type="submit" title="앞으로" {% if loop.first %}disabled{% endif %}><i class="fa-solid fa-arrow-left"></i></button>
+            </form>
+            <form method="post" action="{{ url_for('photobook.move_page', photobook_id=book.id, page_id=page.id) }}">
+              <input type="hidden" name="direction" value="down">
+              <button class="pb-icon-btn" type="submit" title="뒤로" {% if loop.last %}disabled{% endif %}><i class="fa-solid fa-arrow-right"></i></button>
+            </form>
+            <form method="post" action="{{ url_for('photobook.delete_page', photobook_id=book.id, page_id=page.id) }}"
+                  onsubmit="return confirm('{{ page.page_no }}번째 장을 삭제할까요?');">
+              <button class="pb-icon-btn danger" type="submit" title="삭제"><i class="fa-solid fa-trash"></i></button>
+            </form>
+          </span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="pb-empty">
+      <i class="fa-regular fa-images"></i>
+      <h2>아직 등록된 장이 없습니다.</h2>
+      <p>위에서 사진이나 PDF를 올리면 이곳에 순서대로 표시됩니다.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="pb-panel">
+    <h2><i class="fa-solid fa-triangle-exclamation" style="color:#b91c1c;"></i> 전자책 삭제</h2>
+    <p class="pb-help">전자책과 담긴 페이지가 모두 지워집니다. 되돌릴 수 없습니다.</p>
+    <form method="post" action="{{ url_for('photobook.delete_book', photobook_id=book.id) }}"
+          onsubmit="return confirm('‘{{ book.title }}’ 전자책을 정말 삭제할까요? 사진도 함께 지워집니다.');">
+      <button class="pb-btn danger" type="submit"><i class="fa-solid fa-trash"></i> 전자책 삭제</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const drop = document.getElementById('pbPhotoDrop');
+  const input = document.getElementById('pbPhotos');
+  if (!drop || !input) return;
+  ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.add('is-over');
+  }));
+  ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, event => {
+    event.preventDefault(); drop.classList.remove('is-over');
+  }));
+  drop.addEventListener('drop', event => {
+    if (event.dataTransfer && event.dataTransfer.files.length) {
+      input.files = event.dataTransfer.files;
+      input.dispatchEvent(new Event('change'));
+    }
+  });
+  input.addEventListener('change', () => {
+    const files = [...(input.files || [])];
+    const pdfCount = files.filter(file => /\.pdf$/i.test(file.name || '')).length;
+    drop.querySelector('p').textContent = files.length
+      ? `파일 ${files.length}개 선택됨 (파일 이름 순서로 추가)` +
+        (pdfCount ? ` · PDF ${pdfCount}개는 쪽마다 나뉩니다` : '')
+      : '사진 · PDF를 선택하거나 여기로 끌어다 놓으세요';
+  });
+})();
+</script>
+{% endblock %}
