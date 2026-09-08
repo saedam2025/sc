@@ -17,8 +17,9 @@ self.addEventListener('push', event => {
     try { d=event.data ? event.data.json() : {}; }
     catch(e) { d={body:event.data ? event.data.text() : '새 메시지가 도착했습니다.'}; }
     event.waitUntil((async()=>{
-        const ws=await self.clients.matchAll({type:'window',includeUncontrolled:true});
-        if(ws.some(c=>c.visibilityState==='visible')) return;
+        // Render에서는 Web Push 구독이 활성화되어 페이지 내 Notification 대신
+        // 이 경로가 전담한다. 인트라넷 창이 보인다는 이유로 건너뛰면
+        // 운영 환경에서만 Windows 작업표시줄 알림이 사라지므로 항상 표시한다.
         await self.registration.showNotification(d.title||'새담 사내메신저',{
             body:d.body||'새 메시지가 도착했습니다.', tag:d.tag||'saedam-chat', renotify:true,
             icon:d.icon||CHAT_NOTIFY_ICON, badge:CHAT_NOTIFY_ICON,
