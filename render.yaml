@@ -16,3 +16,15 @@ services:
       # 빠진 배포는 시작 단계에서 실패하여 명세서 데이터 유실을 막는다.
       - key: ALLOW_EPHEMERAL_DATA_ON_RENDER
         value: "false"
+      # 통합관리 > 시스템관리 > 솔라피설정에 저장한 값이 우선이며,
+      # 아래 값은 신규 배포 또는 DB 미설정 시 안전한 환경변수 폴백으로 사용한다.
+      - key: SOLAPI_API_KEY
+        sync: false
+      - key: SOLAPI_API_SECRET
+        sync: false
+      - key: SOLAPI_PF_ID
+        sync: false
+      - key: SOLAPI_TEMPLATE_ID
+        sync: false
+      - key: SOLAPI_FROM
+        sync: false
