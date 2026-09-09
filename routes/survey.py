@@ -50,6 +50,9 @@ RECIPIENT_SAMPLE_ROWS = (
 MAX_QUESTIONS = 50
 MAX_OPTIONS = 20
 MAX_RECIPIENTS = 2000
+# base.html 상단 주메뉴에서 쓰는 로고. 응답 화면과 문자 링크 미리보기(og:image)에 함께 쓴다.
+BRAND_LOGO_FILE = 'logo01.gif'
+BRAND_NAME = '사단법인 새담 청소년교육문화원'
 
 
 # ---------------------------------------------------------------------------
@@ -318,6 +321,21 @@ def _survey_dict(row, *, response_count=0, recipient_count=0, sent_count=0):
 def _public_link(token, origin=None):
     base = origin if origin is not None else resolve_public_origin()
     return f"{base}{url_for('survey.respond', token=token)}"
+
+
+def _brand_context(token=''):
+    """응답 화면과 문자 링크 미리보기에 쓰는 로고·주소 정보.
+
+    카카오톡·문자 앱이 링크 미리보기를 만들 때 og:image는 반드시 절대주소여야 하므로
+    통합관리에 저장된 '공개 링크 기본 주소'를 앞에 붙인다.
+    """
+    origin = resolve_public_origin()
+    return {
+        'brand_name': BRAND_NAME,
+        'logo_url': url_for('static', filename=BRAND_LOGO_FILE),
+        'logo_absolute_url': f"{origin}{url_for('static', filename=BRAND_LOGO_FILE)}",
+        'page_url': _public_link(token, origin) if token else origin,
+    }
 
 
 def _survey_is_open(row):
@@ -1385,11 +1403,13 @@ def respond(token):
             return render_template(
                 'survey/public.html', survey=None,
                 notice='설문 주소가 올바르지 않거나 삭제된 설문입니다.',
+                **_brand_context(),
             ), 404
         if recipient is None and not survey['allow_public_link']:
             return render_template(
                 'survey/public.html', survey=None,
                 notice='개인별로 발송된 설문 주소로만 참여할 수 있습니다.',
+                **_brand_context(),
             ), 403
         open_now, notice = _survey_is_open(survey)
         questions = _questions_of(conn, survey['id'])
@@ -1403,11 +1423,12 @@ def respond(token):
         return render_template(
             'survey/public.html', survey=survey, questions=[],
             notice='이미 응답을 완료하셨습니다. 참여해 주셔서 감사합니다.',
-            done=True,
+            done=True, **_brand_context(token),
         )
     if not open_now:
         return render_template(
             'survey/public.html', survey=survey, questions=[], notice=notice,
+            **_brand_context(token),
         )
     return render_template(
         'survey/public.html',
@@ -1418,6 +1439,7 @@ def respond(token):
         allow_anonymous=bool(survey['allow_anonymous'] and recipient is not None),
         notice='',
         token=token,
+        **_brand_context(token),
     )
 
 
