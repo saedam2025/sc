@@ -60,6 +60,41 @@
     .table th { font-size: .78rem; color: var(--text-gray); font-weight: 800; white-space: nowrap; }
     .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
     .empty { padding: 46px 20px; text-align: center; color: var(--text-gray); }
+
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+        border: 0; background: transparent; padding: 11px 18px; font-weight: 800; font-size: .92rem;
+        color: var(--text-gray); cursor: pointer; border-bottom: 3px solid transparent;
+    }
+    .tab.active { color: var(--saedam-blue); border-bottom-color: var(--saedam-blue); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* 응답자별 집계: 문항 수만큼 열이 늘어나므로 가로 스크롤 + 좌측 고정 */
+    .matrix-scroll { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 12px; }
+    .matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .85rem; }
+    .matrix th, .matrix td {
+        padding: 10px 12px; border-bottom: 1px solid var(--border-color);
+        text-align: left; vertical-align: top; white-space: nowrap;
+    }
+    .matrix thead th {
+        position: sticky; top: 0; z-index: 2; background: var(--widget-bg, #f8fafc);
+        font-size: .78rem; color: var(--text-gray); font-weight: 800;
+    }
+    .matrix td.answer { white-space: normal; min-width: 150px; max-width: 320px; word-break: break-word; }
+    .matrix tbody tr:hover td { background: var(--widget-hover, rgba(0,78,162,.05)); }
+    .matrix .who { font-weight: 800; color: var(--text-dark); }
+    .matrix .muted { color: var(--text-gray); }
+    .anon-tag {
+        display: inline-block; padding: 2px 9px; border-radius: 999px;
+        background: #ede9fe; color: #5b21b6; font-size: .72rem; font-weight: 800;
+    }
+    .matrix-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .matrix-tools input[type=search] {
+        padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 9px;
+        background: var(--input-bg, #fff); color: var(--text-dark); font-size: .86rem; min-width: 220px;
+    }
+    .legend { font-size: .78rem; color: var(--text-gray); }
     @media (max-width: 820px) {
         .survey-container { padding: 18px; }
         .bar-row { grid-template-columns: 1fr; gap: 4px; }
@@ -89,29 +124,42 @@
         <div class="stat-box"><b id="cntRecipients">0</b><span>등록 수신자</span></div>
     </div>
 
-    <h3 style="margin:0 0 12px;font-size:1.05rem;color:var(--text-dark)">문항별 집계</h3>
-    <div id="statsBox"></div>
-
-    <h3 style="margin:28px 0 10px;font-size:1.05rem;color:var(--text-dark)">응답 기록</h3>
-    <div style="overflow-x:auto">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th style="width:60px">번호</th>
-                    <th style="width:140px">이름</th>
-                    <th style="width:160px">휴대폰</th>
-                    <th>응답일시</th>
-                </tr>
-            </thead>
-            <tbody id="responseBody"></tbody>
-        </table>
+    <div class="tabs">
+        <button type="button" class="tab active" data-panel="panelStats">문항별 집계</button>
+        <button type="button" class="tab" data-panel="panelPeople">응답자별 집계</button>
     </div>
+
+    <section id="panelStats" class="panel active">
+        <div id="statsBox"></div>
+    </section>
+
+    <section id="panelPeople" class="panel">
+        <div class="matrix-tools">
+            <input type="search" id="peopleKeyword" placeholder="이름·구분·응답 내용 검색">
+            <label class="legend" style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="hideAnonymous"> 무기명 응답 숨기기
+            </label>
+            <span class="legend" id="peopleCount"></span>
+        </div>
+        <div class="matrix-scroll">
+            <table class="matrix">
+                <thead><tr id="matrixHead"></tr></thead>
+                <tbody id="matrixBody"></tbody>
+            </table>
+        </div>
+        <p class="legend" style="margin-top:12px">
+            무기명으로 제출된 응답은 이름·구분·휴대폰번호가 저장되지 않아 <span class="anon-tag">무기명</span> 으로만 표시됩니다.
+            문항별 집계에는 무기명 응답도 그대로 포함됩니다.
+        </p>
+    </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 const SURVEY_ID = {{ survey_id|int }};
+let questions = [];
+let respondents = [];
 
 function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -145,8 +193,10 @@ async function load() {
     document.getElementById('cntRate').textContent = data.summary.rate + '%';
     document.getElementById('cntRecipients').textContent = data.summary.recipients;
 
+    questions = data.questions || [];
+    respondents = data.responses || [];
     renderStats(data.stats || []);
-    renderResponses(data.responses || []);
+    renderMatrix();
 }
 
 function renderStats(stats) {
@@ -185,23 +235,65 @@ function renderStats(stats) {
     });
 }
 
-function renderResponses(items) {
-    const body = document.getElementById('responseBody');
+function renderMatrix() {
+    const head = document.getElementById('matrixHead');
+    const body = document.getElementById('matrixBody');
+    const keyword = document.getElementById('peopleKeyword').value.trim().toLowerCase();
+    const hideAnonymous = document.getElementById('hideAnonymous').checked;
+
+    head.innerHTML = ['번호', '구분', '이름', '휴대폰', '응답일시']
+        .map(label => `<th>${label}</th>`).join('')
+        + questions.map((question, index) =>
+            `<th class="answer">${index + 1}. ${escapeHtml(question.title)}</th>`).join('');
+
+    const rows = respondents.filter(item => {
+        if (hideAnonymous && item.anonymous) return false;
+        if (!keyword) return true;
+        const haystack = [item.name, item.category, item.note, ...(item.answers || [])]
+            .join(' ').toLowerCase();
+        return haystack.includes(keyword);
+    });
+
+    document.getElementById('peopleCount').textContent =
+        `${rows.length}건 표시 (전체 응답 ${respondents.length}건)`;
+
     body.innerHTML = '';
-    if (!items.length) {
-        body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-gray);padding:26px">아직 수집된 응답이 없습니다.</td></tr>';
+    if (!rows.length) {
+        const span = 5 + questions.length;
+        body.innerHTML = `<tr><td colspan="${span}" style="text-align:center;color:var(--text-gray);padding:30px">`
+            + (respondents.length ? '조건에 맞는 응답이 없습니다.' : '아직 수집된 응답이 없습니다.')
+            + '</td></tr>';
         return;
     }
-    items.forEach((item, index) => {
+
+    rows.forEach((item, index) => {
         const tr = document.createElement('tr');
+        const who = item.anonymous
+            ? '<span class="anon-tag">무기명</span>'
+            : `<span class="who">${escapeHtml(item.name)}</span>`;
         tr.innerHTML = `
-            <td class="num">${items.length - index}</td>
-            <td>${escapeHtml(item.name)}</td>
-            <td class="num">${escapeHtml(item.phone)}</td>
-            <td class="num">${escapeHtml(item.submitted_at)}</td>`;
+            <td class="num">${rows.length - index}</td>
+            <td class="muted">${escapeHtml(item.category) || '-'}</td>
+            <td>${who}</td>
+            <td class="num muted">${escapeHtml(item.phone)}</td>
+            <td class="num muted">${escapeHtml(item.submitted_at)}</td>`
+            + (item.answers || []).map(answer =>
+                `<td class="answer">${answer ? escapeHtml(answer) : '<span class="muted">-</span>'}</td>`).join('');
         body.appendChild(tr);
     });
 }
+
+document.getElementById('peopleKeyword').addEventListener('input', renderMatrix);
+document.getElementById('hideAnonymous').addEventListener('change', renderMatrix);
+
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+});
 
 document.addEventListener('DOMContentLoaded', load);
 </script>
