@@ -20,10 +20,13 @@
     <div class="solapi-head">
       <div>
         <h2>솔라피설정</h2>
-        <p>인증전자계약 링크 알림톡과 휴대폰 본인인증 문자에 사용하는 공용 설정입니다.</p>
+        <p>인증전자계약 링크 알림톡, 휴대폰 본인인증 문자, 설문조사 URL 문자에 함께 사용하는 공용 설정입니다.</p>
         <div class="solapi-source">현재 설정 출처: {% if solapi.source=='database' %}통합관리 저장값{% elif solapi.source=='environment' %}Render 환경변수{% else %}미설정{% endif %}{% if solapi.updated_at %} · 최근 저장 {{ solapi.updated_at }}{% endif %}</div>
       </div>
-      <span class="solapi-status{% if solapi.configured %} ok{% endif %}">{% if solapi.configured %}발송 설정 완료{% else %}설정 필요{% endif %}</span>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+        <span class="solapi-status{% if solapi.configured %} ok{% endif %}">알림톡 {% if solapi.configured %}설정 완료{% else %}설정 필요{% endif %}</span>
+        <span class="solapi-status{% if solapi.sms_configured %} ok{% endif %}">문자(설문조사) {% if solapi.sms_configured %}설정 완료{% else %}설정 필요{% endif %}</span>
+      </div>
     </div>
     {% if error %}<div class="solapi-message error">{{ error }}</div>{% endif %}
     {% if success %}<div class="solapi-message success">{{ success }}</div>{% endif %}
@@ -40,12 +43,30 @@
           <input id="solapi-api-secret" name="api_secret" type="password" placeholder="{% if solapi.has_api_secret %}저장됨 · 변경할 때만 입력{% else %}API Secret 입력{% endif %}">
           <span class="solapi-help">서명 생성에만 사용하며 브라우저나 계약자 화면에 노출하지 않습니다.</span>
         </div>
-        <div class="solapi-field"><label for="solapi-pf-id">SOLAPI_PF_ID</label><input id="solapi-pf-id" name="pf_id" value="{{ solapi.pf_id }}" maxlength="120" required placeholder="카카오 채널 연동 ID"></div>
-        <div class="solapi-field"><label for="solapi-template-id">SOLAPI_TEMPLATE_ID</label><input id="solapi-template-id" name="template_id" value="{{ solapi.template_id }}" maxlength="120" required placeholder="승인된 알림톡 템플릿 ID"></div>
+        <div class="solapi-field">
+          <label for="solapi-pf-id">SOLAPI_PF_ID</label>
+          <input id="solapi-pf-id" name="pf_id" value="{{ solapi.pf_id }}" maxlength="120" placeholder="카카오 채널 연동 ID">
+          <span class="solapi-help">알림톡(인증전자계약)에만 사용합니다. 문자만 쓰면 비워 두세요.</span>
+        </div>
+        <div class="solapi-field">
+          <label for="solapi-template-id">SOLAPI_TEMPLATE_ID</label>
+          <input id="solapi-template-id" name="template_id" value="{{ solapi.template_id }}" maxlength="120" placeholder="승인된 알림톡 템플릿 ID">
+          <span class="solapi-help">알림톡(인증전자계약)에만 사용합니다. 문자만 쓰면 비워 두세요.</span>
+        </div>
         <div class="solapi-field full">
           <label for="solapi-from">SOLAPI_FROM</label>
           <input id="solapi-from" name="from_number" value="{{ solapi.from_number }}" inputmode="tel" maxlength="20" required placeholder="회사 발신번호">
           <span class="solapi-help">솔라피에서 사전 등록·인증한 발신번호를 입력하세요. 하이픈은 저장할 때 제거됩니다.</span>
+        </div>
+        <div class="solapi-field">
+          <label for="solapi-origin">공개 링크 기본 주소</label>
+          <input id="solapi-origin" name="public_origin" value="{{ solapi.public_origin }}" maxlength="200" placeholder="https://works.saedam.org">
+          <span class="solapi-help">설문조사 URL 문자에 담을 주소입니다. 경로 없이 https://도메인 까지만 입력하세요.</span>
+        </div>
+        <div class="solapi-field">
+          <label for="solapi-sender-name">문자 발신 기관명</label>
+          <input id="solapi-sender-name" name="sender_name" value="{{ solapi.sender_name }}" maxlength="30" placeholder="새담">
+          <span class="solapi-help">설문 문자 앞머리 <code>[기관명]</code>과 LMS 제목에 사용합니다.</span>
         </div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:.8rem;color:var(--text-gray,#64748b)"><input type="checkbox" name="clear_credentials" value="1" style="width:auto"> 저장된 API KEY·SECRET을 지우고 입력값 또는 Render 환경변수를 사용</label>
@@ -55,7 +76,9 @@
       <b>발송 규칙</b><br>
       계약대상자에게 휴대폰번호가 있으면 알림톡으로 계약 링크를 발송하고 인증번호는 SMS로 보냅니다. 휴대폰번호 없이 이메일만 있으면 기존 이메일 링크와 이메일 인증을 사용합니다.<br><br>
       <b>알림톡 템플릿 변수</b><br>
-      승인 템플릿에는 계약자 이름 변수 <code>#{이름}</code>과 계약 링크 변수 <code>#{url}</code>을 사용하세요. 웹링크 버튼명은 <code>전자계약서보기</code>이며 모바일·PC 링크에는 모두 <code>https://#{url}</code>을 지정합니다. 시스템이 <code>#{url}</code>에 https://를 제외한 주소를 넣습니다. 본문·강조문구·버튼은 솔라피에 승인된 템플릿을 그대로 사용합니다. 계약 등록과 발송은 <a href="https://works.saedam.org">works.saedam.org</a>에서 진행해 주세요. 알림톡 실패 시에는 솔라피의 문자 대체발송 설정이 적용됩니다.
+      승인 템플릿에는 계약자 이름 변수 <code>#{이름}</code>과 계약 링크 변수 <code>#{url}</code>을 사용하세요. 웹링크 버튼명은 <code>전자계약서보기</code>이며 모바일·PC 링크에는 모두 <code>https://#{url}</code>을 지정합니다. 시스템이 <code>#{url}</code>에 https://를 제외한 주소를 넣습니다. 본문·강조문구·버튼은 솔라피에 승인된 템플릿을 그대로 사용합니다. 계약 등록과 발송은 <a href="https://works.saedam.org">works.saedam.org</a>에서 진행해 주세요. 알림톡 실패 시에는 솔라피의 문자 대체발송 설정이 적용됩니다.<br><br>
+      <b>설문조사 문자</b><br>
+      학교관리 &gt; 설문조사 메뉴는 알림톡 템플릿 없이 <code>API KEY · API SECRET · 발신번호</code>만으로 URL 문자를 보냅니다. 본문이 EUC-KR 90바이트를 넘으면 자동으로 LMS(장문)로 전환되며, 이때 제목에는 위의 <b>문자 발신 기관명</b>이 들어갑니다. 수신자에게 전달되는 설문 주소는 <b>공개 링크 기본 주소</b> + <code>/survey/r/…</code> 형태입니다.
     </div>
   </section>
 </div>

@@ -1035,13 +1035,14 @@
                         <!-- 3. 학교관리 메뉴 신설 (드롭다운 서브메뉴 추가) -->
                         {% if menu_access.get('school_group', true) %}
                         <li class="menu-item-wrapper dropdown">
-                            <a href="javascript:void(0);" class="menu-item {% if 'school' in request.path %}active{% endif %}">
+                            <a href="javascript:void(0);" class="menu-item {% if 'school' in request.path or request.path.startswith('/survey') %}active{% endif %}">
                                 <i class="fa-solid fa-school"></i> 학교관리
                             </a>
                             <div class="dropdown-content">
                                 {% if menu_access.get('school_workspace', true) %}<a href="/school"><i class="fa-solid fa-chalkboard-user"></i>학교업무공간</a>{% endif %}
                                 {% if menu_access.get('school_tasks', true) %}<a href="/school/tasks"><i class="fa-solid fa-list-check"></i>학교업무처리</a>{% endif %}
                                 {% if menu_access.get('school_calendar', true) %}<a href="/school/calendar"><i class="fa-solid fa-calendar-week"></i>학교일정표</a>{% endif %}
+                                {% if menu_access.get('school_survey', true) %}<a href="/survey/"><i class="fa-solid fa-square-poll-vertical"></i>설문조사</a>{% endif %}
                             </div>
                         </li>
                         {% endif %}
