@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --saedam-blue: var(--primary-color, #004ea2);
+        --border-color: var(--card-border, #e2e8f0);
+        --text-dark: var(--text-dark, #1e293b);
+        --text-gray: var(--text-gray, #64748b);
+    }
+    .survey-container {
+        width: 100%; min-height: 85vh; margin: 0 auto; padding: 30px;
+        background: var(--card-bg, #fff); border: 1px solid var(--border-color);
+        border-radius: 20px; box-shadow: var(--card-shadow, 0 10px 25px -5px rgba(0,0,0,.08));
+        font-family: 'Pretendard', sans-serif; box-sizing: border-box; position: relative; z-index: 2;
+    }
+    .page-header {
+        display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+        flex-wrap: wrap; margin-bottom: 22px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color);
+    }
+    .page-title { font-size: 1.7rem; font-weight: 800; color: var(--text-dark); margin: 0; letter-spacing: -.5px; }
+    .page-sub { margin: 6px 0 0; color: var(--text-gray); font-size: .86rem; }
+    .btn {
+        border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-dark);
+        border-radius: 9px; padding: 9px 16px; font-weight: 700; font-size: .86rem; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--saedam-blue); color: var(--saedam-blue); }
+    .btn.primary { background: var(--saedam-blue); border-color: var(--saedam-blue); color: #fff; }
+
+    .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .stat-box {
+        flex: 1 1 150px; border: 1px solid var(--border-color); border-radius: 12px;
+        padding: 16px 18px; background: var(--widget-bg, #f8fafc);
+    }
+    .stat-box b { display: block; font-size: 1.7rem; color: var(--saedam-blue); font-variant-numeric: tabular-nums; }
+    .stat-box span { font-size: .79rem; color: var(--text-gray); font-weight: 700; }
+
+    .q-block {
+        border: 1px solid var(--border-color); border-radius: 14px; padding: 20px;
+        margin-bottom: 16px; background: var(--card-bg, #fff);
+    }
+    .q-block h3 { margin: 0 0 4px; font-size: 1.02rem; color: var(--text-dark); line-height: 1.5; }
+    .q-meta { font-size: .78rem; color: var(--text-gray); font-weight: 700; margin-bottom: 16px; }
+    .q-meta .avg { color: var(--saedam-blue); }
+
+    .bar-row { display: grid; grid-template-columns: minmax(90px, 190px) 1fr 96px; gap: 12px; align-items: center; margin-bottom: 9px; }
+    .bar-label { font-size: .86rem; color: var(--text-dark); font-weight: 700; word-break: keep-all; }
+    .bar-track { background: var(--widget-bg, #eef2f7); border-radius: 999px; height: 20px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--saedam-blue); min-width: 2px; transition: width .4s ease; }
+    .bar-value { font-size: .82rem; color: var(--text-gray); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    .text-list { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; }
+    .text-list li {
+        padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 9px;
+        margin-bottom: 7px; font-size: .88rem; line-height: 1.6; background: var(--widget-bg, #f8fafc);
+        white-space: pre-wrap; word-break: break-word;
+    }
+    .table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .table th, .table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); text-align: left; }
+    .table th { font-size: .78rem; color: var(--text-gray); font-weight: 800; white-space: nowrap; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .empty { padding: 46px 20px; text-align: center; color: var(--text-gray); }
+    @media (max-width: 820px) {
+        .survey-container { padding: 18px; }
+        .bar-row { grid-template-columns: 1fr; gap: 4px; }
+        .bar-value { text-align: left; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="survey-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-chart-pie"></i> <span id="headTitle">설문 결과 및 통계</span></h1>
+            <p class="page-sub" id="headSub">응답 현황과 문항별 집계를 확인합니다.</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn" onclick="location.href='/survey/'"><i class="fa-solid fa-list"></i> 목록</button>
+            <button type="button" class="btn" id="editBtn" style="display:none"><i class="fa-solid fa-pen"></i> 편집·발송</button>
+            <button type="button" class="btn primary" id="exportBtn"><i class="fa-solid fa-file-excel"></i> 엑셀 내려받기</button>
+        </div>
+    </div>
+
+    <div class="stat-row">
+        <div class="stat-box"><b id="cntSent">0</b><span>문자 발송</span></div>
+        <div class="stat-box"><b id="cntResponses">0</b><span>수집 응답</span></div>
+        <div class="stat-box"><b id="cntRate">0%</b><span>응답률</span></div>
+        <div class="stat-box"><b id="cntRecipients">0</b><span>등록 수신자</span></div>
+    </div>
+
+    <h3 style="margin:0 0 12px;font-size:1.05rem;color:var(--text-dark)">문항별 집계</h3>
+    <div id="statsBox"></div>
+
+    <h3 style="margin:28px 0 10px;font-size:1.05rem;color:var(--text-dark)">응답 기록</h3>
+    <div style="overflow-x:auto">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:60px">번호</th>
+                    <th style="width:140px">이름</th>
+                    <th style="width:160px">휴대폰</th>
+                    <th>응답일시</th>
+                </tr>
+            </thead>
+            <tbody id="responseBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SURVEY_ID = {{ survey_id|int }};
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+async function load() {
+    const response = await fetch(`/survey/api/${SURVEY_ID}/stats`);
+    const data = await response.json();
+    if (!response.ok || data.status === 'error') {
+        alert(data.message || '결과를 불러오지 못했습니다.');
+        return;
+    }
+    const survey = data.survey;
+    document.getElementById('headTitle').textContent = survey.title;
+    document.title = survey.title + ' - 설문 결과';
+    document.getElementById('headSub').textContent =
+        `${survey.status_label} · 등록 ${survey.created_at} · 등록자 ${survey.created_by_name || '-'}`
+        + (survey.starts_on || survey.ends_on ? ` · 기간 ${survey.starts_on || '제한없음'} ~ ${survey.ends_on || '제한없음'}` : '');
+
+    if (survey.can_manage) {
+        const editBtn = document.getElementById('editBtn');
+        editBtn.style.display = '';
+        editBtn.onclick = () => { location.href = `/survey/${SURVEY_ID}/edit`; };
+    }
+    document.getElementById('exportBtn').onclick = () => { location.href = `/survey/${SURVEY_ID}/export`; };
+
+    document.getElementById('cntSent').textContent = data.summary.sent;
+    document.getElementById('cntResponses').textContent = data.summary.responses;
+    document.getElementById('cntRate').textContent = data.summary.rate + '%';
+    document.getElementById('cntRecipients').textContent = data.summary.recipients;
+
+    renderStats(data.stats || []);
+    renderResponses(data.responses || []);
+}
+
+function renderStats(stats) {
+    const box = document.getElementById('statsBox');
+    box.innerHTML = '';
+    if (!stats.length) {
+        box.innerHTML = '<div class="empty">집계할 문항이 없습니다.</div>';
+        return;
+    }
+    stats.forEach((entry, index) => {
+        const block = document.createElement('div');
+        block.className = 'q-block';
+        let meta = `${entry.qtype_label} · 응답 ${entry.answer_count}건`;
+        if (entry.average !== null && entry.average !== undefined) {
+            meta += ` · <span class="avg">평균 ${entry.average}점 / 5점</span>`;
+        }
+        let body = '';
+        if (entry.qtype === 'text') {
+            body = entry.texts.length
+                ? '<ul class="text-list">' + entry.texts.map(text => `<li>${escapeHtml(text)}</li>`).join('') + '</ul>'
+                : '<div class="empty" style="padding:22px">아직 주관식 응답이 없습니다.</div>';
+        } else if (!entry.options.length) {
+            body = '<div class="empty" style="padding:22px">집계할 보기가 없습니다.</div>';
+        } else {
+            const top = Math.max(...entry.options.map(option => option.count), 1);
+            body = entry.options.map(option => `
+                <div class="bar-row">
+                    <div class="bar-label">${escapeHtml(option.label)}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:${(option.count / top * 100).toFixed(1)}%"></div></div>
+                    <div class="bar-value">${option.count}명 (${option.ratio}%)</div>
+                </div>`).join('');
+        }
+        block.innerHTML = `<h3>${index + 1}. ${escapeHtml(entry.title)}</h3>
+            <div class="q-meta">${meta}</div>${body}`;
+        box.appendChild(block);
+    });
+}
+
+function renderResponses(items) {
+    const body = document.getElementById('responseBody');
+    body.innerHTML = '';
+    if (!items.length) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-gray);padding:26px">아직 수집된 응답이 없습니다.</td></tr>';
+        return;
+    }
+    items.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="num">${items.length - index}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="num">${escapeHtml(item.phone)}</td>
+            <td class="num">${escapeHtml(item.submitted_at)}</td>`;
+        body.appendChild(tr);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', load);
+</script>
+{% endblock %}

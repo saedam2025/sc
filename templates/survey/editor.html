@@ -1,0 +1,786 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --saedam-blue: var(--primary-color, #004ea2);
+        --border-color: var(--card-border, #e2e8f0);
+        --text-dark: var(--text-dark, #1e293b);
+        --text-gray: var(--text-gray, #64748b);
+    }
+    .survey-container {
+        width: 100%; min-height: 85vh; margin: 0 auto; padding: 30px;
+        background: var(--card-bg, #fff); border: 1px solid var(--border-color);
+        border-radius: 20px; box-shadow: var(--card-shadow, 0 10px 25px -5px rgba(0,0,0,.08));
+        font-family: 'Pretendard', sans-serif; box-sizing: border-box; position: relative; z-index: 2;
+    }
+    .page-header {
+        display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+        flex-wrap: wrap; margin-bottom: 22px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color);
+    }
+    .page-title { font-size: 1.7rem; font-weight: 800; color: var(--text-dark); margin: 0; letter-spacing: -.5px; }
+    .page-sub { margin: 6px 0 0; color: var(--text-gray); font-size: .86rem; }
+    .btn {
+        border: 1px solid var(--border-color); background: var(--input-bg, #fff); color: var(--text-dark);
+        border-radius: 9px; padding: 9px 16px; font-weight: 700; font-size: .86rem; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--saedam-blue); color: var(--saedam-blue); }
+    .btn.primary { background: var(--saedam-blue); border-color: var(--saedam-blue); color: #fff; }
+    .btn.primary:hover { opacity: .9; color: #fff; }
+    .btn.danger { color: #c0392b; }
+    .btn.danger:hover { border-color: #c0392b; color: #c0392b; }
+    .btn.small { padding: 6px 11px; font-size: .78rem; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; }
+    .tab {
+        border: 0; background: transparent; padding: 11px 18px; font-weight: 800; font-size: .92rem;
+        color: var(--text-gray); cursor: pointer; border-bottom: 3px solid transparent;
+    }
+    .tab.active { color: var(--saedam-blue); border-bottom-color: var(--saedam-blue); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+    .field label { font-size: .84rem; font-weight: 800; color: var(--text-dark); }
+    .field input[type=text], .field input[type=date], .field textarea, .field select {
+        width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid var(--border-color);
+        border-radius: 9px; background: var(--input-bg, #fff); color: var(--text-dark);
+        font-family: inherit; font-size: .92rem;
+    }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .hint { font-size: .77rem; color: var(--text-gray); line-height: 1.6; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+
+    .q-card {
+        border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;
+        margin-bottom: 12px; background: var(--widget-bg, #f8fafc);
+    }
+    .q-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .q-no {
+        width: 28px; height: 28px; border-radius: 50%; background: var(--saedam-blue); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: .82rem; flex: none;
+    }
+    .q-head input[type=text] { flex: 1 1 260px; }
+    .q-head select { width: 130px; flex: none; }
+    .q-opts { display: flex; flex-direction: column; gap: 7px; margin: 10px 0 0 38px; }
+    .q-opt { display: flex; gap: 7px; align-items: center; }
+    .q-opt input { flex: 1; padding: 8px 11px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg, #fff); color: var(--text-dark); }
+    .q-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .q-check { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-gray); font-weight: 700; }
+    .q-check input { width: auto; }
+
+    .table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .table th, .table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); text-align: left; }
+    .table th { font-size: .78rem; color: var(--text-gray); font-weight: 800; white-space: nowrap; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .chip { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+    .chip.ready { background: #f1f5f9; color: #475569; }
+    .chip.sent { background: #e6f4ea; color: #176b36; }
+    .chip.failed { background: #fdecea; color: #9e2525; }
+    .chip.done { background: #e7f0fb; color: #17457e; }
+
+    .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .stat-box {
+        flex: 1 1 140px; border: 1px solid var(--border-color); border-radius: 12px;
+        padding: 14px 16px; background: var(--widget-bg, #f8fafc);
+    }
+    .stat-box b { display: block; font-size: 1.5rem; color: var(--saedam-blue); font-variant-numeric: tabular-nums; }
+    .stat-box span { font-size: .78rem; color: var(--text-gray); font-weight: 700; }
+
+    .preview-box {
+        border: 1px dashed var(--border-color); border-radius: 12px; padding: 14px;
+        background: var(--widget-bg, #f8fafc); white-space: pre-wrap; word-break: break-all;
+        font-size: .88rem; line-height: 1.7; min-height: 60px;
+    }
+    .byte-meter { margin-top: 8px; }
+    .byte-bar {
+        position: relative; height: 10px; border-radius: 999px; overflow: hidden;
+        background: var(--widget-bg, #eef2f7); border: 1px solid var(--border-color);
+    }
+    .byte-fill { height: 100%; width: 0; min-width: 3px; background: #2e7d32; transition: width .2s ease, background .2s ease; }
+    .byte-fill.lms { background: #d98200; }
+    /* SMS -> LMS 전환 지점(90바이트)을 눈금으로 표시한다. 막대가 overflow:hidden이라 안쪽에 그린다. */
+    .byte-mark { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -2px; background: #c0392b; }
+    .byte-text { margin-top: 7px; font-size: .8rem; font-weight: 800; color: var(--text-dark); }
+    .byte-text .kind { display: inline-block; padding: 2px 9px; border-radius: 999px; margin-right: 7px; font-size: .74rem; }
+    .byte-text .kind.sms { background: #e6f4ea; color: #176b36; }
+    .byte-text .kind.lms { background: #fff3cd; color: #7a5b00; }
+    .byte-text small { display: block; margin-top: 4px; font-weight: 600; color: var(--text-gray); }
+    .msg { margin: 12px 0; padding: 12px 14px; border-radius: 9px; font-weight: 700; font-size: .86rem; display: none; }
+    .msg.error { background: #fff0f0; color: #9e2525; display: block; }
+    .msg.success { background: #e9f7ee; color: #176b36; display: block; }
+    .msg.warn { background: #fff8e1; color: #7a5b00; display: block; }
+    .sticky-actions {
+        position: sticky; bottom: 0; background: var(--card-bg, #fff); padding: 14px 0 2px;
+        border-top: 1px solid var(--border-color); margin-top: 20px;
+        display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+    }
+    @media (max-width: 820px) {
+        .survey-container { padding: 18px; }
+        .grid2 { grid-template-columns: 1fr; }
+        .q-opts { margin-left: 0; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="survey-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-square-poll-vertical"></i> <span id="headTitle">설문 만들기</span></h1>
+            <p class="page-sub">문항을 구성해 저장한 뒤, 수신자 탭에서 휴대폰번호를 등록하고 문자로 참여 URL을 보냅니다.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button type="button" class="btn" onclick="location.href='/survey/'"><i class="fa-solid fa-list"></i> 목록</button>
+            <button type="button" class="btn" id="resultBtn" style="display:none"><i class="fa-solid fa-chart-pie"></i> 결과·통계</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button type="button" class="tab active" data-panel="panelForm">1. 설문 내용</button>
+        <button type="button" class="tab" data-panel="panelSend" id="tabSend">2. 수신자 · 문자발송</button>
+    </div>
+
+    <div id="globalMsg" class="msg"></div>
+
+    <!-- 1. 설문 내용 -->
+    <section id="panelForm" class="panel active">
+        <div class="field">
+            <label for="title">설문 제목 <span style="color:#c0392b">*</span></label>
+            <input type="text" id="title" maxlength="200" placeholder="예) 2026학년도 방과후학교 만족도 조사">
+        </div>
+        <div class="field">
+            <label for="description">설문 설명</label>
+            <textarea id="description" maxlength="2000" placeholder="응답 화면 상단에 안내할 내용을 적어 주세요."></textarea>
+        </div>
+        <div class="grid2">
+            <div class="field">
+                <label for="startsOn">응답 시작일</label>
+                <input type="date" id="startsOn">
+                <span class="hint">비워 두면 마감 전까지 언제든 응답할 수 있습니다.</span>
+            </div>
+            <div class="field">
+                <label for="endsOn">응답 종료일</label>
+                <input type="date" id="endsOn">
+                <span class="hint">종료일이 지나면 링크를 열어도 응답할 수 없습니다.</span>
+            </div>
+        </div>
+        <div class="field">
+            <label class="q-check">
+                <input type="checkbox" id="allowPublicLink">
+                공용 링크로도 응답 허용 (문자를 받지 않은 사람도 주소만 알면 참여)
+            </label>
+            <span class="hint">체크하지 않으면 개인별로 발송된 주소로만 참여할 수 있어 중복 응답을 막을 수 있습니다.</span>
+        </div>
+
+        <h3 style="margin:26px 0 12px;font-size:1.05rem;color:var(--text-dark)">설문 문항</h3>
+        <div id="questionList"></div>
+        <div id="lockNotice" class="msg warn" style="display:none"></div>
+        <button type="button" class="btn" id="addQuestionBtn"><i class="fa-solid fa-plus"></i> 문항 추가</button>
+
+        <div class="sticky-actions">
+            <button type="button" class="btn primary" id="saveBtn"><i class="fa-solid fa-floppy-disk"></i> 저장</button>
+        </div>
+    </section>
+
+    <!-- 2. 수신자 · 문자발송 -->
+    <section id="panelSend" class="panel">
+        <div class="stat-row">
+            <div class="stat-box"><b id="cntRecipients">0</b><span>등록 수신자</span></div>
+            <div class="stat-box"><b id="cntSent">0</b><span>발송 완료</span></div>
+            <div class="stat-box"><b id="cntResponded">0</b><span>응답 완료</span></div>
+            <div class="stat-box"><b id="cntStatus">-</b><span>설문 상태</span></div>
+        </div>
+
+        <div id="smsMsg" class="msg"></div>
+
+        <div class="field">
+            <label for="recipientRaw">수신자 일괄 등록</label>
+            <textarea id="recipientRaw" style="min-height:120px" placeholder="한 줄에 한 명씩 입력하세요.&#10;010-1234-5678&#10;홍길동,010-2345-6789&#10;010-3456-7890,김새담"></textarea>
+            <span class="hint">번호만 넣거나 <b>이름,번호</b> 형태로 넣을 수 있습니다. 쉼표·탭·세로줄로 구분하며, 이미 등록된 번호는 자동으로 건너뜁니다.</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
+            <button type="button" class="btn primary" id="addRecipientBtn"><i class="fa-solid fa-user-plus"></i> 수신자 추가</button>
+            <button type="button" class="btn danger" id="clearRecipientBtn"><i class="fa-solid fa-user-minus"></i> 전체 삭제</button>
+        </div>
+
+        <div class="field">
+            <label for="smsTemplate">문자 내용</label>
+            <textarea id="smsTemplate" maxlength="500" style="min-height:90px"></textarea>
+            <div class="byte-meter">
+                <div class="byte-bar"><div class="byte-fill" id="byteFill"></div><div class="byte-mark" id="byteMark"></div></div>
+                <div class="byte-text" id="byteText"></div>
+            </div>
+            <span class="hint">
+                <b>{제목}</b>은 설문 제목, <b>{기관명}</b>은 솔라피설정의 발신 기관명, <b>{링크}</b>는 수신자별 응답 주소로 바뀝니다.
+                <b>{링크}</b>는 반드시 포함해야 합니다. 바이트는 치환된 실제 발송 내용 기준이며,
+                한글·기호는 2바이트, 영문·숫자·공백은 1바이트로 셉니다.
+            </span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <button type="button" class="btn" id="previewBtn"><i class="fa-regular fa-eye"></i> 문자 미리보기</button>
+            <button type="button" class="btn" id="copyLinkBtn"><i class="fa-regular fa-copy"></i> 공용 링크 복사</button>
+        </div>
+        <div class="preview-box" id="previewBox">문자 미리보기 버튼을 누르면 실제 발송될 내용을 확인할 수 있습니다.</div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 26px">
+            <button type="button" class="btn primary" id="sendBtn"><i class="fa-solid fa-paper-plane"></i> 미발송자에게 발송</button>
+            <button type="button" class="btn" id="resendBtn"><i class="fa-solid fa-rotate"></i> 전체 재발송</button>
+        </div>
+
+        <h3 style="margin:0 0 10px;font-size:1.05rem;color:var(--text-dark)">수신자 목록</h3>
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:34px"><input type="checkbox" id="checkAll"></th>
+                        <th style="width:50px">번호</th>
+                        <th style="width:110px">이름</th>
+                        <th style="width:140px">휴대폰</th>
+                        <th style="width:90px">발송</th>
+                        <th style="width:140px">발송일시</th>
+                        <th style="width:140px">응답일시</th>
+                        <th>비고</th>
+                        <th style="width:70px"></th>
+                    </tr>
+                </thead>
+                <tbody id="recipientBody"></tbody>
+            </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button type="button" class="btn small" id="sendSelectedBtn"><i class="fa-solid fa-paper-plane"></i> 선택 발송</button>
+            <button type="button" class="btn small danger" id="deleteSelectedBtn"><i class="fa-solid fa-trash"></i> 선택 삭제</button>
+        </div>
+
+        <h3 style="margin:28px 0 10px;font-size:1.05rem;color:var(--text-dark)">발송 기록</h3>
+        <div style="overflow-x:auto">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:160px">발송일시</th>
+                        <th style="width:120px">발송자</th>
+                        <th style="width:80px">대상</th>
+                        <th style="width:80px">성공</th>
+                        <th style="width:80px">실패</th>
+                        <th>비고</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody"></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SURVEY_ID_INITIAL = {{ survey_id|int }};
+const QTYPES = [
+    ['single', '단일선택'],
+    ['multiple', '복수선택'],
+    ['text', '주관식'],
+    ['scale', '5점 척도'],
+];
+const SEND_LABEL = { ready: '대기', sent: '발송', failed: '실패' };
+const STATUS_LABEL = { draft: '작성중', open: '진행중', closed: '마감' };
+
+let surveyId = SURVEY_ID_INITIAL;
+let questions = [];
+let questionsLocked = false;
+let publicLink = '';
+let defaultTemplate = '';
+let senderName = '새담';
+const SMS_BYTE_LIMIT = 90;
+const LMS_BYTE_LIMIT = 2000;
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+function showMessage(id, text, kind) {
+    const box = document.getElementById(id);
+    box.className = 'msg ' + (kind || 'success');
+    box.textContent = text;
+    if (kind !== 'error') {
+        setTimeout(() => { if (box.textContent === text) box.style.display = 'none'; }, 6000);
+    }
+}
+
+async function api(url, options) {
+    const response = await fetch(url, Object.assign({
+        headers: { 'Content-Type': 'application/json' }
+    }, options || {}));
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || '요청을 처리하지 못했습니다.');
+    }
+    return data;
+}
+
+/* ---------------- 문자 바이트 계산 ---------------- */
+// SOLAPI는 EUC-KR 기준 바이트로 SMS(90바이트)와 LMS를 나눈다.
+// 한글·전각기호는 2바이트, 영문·숫자·공백·줄바꿈은 1바이트다.
+function textBytes(text) {
+    let total = 0;
+    for (const char of String(text || '')) {
+        total += char.codePointAt(0) <= 0x7f ? 1 : 2;
+    }
+    return total;
+}
+
+// 저장 전에는 실제 주소를 모르므로 길이가 같은 예시 링크로 계산한다.
+function sampleLink() {
+    return publicLink || `${location.origin}/survey/r/${'x'.repeat(32)}`;
+}
+
+function renderTemplate(template) {
+    return String(template || '')
+        .replaceAll('{기관명}', senderName)
+        .replaceAll('{제목}', document.getElementById('title').value.trim() || '설문조사')
+        .replaceAll('{링크}', sampleLink())
+        .trim();
+}
+
+function updateByteMeter() {
+    const rendered = renderTemplate(document.getElementById('smsTemplate').value);
+    const bytes = textBytes(rendered);
+    const isLms = bytes > SMS_BYTE_LIMIT;
+    const limit = isLms ? LMS_BYTE_LIMIT : SMS_BYTE_LIMIT;
+
+    const fill = document.getElementById('byteFill');
+    fill.style.width = Math.min(100, bytes / limit * 100).toFixed(1) + '%';
+    fill.classList.toggle('lms', isLms);
+    // 전환 눈금: SMS 구간에서는 막대 끝(90바이트), LMS 구간에서는 90/2000 지점.
+    document.getElementById('byteMark').style.left =
+        (isLms ? SMS_BYTE_LIMIT / LMS_BYTE_LIMIT * 100 : 100).toFixed(1) + '%';
+
+    const detail = isLms
+        ? `<b>90바이트를 넘어 장문(LMS)으로 전환되었습니다.</b> 최대 ${LMS_BYTE_LIMIT}바이트까지 쓸 수 있고, `
+          + 'LMS 제목에는 솔라피설정의 발신 기관명이 들어갑니다.'
+        : `<b>90바이트를 넘으면 장문(LMS)으로 자동 전환됩니다.</b> `
+          + `단문으로 보내려면 ${SMS_BYTE_LIMIT - bytes}바이트 더 쓸 수 있습니다.`;
+    document.getElementById('byteText').innerHTML =
+        `<span class="kind ${isLms ? 'lms' : 'sms'}">${isLms ? 'LMS 장문' : 'SMS 단문'}</span>`
+        + `<span>${bytes} / ${limit}바이트</span>`
+        + `<small>${detail}</small>`
+        + `<small>이 가운데 응답 링크가 ${textBytes(sampleLink())}바이트를 차지합니다`
+        + `${publicLink ? '' : ' (저장하면 실제 주소로 다시 계산됩니다)'}.</small>`;
+}
+
+document.getElementById('smsTemplate').addEventListener('input', updateByteMeter);
+document.getElementById('title').addEventListener('input', updateByteMeter);
+
+/* ---------------- 문항 편집 ---------------- */
+function blankQuestion() {
+    return { qtype: 'single', title: '', options: ['', ''], is_required: true };
+}
+
+function renderQuestions() {
+    const wrap = document.getElementById('questionList');
+    wrap.innerHTML = '';
+    questions.forEach((question, index) => {
+        const card = document.createElement('div');
+        card.className = 'q-card';
+        const typeOptions = QTYPES.map(([value, label]) =>
+            `<option value="${value}"${question.qtype === value ? ' selected' : ''}>${label}</option>`).join('');
+        card.innerHTML = `
+            <div class="q-head">
+                <span class="q-no">${index + 1}</span>
+                <input type="text" maxlength="300" placeholder="질문 내용을 입력하세요"
+                       value="${escapeHtml(question.title)}" data-role="title" data-index="${index}">
+                <select data-role="qtype" data-index="${index}">${typeOptions}</select>
+            </div>
+            <div class="q-opts" data-role="options" data-index="${index}"></div>
+            <div class="q-foot">
+                <label class="q-check">
+                    <input type="checkbox" data-role="required" data-index="${index}" ${question.is_required ? 'checked' : ''}>
+                    필수 응답
+                </label>
+                <span style="display:flex;gap:6px">
+                    <button type="button" class="btn small" data-role="up" data-index="${index}"><i class="fa-solid fa-arrow-up"></i></button>
+                    <button type="button" class="btn small" data-role="down" data-index="${index}"><i class="fa-solid fa-arrow-down"></i></button>
+                    <button type="button" class="btn small danger" data-role="remove" data-index="${index}"><i class="fa-solid fa-trash"></i></button>
+                </span>
+            </div>`;
+        wrap.appendChild(card);
+        renderOptions(card.querySelector('[data-role=options]'), question, index);
+    });
+
+    wrap.querySelectorAll('input, select, button').forEach(el => { el.disabled = questionsLocked; });
+    document.getElementById('addQuestionBtn').disabled = questionsLocked;
+}
+
+function renderOptions(host, question, index) {
+    host.innerHTML = '';
+    if (question.qtype === 'text') {
+        host.innerHTML = '<span class="hint">응답자가 직접 입력하는 주관식 문항입니다.</span>';
+        return;
+    }
+    if (question.qtype === 'scale') {
+        host.innerHTML = '<span class="hint">보기: 매우 그렇다 / 그렇다 / 보통이다 / 아니다 / 전혀 아니다 (5→1점으로 평균 점수를 계산합니다)</span>';
+        return;
+    }
+    question.options.forEach((option, optionIndex) => {
+        const row = document.createElement('div');
+        row.className = 'q-opt';
+        row.innerHTML = `
+            <input type="text" maxlength="120" placeholder="보기 ${optionIndex + 1}" value="${escapeHtml(option)}"
+                   data-role="option" data-index="${index}" data-option="${optionIndex}">
+            <button type="button" class="btn small danger" data-role="option-remove" data-index="${index}" data-option="${optionIndex}">
+                <i class="fa-solid fa-xmark"></i>
+            </button>`;
+        host.appendChild(row);
+    });
+    const addRow = document.createElement('div');
+    addRow.innerHTML = `<button type="button" class="btn small" data-role="option-add" data-index="${index}">
+        <i class="fa-solid fa-plus"></i> 보기 추가</button>`;
+    host.appendChild(addRow);
+    if (questionsLocked) {
+        host.querySelectorAll('input, button').forEach(el => { el.disabled = true; });
+    }
+}
+
+document.getElementById('questionList').addEventListener('input', event => {
+    const target = event.target;
+    const index = Number(target.dataset.index);
+    if (Number.isNaN(index)) return;
+    if (target.dataset.role === 'title') questions[index].title = target.value;
+    if (target.dataset.role === 'option') questions[index].options[Number(target.dataset.option)] = target.value;
+    if (target.dataset.role === 'required') questions[index].is_required = target.checked;
+});
+
+document.getElementById('questionList').addEventListener('change', event => {
+    const target = event.target;
+    if (target.dataset.role !== 'qtype') return;
+    const index = Number(target.dataset.index);
+    questions[index].qtype = target.value;
+    if ((target.value === 'single' || target.value === 'multiple') && questions[index].options.length < 2) {
+        questions[index].options = ['', ''];
+    }
+    renderQuestions();
+});
+
+document.getElementById('questionList').addEventListener('click', event => {
+    const target = event.target.closest('button');
+    if (!target) return;
+    const index = Number(target.dataset.index);
+    const role = target.dataset.role;
+    if (Number.isNaN(index)) return;
+    if (role === 'remove') {
+        if (questions.length <= 1) { alert('문항은 1개 이상 있어야 합니다.'); return; }
+        questions.splice(index, 1);
+    } else if (role === 'up' && index > 0) {
+        [questions[index - 1], questions[index]] = [questions[index], questions[index - 1]];
+    } else if (role === 'down' && index < questions.length - 1) {
+        [questions[index + 1], questions[index]] = [questions[index], questions[index + 1]];
+    } else if (role === 'option-add') {
+        questions[index].options.push('');
+    } else if (role === 'option-remove') {
+        if (questions[index].options.length <= 2) { alert('보기는 2개 이상이어야 합니다.'); return; }
+        questions[index].options.splice(Number(target.dataset.option), 1);
+    } else {
+        return;
+    }
+    renderQuestions();
+});
+
+document.getElementById('addQuestionBtn').addEventListener('click', () => {
+    questions.push(blankQuestion());
+    renderQuestions();
+});
+
+/* ---------------- 저장 / 불러오기 ---------------- */
+document.getElementById('saveBtn').addEventListener('click', async () => {
+    const button = document.getElementById('saveBtn');
+    button.disabled = true;
+    try {
+        const data = await api('/survey/api/save', {
+            method: 'POST',
+            body: JSON.stringify({
+                id: surveyId || null,
+                title: document.getElementById('title').value.trim(),
+                description: document.getElementById('description').value.trim(),
+                starts_on: document.getElementById('startsOn').value,
+                ends_on: document.getElementById('endsOn').value,
+                allow_public_link: document.getElementById('allowPublicLink').checked,
+                sms_template: document.getElementById('smsTemplate').value.trim() || defaultTemplate,
+                questions: questions.map(question => ({
+                    qtype: question.qtype,
+                    title: question.title,
+                    options: question.options,
+                    is_required: question.is_required ? 1 : 0,
+                })),
+            }),
+        });
+        const isNew = !surveyId;
+        surveyId = data.id;
+        showMessage('globalMsg', '설문을 저장했습니다.', 'success');
+        if (isNew) history.replaceState(null, '', `/survey/${surveyId}/edit`);
+        await loadSurvey();
+    } catch (error) {
+        showMessage('globalMsg', error.message, 'error');
+    } finally {
+        button.disabled = false;
+    }
+});
+
+async function loadSurvey() {
+    if (!surveyId) {
+        questions = [blankQuestion()];
+        document.getElementById('smsTemplate').value = '[{기관명}] {제목} 설문에 참여해 주세요.\n{링크}';
+        defaultTemplate = document.getElementById('smsTemplate').value;
+        renderQuestions();
+        updateByteMeter();
+        return;
+    }
+    const data = await api(`/survey/api/${surveyId}`);
+    const survey = data.survey;
+    defaultTemplate = data.default_template;
+    publicLink = survey.public_link;
+    senderName = data.sender_name || senderName;
+
+    document.getElementById('headTitle').textContent = '설문 편집';
+    document.title = survey.title + ' - 설문조사';
+    document.getElementById('title').value = survey.title;
+    document.getElementById('description').value = survey.description;
+    document.getElementById('startsOn').value = survey.starts_on;
+    document.getElementById('endsOn').value = survey.ends_on;
+    document.getElementById('allowPublicLink').checked = survey.allow_public_link;
+    document.getElementById('smsTemplate').value = survey.sms_template;
+
+    const resultBtn = document.getElementById('resultBtn');
+    resultBtn.style.display = '';
+    resultBtn.onclick = () => { location.href = `/survey/${surveyId}/result`; };
+
+    questions = survey.questions.map(question => ({
+        qtype: question.qtype,
+        title: question.title,
+        options: question.options.length ? question.options.slice() : ['', ''],
+        is_required: question.is_required,
+    }));
+    if (!questions.length) questions = [blankQuestion()];
+
+    questionsLocked = survey.response_count > 0;
+    const lockNotice = document.getElementById('lockNotice');
+    if (questionsLocked) {
+        lockNotice.style.display = 'block';
+        lockNotice.className = 'msg warn';
+        lockNotice.textContent = `이미 ${survey.response_count}건의 응답이 수집되어 문항은 잠겼습니다. `
+            + '제목·기간·문자 내용은 계속 수정할 수 있고, 문항을 바꾸려면 목록에서 복제해 새 설문으로 진행하세요.';
+    } else {
+        lockNotice.style.display = 'none';
+    }
+    renderQuestions();
+
+    document.getElementById('cntRecipients').textContent = survey.recipient_count;
+    document.getElementById('cntSent').textContent = survey.sent_count;
+    document.getElementById('cntResponded').textContent = survey.response_count;
+    document.getElementById('cntStatus').textContent = STATUS_LABEL[survey.status] || survey.status;
+
+    if (!data.sms_ready) {
+        showMessage('smsMsg',
+            '통합관리 > 솔라피설정에서 API KEY·API SECRET·발신번호를 먼저 저장해야 문자를 보낼 수 있습니다.', 'warn');
+    }
+    renderRecipients(data.recipients || []);
+    renderLogs(data.send_logs || []);
+    updateByteMeter();
+}
+
+function renderRecipients(items) {
+    const body = document.getElementById('recipientBody');
+    body.innerHTML = '';
+    if (!items.length) {
+        body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-gray);padding:26px">등록된 수신자가 없습니다.</td></tr>';
+        return;
+    }
+    items.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="checkbox" class="recipient-check" value="${item.id}"></td>
+            <td class="num">${index + 1}</td>
+            <td>${escapeHtml(item.name || '-')}</td>
+            <td class="num">${escapeHtml(item.phone)}</td>
+            <td><span class="chip ${item.send_status}">${SEND_LABEL[item.send_status] || item.send_status}</span></td>
+            <td class="num">${escapeHtml(item.sent_at || '-')}</td>
+            <td>${item.responded_at ? `<span class="chip done">${escapeHtml(item.responded_at)}</span>` : '<span style="color:var(--text-gray)">미응답</span>'}</td>
+            <td style="color:#9e2525;font-size:.8rem">${escapeHtml(item.send_error || '')}</td>
+            <td><button type="button" class="btn small" onclick="copyText('${item.link}')"><i class="fa-regular fa-copy"></i></button></td>`;
+        body.appendChild(tr);
+    });
+}
+
+function renderLogs(items) {
+    const body = document.getElementById('logBody');
+    body.innerHTML = '';
+    if (!items.length) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-gray);padding:22px">발송 기록이 없습니다.</td></tr>';
+        return;
+    }
+    items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="num">${escapeHtml(item.created_at)}</td>
+            <td>${escapeHtml(item.sent_by || '-')}</td>
+            <td class="num">${item.total}건</td>
+            <td class="num" style="color:#176b36;font-weight:800">${item.success}건</td>
+            <td class="num" style="color:#9e2525;font-weight:800">${item.failed}건</td>
+            <td>${escapeHtml(item.memo || '')}</td>`;
+        body.appendChild(tr);
+    });
+}
+
+function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => alert('링크를 복사했습니다.'));
+        return;
+    }
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand('copy');
+    helper.remove();
+    alert('링크를 복사했습니다.');
+}
+
+/* ---------------- 수신자 / 발송 ---------------- */
+function requireSaved() {
+    if (!surveyId) {
+        showMessage('globalMsg', '먼저 [1. 설문 내용] 탭에서 설문을 저장해 주세요.', 'error');
+        return false;
+    }
+    return true;
+}
+
+function selectedRecipientIds() {
+    return Array.from(document.querySelectorAll('.recipient-check:checked')).map(el => Number(el.value));
+}
+
+document.getElementById('checkAll').addEventListener('change', event => {
+    document.querySelectorAll('.recipient-check').forEach(el => { el.checked = event.target.checked; });
+});
+
+document.getElementById('addRecipientBtn').addEventListener('click', async () => {
+    if (!requireSaved()) return;
+    const raw = document.getElementById('recipientRaw').value.trim();
+    if (!raw) { showMessage('smsMsg', '등록할 휴대폰번호를 입력해 주세요.', 'error'); return; }
+    try {
+        const data = await api(`/survey/api/${surveyId}/recipients`, {
+            method: 'POST', body: JSON.stringify({ raw }),
+        });
+        document.getElementById('recipientRaw').value = (data.errors || []).join('\n');
+        let text = `${data.added}명을 추가했습니다.`;
+        if (data.skipped) text += ` 이미 등록된 ${data.skipped}명은 건너뛰었습니다.`;
+        if ((data.errors || []).length) text += ` 형식이 잘못된 ${data.errors.length}줄은 입력칸에 남겨 두었습니다.`;
+        showMessage('smsMsg', text, (data.errors || []).length ? 'warn' : 'success');
+        await loadSurvey();
+    } catch (error) {
+        showMessage('smsMsg', error.message, 'error');
+    }
+});
+
+document.getElementById('clearRecipientBtn').addEventListener('click', async () => {
+    if (!requireSaved()) return;
+    if (!confirm('등록된 수신자를 모두 삭제할까요? 발송 상태 기록도 함께 사라집니다.')) return;
+    try {
+        const data = await api(`/survey/api/${surveyId}/recipients/delete`, {
+            method: 'POST', body: JSON.stringify({ all: true }),
+        });
+        showMessage('smsMsg', `수신자 ${data.deleted}명을 삭제했습니다.`, 'success');
+        await loadSurvey();
+    } catch (error) { showMessage('smsMsg', error.message, 'error'); }
+});
+
+document.getElementById('deleteSelectedBtn').addEventListener('click', async () => {
+    if (!requireSaved()) return;
+    const ids = selectedRecipientIds();
+    if (!ids.length) { showMessage('smsMsg', '삭제할 수신자를 선택해 주세요.', 'error'); return; }
+    if (!confirm(`선택한 ${ids.length}명을 삭제할까요?`)) return;
+    try {
+        const data = await api(`/survey/api/${surveyId}/recipients/delete`, {
+            method: 'POST', body: JSON.stringify({ ids }),
+        });
+        showMessage('smsMsg', `수신자 ${data.deleted}명을 삭제했습니다.`, 'success');
+        await loadSurvey();
+    } catch (error) { showMessage('smsMsg', error.message, 'error'); }
+});
+
+document.getElementById('previewBtn').addEventListener('click', async () => {
+    if (!requireSaved()) return;
+    try {
+        const data = await api(`/survey/api/${surveyId}/preview`, {
+            method: 'POST',
+            body: JSON.stringify({ sms_template: document.getElementById('smsTemplate').value.trim() }),
+        });
+        document.getElementById('previewBox').textContent =
+            `[${data.message_type} · ${data.bytes}바이트 · 실제 발송 기준]\n\n${data.text}`;
+    } catch (error) { showMessage('smsMsg', error.message, 'error'); }
+});
+
+document.getElementById('copyLinkBtn').addEventListener('click', () => {
+    if (!requireSaved()) return;
+    if (!publicLink) { showMessage('smsMsg', '링크를 불러오지 못했습니다.', 'error'); return; }
+    if (!document.getElementById('allowPublicLink').checked) {
+        if (!confirm('공용 링크 응답이 꺼져 있어 이 주소로는 응답할 수 없습니다. 그래도 복사할까요?')) return;
+    }
+    copyText(publicLink);
+});
+
+async function sendSurvey(options) {
+    if (!requireSaved()) return;
+    const buttons = ['sendBtn', 'resendBtn', 'sendSelectedBtn'].map(id => document.getElementById(id));
+    buttons.forEach(button => { button.disabled = true; });
+    try {
+        const data = await api(`/survey/api/${surveyId}/send`, {
+            method: 'POST', body: JSON.stringify(options),
+        });
+        let text = `총 ${data.total}건 중 ${data.success}건 접수, ${data.failed}건 실패했습니다.`;
+        if (data.failed && (data.failures || []).length) {
+            text += '\n실패: ' + data.failures.map(item => `${item.phone} (${item.error})`).join(' / ');
+        }
+        showMessage('smsMsg', text, data.failed ? 'warn' : 'success');
+        await loadSurvey();
+    } catch (error) {
+        showMessage('smsMsg', error.message, 'error');
+    } finally {
+        buttons.forEach(button => { button.disabled = false; });
+    }
+}
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+    if (!confirm('아직 발송하지 않은 수신자에게 설문 문자를 보낼까요?\n문자 발송 비용이 발생합니다.')) return;
+    sendSurvey({});
+});
+
+document.getElementById('resendBtn').addEventListener('click', () => {
+    if (!confirm('이미 발송한 사람을 포함해 전체에게 다시 보낼까요?\n중복 수신과 문자 발송 비용이 발생합니다.')) return;
+    sendSurvey({ resend: true });
+});
+
+document.getElementById('sendSelectedBtn').addEventListener('click', () => {
+    const ids = selectedRecipientIds();
+    if (!ids.length) { showMessage('smsMsg', '발송할 수신자를 선택해 주세요.', 'error'); return; }
+    if (!confirm(`선택한 ${ids.length}명에게 설문 문자를 보낼까요?\n문자 발송 비용이 발생합니다.`)) return;
+    sendSurvey({ ids });
+});
+
+/* ---------------- 탭 ---------------- */
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        if (tab.id === 'tabSend' && !requireSaved()) return;
+        document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.panel).classList.add('active');
+    });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadSurvey().catch(error => showMessage('globalMsg', error.message, 'error'));
+});
+</script>
+{% endblock %}

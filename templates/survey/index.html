@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --saedam-blue: var(--primary-color, #004ea2);
+        --border-color: var(--card-border, #e2e8f0);
+        --text-dark: var(--text-dark, #1e293b);
+        --text-gray: var(--text-gray, #64748b);
+    }
+    .survey-container {
+        width: 100%;
+        min-height: 85vh;
+        margin: 0 auto;
+        padding: 30px;
+        background: var(--card-bg, #fff);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        box-shadow: var(--card-shadow, 0 10px 25px -5px rgba(0,0,0,.08));
+        font-family: 'Pretendard', sans-serif;
+        box-sizing: border-box;
+        position: relative;
+        z-index: 2;
+    }
+    .page-header {
+        display: flex; justify-content: space-between; align-items: flex-end;
+        gap: 16px; flex-wrap: wrap;
+        margin-bottom: 22px; padding-bottom: 15px;
+        border-bottom: 2px solid var(--border-color);
+    }
+    .page-title { font-size: 1.8rem; font-weight: 800; color: var(--text-dark); margin: 0; letter-spacing: -.5px; }
+    .page-sub { margin: 6px 0 0; color: var(--text-gray); font-size: .88rem; }
+    .btn {
+        border: 1px solid var(--border-color); background: var(--input-bg, #fff);
+        color: var(--text-dark); border-radius: 9px; padding: 9px 16px;
+        font-weight: 700; font-size: .86rem; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--saedam-blue); color: var(--saedam-blue); }
+    .btn.primary { background: var(--saedam-blue); border-color: var(--saedam-blue); color: #fff; }
+    .btn.primary:hover { opacity: .9; color: #fff; }
+    .btn.danger { color: #c0392b; }
+    .btn.danger:hover { border-color: #c0392b; color: #c0392b; }
+    .btn.small { padding: 6px 11px; font-size: .78rem; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+    .toolbar input[type=search], .toolbar select {
+        padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 9px;
+        background: var(--input-bg, #fff); color: var(--text-dark); font-size: .88rem;
+    }
+    .toolbar input[type=search] { min-width: 240px; }
+    .survey-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .survey-table th, .survey-table td {
+        padding: 13px 10px; border-bottom: 1px solid var(--border-color); text-align: left;
+        vertical-align: middle;
+    }
+    .survey-table th { font-size: .8rem; color: var(--text-gray); font-weight: 800; white-space: nowrap; }
+    .survey-table tbody tr:hover { background: var(--widget-hover, rgba(0,78,162,.05)); }
+    .survey-title { font-weight: 800; color: var(--text-dark); }
+    .survey-desc { display: block; margin-top: 3px; color: var(--text-gray); font-size: .8rem; }
+    .chip {
+        display: inline-block; padding: 4px 10px; border-radius: 999px;
+        font-size: .74rem; font-weight: 800; white-space: nowrap;
+    }
+    .chip.draft { background: #f1f5f9; color: #475569; }
+    .chip.open { background: #e6f4ea; color: #176b36; }
+    .chip.closed { background: #fdecea; color: #9e2525; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .empty { padding: 60px 20px; text-align: center; color: var(--text-gray); }
+    .empty i { font-size: 2.4rem; display: block; margin-bottom: 12px; opacity: .5; }
+    .notice-bar {
+        margin-bottom: 16px; padding: 12px 15px; border-radius: 10px;
+        background: #fff8e1; color: #7a5b00; font-size: .84rem; font-weight: 600;
+    }
+    @media (max-width: 820px) {
+        .survey-container { padding: 18px; }
+        .survey-table thead { display: none; }
+        .survey-table, .survey-table tbody, .survey-table tr, .survey-table td { display: block; width: 100%; }
+        .survey-table tr { border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 12px; padding: 8px; }
+        .survey-table td { border: 0; padding: 6px 8px; }
+        .row-actions { justify-content: flex-start; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="survey-container">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-square-poll-vertical"></i> 설문조사</h1>
+            <p class="page-sub">설문을 만들고 수신자 휴대폰번호로 참여 URL 문자를 보낸 뒤, 결과와 통계를 확인합니다.</p>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button type="button" class="btn primary" onclick="location.href='/survey/new'">
+                <i class="fa-solid fa-plus"></i> 설문 만들기
+            </button>
+        </div>
+    </div>
+
+    <div id="smsNotice" class="notice-bar" style="display:none">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        문자 발송 설정이 없습니다. <b>통합관리 &gt; 솔라피설정</b>에서 API KEY·API SECRET·발신번호를 저장해 주세요.
+    </div>
+
+    <div class="toolbar">
+        <input type="search" id="keyword" placeholder="설문 제목·설명 검색" onkeydown="if(event.key==='Enter')loadList()">
+        <select id="statusFilter" onchange="loadList()">
+            <option value="">전체 상태</option>
+            <option value="draft">작성중</option>
+            <option value="open">진행중</option>
+            <option value="closed">마감</option>
+        </select>
+        <button type="button" class="btn" onclick="loadList()"><i class="fa-solid fa-magnifying-glass"></i> 검색</button>
+    </div>
+
+    <div style="overflow-x:auto">
+        <table class="survey-table">
+            <thead>
+                <tr>
+                    <th style="width:60px">번호</th>
+                    <th>제목</th>
+                    <th style="width:90px">상태</th>
+                    <th style="width:110px">수신자</th>
+                    <th style="width:90px">응답</th>
+                    <th style="width:110px">등록자</th>
+                    <th style="width:120px">등록일</th>
+                    <th style="width:280px"></th>
+                </tr>
+            </thead>
+            <tbody id="surveyBody"></tbody>
+        </table>
+    </div>
+    <div id="emptyBox" class="empty" style="display:none">
+        <i class="fa-regular fa-clipboard"></i>
+        등록된 설문이 없습니다. 오른쪽 위 <b>설문 만들기</b>로 첫 설문을 등록해 보세요.
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STATUS_LABEL = { draft: '작성중', open: '진행중', closed: '마감' };
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
+}
+
+async function api(url, options) {
+    const response = await fetch(url, Object.assign({
+        headers: { 'Content-Type': 'application/json' }
+    }, options || {}));
+    let data = {};
+    try { data = await response.json(); } catch (e) { data = {}; }
+    if (!response.ok || data.status === 'error') {
+        throw new Error(data.message || '요청을 처리하지 못했습니다.');
+    }
+    return data;
+}
+
+async function loadList() {
+    const keyword = document.getElementById('keyword').value.trim();
+    const status = document.getElementById('statusFilter').value;
+    const params = new URLSearchParams();
+    if (keyword) params.set('q', keyword);
+    if (status) params.set('status', status);
+    try {
+        const data = await api('/survey/api/list?' + params.toString());
+        document.getElementById('smsNotice').style.display = data.sms_ready ? 'none' : 'block';
+        renderList(data.items || []);
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function renderList(items) {
+    const body = document.getElementById('surveyBody');
+    const empty = document.getElementById('emptyBox');
+    body.innerHTML = '';
+    empty.style.display = items.length ? 'none' : 'block';
+
+    items.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        const manage = item.can_manage;
+        tr.innerHTML = `
+            <td class="num">${items.length - index}</td>
+            <td>
+                <span class="survey-title">${escapeHtml(item.title)}</span>
+                ${item.description ? `<span class="survey-desc">${escapeHtml(item.description).slice(0, 120)}</span>` : ''}
+                ${item.starts_on || item.ends_on ? `<span class="survey-desc"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.starts_on || '제한없음')} ~ ${escapeHtml(item.ends_on || '제한없음')}</span>` : ''}
+            </td>
+            <td><span class="chip ${item.status}">${STATUS_LABEL[item.status] || item.status}</span></td>
+            <td class="num">${item.sent_count} / ${item.recipient_count}명</td>
+            <td class="num">${item.response_count}건</td>
+            <td>${escapeHtml(item.created_by_name || '-')}</td>
+            <td class="num">${escapeHtml(item.created_at)}</td>
+            <td>
+                <div class="row-actions">
+                    <button type="button" class="btn small" onclick="location.href='/survey/${item.id}/result'">
+                        <i class="fa-solid fa-chart-pie"></i> 결과·통계
+                    </button>
+                    ${manage ? `<button type="button" class="btn small" onclick="location.href='/survey/${item.id}/edit'">
+                        <i class="fa-solid fa-pen"></i> 편집·발송
+                    </button>` : ''}
+                    ${manage ? `<button type="button" class="btn small" onclick="toggleStatus(${item.id}, '${item.status}')">
+                        ${item.status === 'closed' ? '<i class="fa-solid fa-rotate-left"></i> 재개' : '<i class="fa-solid fa-flag-checkered"></i> 마감'}
+                    </button>` : ''}
+                    <button type="button" class="btn small" onclick="duplicateSurvey(${item.id})">
+                        <i class="fa-regular fa-copy"></i> 복제
+                    </button>
+                    ${manage ? `<button type="button" class="btn small danger" onclick="removeSurvey(${item.id}, '${escapeHtml(item.title).replaceAll("'", '&#039;')}')">
+                        <i class="fa-solid fa-trash"></i> 삭제
+                    </button>` : ''}
+                </div>
+            </td>`;
+        body.appendChild(tr);
+    });
+}
+
+async function toggleStatus(id, current) {
+    const next = current === 'closed' ? 'open' : 'closed';
+    if (!confirm(next === 'closed' ? '이 설문을 마감할까요? 마감하면 응답을 받지 않습니다.' : '이 설문을 다시 진행중으로 바꿀까요?')) return;
+    try {
+        await api(`/survey/api/${id}/status`, { method: 'POST', body: JSON.stringify({ status: next }) });
+        loadList();
+    } catch (error) { alert(error.message); }
+}
+
+async function duplicateSurvey(id) {
+    if (!confirm('문항을 그대로 복사해 새 설문을 만들까요? 수신자와 응답은 복사하지 않습니다.')) return;
+    try {
+        const data = await api(`/survey/api/${id}/duplicate`, { method: 'POST' });
+        location.href = `/survey/${data.id}/edit`;
+    } catch (error) { alert(error.message); }
+}
+
+async function removeSurvey(id, title) {
+    if (!confirm(`'${title}' 설문을 삭제할까요?\n수신자 목록과 수집된 응답·통계가 모두 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    try {
+        await api(`/survey/api/${id}/delete`, { method: 'POST' });
+        loadList();
+    } catch (error) { alert(error.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadList);
+</script>
+{% endblock %}

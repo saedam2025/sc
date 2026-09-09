@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}</title>
+<link rel="icon" href="/static/favicon.ico">
+<style>
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 0 0 40px;
+        background: #eef2f7; color: #1e293b;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+        line-height: 1.6; -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 640px; margin: 0 auto; padding: 18px 14px; }
+    .head {
+        background: #004ea2; color: #fff; border-radius: 16px 16px 0 0;
+        padding: 26px 22px; margin-top: 12px;
+    }
+    .head h1 { margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1.45; word-break: keep-all; }
+    .head p { margin: 10px 0 0; font-size: .88rem; opacity: .92; white-space: pre-wrap; word-break: break-word; }
+    .head .period { margin-top: 12px; font-size: .78rem; opacity: .8; }
+    .card {
+        background: #fff; border-radius: 0 0 16px 16px; padding: 22px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+    }
+    .greet { font-size: .9rem; color: #475569; margin: 0 0 18px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
+    .q { padding: 18px 0; border-bottom: 1px solid #f1f5f9; }
+    .q:last-of-type { border-bottom: 0; }
+    .q-title { font-size: 1rem; font-weight: 800; margin: 0 0 12px; word-break: keep-all; }
+    .required { color: #c0392b; font-size: .85rem; margin-left: 3px; }
+    .opt { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border: 1px solid #e2e8f0;
+           border-radius: 10px; margin-bottom: 8px; cursor: pointer; font-size: .93rem; transition: all .15s; }
+    .opt:hover { border-color: #004ea2; }
+    .opt input { margin: 3px 0 0; width: 18px; height: 18px; flex: none; accent-color: #004ea2; }
+    .opt.checked { border-color: #004ea2; background: #f2f7fd; font-weight: 700; }
+    textarea {
+        width: 100%; min-height: 96px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px;
+        font-family: inherit; font-size: .95rem; resize: vertical; color: #1e293b;
+    }
+    .submit {
+        width: 100%; margin-top: 22px; padding: 15px; border: 0; border-radius: 12px;
+        background: #004ea2; color: #fff; font-size: 1.02rem; font-weight: 800; cursor: pointer;
+    }
+    .submit:disabled { background: #94a3b8; cursor: not-allowed; }
+    .notice {
+        background: #fff; border-radius: 16px; padding: 46px 24px; text-align: center;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, .08); margin-top: 24px;
+    }
+    .notice .icon { font-size: 3rem; margin-bottom: 14px; }
+    .notice p { margin: 0; font-size: 1rem; color: #475569; font-weight: 700; word-break: keep-all; }
+    .notice h2 { margin: 0 0 10px; font-size: 1.2rem; color: #1e293b; }
+    .error-box {
+        display: none; margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+        background: #fff0f0; color: #9e2525; font-size: .88rem; font-weight: 700;
+    }
+    .foot { text-align: center; margin-top: 20px; font-size: .76rem; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+{% if not survey or notice %}
+    <div class="notice">
+        <div class="icon">{% if done %}✅{% elif survey %}🕒{% else %}⚠️{% endif %}</div>
+        <h2>{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}</h2>
+        <p>{{ notice }}</p>
+    </div>
+{% else %}
+    <div class="head">
+        <h1>{{ survey['title'] }}</h1>
+        {% if survey['description'] %}<p>{{ survey['description'] }}</p>{% endif %}
+        {% if survey['starts_on'] or survey['ends_on'] %}
+        <div class="period">응답 기간 : {{ survey['starts_on'] or '제한없음' }} ~ {{ survey['ends_on'] or '제한없음' }}</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <p class="greet">
+            {% if recipient_name %}{{ recipient_name }}님, 안녕하세요. {% endif %}설문에 참여해 주셔서 감사합니다.
+            <span style="color:#c0392b">*</span> 표시는 반드시 응답해야 하는 문항입니다.
+        </p>
+        <form id="surveyForm">
+            {% for question in questions %}
+            <div class="q" data-qid="{{ question.id }}" data-qtype="{{ question.qtype }}" data-required="{{ 1 if question.is_required else 0 }}">
+                <p class="q-title">{{ loop.index }}. {{ question.title }}{% if question.is_required %}<span class="required">*</span>{% endif %}</p>
+                {% if question.qtype == 'text' %}
+                    <textarea maxlength="2000" data-role="text" placeholder="답변을 입력해 주세요."></textarea>
+                {% else %}
+                    {% for option in question.options %}
+                    <label class="opt">
+                        <input type="{{ 'checkbox' if question.qtype == 'multiple' else 'radio' }}"
+                               name="q{{ question.id }}" value="{{ option }}">
+                        <span>{{ option }}</span>
+                    </label>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            {% endfor %}
+            <div id="errorBox" class="error-box"></div>
+            <button type="submit" class="submit" id="submitBtn">응답 제출하기</button>
+        </form>
+    </div>
+    <div class="foot">본 설문은 새담 인트라넷을 통해 발송되었습니다.</div>
+{% endif %}
+</div>
+
+{% if survey and not notice %}
+<script>
+const TOKEN = {{ token|tojson }};
+
+document.querySelectorAll('.opt input').forEach(input => {
+    input.addEventListener('change', () => {
+        const box = input.closest('.q');
+        if (input.type === 'radio') {
+            box.querySelectorAll('.opt').forEach(opt => opt.classList.remove('checked'));
+        }
+        input.closest('.opt').classList.toggle('checked', input.checked);
+    });
+});
+
+function showError(message) {
+    const box = document.getElementById('errorBox');
+    box.textContent = message;
+    box.style.display = 'block';
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+document.getElementById('surveyForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('submitBtn');
+    const answers = {};
+
+    for (const block of document.querySelectorAll('.q')) {
+        const questionId = block.dataset.qid;
+        const required = block.dataset.required === '1';
+        if (block.dataset.qtype === 'text') {
+            const value = block.querySelector('[data-role=text]').value.trim();
+            if (required && !value) { showError('필수 문항에 모두 답변해 주세요.'); return; }
+            answers[questionId] = value;
+        } else {
+            const picked = Array.from(block.querySelectorAll('input:checked')).map(input => input.value);
+            if (required && !picked.length) { showError('필수 문항을 모두 선택해 주세요.'); return; }
+            answers[questionId] = picked;
+        }
+    }
+
+    button.disabled = true;
+    button.textContent = '제출 중...';
+    try {
+        const response = await fetch(`/survey/r/${encodeURIComponent(TOKEN)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers }),
+        });
+        const data = await response.json();
+        if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || '응답을 저장하지 못했습니다.');
+        }
+        document.querySelector('.wrap').innerHTML =
+            '<div class="notice"><div class="icon">✅</div><h2>응답이 제출되었습니다</h2>'
+            + '<p>소중한 의견을 남겨 주셔서 감사합니다.</p></div>';
+        window.scrollTo(0, 0);
+    } catch (error) {
+        showError(error.message);
+        button.disabled = false;
+        button.textContent = '응답 제출하기';
+    }
+});
+</script>
+{% endif %}
+</body>
+</html>
