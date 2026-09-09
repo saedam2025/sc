@@ -68,7 +68,6 @@ from .solapi_settings import (
     mask_phone,
     normalize_phone,
     send_alimtalk,
-    send_sms_otp,
 )
 from .secure_files import (
     delete_file,
@@ -2567,20 +2566,12 @@ def public_contract(token: str):
             can_download=_public_verified(row, token),
         )
     if not _public_verified(row, token):
-        try:
-            delivery_channel, _, masked_recipient = _delivery_recipient(row)
-        except (ValueError, RuntimeError):
-            return render_template(
-                "verified_contract/public.html",
-                state="error",
-                message="등록된 연락처를 확인할 수 없습니다. 계약 담당자에게 문의해 주세요.",
-            ), 500
+        # 본인 확인은 이메일로만 한다. 계약자가 입력한 주소로 인증번호가 오가야
+        # 완료 계약서를 받을 주소가 실제로 도달 가능한 주소임이 확인된다.
         return render_template(
             "verified_contract/public.html",
             state="verify",
             data=_row_for_view(row),
-            sms_available=delivery_channel == "alimtalk",
-            masked_recipient=masked_recipient,
             registered_email=str(row["signer_email"] or "").strip().lower(),
             token=token,
             csrf_token=_csrf_token(),
@@ -2606,12 +2597,12 @@ def public_contract(token: str):
 @_csrf_required
 def send_otp(token: str):
     # 계약 등록 때 휴대폰번호만 아는 경우가 많아, 계약자가 이 화면에서 최종 계약서를 받을
-    # 이메일 주소를 직접 입력하고 그 주소로 인증번호를 받는다. 입력한 주소는 인증에
-    # 성공한 뒤에야 계약에 반영한다(verify_otp).
-    requested = str((request.get_json(silent=True) or {}).get("email", "")).strip()
-    entered_email = _normalized_email(requested)
-    if requested and not entered_email:
-        return jsonify({"status": "error", "message": "이메일 주소 형식을 확인해 주세요."}), 400
+    # 이메일 주소를 직접 입력하고 그 주소로만 인증번호를 받는다. 이 인증을 통과해야
+    # 계약서를 열 수 있으므로, 주소를 잘못 적으면 계약이 진행되지 않아 완료 계약서를
+    # 못 받는 상황이 생기지 않는다. 입력한 주소는 인증에 성공한 뒤에야 계약에 반영한다.
+    entered_email = _normalized_email((request.get_json(silent=True) or {}).get("email"))
+    if not entered_email:
+        return jsonify({"status": "error", "message": "이메일 주소를 정확히 입력해 주세요."}), 400
     conn = get_db()
     try:
         row = _load_by_token(conn, token)
@@ -2621,16 +2612,7 @@ def send_otp(token: str):
         sent_at = _parse_iso(row["otp_sent_at"])
         if sent_at and (_now() - sent_at).total_seconds() < 60:
             return jsonify({"status": "error", "message": "인증번호는 1분 후 다시 요청할 수 있습니다."}), 429
-        if entered_email:
-            otp_channel = "email"
-            recipient = entered_email
-            masked_recipient = _mask_email(entered_email)
-        else:
-            try:
-                delivery_channel, recipient, masked_recipient = _delivery_recipient(row)
-            except (ValueError, RuntimeError) as exc:
-                return jsonify({"status": "error", "message": str(exc)}), 400
-            otp_channel = "sms" if delivery_channel == "alimtalk" else "email"
+        masked_recipient = _mask_email(entered_email)
         code = f"{secrets.randbelow(900000) + 100000:06d}"
         update_verified_contract(
             conn,
@@ -2647,24 +2629,19 @@ def send_otp(token: str):
         conn.close()
     message_id = ""
     try:
-        if otp_channel == "sms":
-            result = send_sms_otp(
-                recipient, signer_name=row["signer_name"], code=code
-            )
-            message_id = str(result.get("message_id") or "")
-        else:
-            _send_mail(
-                recipient,
-                "[새담 인증전자계약] 이메일 인증번호",
-                f"""
-                <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7">
-                  <h2>이메일 인증번호</h2>
-                  <p>{escape(row['signer_name'])}님의 인증번호는 다음과 같습니다.</p>
-                  <div style="font-size:30px;font-weight:bold;letter-spacing:8px;color:#123b6d">{code}</div>
-                  <p>5분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
-                </div>
-                """,
-            )
+        _send_mail(
+            entered_email,
+            "[새담 인증전자계약] 이메일 인증번호",
+            f"""
+            <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7">
+              <h2>이메일 인증번호</h2>
+              <p>{escape(row['signer_name'])}님의 인증번호는 다음과 같습니다.</p>
+              <div style="font-size:30px;font-weight:bold;letter-spacing:8px;color:#123b6d">{code}</div>
+              <p>5분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
+              <p>계약을 마치면 서명된 계약서 원본도 이 주소로 발송됩니다.</p>
+            </div>
+            """,
+        )
     except Exception as exc:
         conn = get_db()
         try:
@@ -2677,7 +2654,7 @@ def send_otp(token: str):
                 conn,
                 row,
                 "OTP_SEND_FAILED",
-                {"channel": otp_channel, "recipient": masked_recipient, "error": str(exc)[:200]},
+                {"channel": "email", "recipient": masked_recipient, "error": str(exc)[:200]},
             )
             conn.commit()
         finally:
@@ -2688,13 +2665,13 @@ def send_otp(token: str):
         update_verified_contract(
             conn,
             row["id"],
-            {"otp_channel": otp_channel, "otp_message_id": message_id},
+            {"otp_channel": "email", "otp_message_id": message_id},
         )
         _record_event(
             conn,
             row,
             "OTP_SENT",
-            {"channel": otp_channel, "recipient": masked_recipient, "message_id": message_id},
+            {"channel": "email", "recipient": masked_recipient, "message_id": message_id},
         )
         conn.commit()
     finally:
@@ -2702,10 +2679,7 @@ def send_otp(token: str):
     pending = session.get("verified_contract_email")
     if not isinstance(pending, dict):
         pending = {}
-    if entered_email:
-        pending[str(row["id"])] = entered_email
-    else:
-        pending.pop(str(row["id"]), None)
+    pending[str(row["id"])] = entered_email
     session["verified_contract_email"] = pending
     return jsonify({"status": "success", "message": f"{masked_recipient}로 인증번호를 보냈습니다."})
 

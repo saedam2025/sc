@@ -41,6 +41,12 @@ QUESTION_TYPE_LABELS = {
 SURVEY_STATUSES = {'draft': '작성중', 'open': '진행중', 'closed': '마감'}
 SCALE_DEFAULT_OPTIONS = ['매우 그렇다', '그렇다', '보통이다', '아니다', '전혀 아니다']
 DEFAULT_SMS_TEMPLATE = '[{기관명}] {제목} 설문에 참여해 주세요.\n{링크}'
+RECIPIENT_COLUMNS = ('번호', '구분', '이름', '핸드폰번호', '비고')
+RECIPIENT_SAMPLE_ROWS = (
+    (1, '신풍초', '홍길동', '010-1234-5678', '3학년 담당'),
+    (2, '신풍초', '김새담', '010-2345-6789', ''),
+    (3, '본사', '이하늘', '010-3456-7890', '주말 연락 요망'),
+)
 MAX_QUESTIONS = 50
 MAX_OPTIONS = 20
 MAX_RECIPIENTS = 2000
@@ -64,6 +70,7 @@ def init_survey_schema(conn=None):
                 starts_on TEXT,
                 ends_on TEXT,
                 allow_public_link INTEGER NOT NULL DEFAULT 0,
+                allow_anonymous INTEGER NOT NULL DEFAULT 0,
                 sms_template TEXT,
                 created_by TEXT,
                 created_by_name TEXT,
@@ -89,6 +96,8 @@ def init_survey_schema(conn=None):
                 survey_id INTEGER NOT NULL,
                 name TEXT,
                 phone TEXT NOT NULL,
+                category TEXT,
+                note TEXT,
                 token TEXT NOT NULL UNIQUE,
                 send_status TEXT NOT NULL DEFAULT 'ready',
                 send_error TEXT,
@@ -106,6 +115,7 @@ def init_survey_schema(conn=None):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 survey_id INTEGER NOT NULL,
                 recipient_id INTEGER,
+                is_anonymous INTEGER NOT NULL DEFAULT 0,
                 submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (survey_id) REFERENCES surveys(id) ON DELETE CASCADE,
                 FOREIGN KEY (recipient_id) REFERENCES survey_recipients(id) ON DELETE CASCADE
@@ -141,10 +151,27 @@ def init_survey_schema(conn=None):
             CREATE INDEX IF NOT EXISTS idx_survey_send_logs_survey
                 ON survey_send_logs(survey_id, created_at DESC);
         ''')
+        _add_missing_columns(conn)
         conn.commit()
     finally:
         if owns_connection:
             conn.close()
+
+
+def _add_missing_columns(conn):
+    """먼저 만들어진 설치본에도 뒤에 추가한 열을 한 번씩 붙여 준다."""
+    additions = (
+        ('surveys', 'allow_anonymous', 'INTEGER NOT NULL DEFAULT 0'),
+        ('survey_recipients', 'category', 'TEXT'),
+        ('survey_recipients', 'note', 'TEXT'),
+        ('survey_responses', 'is_anonymous', 'INTEGER NOT NULL DEFAULT 0'),
+    )
+    for table, column, definition in additions:
+        columns = {
+            row[1] for row in conn.execute(f'PRAGMA table_info({table})').fetchall()
+        }
+        if column not in columns:
+            conn.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
 
 
 # ---------------------------------------------------------------------------
@@ -275,6 +302,7 @@ def _survey_dict(row, *, response_count=0, recipient_count=0, sent_count=0):
         'starts_on': row['starts_on'] or '',
         'ends_on': row['ends_on'] or '',
         'allow_public_link': bool(row['allow_public_link']),
+        'allow_anonymous': bool(row['allow_anonymous']),
         'sms_template': row['sms_template'] or DEFAULT_SMS_TEMPLATE,
         'created_by': row['created_by'] or '',
         'created_by_name': row['created_by_name'] or '',
@@ -431,6 +459,8 @@ def api_detail(survey_id):
         recipients = [{
             'id': item['id'],
             'name': item['name'] or '',
+            'category': item['category'] or '',
+            'note': item['note'] or '',
             'phone': format_phone(item['phone']),
             'phone_masked': mask_phone(item['phone']),
             'send_status': item['send_status'],
@@ -481,6 +511,7 @@ def api_save():
     if '{링크}' not in template:
         return _json_error('문자 내용에는 설문 주소가 들어갈 {링크} 를 반드시 넣어 주세요.')
     allow_public_link = 1 if payload.get('allow_public_link') else 0
+    allow_anonymous = 1 if payload.get('allow_anonymous') else 0
 
     try:
         starts_on = _clean_date(payload.get('starts_on'))
@@ -515,11 +546,11 @@ def api_save():
             conn.execute(
                 '''UPDATE surveys
                       SET title=?, description=?, starts_on=?, ends_on=?,
-                          allow_public_link=?, sms_template=?,
+                          allow_public_link=?, allow_anonymous=?, sms_template=?,
                           updated_at=CURRENT_TIMESTAMP
                     WHERE id=?''',
                 (title, description, starts_on, ends_on,
-                 allow_public_link, template, survey_id),
+                 allow_public_link, allow_anonymous, template, survey_id),
             )
             if not responded:
                 conn.execute('DELETE FROM survey_questions WHERE survey_id=?', (survey_id,))
@@ -528,10 +559,12 @@ def api_save():
             cursor = conn.execute(
                 '''INSERT INTO surveys
                        (title, description, status, public_token, starts_on, ends_on,
-                        allow_public_link, sms_template, created_by, created_by_name)
-                   VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)''',
+                        allow_public_link, allow_anonymous, sms_template,
+                        created_by, created_by_name)
+                   VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)''',
                 (title, description, _new_token(), starts_on, ends_on,
-                 allow_public_link, template, actor['emp_no'], actor['name']),
+                 allow_public_link, allow_anonymous, template,
+                 actor['emp_no'], actor['name']),
             )
             survey_id = cursor.lastrowid
             _insert_questions(conn, survey_id, questions)
@@ -617,11 +650,13 @@ def api_duplicate(survey_id):
         cursor = conn.execute(
             '''INSERT INTO surveys
                    (title, description, status, public_token, starts_on, ends_on,
-                    allow_public_link, sms_template, created_by, created_by_name)
-               VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?)''',
+                    allow_public_link, allow_anonymous, sms_template,
+                    created_by, created_by_name)
+               VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?)''',
             (f"{row['title']} (복사본)"[:200], row['description'], _new_token(),
              row['starts_on'], row['ends_on'], row['allow_public_link'],
-             row['sms_template'], actor['emp_no'], actor['name']),
+             row['allow_anonymous'], row['sms_template'],
+             actor['emp_no'], actor['name']),
         )
         new_id = cursor.lastrowid
         conn.execute(
@@ -666,8 +701,212 @@ def _parse_recipient_lines(raw):
         if phone in seen:
             continue
         seen.add(phone)
-        parsed.append({'name': name[:40], 'phone': phone})
+        parsed.append({'name': name[:40], 'phone': phone, 'category': '', 'note': ''})
     return parsed, errors
+
+
+def build_recipient_workbook(include_samples=True):
+    """수신자 일괄등록 엑셀 양식을 만든다. 저장해 둔 파일 없이 요청할 때마다 새로 만든다."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = '수신자목록'
+    sheet.append(list(RECIPIENT_COLUMNS))
+    header_fill = PatternFill('solid', fgColor='004EA2')
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    sheet.freeze_panes = 'A2'
+    if include_samples:
+        for row in RECIPIENT_SAMPLE_ROWS:
+            sheet.append(list(row))
+    for index, width in enumerate((8, 16, 14, 20, 30), start=1):
+        sheet.column_dimensions[get_column_letter(index)].width = width
+    # 휴대폰번호 앞의 0이 사라지지 않도록 열 서식을 문자열로 지정한다.
+    # (셀을 미리 순회하면 빈 행까지 사용 영역으로 잡히므로 열 단위로 지정한다.)
+    phone_column = sheet.column_dimensions['D']
+    phone_column.number_format = '@'
+    for row in sheet.iter_rows(min_row=2, min_col=4, max_col=4):
+        for cell in row:
+            cell.number_format = '@'
+
+    guide = workbook.create_sheet('작성안내')
+    for line in (
+        ('항목', '설명'),
+        ('번호', '보기 편하도록 매기는 순번입니다. 등록할 때는 사용하지 않습니다.'),
+        ('구분', '학교명·부서 등 원하는 분류를 적습니다. 수신자 목록에 그대로 표시됩니다.'),
+        ('이름', '수신자 이름입니다. 비워 두어도 등록됩니다.'),
+        ('핸드폰번호', '실제 문자 발송에 사용합니다. 010-1234-5678 또는 01012345678 형식.'),
+        ('비고', '메모입니다. 수신자 목록에 그대로 표시되며 문자에는 들어가지 않습니다.'),
+        ('', ''),
+        ('중복', '이미 등록된 번호는 자동으로 건너뜁니다.'),
+        ('형식오류', '휴대폰번호 형식이 아니면 해당 줄만 건너뛰고 사유를 알려 줍니다.'),
+    ):
+        guide.append(list(line))
+    for cell in guide[1]:
+        cell.font = Font(bold=True)
+    guide.column_dimensions['A'].width = 14
+    guide.column_dimensions['B'].width = 68
+    return workbook
+
+
+@survey_bp.route('/recipients/template')
+def recipients_template():
+    workbook = build_recipient_workbook(
+        include_samples=request.args.get('samples', '1') != '0'
+    )
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name='설문조사_수신자목록_양식.xlsx',
+    )
+
+
+def _cell_text(value):
+    if value is None:
+        return ''
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return str(value).strip()
+
+
+def parse_recipient_workbook(stream):
+    """업로드된 엑셀에서 (구분, 이름, 핸드폰번호, 비고)를 읽는다.
+
+    머리글 행을 찾아 열 위치를 이름으로 잡으므로 열 순서가 조금 달라도 읽어낸다.
+    """
+    from openpyxl import load_workbook
+
+    try:
+        workbook = load_workbook(stream, data_only=True, read_only=True)
+    except Exception as exc:
+        raise ValueError('엑셀 파일을 열 수 없습니다. xlsx 형식인지 확인해 주세요.') from exc
+
+    sheet = workbook['수신자목록'] if '수신자목록' in workbook.sheetnames else workbook.worksheets[0]
+    rows = [[_cell_text(cell) for cell in row] for row in sheet.iter_rows(values_only=True)]
+    workbook.close()
+    if not rows:
+        raise ValueError('엑셀에 내용이 없습니다.')
+
+    header_index, columns = None, {}
+    for index, row in enumerate(rows[:20]):
+        labels = {value.replace(' ', ''): position for position, value in enumerate(row) if value}
+        if '핸드폰번호' in labels or '휴대폰번호' in labels or '연락처' in labels:
+            columns = {
+                'category': labels.get('구분'),
+                'name': labels.get('이름') if labels.get('이름') is not None else labels.get('성명'),
+                'phone': (labels.get('핸드폰번호') if labels.get('핸드폰번호') is not None
+                          else labels.get('휴대폰번호') if labels.get('휴대폰번호') is not None
+                          else labels.get('연락처')),
+                'note': labels.get('비고'),
+            }
+            header_index = index
+            break
+    if header_index is None:
+        raise ValueError(
+            '머리글에서 "핸드폰번호" 열을 찾지 못했습니다. 양식을 내려받아 그대로 사용해 주세요.'
+        )
+
+    def pick(row, key):
+        position = columns.get(key)
+        if position is None or position >= len(row):
+            return ''
+        return row[position]
+
+    parsed, errors, seen = [], [], set()
+    for offset, row in enumerate(rows[header_index + 1:], start=header_index + 2):
+        if not any(row):
+            continue
+        raw_phone = pick(row, 'phone')
+        name = pick(row, 'name')
+        if not raw_phone and not name:
+            continue
+        try:
+            phone = normalize_phone(raw_phone, required=True)
+        except ValueError as exc:
+            errors.append(f'{offset}행({name or raw_phone or "빈 줄"}): {exc}')
+            continue
+        if phone in seen:
+            continue
+        seen.add(phone)
+        parsed.append({
+            'name': name[:40],
+            'phone': phone,
+            'category': pick(row, 'category')[:40],
+            'note': pick(row, 'note')[:200],
+        })
+    return parsed, errors
+
+
+def _store_recipients(conn, survey_id, parsed):
+    added, skipped = 0, 0
+    for item in parsed:
+        exists = conn.execute(
+            'SELECT id FROM survey_recipients WHERE survey_id=? AND phone=?',
+            (survey_id, item['phone']),
+        ).fetchone()
+        if exists:
+            skipped += 1
+            continue
+        conn.execute(
+            '''INSERT INTO survey_recipients (survey_id, name, phone, category, note, token)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (survey_id, item['name'], item['phone'], item.get('category') or '',
+             item.get('note') or '', _new_token()),
+        )
+        added += 1
+    return added, skipped
+
+
+@survey_bp.route('/api/<int:survey_id>/recipients/upload', methods=['POST'])
+def api_upload_recipients(survey_id):
+    upload = request.files.get('file')
+    if not upload or not upload.filename:
+        return _json_error('업로드할 엑셀 파일을 선택해 주세요.')
+    if not upload.filename.lower().endswith(('.xlsx', '.xlsm')):
+        return _json_error('엑셀(xlsx) 파일만 등록할 수 있습니다.')
+    try:
+        parsed, errors = parse_recipient_workbook(upload.stream)
+    except ValueError as exc:
+        return _json_error(str(exc))
+    if not parsed:
+        return _json_error(
+            '등록할 휴대폰번호가 없습니다.' + (' ' + errors[0] if errors else '')
+        )
+
+    conn = get_db()
+    try:
+        row = _survey_row(conn, survey_id)
+        if not row:
+            return _json_error('설문을 찾을 수 없습니다.', 404)
+        if not _can_manage(row):
+            return _json_error('이 설문의 수신자를 편집할 권한이 없습니다.', 403)
+        current = conn.execute(
+            'SELECT COUNT(*) AS c FROM survey_recipients WHERE survey_id=?', (survey_id,)
+        ).fetchone()['c']
+        if current + len(parsed) > MAX_RECIPIENTS:
+            return _json_error(f'수신자는 설문당 최대 {MAX_RECIPIENTS}명까지 등록할 수 있습니다.')
+        added, skipped = _store_recipients(conn, survey_id, parsed)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+    return jsonify({
+        'status': 'success',
+        'added': added,
+        'skipped': skipped,
+        'errors': errors[:20],
+    })
 
 
 @survey_bp.route('/api/<int:survey_id>/recipients', methods=['POST'])
@@ -690,20 +929,7 @@ def api_add_recipients(survey_id):
         ).fetchone()['c']
         if current + len(parsed) > MAX_RECIPIENTS:
             return _json_error(f'수신자는 설문당 최대 {MAX_RECIPIENTS}명까지 등록할 수 있습니다.')
-        added, skipped = 0, 0
-        for item in parsed:
-            exists = conn.execute(
-                'SELECT id FROM survey_recipients WHERE survey_id=? AND phone=?',
-                (survey_id, item['phone']),
-            ).fetchone()
-            if exists:
-                skipped += 1
-                continue
-            conn.execute(
-                'INSERT INTO survey_recipients (survey_id, name, phone, token) VALUES (?, ?, ?, ?)',
-                (survey_id, item['name'], item['phone'], _new_token()),
-            )
-            added += 1
+        added, skipped = _store_recipients(conn, survey_id, parsed)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -953,6 +1179,53 @@ def _build_statistics(conn, survey_id):
     return questions, stats
 
 
+def _answer_display(row):
+    """보기 선택은 쉼표로 잇고, 주관식은 입력 원문을 그대로 쓴다."""
+    options = _load_options(row['answer_options'])
+    return ', '.join(options) if options else str(row['answer_text'] or '')
+
+
+def _respondent_rows(conn, survey_id, questions, limit=500):
+    """누가 어떤 문항에 무엇이라고 답했는지 한 줄씩 만든다.
+
+    무기명 응답은 수신자와 연결하지 않았으므로 이름·연락처 없이 응답 내용만 남는다.
+    """
+    rows = conn.execute(
+        '''SELECT r.id, r.submitted_at, r.is_anonymous, c.name, c.phone, c.category, c.note
+             FROM survey_responses r
+             LEFT JOIN survey_recipients c ON c.id = r.recipient_id
+            WHERE r.survey_id=? ORDER BY r.id DESC LIMIT ?''',
+        (survey_id, limit),
+    ).fetchall()
+    if not rows:
+        return []
+
+    answers = {}
+    placeholders = ','.join('?' * len(rows))
+    for item in conn.execute(
+        f'''SELECT response_id, question_id, answer_text, answer_options
+              FROM survey_answers WHERE response_id IN ({placeholders})''',
+        [row['id'] for row in rows],
+    ).fetchall():
+        answers[(item['response_id'], item['question_id'])] = _answer_display(item)
+
+    result = []
+    for row in rows:
+        anonymous = bool(row['is_anonymous'])
+        result.append({
+            'id': row['id'],
+            'anonymous': anonymous,
+            'name': '무기명' if anonymous else (row['name'] or '익명'),
+            'category': '' if anonymous else (row['category'] or ''),
+            'note': '' if anonymous else (row['note'] or ''),
+            'phone': '-' if anonymous or not row['phone'] else mask_phone(row['phone']),
+            'submitted_at': str(row['submitted_at'] or '')[:16],
+            'answers': [answers.get((row['id'], question['id']), '')
+                        for question in questions],
+        })
+    return result
+
+
 @survey_bp.route('/api/<int:survey_id>/stats')
 def api_stats(survey_id):
     conn = get_db()
@@ -971,18 +1244,7 @@ def api_stats(survey_id):
                    WHERE survey_id=? AND responded_at IS NOT NULL) AS responded''',
             (survey_id, survey_id, survey_id, survey_id),
         ).fetchone()
-        responses = [{
-            'id': item['id'],
-            'name': item['name'] or '익명',
-            'phone': mask_phone(item['phone']) if item['phone'] else '-',
-            'submitted_at': str(item['submitted_at'] or '')[:16],
-        } for item in conn.execute(
-            '''SELECT r.id, r.submitted_at, c.name, c.phone
-                 FROM survey_responses r
-                 LEFT JOIN survey_recipients c ON c.id = r.recipient_id
-                WHERE r.survey_id=? ORDER BY r.id DESC LIMIT 500''',
-            (survey_id,),
-        ).fetchall()]
+        responses = _respondent_rows(conn, survey_id, questions)
         survey = _survey_dict(
             row,
             response_count=summary['responses'],
@@ -991,7 +1253,9 @@ def api_stats(survey_id):
         )
     finally:
         conn.close()
-    sent = summary['sent'] or 0
+    # 문자를 보내지 않고 링크만 공유한 설문도 있으므로, 발송 건수가 없으면
+    # 등록 수신자 수를 분모로 삼는다.
+    base = summary['sent'] or summary['recipients'] or 0
     return jsonify({
         'status': 'success',
         'survey': survey,
@@ -1001,9 +1265,9 @@ def api_stats(survey_id):
         'summary': {
             'responses': summary['responses'],
             'recipients': summary['recipients'],
-            'sent': sent,
+            'sent': summary['sent'],
             'responded': summary['responded'],
-            'rate': round(summary['responded'] * 100 / sent, 1) if sent else 0.0,
+            'rate': round(summary['responded'] * 100 / base, 1) if base else 0.0,
         },
     })
 
@@ -1019,46 +1283,51 @@ def export_result(survey_id):
         if not row:
             return '설문을 찾을 수 없습니다.', 404
         questions, stats = _build_statistics(conn, survey_id)
-        responses = conn.execute(
-            '''SELECT r.id, r.submitted_at, c.name, c.phone
-                 FROM survey_responses r
-                 LEFT JOIN survey_recipients c ON c.id = r.recipient_id
-                WHERE r.survey_id=? ORDER BY r.id''',
-            (survey_id,),
-        ).fetchall()
-        answer_rows = conn.execute(
-            '''SELECT a.response_id, a.question_id, a.answer_text, a.answer_options
-                 FROM survey_answers a
-                 JOIN survey_responses r ON r.id = a.response_id
-                WHERE r.survey_id=?''',
+        respondents = _respondent_rows(conn, survey_id, questions, limit=100000)
+        recipients = conn.execute(
+            '''SELECT name, category, phone, note, send_status, sent_at, responded_at
+                 FROM survey_recipients WHERE survey_id=? ORDER BY id''',
             (survey_id,),
         ).fetchall()
     finally:
         conn.close()
 
-    answer_map = {}
-    for item in answer_rows:
-        options = _load_options(item['answer_options'])
-        answer_map[(item['response_id'], item['question_id'])] = (
-            ', '.join(options) if options else str(item['answer_text'] or '')
-        )
-
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = '응답'
-    header = ['번호', '이름', '휴대폰', '응답일시'] + [
+    sheet.title = '응답자별'
+    header = ['번호', '구분', '이름', '휴대폰', '응답일시'] + [
         f"{index}. {question['title']}" for index, question in enumerate(questions, start=1)
     ]
     sheet.append(header)
     for cell in sheet[1]:
         cell.font = Font(bold=True)
-    for number, response in enumerate(responses, start=1):
+    sheet.freeze_panes = 'A2'
+    for number, respondent in enumerate(reversed(respondents), start=1):
         sheet.append([
             number,
-            response['name'] or '익명',
-            mask_phone(response['phone']) if response['phone'] else '-',
-            str(response['submitted_at'] or '')[:16],
-            *[answer_map.get((response['id'], question['id']), '') for question in questions],
+            respondent['category'],
+            respondent['name'],
+            respondent['phone'],
+            respondent['submitted_at'],
+            *respondent['answers'],
+        ])
+
+    recipient_sheet = workbook.create_sheet('수신자')
+    recipient_sheet.append(['번호', '구분', '이름', '핸드폰번호', '비고',
+                            '발송상태', '발송일시', '응답일시'])
+    for cell in recipient_sheet[1]:
+        cell.font = Font(bold=True)
+    for number, item in enumerate(recipients, start=1):
+        recipient_sheet.append([
+            number,
+            item['category'] or '',
+            item['name'] or '',
+            format_phone(item['phone']),
+            item['note'] or '',
+            {'ready': '대기', 'sent': '발송', 'failed': '실패'}.get(
+                item['send_status'], item['send_status']),
+            str(item['sent_at'] or '')[:16],
+            str(item['responded_at'] or '')[:16] or '미응답',
         ])
 
     summary_sheet = workbook.create_sheet('통계')
@@ -1145,6 +1414,8 @@ def respond(token):
         survey=survey,
         questions=questions,
         recipient_name=(recipient['name'] if recipient is not None else ''),
+        # 공용 링크로 들어온 사람은 애초에 신원이 없으므로 선택지를 보여주지 않는다.
+        allow_anonymous=bool(survey['allow_anonymous'] and recipient is not None),
         notice='',
         token=token,
     )
@@ -1169,6 +1440,9 @@ def submit_response(token):
             return _json_error(notice, 403)
         if recipient is not None and recipient['responded_at']:
             return _json_error('이미 응답을 완료하셨습니다.', 409)
+        # 무기명을 고르면 응답에 수신자를 연결하지 않는다. 다만 중복 응답을 막고
+        # 응답률을 세기 위해 "응답했다"는 사실만 수신자 쪽에 남긴다.
+        anonymous = bool(survey['allow_anonymous']) and bool(payload.get('anonymous'))
 
         questions = _questions_of(conn, survey['id'])
         prepared = []
@@ -1191,8 +1465,11 @@ def submit_response(token):
             ))
 
         cursor = conn.execute(
-            'INSERT INTO survey_responses (survey_id, recipient_id) VALUES (?, ?)',
-            (survey['id'], recipient['id'] if recipient is not None else None),
+            '''INSERT INTO survey_responses (survey_id, recipient_id, is_anonymous)
+               VALUES (?, ?, ?)''',
+            (survey['id'],
+             None if anonymous or recipient is None else recipient['id'],
+             1 if anonymous else 0),
         )
         response_id = cursor.lastrowid
         conn.executemany(
