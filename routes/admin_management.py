@@ -1664,6 +1664,8 @@ def save_solapi_settings_route():
             pf_id=request.form.get('pf_id'),
             template_id=request.form.get('template_id'),
             from_number=request.form.get('from_number'),
+            public_origin=request.form.get('public_origin'),
+            sender_name=request.form.get('sender_name'),
             actor=session.get('emp_no') or session.get('user_name') or 'admin',
             clear_credentials=request.form.get('clear_credentials') == '1',
         )

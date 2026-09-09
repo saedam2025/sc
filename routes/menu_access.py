@@ -83,6 +83,7 @@ MENU_GROUPS = (
             ('school_workspace', '학교업무공간', 'fa-chalkboard-user', 14),
             ('school_tasks', '학교업무처리', 'fa-list-check', 14),
             ('school_calendar', '학교일정표', 'fa-calendar-week', 14),
+            ('school_survey', '설문조사', 'fa-square-poll-vertical', 14),
             ('school_center_boards', '[센터장] 일반 게시판 (9개 메뉴 일괄)', 'fa-table-list', 14),
             ('school_center_shared', '[센터장] 본부공지사항·자료실 - 접근', 'fa-door-open', 8),
             ('school_center_shared_read', '[센터장] 본부공지사항·자료실 - 읽기', 'fa-book-open', 8),
@@ -478,6 +479,11 @@ def resolve_request_menu(path, endpoint='', view_args=None):
         return SCHOOL_WORKSPACE_CATEGORY_MENU_KEYS['expense']
     if path.startswith('/expense'):
         return 'expense_main'
+    # 설문 응답 링크는 인트라넷 계정 없이 여는 공개 주소라 메뉴 권한을 적용하지 않는다.
+    if path.startswith('/survey/r/'):
+        return None
+    if path.startswith('/survey'):
+        return 'school_survey'
     if path.startswith('/school/tasks'):
         return 'school_tasks'
     if path.startswith('/school/calendar'):

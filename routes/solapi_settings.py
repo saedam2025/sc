@@ -26,6 +26,12 @@ SOLAPI_SEND_URL = "https://api.solapi.com/messages/v4/send-many/detail"
 CONTRACT_PUBLIC_ORIGIN = "https://works.saedam.org"
 # 알림톡 실패 시 나가는 대체문자 제목. LMS는 제목이 비면 접수되지 않는다.
 ALIMTALK_FALLBACK_SUBJECT = "새담 전자계약 안내"
+# 설문조사 등 링크 문자에 사용하는 기본 기관명. 통합관리에서 바꿀 수 있다.
+DEFAULT_SENDER_NAME = "새담"
+# SMS 1건의 최대 본문 길이(EUC-KR 기준 바이트). 넘으면 LMS로 전환한다.
+SMS_BYTE_LIMIT = 90
+# 한 번의 send-many 요청에 담을 최대 건수.
+BULK_CHUNK_SIZE = 100
 
 
 def _fernet() -> Fernet:
@@ -123,7 +129,20 @@ def _environment_settings() -> dict[str, str]:
         "pf_id": str(os.environ.get("SOLAPI_PF_ID", "")).strip(),
         "template_id": str(os.environ.get("SOLAPI_TEMPLATE_ID", "")).strip(),
         "from_number": re.sub(r"\D", "", str(os.environ.get("SOLAPI_FROM", ""))),
+        "public_origin": str(os.environ.get("PUBLIC_ORIGIN", "")).strip().rstrip("/"),
+        "sender_name": str(os.environ.get("SOLAPI_SENDER_NAME", "")).strip(),
     }
+
+
+def normalize_origin(value: object) -> str:
+    """문자에 담을 공개 링크의 기준 주소를 검증한다."""
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return ""
+    parsed = urlsplit(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc             or parsed.path or parsed.query or parsed.fragment             or re.search(r"\s", text):
+        raise ValueError("공개 링크 주소는 https://example.com 형식으로 입력해 주세요.")
+    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def get_settings(conn=None) -> dict[str, Any]:
@@ -151,6 +170,14 @@ def get_settings(conn=None) -> dict[str, Any]:
         "from_number": re.sub(
             r"\D", "", str(store.get("from_number") or environment["from_number"])
         ),
+        "public_origin": str(
+            store.get("public_origin")
+            or environment["public_origin"]
+            or CONTRACT_PUBLIC_ORIGIN
+        ).rstrip("/"),
+        "sender_name": str(
+            store.get("sender_name") or environment["sender_name"] or DEFAULT_SENDER_NAME
+        ),
         "updated_by": str(store.get("updated_by") or ""),
         "updated_at": str(store.get("updated_at") or ""),
     }
@@ -172,6 +199,10 @@ def get_settings(conn=None) -> dict[str, Any]:
         result.get(key)
         for key in ("api_key", "api_secret", "pf_id", "template_id", "from_number")
     )
+    # 설문조사 URL 문자는 알림톡 템플릿 없이 API 키·시크릿·발신번호만으로 보낸다.
+    result["sms_configured"] = all(
+        result.get(key) for key in ("api_key", "api_secret", "from_number")
+    )
     return result
 
 
@@ -185,10 +216,13 @@ def settings_for_view() -> dict[str, Any]:
         "pf_id": settings.get("pf_id", ""),
         "template_id": settings.get("template_id", ""),
         "from_number": settings.get("from_number", ""),
+        "public_origin": settings.get("public_origin", ""),
+        "sender_name": settings.get("sender_name", ""),
         "updated_by": settings.get("updated_by", ""),
         "updated_at": settings.get("updated_at", ""),
         "source": settings.get("source", "none"),
         "configured": bool(settings.get("configured")),
+        "sms_configured": bool(settings.get("sms_configured")),
     }
 
 
@@ -200,6 +234,8 @@ def save_settings(
     template_id: object,
     from_number: object,
     actor: object,
+    public_origin: object = None,
+    sender_name: object = None,
     clear_credentials: bool = False,
 ) -> None:
     api_key_text = str(api_key or "").strip()
@@ -207,12 +243,17 @@ def save_settings(
     pf_id_text = str(pf_id or "").strip()
     template_id_text = str(template_id or "").strip()
     from_digits = re.sub(r"\D", "", str(from_number or ""))
+    origin_text = normalize_origin(public_origin) if public_origin is not None else None
+    sender_text = (
+        str(sender_name).strip()[:30] if sender_name is not None else None
+    )
 
+    # 알림톡 항목은 문자 전용으로만 쓰는 설치본을 위해 선택 입력으로 둔다.
     for label, value, maximum in (
         ("SOLAPI PF ID", pf_id_text, 120),
         ("SOLAPI 템플릿 ID", template_id_text, 120),
     ):
-        if not value or len(value) > maximum or re.search(r"\s", value):
+        if value and (len(value) > maximum or re.search(r"\s", value)):
             raise ValueError(f"{label} 값을 확인해 주세요.")
     if not re.fullmatch(r"\d{8,12}", from_digits):
         raise ValueError("회사 발신번호는 지역번호를 포함한 숫자 8~12자리로 입력해 주세요.")
@@ -255,6 +296,10 @@ def save_settings(
                 "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
         )
+        if origin_text is not None:
+            store["public_origin"] = origin_text
+        if sender_text is not None:
+            store["sender_name"] = sender_text
         conn.execute(
             """
             INSERT INTO admin_settings (key, value, updated_at)
@@ -453,3 +498,219 @@ def send_sms_otp(
         },
         active,
     )
+
+
+def resolve_public_origin(settings: dict[str, Any] | None = None) -> str:
+    """설문 링크 등 외부 공개 주소의 기준이 되는 origin을 반환한다."""
+    active = settings or get_settings()
+    return str(active.get("public_origin") or CONTRACT_PUBLIC_ORIGIN).rstrip("/")
+
+
+def message_byte_length(text: object) -> int:
+    """SOLAPI가 SMS/LMS를 나누는 기준인 EUC-KR 바이트 길이를 계산한다."""
+    body = str(text or "")
+    try:
+        return len(body.encode("euc-kr"))
+    except UnicodeEncodeError:
+        # EUC-KR로 표현할 수 없는 글자(이모지 등)가 있으면 LMS로 보내야 한다.
+        return SMS_BYTE_LIMIT + 1
+
+
+def _send_many(messages: list[dict[str, Any]], settings: dict[str, Any]) -> dict[str, Any]:
+    """여러 건을 한 번에 접수한다. strict=False라 일부 실패해도 나머지는 접수된다."""
+    payload = json.dumps(
+        {
+            "messages": messages,
+            "strict": False,
+            "allowDuplicates": True,
+            "showMessageList": True,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    request_object = Request(
+        SOLAPI_SEND_URL,
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": _authorization(settings),
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "Saedam-Intranet/1.0",
+        },
+    )
+    try:
+        with urlopen(request_object, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8"))
+            reason = (
+                detail.get("errorMessage") or detail.get("message") or "요청 거절"
+            )
+        except Exception:
+            reason = str(exc)
+        raise RuntimeError(f"SOLAPI 요청 실패: {reason}") from exc
+    except (URLError, TimeoutError, OSError, ValueError) as exc:
+        raise RuntimeError(f"SOLAPI 서버 연결 실패: {exc}") from exc
+
+
+def _entry_phone(item: object) -> str:
+    """응답 항목에서 수신번호를 뽑는다. 문자열(접수번호)만 오는 응답도 있다."""
+    if isinstance(item, dict):
+        return re.sub(r"\D", "", str(item.get("to") or ""))
+    return ""
+
+
+def _entry_message_id(item: object) -> str:
+    if isinstance(item, str):
+        return item.strip()
+    if isinstance(item, dict):
+        return str(item.get("messageId") or "")
+    return ""
+
+
+def _entry_failure_reason(item: object) -> str:
+    if not isinstance(item, dict):
+        return "발송 접수 실패"
+    code = str(item.get("statusCode") or "")
+    reason = (
+        item.get("statusMessage")
+        or item.get("reason")
+        or item.get("errorMessage")
+        or "발송 접수 실패"
+    )
+    return f"[{code or 'UNKNOWN'}] {reason}"
+
+
+def _apply_bulk_result(chunk: list[dict[str, Any]], result: object) -> None:
+    """send-many 응답을 수신자 행에 반영한다.
+
+    strict=False로 접수하면 SOLAPI는 거절한 건만 failedMessageList에 담아 돌려준다.
+    따라서 이 목록에 없는 번호는 접수된 것으로 판정해야 한다. messageList는 접수번호를
+    붙이는 용도로만 쓰며, 항목이 객체든 접수번호 문자열이든, to가 있든 없든 견딘다.
+    (예전 구현은 messageList의 to로만 성공을 확인해서, to를 돌려주지 않는 응답에서는
+     실제로 발송된 문자까지 전부 실패로 기록했다.)
+    """
+    payload = result if isinstance(result, dict) else {}
+    group = payload.get("groupInfo") or {}
+    if payload.get("errorCode") or str(group.get("status") or "") == "FAILED":
+        reason = str(
+            payload.get("errorMessage") or payload.get("message") or "그룹 발송 실패"
+        )
+        code = str(payload.get("errorCode") or "GROUP_FAILED")
+        for row in chunk:
+            row["error"] = f"[{code}] {reason}"
+        return
+
+    failed_by_phone: dict[str, object] = {}
+    floating_failures: list[object] = []
+    for item in payload.get("failedMessageList") or []:
+        phone = _entry_phone(item)
+        if phone:
+            failed_by_phone[phone] = item
+        else:
+            floating_failures.append(item)
+
+    sent_by_phone: dict[str, object] = {}
+    floating_sent: list[object] = []
+    for item in payload.get("messageList") or []:
+        code = str(item.get("statusCode") or "") if isinstance(item, dict) else ""
+        phone = _entry_phone(item)
+        if code and code not in {"2000", "4000"}:
+            if phone:
+                failed_by_phone.setdefault(phone, item)
+            else:
+                floating_failures.append(item)
+            continue
+        if phone:
+            sent_by_phone[phone] = item
+        else:
+            floating_sent.append(item)
+
+    unresolved: list[dict[str, Any]] = []
+    for row in chunk:
+        phone = row["phone"]
+        if phone in failed_by_phone:
+            row["error"] = _entry_failure_reason(failed_by_phone[phone])
+        elif phone in sent_by_phone:
+            row["ok"] = True
+            row["message_id"] = _entry_message_id(sent_by_phone[phone])
+        else:
+            unresolved.append(row)
+
+    # 번호를 알 수 없는 실패 건수가 남은 행 수와 정확히 맞을 때만 실패로 돌린다.
+    if floating_failures and len(floating_failures) == len(unresolved):
+        for row, item in zip(unresolved, floating_failures):
+            row["error"] = _entry_failure_reason(item)
+        return
+    for row in unresolved:
+        row["ok"] = True
+        row["message_id"] = _entry_message_id(floating_sent.pop(0)) if floating_sent else ""
+
+
+def send_bulk_text(
+    recipients: list[dict[str, Any]],
+    *,
+    settings: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """문자(SMS/LMS)를 여러 명에게 보내고 수신자별 접수 결과를 그대로 돌려준다.
+
+    recipients 각 항목은 {'to': 휴대폰번호, 'text': 본문, 'subject': 제목(선택)} 형태이며,
+    반환값은 입력 순서를 유지한 {'to', 'ok', 'message_id', 'error'} 목록이다.
+    """
+    active = settings or get_settings()
+    _require_complete(active, kakao=False)
+
+    prepared: list[dict[str, Any]] = []
+    for entry in recipients:
+        row: dict[str, Any] = {
+            "to": str((entry or {}).get("to") or ""),
+            "ok": False,
+            "message_id": "",
+            "error": "",
+            "phone": "",
+        }
+        try:
+            row["phone"] = normalize_phone(row["to"], required=True)
+        except ValueError as exc:
+            row["error"] = str(exc)
+            prepared.append(row)
+            continue
+        body = str((entry or {}).get("text") or "").strip()
+        if not body:
+            row["error"] = "발송할 문자 내용이 없습니다."
+            prepared.append(row)
+            continue
+        subject = str((entry or {}).get("subject") or "").strip()
+        if message_byte_length(body) > SMS_BYTE_LIMIT:
+            row["payload"] = {
+                "to": row["phone"],
+                "from": active["from_number"],
+                "type": "LMS",
+                "subject": (subject or DEFAULT_SENDER_NAME)[:40],
+                "text": body,
+                "autoTypeDetect": False,
+            }
+        else:
+            row["payload"] = {
+                "to": row["phone"],
+                "from": active["from_number"],
+                "type": "SMS",
+                "text": body,
+                "autoTypeDetect": False,
+            }
+        prepared.append(row)
+
+    sendable = [row for row in prepared if row.get("payload")]
+    for start in range(0, len(sendable), BULK_CHUNK_SIZE):
+        chunk = sendable[start:start + BULK_CHUNK_SIZE]
+        try:
+            result = _send_many([row["payload"] for row in chunk], active)
+        except RuntimeError as exc:
+            for row in chunk:
+                row["error"] = str(exc)
+            continue
+        _apply_bulk_result(chunk, result)
+
+    for row in prepared:
+        row.pop("payload", None)
+    return prepared
