@@ -35,6 +35,7 @@ from routes.notifications import emit_notification_refresh, noti_bp
 from routes.gallery import gallery_bp
 from routes.school_bp import school_bp
 from routes.school_task import school_task_bp
+from routes.survey import init_survey_schema, survey_bp
 from routes.contacts import contacts_bp
 from routes.admin_management import admin_bp, get_active_theme
 from routes.ebook import ebook_bp, init_ebook_schema
@@ -103,6 +104,7 @@ with app.app_context():
         ensure_smart_document_schema()
         ensure_interview_schema()
         ensure_mydesk_schema()
+        init_survey_schema()
         password_conn = get_db()
         try:
             migrated_passwords = migrate_plaintext_passwords(password_conn)
@@ -189,7 +191,13 @@ EXEMPT_ROUTES = [
     'parent_notifications.instructor_page',
     # 면접자가 인트라넷 계정 없이 링크로 여는 사전질문지.
     'interview.questionnaire',
+    # 설문 대상자는 문자로 받은 링크만으로 응답한다.
+    'survey.respond',
+    'survey.submit_response',
 ]
+
+# 엔드포인트 이름과 무관하게 로그인을 요구하지 않는 공개 경로.
+PUBLIC_PATH_PREFIXES = ('/survey/r/',)
 
 @app.before_request
 def check_login():
@@ -199,6 +207,12 @@ def check_login():
         abort(404)
     # 1. 예외 경로이거나 정적 파일 요청이면 통과
     if request.endpoint in EXEMPT_ROUTES or (request.path and request.path.startswith('/static')):
+        return None
+
+    # 설문 응답 링크는 인트라넷 회원이 아닌 사람이 문자로 받아서 여는 주소다.
+    # 배포 직후처럼 라우트를 아직 못 찾아 endpoint가 비는 상황에서도 로그인
+    # 화면으로 밀려나지 않도록 경로만 보고 통과시킨다.
+    if any((request.path or '').startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES):
         return None
     
     # 2. 세션에 사번(emp_no)이 없으면 로그인 페이지로 이동
@@ -267,6 +281,7 @@ def _classify_menu(path):
         ('/chat', '사내메신저'),
         ('/chat_popup', '사내메신저'),
         ('/school', '학교업무메뉴'),
+        ('/survey', '설문조사'),
         ('/document', '증명발급'),
         ('/contract', '계약시스템'),
         ('/gall2', '갤러리'),
@@ -1056,6 +1071,7 @@ app.register_blueprint(noti_bp)
 app.register_blueprint(gallery_bp) 
 app.register_blueprint(school_bp, url_prefix='/school')
 app.register_blueprint(school_task_bp, url_prefix='/school/tasks')
+app.register_blueprint(survey_bp, url_prefix='/survey')
 app.register_blueprint(contacts_bp)
 app.register_blueprint(gall2_bp)
 app.register_blueprint(admin_bp, url_prefix='/admin')
