@@ -6,6 +6,17 @@
 <meta name="robots" content="noindex, nofollow">
 <title>{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}</title>
 <link rel="icon" href="/static/favicon.ico">
+{#- 문자·메신저가 링크 미리보기를 만들 때 쓰는 정보. 이미지는 절대주소여야 한다. -#}
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ brand_name }}">
+<meta property="og:title" content="{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}">
+<meta property="og:description" content="{% if survey and survey['description'] %}{{ survey['description']|truncate(120, True) }}{% else %}{{ brand_name }} 설문조사입니다. 참여해 주세요.{% endif %}">
+<meta property="og:image" content="{{ logo_absolute_url }}">
+<meta property="og:image:alt" content="{{ brand_name }}">
+<meta property="og:url" content="{{ page_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}">
+<meta name="twitter:image" content="{{ logo_absolute_url }}">
 <style>
     * { box-sizing: border-box; }
     body {
@@ -57,6 +68,11 @@
         background: #fff0f0; color: #9e2525; font-size: .88rem; font-weight: 700;
     }
     .foot { text-align: center; margin-top: 20px; font-size: .76rem; color: #94a3b8; }
+    .brand {
+        margin-top: 24px; padding-top: 20px; border-top: 1px dashed #e2e8f0; text-align: center;
+    }
+    .brand img { height: 52px; width: auto; display: inline-block; }
+    .brand span { display: block; margin-top: 9px; font-size: .76rem; color: #94a3b8; }
     .anon-box {
         display: block; margin: 16px 0 4px; padding: 14px 16px; cursor: pointer;
         border: 1px solid #dbeafe; border-radius: 12px; background: #f5f8ff; transition: all .15s;
@@ -74,6 +90,10 @@
         <div class="icon">{% if done %}✅{% elif survey %}🕒{% else %}⚠️{% endif %}</div>
         <h2>{% if survey %}{{ survey['title'] }}{% else %}설문조사{% endif %}</h2>
         <p>{{ notice }}</p>
+        <div class="brand">
+            <img src="{{ logo_url }}" alt="{{ brand_name }}">
+            <span>{{ brand_name }}</span>
+        </div>
     </div>
 {% else %}
     <div class="head">
@@ -120,6 +140,10 @@
             <div id="errorBox" class="error-box"></div>
             <button type="submit" class="submit" id="submitBtn">응답 제출하기</button>
         </form>
+        <div class="brand">
+            <img src="{{ logo_url }}" alt="{{ brand_name }}">
+            <span>{{ brand_name }}</span>
+        </div>
     </div>
     <div class="foot">본 설문은 새담 인트라넷을 통해 발송되었습니다.</div>
 {% endif %}
@@ -128,6 +152,8 @@
 {% if survey and not notice %}
 <script>
 const TOKEN = {{ token|tojson }};
+const BRAND_BLOCK = '<div class="brand"><img src="{{ logo_url }}" alt="{{ brand_name }}">'
+    + '<span>{{ brand_name }}</span></div>';
 const anonymousInput = document.getElementById('anonymous');
 if (anonymousInput) {
     anonymousInput.addEventListener('change', () => {
@@ -188,7 +214,8 @@ document.getElementById('surveyForm').addEventListener('submit', async event => 
             : '';
         document.querySelector('.wrap').innerHTML =
             '<div class="notice"><div class="icon">✅</div><h2>응답이 제출되었습니다</h2>'
-            + '<p>소중한 의견을 남겨 주셔서 감사합니다.</p>' + anonymousNote + '</div>';
+            + '<p>소중한 의견을 남겨 주셔서 감사합니다.</p>' + anonymousNote
+            + BRAND_BLOCK + '</div>';
         window.scrollTo(0, 0);
     } catch (error) {
         showError(error.message);
