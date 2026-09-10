@@ -36,6 +36,7 @@ from flask import (
     url_for,
 )
 from PIL import Image, UnidentifiedImageError
+from werkzeug.exceptions import RequestEntityTooLarge
 
 try:  # PDF를 쪽마다 이미지로 바꿔 주는 라이브러리
     import pypdfium2 as pdfium
@@ -84,10 +85,42 @@ PREVIEW_MAX_PAGES = 40
 PDF_PREVIEW_DPI = 130
 
 MAX_MATERIAL_BYTES = 50 * 1024 * 1024
-MAX_RECORDING_BYTES = 300 * 1024 * 1024
+# 진행 화면은 긴 회의를 조각(회차)으로 잘라 올린다. 한 조각은 넉넉히 잡아도
+# 몇 십 MB를 넘지 않으므로, 한 번에 올리는 크기를 줄여 Render의 요청 시간과
+# 메모리 한도 안에서 안전하게 끝나게 한다.
+MAX_RECORDING_BYTES = 120 * 1024 * 1024
 MAX_MATERIALS_PER_AGENDA = 20
 MAX_AGENDAS = 60
 MAX_TRANSCRIPT_CHARS = 120000
+
+# 브라우저마다 녹음 형식이 다르다(크롬·엣지=webm, 사파리·아이폰=mp4).
+# 실제 형식을 그대로 보관해야 나중에 다시 들을 수 있다.
+RECORDING_MIME_EXTENSIONS = {
+    "audio/webm": ".webm",
+    "video/webm": ".webm",
+    "audio/ogg": ".ogg",
+    "video/ogg": ".ogg",
+    "audio/mp4": ".m4a",
+    "video/mp4": ".mp4",
+    "audio/x-m4a": ".m4a",
+    "audio/aac": ".aac",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/wave": ".wav",
+    "audio/flac": ".flac",
+}
+RECORDING_EXTENSION_MIMES = {
+    ".webm": "audio/webm",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".aac": "audio/aac",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".flac": "audio/flac",
+}
+RECORDING_EXTENSIONS = set(RECORDING_EXTENSION_MIMES)
 
 STATUS_LABELS = {"planned": "예정", "running": "진행중", "closed": "종료"}
 DECISION_LABELS = {
@@ -215,10 +248,34 @@ def init_meeting_schema():
             CREATE INDEX IF NOT EXISTS idx_meeting_recordings_meeting
                 ON meeting_recordings(meeting_id, id);
         """)
+        _add_missing_columns(conn, "meetings", {
+            # 여러 참석자가 같은 회의를 동시에 받아 적어도 서로의 기록을
+            # 지우지 않도록, 저장할 때마다 올라가는 판번호를 함께 둔다.
+            "transcript_revision": "INTEGER NOT NULL DEFAULT 0",
+        })
+        _add_missing_columns(conn, "meeting_recordings", {
+            # 브라우저가 실제로 만든 형식을 그대로 보관해 재생 실패를 막는다.
+            "mime_type": "TEXT NOT NULL DEFAULT ''",
+        })
+        _add_missing_columns(conn, "meeting_materials", {
+            # 미리보기 변환을 이미 시도했는지 기록한다. 실패한 자료를 화면을
+            # 열 때마다 다시 변환하느라 느려지는 것을 막는다.
+            "preview_state": "TEXT NOT NULL DEFAULT ''",
+        })
         _migrate_single_recordings(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _add_missing_columns(conn, table: str, columns: dict) -> None:
+    """이미 만들어진 표에 새 칸만 더한다(기존 데이터는 그대로 둔다)."""
+    existing = {
+        str(row["name"]) for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+    }
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
 def _migrate_single_recordings(conn) -> None:
@@ -370,6 +427,7 @@ def _recordings(conn, meeting_id: int):
     items = []
     for index, row in enumerate(rows, 1):
         seconds = int(row["seconds"] or 0)
+        extension = Path(str(_row_value(row, "filename"))).suffix.lower()
         items.append({
             "id": int(row["id"]),
             "no": index,
@@ -379,6 +437,17 @@ def _recordings(conn, meeting_id: int):
             "length": f"{seconds // 60:02d}:{seconds % 60:02d}",
             "uploaded_by": row["uploaded_by"],
             "created_at": str(row["created_at"] or "")[:16],
+            "mime_type": (
+                str(_row_value(row, "mime_type"))
+                or RECORDING_EXTENSION_MIMES.get(extension, "audio/webm")
+            ),
+            "url": url_for(
+                "meeting.serve_recording", meeting_id=meeting_id, recording_id=int(row["id"])
+            ),
+            "download_url": url_for(
+                "meeting.serve_recording", meeting_id=meeting_id,
+                recording_id=int(row["id"]), download=1,
+            ),
         })
     return items
 
@@ -548,28 +617,60 @@ def _build_material_pages(conn, meeting_id: int, material_id: int, extension: st
     return len(frames)
 
 
+def _row_value(row, key, default=""):
+    """예전 스키마로 만들어진 행에도 안전하게 접근한다."""
+    try:
+        value = row[key]
+    except (IndexError, KeyError):
+        return default
+    return default if value is None else value
+
+
 def _ensure_material_pages(conn, material) -> None:
-    """미리보기가 아직 없는 자료(예전에 올린 것)를 열람 시점에 한 번 만들어 둔다."""
-    extension = str(material["extension"] or "").lower()
+    """미리보기가 아직 없는 자료(예전에 올린 것)를 열람 시점에 한 번 만들어 둔다.
+
+    한 번 실패한 자료는 상태를 남겨 두고 다시 시도하지 않는다. 그러지 않으면
+    변환할 수 없는 자료가 있는 회의는 화면을 열 때마다 파일을 통째로 다시
+    읽어 느려진다.
+    """
+    extension = str(_row_value(material, "extension")).lower()
+    material_id = int(material["id"])
     if not _can_convert(extension):
+        if str(_row_value(material, "preview_state")) != "skip":
+            conn.execute(
+                "UPDATE meeting_materials SET preview_state='skip' WHERE id=?",
+                (material_id,),
+            )
+            conn.commit()
+        return
+    if str(_row_value(material, "preview_state")) in {"done", "failed"}:
         return
     existing = conn.execute(
         "SELECT COUNT(*) AS c FROM meeting_material_pages WHERE material_id=?",
-        (material["id"],),
+        (material_id,),
     ).fetchone()["c"]
     if existing:
+        conn.execute(
+            "UPDATE meeting_materials SET preview_state='done' WHERE id=?", (material_id,)
+        )
+        conn.commit()
         return
-    stored = str(material["stored_path"] or "")
+    stored = str(_row_value(material, "stored_path"))
     if not stored or not os.path.isfile(stored):
         return
+    state = "failed"
     try:
         data = read_decrypted(stored, MAX_MATERIAL_BYTES)
-    except (OSError, ValueError):
-        return
-    if _build_material_pages(
-        conn, int(material["meeting_id"]), int(material["id"]), extension, data
-    ):
-        conn.commit()
+        if _build_material_pages(
+            conn, int(material["meeting_id"]), material_id, extension, data
+        ):
+            state = "done"
+    except Exception as exc:  # 변환 실패로 화면 전체가 죽지 않게 한다.
+        current_app.logger.warning("회의 자료 미리보기 생성 실패(id=%s): %s", material_id, exc)
+    conn.execute(
+        "UPDATE meeting_materials SET preview_state=? WHERE id=?", (state, material_id)
+    )
+    conn.commit()
 
 
 def _pages_by_material(conn, meeting_id: int) -> dict:
@@ -658,6 +759,48 @@ def _meeting_context(conn, meeting, build_previews: bool = False):
 # ---------------------------------------------------------------------------
 # 1단계 : 회의 목록 · 생성
 # ---------------------------------------------------------------------------
+
+
+def _wants_json() -> bool:
+    """진행 화면의 자동 저장처럼 스크립트가 부른 요청인지 판단한다."""
+    return bool(
+        request.is_json
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or request.accept_mimetypes.best == "application/json"
+    )
+
+
+@meeting_bp.errorhandler(RequestEntityTooLarge)
+def _too_large(_error):
+    message = (
+        "파일이 서버에서 받을 수 있는 크기를 넘었습니다. "
+        f"자료는 {MAX_MATERIAL_BYTES // (1024 * 1024)}MB, "
+        f"녹음은 한 회차에 {MAX_RECORDING_BYTES // (1024 * 1024)}MB까지 올릴 수 있습니다."
+    )
+    if _wants_json():
+        return jsonify({"status": "error", "message": message}), 413
+    flash(message, "error")
+    # 돌아갈 곳은 요청 주소에서 직접 얻는다(Referer는 바깥에서 조작될 수 있다).
+    meeting_id = (request.view_args or {}).get("meeting_id")
+    if meeting_id:
+        return redirect(url_for("meeting.meeting_detail", meeting_id=meeting_id))
+    return redirect(url_for("meeting.meeting_list"))
+
+
+@meeting_bp.errorhandler(401)
+def _needs_login(_error):
+    message = "로그인이 풀렸습니다. 새 창에서 다시 로그인한 뒤 저장해 주세요."
+    if _wants_json():
+        return jsonify({"status": "error", "code": "login_required", "message": message}), 401
+    return message, 401
+
+
+@meeting_bp.errorhandler(403)
+def _forbidden(_error):
+    message = "이 회의에 대한 권한이 없습니다."
+    if _wants_json():
+        return jsonify({"status": "error", "message": message}), 403
+    return message, 403
 
 
 @meeting_bp.route("/")
@@ -1089,7 +1232,12 @@ def move_agenda(meeting_id, agenda_id):
 
 
 def _save_materials(conn, meeting_id: int, agenda_id: int, uploads):
-    """안건(또는 공용) 자료를 저장하고 (저장수, 실패메시지목록)을 돌려준다."""
+    """안건(또는 공용) 자료를 저장하고 (저장수, 실패메시지목록)을 돌려준다.
+
+    올린 파일을 먼저 확정 저장(commit)한 뒤에 미리보기 그림을 만든다. 변환은
+    큰 PDF에서 시간과 메모리를 많이 쓰므로, 변환이 실패하거나 서버가 도중에
+    재시작되어도 올린 자료 자체는 절대 사라지지 않게 하기 위함이다.
+    """
     files = [item for item in uploads if item and item.filename]
     if not files:
         return 0, []
@@ -1097,7 +1245,7 @@ def _save_materials(conn, meeting_id: int, agenda_id: int, uploads):
         "SELECT COUNT(*) AS c FROM meeting_materials WHERE meeting_id=? AND agenda_id=?",
         (meeting_id, agenda_id),
     ).fetchone()["c"]
-    stored, failures = 0, []
+    stored, failures, pending = 0, [], []
     for upload in files:
         if existing + stored >= MAX_MATERIALS_PER_AGENDA:
             failures.append(
@@ -1112,25 +1260,49 @@ def _save_materials(conn, meeting_id: int, agenda_id: int, uploads):
         except ValueError as exc:
             failures.append(str(exc))
             continue
+        except OSError as exc:
+            current_app.logger.exception("회의 자료 저장 실패: %s", exc)
+            failures.append(
+                f"‘{original_filename(upload.filename, 'file')}’을(를) 저장하지 못했습니다."
+            )
+            continue
         cursor = conn.execute(
             """INSERT INTO meeting_materials
                (meeting_id, agenda_id, filename, stored_path, extension, size_bytes,
-                uploaded_by, uploaded_by_emp_no)
-               VALUES (?,?,?,?,?,?,?,?)""",
+                uploaded_by, uploaded_by_emp_no, preview_state)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
             (
                 meeting_id, agenda_id, name, path, extension, size,
                 _current_name(), _emp_no(),
+                "pending" if _can_convert(extension) else "skip",
             ),
         )
-        # 올리는 즉시 쪽마다 그림으로 바꿔 둔다(진행 화면에서 바로 뿌리기 위함).
-        try:
-            upload.stream.seek(0)
-            _build_material_pages(
-                conn, meeting_id, cursor.lastrowid, extension, upload.stream.read()
-            )
-        except OSError as exc:
-            current_app.logger.warning("회의 자료 변환 건너뜀(%s): %s", name, exc)
+        if _can_convert(extension):
+            pending.append((int(cursor.lastrowid), name, extension, path))
         stored += 1
+
+    # 여기까지가 '올리기'다. 변환 전에 확정해 두면 자료를 잃지 않는다.
+    _touch(conn, meeting_id)
+    conn.commit()
+
+    # 미리보기 변환은 실패해도 자료는 그대로 남는다(내려받기로 볼 수 있다).
+    for material_id, name, extension, path in pending:
+        state = "failed"
+        try:
+            data = read_decrypted(path, MAX_MATERIAL_BYTES)
+            if _build_material_pages(conn, meeting_id, material_id, extension, data):
+                state = "done"
+        except Exception as exc:  # 변환 실패가 업로드 실패로 번지지 않게 한다.
+            current_app.logger.warning("회의 자료 변환 건너뜀(%s): %s", name, exc)
+        conn.execute(
+            "UPDATE meeting_materials SET preview_state=? WHERE id=?", (state, material_id)
+        )
+        conn.commit()
+        if state == "failed":
+            failures.append(
+                f"‘{name}’은(는) 올렸지만 화면용 그림으로 바꾸지 못했습니다. "
+                "진행 화면에서는 내려받기로 보실 수 있습니다."
+            )
     return stored, failures
 
 
@@ -1304,7 +1476,11 @@ def live_meeting(meeting_id):
         for item in context["agendas"]
     ]
     return render_template(
-        "meeting/live.html", stage_data=stage_data, recordings=recordings, **context
+        "meeting/live.html", stage_data=stage_data, recordings=recordings,
+        transcript_revision=int(_row_value(meeting, "transcript_revision", 0) or 0),
+        max_transcript_chars=MAX_TRANSCRIPT_CHARS,
+        max_recording_mb=MAX_RECORDING_BYTES // (1024 * 1024),
+        **context
     )
 
 
@@ -1406,9 +1582,31 @@ def save_decision(meeting_id, agenda_id):
     })
 
 
+def _merge_transcripts(server_text: str, client_text: str) -> str:
+    """두 사람이 동시에 받아 적었을 때 어느 쪽 기록도 지우지 않고 합친다.
+
+    받아쓰기는 ``[시:분] 말한 내용`` 형태의 줄이 쌓이는 구조이므로, 서버에 이미
+    있는 줄을 그대로 두고 그 안에 없는 줄만 뒤에 이어 붙인다.
+    """
+    server_lines = server_text.split("\n")
+    known = {line.strip() for line in server_lines if line.strip()}
+    extra = [
+        line for line in client_text.split("\n")
+        if line.strip() and line.strip() not in known
+    ]
+    if not extra:
+        return server_text
+    merged = "\n".join(server_lines + extra)
+    return merged[:MAX_TRANSCRIPT_CHARS]
+
+
 @meeting_bp.route("/<int:meeting_id>/transcript", methods=["POST"])
 def save_transcript(meeting_id):
-    """진행 화면에서 받아 적은 회의 내용을 저장한다."""
+    """진행 화면에서 받아 적은 회의 내용을 저장한다.
+
+    화면에서 마지막으로 받아 간 판번호(base_revision)를 함께 보내면, 그 사이에
+    다른 참석자가 저장한 내용이 있는지 확인해 두 기록을 합쳐 저장한다.
+    """
     _require_staff()
     payload = request.get_json(silent=True) or request.form
     conn = get_db()
@@ -1417,10 +1615,23 @@ def save_transcript(meeting_id):
         if not _can_join(conn, meeting):
             return jsonify({"status": "error", "message": "참석자만 기록할 수 있습니다."}), 403
         text = _clean_multiline(payload.get("transcript"), MAX_TRANSCRIPT_CHARS)
+        current_text = str(_row_value(meeting, "transcript"))
+        current_revision = int(_row_value(meeting, "transcript_revision", 0) or 0)
+        try:
+            base_revision = int(payload.get("base_revision"))
+        except (TypeError, ValueError):
+            base_revision = current_revision
+
+        merged = False
+        if base_revision != current_revision and current_text.strip() != text.strip():
+            text = _merge_transcripts(current_text, text)
+            merged = True
+        revision = current_revision + 1
         conn.execute(
-            """UPDATE meetings SET transcript=?, transcript_updated_at=CURRENT_TIMESTAMP,
+            """UPDATE meetings SET transcript=?, transcript_revision=?,
+                   transcript_updated_at=CURRENT_TIMESTAMP,
                    updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-            (text, meeting_id),
+            (text, revision, meeting_id),
         )
         conn.commit()
     finally:
@@ -1428,8 +1639,28 @@ def save_transcript(meeting_id):
     return jsonify({
         "status": "success",
         "length": len(text),
+        "revision": revision,
+        "merged": merged,
+        # 합쳐진 경우에만 화면을 바꿔야 하므로 그때만 본문을 돌려준다.
+        "transcript": text if merged else None,
         "saved_at": datetime.now().strftime("%H:%M:%S"),
     })
+
+
+def _recording_extension(upload, declared_mime: str) -> str:
+    """브라우저가 만든 실제 형식에 맞는 확장자를 고른다.
+
+    크롬·엣지는 webm, 사파리와 아이폰은 mp4로 녹음한다. 확장자를 webm으로
+    고정해 두면 사파리에서 만든 녹음을 나중에 다시 들을 수 없다.
+    """
+    for candidate in (declared_mime, getattr(upload, "mimetype", "") or ""):
+        base = str(candidate or "").split(";")[0].strip().lower()
+        if base in RECORDING_MIME_EXTENSIONS:
+            return RECORDING_MIME_EXTENSIONS[base]
+    suffix = Path(original_filename(upload.filename, "recording")).suffix.lower()
+    if suffix in RECORDING_EXTENSIONS:
+        return suffix
+    return ".webm"
 
 
 @meeting_bp.route("/<int:meeting_id>/recording", methods=["POST"])
@@ -1444,31 +1675,49 @@ def upload_recording(meeting_id):
         upload = request.files.get("recording")
         if not upload or not upload.filename:
             return jsonify({"status": "error", "message": "녹음 파일이 없습니다."}), 400
+
+        declared_mime = _clean(request.form.get("mime"), 80)
+        extension = _recording_extension(upload, declared_mime)
+        # 저장 이름은 브라우저가 보낸 값 대신 실제 형식에 맞춰 다시 만든다.
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        upload.filename = f"회의녹음_{meeting_id}_{stamp}{extension}"
         try:
-            name, path, _extension, size = _store_upload(
-                upload, RECORDING_ROOT / str(meeting_id), MAX_RECORDING_BYTES, set()
+            name, path, extension, size = _store_upload(
+                upload, RECORDING_ROOT / str(meeting_id), MAX_RECORDING_BYTES,
+                RECORDING_EXTENSIONS,
             )
         except ValueError as exc:
             return jsonify({"status": "error", "message": str(exc)}), 400
+        except OSError as exc:
+            current_app.logger.exception("회의 녹음 저장 실패: %s", exc)
+            return jsonify({
+                "status": "error",
+                "message": "녹음을 서버에 저장하지 못했습니다. 잠시 후 [다시 올리기]를 눌러 주세요.",
+            }), 500
 
         try:
             seconds = max(0, int(float(request.form.get("seconds") or 0)))
         except (TypeError, ValueError):
             seconds = 0
+        mime_type = (
+            RECORDING_EXTENSION_MIMES.get(extension)
+            or str(declared_mime).split(";")[0].strip().lower()
+            or "audio/webm"
+        )
         conn.execute(
             """INSERT INTO meeting_recordings
                (meeting_id, filename, stored_path, size_bytes, seconds,
-                uploaded_by, uploaded_by_emp_no)
-               VALUES (?,?,?,?,?,?,?)""",
-            (meeting_id, name, path, size, seconds, _current_name(), _emp_no()),
+                uploaded_by, uploaded_by_emp_no, mime_type)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (meeting_id, name, path, size, seconds, _current_name(), _emp_no(), mime_type),
         )
         conn.execute(
             "UPDATE meetings SET recording_seconds=recording_seconds+?, "
             "updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (seconds, meeting_id),
         )
-        recordings = _recordings(conn, meeting_id)
         conn.commit()
+        recordings = _recordings(conn, meeting_id)
     finally:
         conn.close()
 
@@ -1495,8 +1744,17 @@ def serve_recording(meeting_id, recording_id):
         conn.close()
     if not row or not os.path.isfile(str(row["stored_path"] or "")):
         abort(404)
+    name = str(row["filename"] or "recording.webm")
+    extension = Path(name).suffix.lower()
+    # 녹음은 소리 파일이다. .webm은 기본 추측이 video/webm이라 브라우저가
+    # 빈 영상 화면을 띄우므로 소리 형식을 분명히 지정해 준다.
+    mimetype = (
+        str(_row_value(row, "mime_type"))
+        or RECORDING_EXTENSION_MIMES.get(extension, "audio/webm")
+    )
+    download = str(request.args.get("download") or "").strip() == "1"
     return encrypted_response(
-        row["stored_path"], row["filename"] or "recording.webm", as_attachment=False
+        row["stored_path"], name, as_attachment=download, mimetype=mimetype
     )
 
 

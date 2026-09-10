@@ -41,7 +41,10 @@ def widget_notifications():
         approval_pending_count = pending[0] if pending else 0
 
         # 기안함 전체
-        draft = conn.execute("SELECT COUNT(*) FROM approvals WHERE drafter = ?", (current_user,)).fetchone()
+        draft = conn.execute(
+            "SELECT COUNT(*) FROM approvals WHERE drafter = ? AND status <> '임시저장'",
+            (current_user,)
+        ).fetchone()
         approval_draft_count = draft[0] if draft else 0
         
         # 학교업무 접수 (본부 공지/자료실은 처리 대상이 아닌 공유 게시판)

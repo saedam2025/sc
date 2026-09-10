@@ -181,6 +181,9 @@ def _approval_snippet(raw):
 
 
 def _approval_visible(row, user_name):
+    # 임시저장은 아직 상신하지 않은 개인 문서라 본인만 검색된다.
+    if str(row["status"] or "").strip() == "임시저장":
+        return bool(user_name and user_name == str(row["drafter"] or "").strip())
     if is_admin_session():
         return True
     direct = {

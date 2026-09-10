@@ -23,7 +23,9 @@ from urllib.request import Request, urlopen
 
 import pdfkit
 import pandas as pd
-import yagmail
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from cryptography.fernet import Fernet, InvalidToken
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -41,7 +43,16 @@ from flask import (
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
+from .ai_mail import _csrf_token as _shared_sender_csrf_token
+from .ai_mail import _owner_emp_no
 from .database import get_db
+from .payroll import (
+    _ensure_sender_schema,
+    _payroll_sender_dict,
+    _sender_from_header,
+    _smtp_login_for_sender,
+    _verify_smtp_sender,
+)
 from .security import load_credential_secret, menu_permission_required
 from .storage import (
     APP_ROOT,
@@ -99,7 +110,6 @@ DEFAULT_CATEGORIES = [
     "원어민사업자",
 ]
 MAX_COMPANY_PROFILES = 20
-MAX_MAIL_ACCOUNTS = 10
 MONEY_FIELDS = ("수수료", "보조금", "경력수당", "직책수당", "기타")
 CONTRACT_FIELDS = (
     "계약구분",
@@ -611,108 +621,88 @@ def _sanitize_contract_html(raw_html: object) -> str:
     return result
 
 
-def _mail_account_store() -> dict:
-    """기존 단일 메일 설정도 자동으로 다중 계정 형식으로 전환한다."""
+def _active_sender_id() -> str:
+    """인증전자계약 발송에 사용할 공유 발송계정(ai_mail_senders) id를 반환한다."""
     value = _json_file(VERIFIED_MAIL_FILE, {})
-    accounts = []
-    active_id = ""
-    needs_save = False
-    if isinstance(value, dict) and isinstance(value.get("accounts"), list):
-        active_id = str(value.get("active_account_id", "")).strip()
-        for index, item in enumerate(value["accounts"]):
-            if not isinstance(item, dict):
-                needs_save = True
-                continue
-            email = str(item.get("email", "")).strip().lower()
-            encrypted_password = str(item.get("encrypted_password", "")).strip()
-            if not email:
-                needs_save = True
-                continue
-            if not encrypted_password and item.get("password"):
-                encrypted_password = _encrypt_sensitive(item["password"])
-                needs_save = True
-            accounts.append(
-                {
-                    "id": str(item.get("id") or f"verified-mail-{index + 1}"),
-                    "label": str(item.get("label") or email).strip()[:80],
-                    "email": email[:254],
-                    "encrypted_password": encrypted_password,
-                }
-            )
-    elif isinstance(value, dict):
-        username = str(value.get("MAIL_USERNAME", "")).strip().lower()
-        password = str(value.get("MAIL_PASSWORD", "")).strip()
-        if username:
-            account_id = "verified-mail-default"
-            accounts = [
-                {
-                    "id": account_id,
-                    "label": "기본 발송계정",
-                    "email": username,
-                    "encrypted_password": _encrypt_sensitive(password),
-                }
-            ]
-            active_id = account_id
-        needs_save = True
-    if len(accounts) > MAX_MAIL_ACCOUNTS:
-        accounts = accounts[:MAX_MAIL_ACCOUNTS]
-        needs_save = True
-    if not any(item["id"] == active_id for item in accounts):
-        active_id = accounts[0]["id"] if accounts else ""
-        needs_save = True
-    store = {
-        "active_account_id": active_id,
-        "accounts": accounts,
-    }
-    if needs_save:
-        _save_json(VERIFIED_MAIL_FILE, store)
-    return store
+    return str((value or {}).get("active_sender_id", "")).strip()
 
 
-def _mail_accounts_for_view(store: dict | None = None) -> list[dict[str, str]]:
-    return [
-        {
-            "id": item["id"],
-            "label": item["label"],
-            "email": item["email"],
-            "has_password": bool(item.get("encrypted_password")),
-        }
-        for item in (store or _mail_account_store())["accounts"]
-    ]
+def _set_active_sender_id(sender_id: str) -> None:
+    _save_json(VERIFIED_MAIL_FILE, {"active_sender_id": str(sender_id)})
 
 
-def _mail_settings(account_id: str | None = None) -> dict[str, str]:
-    store = _mail_account_store()
-    target_id = str(account_id or store["active_account_id"]).strip()
-    account = next(
-        (item for item in store["accounts"] if item["id"] == target_id),
-        None,
-    )
-    if not account:
-        return {"MAIL_USERNAME": "", "MAIL_PASSWORD": ""}
-    encrypted_password = str(account.get("encrypted_password", "")).strip()
-    password = ""
-    if encrypted_password:
-        try:
-            password = _sensitive_cipher().decrypt(
-                encrypted_password.encode("ascii")
-            ).decode("utf-8")
-        except (InvalidToken, UnicodeDecodeError, ValueError, TypeError) as exc:
-            raise RuntimeError(
-                "발송계정 비밀번호를 복호화할 수 없습니다. 비밀번호를 다시 저장해 주세요."
-            ) from exc
-    return {
-        "MAIL_USERNAME": account["email"],
-        "MAIL_PASSWORD": password,
-    }
+def _mail_senders_for_view(conn) -> list[dict]:
+    """스마트명세서·인감증명서와 동일한 공유 발송계정 목록을 그대로 사용한다."""
+    _ensure_sender_schema(conn)
+    rows = conn.execute(
+        """
+        SELECT * FROM ai_mail_senders
+        WHERE owner_emp_no=? AND is_active=1
+        ORDER BY updated_at DESC, id DESC
+        """,
+        (_owner_emp_no(),),
+    ).fetchall()
+    return [_payroll_sender_dict(row) for row in rows]
+
+
+def _active_sender_row(conn):
+    _ensure_sender_schema(conn)
+    sender_id = _active_sender_id()
+    row = None
+    if sender_id:
+        row = conn.execute(
+            "SELECT * FROM ai_mail_senders WHERE id=? AND owner_emp_no=? AND is_active=1",
+            (sender_id, _owner_emp_no()),
+        ).fetchone()
+    if not row:
+        row = conn.execute(
+            """
+            SELECT * FROM ai_mail_senders
+            WHERE owner_emp_no=? AND is_active=1
+            ORDER BY updated_at DESC, id DESC LIMIT 1
+            """,
+            (_owner_emp_no(),),
+        ).fetchone()
+    return row
 
 
 def _send_mail(to, subject: str, contents, attachments=None) -> None:
-    settings = _mail_settings()
-    if not settings["MAIL_USERNAME"] or not settings["MAIL_PASSWORD"]:
-        raise RuntimeError("인증전자계약 전용 메일 계정이 설정되지 않았습니다.")
-    smtp = yagmail.SMTP(settings["MAIL_USERNAME"], settings["MAIL_PASSWORD"])
-    smtp.send(to=to, subject=subject, contents=contents, attachments=attachments)
+    """스마트명세서·인감증명서와 동일한 공유 발송계정(Gmail/ZeptoMail)으로 발송한다."""
+    conn = get_db()
+    try:
+        row = _active_sender_row(conn)
+    finally:
+        conn.close()
+    if not row:
+        raise RuntimeError(
+            "인증전자계약 발송계정이 설정되지 않았습니다. 양식관리 > 발송메일계정에서 계정을 등록·선택해 주세요."
+        )
+    sender = _payroll_sender_dict(row)
+    message = MIMEMultipart()
+    message["From"] = _sender_from_header(sender)
+    message["To"] = to if isinstance(to, str) else ", ".join(to)
+    message["Subject"] = subject
+    message.attach(MIMEText(contents, "html", "utf-8"))
+    if attachments:
+        paths = attachments if isinstance(attachments, (list, tuple)) else [attachments]
+        for item in paths:
+            item_path = Path(item)
+            part = MIMEApplication(item_path.read_bytes(), _subtype="pdf")
+            part.add_header(
+                "Content-Disposition", "attachment", filename=item_path.name
+            )
+            message.attach(part)
+    smtp = _smtp_login_for_sender(sender)
+    try:
+        _verify_smtp_sender(smtp, sender)
+        smtp.send_message(
+            message, from_addr=str(sender.get("email") or "").strip().lower()
+        )
+    finally:
+        try:
+            smtp.quit()
+        except Exception:
+            smtp.close()
 
 
 def _csrf_token() -> str:
@@ -916,6 +906,102 @@ def _void_notice_html(row, reason_label: str) -> str:
     """
 
 
+def _completion_mail_html(row, pdf_hash: str, company_name: str = "") -> str:
+    """계약완료 안내메일. 면접 합격 안내메일과 같은 금테두리·한지 배경·캐릭터 결로 꾸민다."""
+    name = escape(row["signer_name"])
+    title = escape(row["title_snapshot"])
+    org_name = escape(str(company_name or "(사)새담청소년교육문화원"))
+    character_url = f"{CONTRACT_PUBLIC_ORIGIN}/static/girl_wel.png"
+    logo_url = f"{CONTRACT_PUBLIC_ORIGIN}/static/logo01.gif"
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:26px 12px 44px;background:#eceff2;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="640"
+       style="width:100%;max-width:640px;">
+<tr><td style="padding:13px;border-radius:20px;background:#f5eee0;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+       style="border:1px solid #ddd2b6;border-radius:14px;background:#fffdf6;">
+
+<tr><td style="padding:30px 30px 22px;text-align:center;border-bottom:3px double #e3d3a8;">
+    <div style="width:46px;height:46px;line-height:46px;margin:0 auto 12px;border-radius:50%;
+                border:1px solid #e3d3a8;background:#ffffff;color:#b99a55;font-size:19px;">✓</div>
+    <div style="color:#0b7a63;font-size:11px;font-weight:800;letter-spacing:.2em;">SAEDAM CONTRACT COMPLETE</div>
+    <h1 style="margin:9px 0 0;color:#182231;font-size:23px;font-weight:800;letter-spacing:-.02em;">
+        계약 체결이 완료되었습니다</h1>
+    <img src="{character_url}" alt="" width="150"
+         style="display:block;margin:0 auto 6px;width:150px;max-width:46%;height:auto;">
+    <div style="display:inline-block;margin-top:10px;padding:10px 22px;border-radius:11px;
+                background:#eef8f5;color:#0b7a63;font-size:14px;font-weight:700;">
+        <b>{name}</b> 님의 인증전자계약이 정상적으로 완료되었습니다.</div>
+</td></tr>
+
+<tr><td style="padding:24px 30px 0;color:#3b4757;font-size:14px;line-height:1.85;">
+    안녕하세요, {org_name}입니다.<br>
+    <b>{name}</b> 님, 계약서 확인과 전자서명까지 모두 마쳐주셔서 감사합니다.<br>
+    첨부해 드린 최종 계약서(PDF)는 아래 안내를 참고하시어 안전하게 보관해 주시기 바랍니다.
+</td></tr>
+
+<tr><td style="padding:20px 30px 0;">
+    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">CONTRACT</div>
+    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">체결 계약서</h2>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+           style="border:1px solid #efe6cf;border-radius:12px;overflow:hidden;">
+        <tr><td style="padding:11px 16px;color:#182231;font-size:14px;font-weight:700;background:#fbf7ec;">
+            {title}</td></tr>
+    </table>
+</td></tr>
+
+<tr><td style="padding:24px 30px 0;">
+    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">KEEP SAFE</div>
+    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">계약서 보관 안내</h2>
+    <div style="padding:14px 16px;border:1px dashed #e3d3a8;border-radius:11px;background:#fffaf0;
+                color:#7c6a44;font-size:12px;line-height:1.85;">
+        · 첨부된 계약서 PDF는 근로·수수료 관련 분쟁이 생겼을 때 중요한 증빙자료이니 별도 폴더에 안전하게 보관해 주세요.<br>
+        · 계약서 원문과 서명 이미지에는 개인정보가 담겨 있으니, 계약 당사자 외의 사람에게 전달하거나 공개된 장소에 올리지 말아 주세요.<br>
+        · 컴퓨터가 아닌 클라우드(이메일, 개인 드라이브 등)에도 사본을 하나 더 남겨 두시면 분실을 예방할 수 있습니다.
+    </div>
+</td></tr>
+
+<tr><td style="padding:24px 30px 0;">
+    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">VERIFICATION</div>
+    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">위변조 확인용 고유번호</h2>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+           style="border:1px solid #efe6cf;border-radius:12px;overflow:hidden;">
+        <tr><td style="padding:14px 16px;background:#fbf7ec;">
+            <div style="color:#7c6a44;font-size:12px;font-weight:700;margin-bottom:6px;">SHA-256</div>
+            <div style="color:#0b7a63;font-size:13px;font-weight:700;font-family:'Consolas',monospace;
+                        word-break:break-all;line-height:1.6;">{escape(pdf_hash)}</div>
+        </td></tr>
+    </table>
+    <div style="margin-top:8px;color:#6b7889;font-size:12px;line-height:1.75;">
+        이 번호는 첨부된 계약서 파일 내용으로 계산한 고유값으로, 이후 파일이 조금이라도 바뀌면 전혀 다른 값이 됩니다.<br>
+        보관하신 계약서가 원본과 같은지 확인이 필요할 때 새담 담당자에게 이 번호와 함께 문의해 주시면 되며, 평소에는 별도로 입력하거나 사용하실 필요가 없습니다.
+    </div>
+</td></tr>
+
+<tr><td style="padding:26px 30px 30px;text-align:center;">
+    <div style="color:#3b4757;font-size:14px;line-height:1.8;">
+        함께해 주셔서 감사합니다. 앞으로도 잘 부탁드립니다.</div>
+</td></tr>
+
+<tr><td style="padding:18px 20px 22px;border-top:1px solid #e3d3a8;text-align:center;
+               background:#fffaf0;border-radius:0 0 14px 14px;">
+    <img src="{logo_url}" alt="{org_name}"
+         style="display:block;margin:0 auto;height:34px;width:auto;">
+    <div style="margin-top:9px;color:#9a8a66;font-size:11px;line-height:1.7;">
+        {org_name}<br>
+        본 메일은 새담 인트라넷 인증전자계약에서 발송되었습니다.
+    </div>
+</td></tr>
+
+</table></td></tr></table>
+</td></tr></table>
+</body></html>"""
+
+
 def _excel_text(value: object) -> str:
     if value is None:
         return ""
@@ -1109,7 +1195,6 @@ def admin_page():
         )
         items.append(item)
     companies = _company_settings()
-    mail_store = _mail_account_store()
     return render_template(
         "verified_contract/admin.html",
         items=items,
@@ -1129,8 +1214,6 @@ def admin_page():
         schools=schools,
         depts=departments,
         companies=companies,
-        mail_accounts=_mail_accounts_for_view(mail_store),
-        active_mail_account_id=mail_store["active_account_id"],
         csrf_token=_csrf_token(),
         sort_key=sort_key,
         sort_dir=sort_dir,
@@ -1145,14 +1228,22 @@ def admin_page():
 def settings_page():
     """계약 목록과 분리된 인증계약 양식·발송 리소스 관리 화면."""
     companies = _company_settings()
-    mail_store = _mail_account_store()
+    conn = get_db()
+    try:
+        mail_senders = _mail_senders_for_view(conn)
+    finally:
+        conn.close()
+    active_sender_id = _active_sender_id()
+    if not any(str(item["id"]) == active_sender_id for item in mail_senders):
+        active_sender_id = str(mail_senders[0]["id"]) if mail_senders else ""
     return render_template(
         "verified_contract/settings.html",
         categories_list=_categories(),
         companies=companies,
-        mail_accounts=_mail_accounts_for_view(mail_store),
-        active_mail_account_id=mail_store["active_account_id"],
+        mail_senders=mail_senders,
+        active_sender_id=active_sender_id,
         csrf_token=_csrf_token(),
+        sender_csrf_token=_shared_sender_csrf_token(),
     )
 
 
@@ -1763,6 +1854,7 @@ def bulk_send_invitations():
     sent_count = 0
     failed = []
     smtp = None
+    smtp_sender = None
     smtp_setup_error = ""
     solapi_config = None
 
@@ -1794,19 +1886,30 @@ def bulk_send_invitations():
             elif not error:
                 if smtp is None and not smtp_setup_error:
                     try:
-                        settings = _mail_settings()
-                        if not settings["MAIL_USERNAME"] or not settings["MAIL_PASSWORD"]:
-                            raise RuntimeError("인증전자계약 전용 메일 계정이 설정되지 않았습니다.")
-                        smtp = yagmail.SMTP(settings["MAIL_USERNAME"], settings["MAIL_PASSWORD"])
+                        sender_row = _active_sender_row(conn)
+                        if not sender_row:
+                            raise RuntimeError(
+                                "인증전자계약 발송계정이 설정되지 않았습니다. "
+                                "양식관리 > 발송메일계정에서 계정을 등록·선택해 주세요."
+                            )
+                        smtp_sender = _payroll_sender_dict(sender_row)
+                        smtp = _smtp_login_for_sender(smtp_sender)
                     except Exception as exc:
                         smtp_setup_error = str(exc)[:500]
                 error = smtp_setup_error
                 if smtp is not None:
                     try:
-                        smtp.send(
-                            to=recipient,
-                            subject=f"[전자계약 요청] {row['title_snapshot']}",
-                            contents=_invitation_html(row, invitation_url),
+                        message = MIMEMultipart()
+                        message["From"] = _sender_from_header(smtp_sender)
+                        message["To"] = recipient
+                        message["Subject"] = f"[전자계약 요청] {row['title_snapshot']}"
+                        message.attach(
+                            MIMEText(_invitation_html(row, invitation_url), "html", "utf-8")
+                        )
+                        _verify_smtp_sender(smtp, smtp_sender)
+                        smtp.send_message(
+                            message,
+                            from_addr=str(smtp_sender.get("email") or "").strip().lower(),
                         )
                     except Exception as exc:
                         error = str(exc)[:500]
@@ -1866,6 +1969,14 @@ def bulk_send_invitations():
         conn.commit()
     finally:
         conn.close()
+        if smtp is not None:
+            try:
+                smtp.quit()
+            except Exception:
+                try:
+                    smtp.close()
+                except Exception:
+                    pass
     return jsonify(
         {
             "status": "warning" if failed else "success",
@@ -2219,6 +2330,96 @@ def admin_download(contract_id: int):
     return encrypted_response(path, path.name, as_attachment=True, mimetype='application/pdf')
 
 
+@verified_contract_bp.route("/admin/<int:contract_id>/preview")
+@menu_permission_required("verified_contract_admin")
+def admin_preview(contract_id: int):
+    """계약자에게 실제로 발송되기 전, 등록된 정보로 채워질 계약서를 미리 확인한다."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM verified_contracts WHERE id=?", (contract_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return "계약을 찾을 수 없습니다.", 404
+    contract_data = json.loads(row["contract_data_json"] or "{}")
+    company = json.loads(row["company_snapshot_json"] or "{}")
+    values = _public_values(row, contract_data, company)
+    values["연락처"] = escape(str(contract_data.get("연락처") or row["signer_phone"] or ""))
+    values["거주지"] = escape(str(contract_data.get("거주지") or row["signer_address"] or ""))
+    content1 = _render_terms(row["terms1_snapshot"], values)
+    content2 = _render_terms(row["terms2_snapshot"], values)
+    stamp = _stamp_data_uri(company)
+    company_text = " ".join(
+        escape(str(company.get(key, "")))
+        for key in ("company_name", "representative_title", "representative_name")
+        if company.get(key)
+    )
+    sign_block = f"""
+      <div class="sign">
+        <p class="sign-date">서명일: (서명 예정)</p>
+        <div class="party"><b>[위탁자]</b>
+          <p class="party-line">{company_text}{f'<img class="stamp" src="{stamp}">' if stamp else ''}</p>
+        </div>
+        <div class="party"><b>[수탁자]</b>
+          <p class="party-line">성명: {escape(row['signer_name'])}</p>
+          <table class="sign-table"><tr>
+            <td class="sign-label">서명:</td>
+            <td class="sign-cell sign-cell-empty">계약자 서명 예정</td>
+          </tr></table>
+        </div>
+      </div>
+    """
+    html = f"""
+    <!doctype html><html lang="ko"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex,nofollow,noarchive">
+    <title>계약서 미리보기 - {escape(row['signer_name'])}</title>
+    <style>
+    *{{box-sizing:border-box}}
+    body{{color:#111;font-size:15px;line-height:1.72;word-break:keep-all;font-family:'Noto Sans KR','Malgun Gothic',Arial,sans-serif;background:#5b6b82;margin:0;padding:24px 0}}
+    .preview-banner{{max-width:900px;margin:0 auto 16px;padding:12px 18px;background:#fff3cd;border:1px solid #f0c766;border-radius:8px;color:#7a5b00;font-size:.88rem;text-align:center}}
+    .sheet{{max-width:900px;margin:0 auto;background:#fff;padding:40px 46px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25)}}
+    h1{{font-size:24px;text-align:center;text-decoration:underline;margin:10px 0 28px}}
+    .info{{width:100%;border-collapse:collapse;margin-bottom:24px;table-layout:fixed}}
+    .info th,.info td{{border-bottom:1px solid #ccc;padding:8px;text-align:left}}
+    .info th{{width:110px}}
+    .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
+    .terms th,.terms td{{border:1px solid #333;padding:7px}}
+    .terms p{{margin:0 0 8px}}
+    .terms{{margin-bottom:48px}}
+    .sign{{margin-top:48px;min-height:250px}}
+    .sign-date{{text-align:center;margin:40px 0 124px}}
+    .party{{width:44%;display:inline-block;vertical-align:top}}
+    .party+.party{{margin-left:8%}}
+    .party-line{{margin:8px 0 0}}
+    .stamp{{width:76px;vertical-align:middle;margin-left:8px}}
+    .sign-table{{border-collapse:collapse;margin-top:6px}}
+    .sign-label{{vertical-align:bottom;padding:0 6px 5px 0;white-space:nowrap}}
+    .sign-cell{{width:225px;border-bottom:1px solid #222;padding:14px 0 5px}}
+    .sign-cell-empty{{color:#aaa;text-align:center;font-size:.82rem}}
+    </style></head><body>
+      <div class="preview-banner">⚠ 미리보기 화면입니다. 실제 발송·서명되는 계약서가 아니며 법적 효력이 없습니다.</div>
+      <div class="sheet">
+      <div style="text-align:center;margin-bottom:14px"><img src="https://www.saedam.org/img/logo01.gif" style="max-width:112px"></div>
+      <h1>{escape(row['title_snapshot'])}</h1>
+      <table class="info">
+        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>(서명 시 입력)</td></tr>
+        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
+        <tr><th>연락처</th><td>{values.get('연락처','') or '(서명 시 입력)'}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
+        <tr><th>주소</th><td colspan="3">{values.get('거주지','') or '(서명 시 입력)'}</td></tr>
+        <tr><th>은행</th><td>(서명 시 입력)</td><th>계좌번호</th><td>(서명 시 입력)</td></tr>
+      </table>
+      <div class="terms">{content1}</div>
+      {sign_block}
+      {f'<div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
+      </div>
+    </body></html>
+    """
+    return html
+
+
 @verified_contract_bp.route("/admin/terms")
 @menu_permission_required("verified_contract_admin")
 def get_terms():
@@ -2329,104 +2530,29 @@ def add_category():
 @menu_permission_required("verified_contract_admin")
 @_csrf_required
 def save_mail_settings():
+    """발송계정 자체는 스마트명세서와 공유하는 /payroll/api/senders에서 등록·수정·연결테스트하고,
+    여기서는 인증전자계약에서 사용할 계정을 선택만 한다."""
     data = request.get_json(silent=True) or {}
-    action = str(data.get("action", "save")).strip()
-    account_id = str(data.get("account_id", "")).strip()
-    store = _mail_account_store()
-    accounts = store["accounts"]
-
-    if action == "select":
-        if not any(item["id"] == account_id for item in accounts):
-            return jsonify({"status": "error", "message": "발송계정을 찾을 수 없습니다."}), 404
-        store["active_account_id"] = account_id
-        _save_json(VERIFIED_MAIL_FILE, store)
-        return jsonify(
-            {
-                "status": "success",
-                "message": "선택한 계정을 계약 발송계정으로 적용했습니다.",
-                "active_account_id": account_id,
-            }
-        )
-
-    if action == "delete":
-        account = next((item for item in accounts if item["id"] == account_id), None)
-        if not account:
-            return jsonify({"status": "error", "message": "삭제할 발송계정을 찾을 수 없습니다."}), 404
-        accounts = [item for item in accounts if item["id"] != account_id]
-        if store["active_account_id"] == account_id:
-            store["active_account_id"] = accounts[0]["id"] if accounts else ""
-        store["accounts"] = accounts
-        _save_json(VERIFIED_MAIL_FILE, store)
-        return jsonify(
-            {
-                "status": "success",
-                "message": "발송계정을 삭제했습니다.",
-                "active_account_id": store["active_account_id"],
-                "accounts": _mail_accounts_for_view(store),
-            }
-        )
-
-    label = str(data.get("label", "")).strip()
-    email = str(data.get("email", data.get("username", ""))).strip().lower()
-    password = re.sub(r"\s+", "", str(data.get("password", "")))
-    if not label or len(label) > 80:
-        return jsonify({"status": "error", "message": "계정 이름을 입력해 주세요."}), 400
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or len(email) > 254:
-        return jsonify({"status": "error", "message": "발송 메일주소를 확인해 주세요."}), 400
-    duplicate = next(
-        (
-            item for item in accounts
-            if item["email"].lower() == email and item["id"] != account_id
-        ),
-        None,
-    )
-    if duplicate:
-        return jsonify({"status": "error", "message": "같은 발송 메일주소가 이미 등록되어 있습니다."}), 409
-
-    if action == "add":
-        if len(accounts) >= MAX_MAIL_ACCOUNTS:
-            return jsonify(
-                {
-                    "status": "error",
-                    "message": f"발송계정은 최대 {MAX_MAIL_ACCOUNTS}개까지 등록할 수 있습니다.",
-                }
-            ), 400
-        if not password:
-            return jsonify({"status": "error", "message": "새 계정의 앱 비밀번호를 입력해 주세요."}), 400
-        account_id = f"verified-mail-{secrets.token_hex(8)}"
-        account = {"id": account_id}
-        accounts.append(account)
-    else:
-        account = next((item for item in accounts if item["id"] == account_id), None)
-        if not account:
-            return jsonify({"status": "error", "message": "수정할 발송계정을 선택해 주세요."}), 404
-        if not password and not account.get("encrypted_password"):
-            return jsonify({"status": "error", "message": "앱 비밀번호를 입력해 주세요."}), 400
-
-    account.update(
-        {
-            "label": label,
-            "email": email,
-            "encrypted_password": (
-                _encrypt_sensitive(password)
-                if password
-                else account.get("encrypted_password", "")
-            ),
-        }
-    )
-    store["active_account_id"] = account_id
-    store["accounts"] = accounts
-    _save_json(VERIFIED_MAIL_FILE, store)
+    sender_id = str(data.get("sender_id") or data.get("account_id") or "").strip()
+    if not sender_id:
+        return jsonify({"status": "error", "message": "사용할 발송계정을 선택해 주세요."}), 400
+    conn = get_db()
+    try:
+        _ensure_sender_schema(conn)
+        row = conn.execute(
+            "SELECT id FROM ai_mail_senders WHERE id=? AND owner_emp_no=? AND is_active=1",
+            (sender_id, _owner_emp_no()),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"status": "error", "message": "발송계정을 찾을 수 없습니다."}), 404
+    _set_active_sender_id(sender_id)
     return jsonify(
         {
             "status": "success",
-            "message": (
-                "새 발송계정을 저장하고 적용했습니다."
-                if action == "add"
-                else "발송계정 정보를 수정하고 적용했습니다."
-            ),
-            "active_account_id": account_id,
-            "accounts": _mail_accounts_for_view(store),
+            "message": "선택한 계정을 계약 발송계정으로 적용했습니다.",
+            "active_sender_id": sender_id,
         }
     )
 
@@ -2862,6 +2988,21 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
         for key in ("company_name", "representative_title", "representative_name")
         if company.get(key)
     )
+    sign_block = f"""
+      <div class="sign">
+        <p class="sign-date">{signed_at.astimezone(KST).strftime('%Y년 %m월 %d일')}</p>
+        <div class="party"><b>[위탁자]</b>
+          <p class="party-line">{company_text}{f'<img class="stamp" src="{stamp}">' if stamp else ''}</p>
+        </div>
+        <div class="party"><b>[수탁자]</b>
+          <p class="party-line">성명: {escape(row['signer_name'])}</p>
+          <table class="sign-table"><tr>
+            <td class="sign-label">서명:</td>
+            <td class="sign-cell"><img class="sign-img" src="{signature_uri}"></td>
+          </tr></table>
+        </div>
+      </div>
+    """
     html = f"""
     <!doctype html><html><head><meta charset="utf-8"><style>
     {_pdf_font_css()}
@@ -2873,9 +3014,17 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
     .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
     .terms th,.terms td{{border:1px solid #333;padding:7px}}
     .terms p{{margin:0 0 8px}}
-    .sign{{margin-top:35px;min-height:210px;page-break-inside:avoid}}
-    .party{{width:42%;display:inline-block;vertical-align:top;position:relative}}
-    .party+.party{{margin-left:10%}}
+    .terms{{margin-bottom:48px}}
+    .sign{{margin-top:48px;min-height:250px;page-break-inside:avoid}}
+    .sign-date{{text-align:center;margin:40px 0 124px}}
+    .party{{width:44%;display:inline-block;vertical-align:top}}
+    .party+.party{{margin-left:8%}}
+    .party-line{{margin:8px 0 0}}
+    .stamp{{width:76px;vertical-align:middle;margin-left:8px}}
+    .sign-table{{border-collapse:collapse;margin-top:6px}}
+    .sign-label{{vertical-align:bottom;padding:0 6px 5px 0;white-space:nowrap}}
+    .sign-cell{{width:225px;border-bottom:1px solid #222;padding:14px 0 5px}}
+    .sign-img{{display:block;width:225px;height:auto;max-height:100px}}
     .evidence{{border:1px solid #9fb3c8;background:#f5f8fb;padding:14px;margin-top:25px;font-size:12px}}
     .evidence li{{margin:5px 0}}
     </style></head><body>
@@ -2889,16 +3038,8 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
         <tr><th>은행</th><td>{values.get('은행','')}</td><th>계좌번호</th><td>{values.get('계좌번호','')}</td></tr>
       </table>
       <div class="terms">{content1}</div>
-      <div class="sign">
-        <p style="text-align:center">{signed_at.astimezone(KST).strftime('%Y년 %m월 %d일')}</p>
-        <div class="party"><b>[계약기관]</b><p>{company_text}</p>
-          {f'<img src="{stamp}" style="width:85px;position:absolute;right:45px;top:18px">' if stamp else ''}
-        </div>
-        <div class="party"><b>[계약자]</b><p>성명: {escape(row['signer_name'])}<br>
-          서명: <img src="{signature_uri}" style="width:225px;max-height:105px;border-bottom:1px solid #222;vertical-align:middle"></p>
-        </div>
-      </div>
-      {f'<div style="page-break-before:always"></div><div class="terms">{content2}</div>' if content2.strip() else ''}
+      {sign_block}
+      {f'<div style="page-break-before:always"></div><div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
       <div class="evidence"><b>전자계약 확인기록</b><ul>{agreement_html}</ul>
         <p>본인 인증 완료: {escape(_format_kst(row['verified_at']))}<br>
         전자서명 완료: {signed_at.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S KST')}<br>
@@ -3077,7 +3218,12 @@ def complete_contract(token: str):
 
     signer_email = str(row["signer_email"] or "").strip().lower()
     try:
-        sender = _mail_settings()["MAIL_USERNAME"]
+        sender_conn = get_db()
+        try:
+            active_sender_row = _active_sender_row(sender_conn)
+        finally:
+            sender_conn.close()
+        sender = str(active_sender_row["email"] or "").strip() if active_sender_row else ""
     except Exception:
         sender = ""
     recipients = [signer_email] if signer_email else []
@@ -3091,15 +3237,7 @@ def complete_contract(token: str):
                 _send_mail(
                     recipients,
                     f"[계약완료] {row['title_snapshot']}",
-                    (
-                        f"{row['signer_name']}님의 인증전자계약이 완료되었습니다.<br>"
-                        "첨부된 최종 계약서를 확인해 주세요.<br><br>"
-                        "계약서 위변조 확인용 고유번호(SHA-256): "
-                        f"<span style='font-family:monospace'>{pdf_hash}</span><br>"
-                        "<span style='font-size:12px;color:#64748b'>"
-                        "첨부 계약서가 이후 변경되지 않았는지 확인할 때 사용하는 번호이며, "
-                        "별도로 입력하실 필요는 없습니다.</span>"
-                    ),
+                    _completion_mail_html(row, pdf_hash, company.get("company_name")),
                     attachments=mail_pdf_path,
                 )
             mail_status, mail_error = "sent", ""
