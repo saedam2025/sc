@@ -2,7 +2,7 @@
 {% block title %}{{ meeting.title }} · 회의 진행{% endblock %}
 {% block body_class %}mt-live-body{% endblock %}
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260905-meeting">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260911-meeting">
 {% endblock %}
 {% block content %}
 <div class="mt-live" id="mtLive"
@@ -11,7 +11,11 @@
      data-transcript-url="{{ url_for('meeting.save_transcript', meeting_id=meeting.id) }}"
      data-recording-url="{{ url_for('meeting.upload_recording', meeting_id=meeting.id) }}"
      data-minutes-url="{{ url_for('meeting.generate_minutes', meeting_id=meeting.id) }}"
+     data-transcript-revision="{{ transcript_revision }}"
      data-can-manage="{{ 1 if can_manage else 0 }}">
+
+  <!-- 저장이 막힌 상태(로그인 만료·인터넷 끊김)를 놓치지 않게 계속 띄워 둔다. -->
+  <div class="mt-live-alert" id="mtAlert" hidden></div>
 
   <header class="mt-live-bar">
     <a class="mt-lbtn" href="{{ url_for('meeting.meeting_detail', meeting_id=meeting.id) }}" title="안건·자료 화면으로">
@@ -64,7 +68,8 @@
       </div>
 
       <div class="mt-rec-list" id="mtRecList" data-meeting-id="{{ meeting.id }}">
-        <h3><i class="fa-solid fa-waveform-lines"></i> 녹음 <span id="mtRecCount">{{ recordings|length }}</span>개</h3>
+        <h3><i class="fa-solid fa-waveform-lines"></i> 녹음 <span id="mtRecCount">{{ recordings|length }}</span>회차
+          <small>5분마다 자동 저장</small></h3>
         <div id="mtRecItems"></div>
       </div>
     </section>
@@ -139,5 +144,5 @@
 <script id="mtRecData" type="application/json">{{ recordings|tojson }}</script>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/meeting_live.js') }}?v=20260905-meeting"></script>
+<script src="{{ url_for('static', filename='js/meeting_live.js') }}?v=20260911-meeting"></script>
 {% endblock %}

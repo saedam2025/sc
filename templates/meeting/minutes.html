@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ meeting.title }} · 회의록{% endblock %}
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260905-meeting">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/meeting.css') }}?v=20260911-meeting">
 {% endblock %}
 {% block content %}
 <div class="mt-page" id="mtMinutesPage" data-generate-url="{{ url_for('meeting.generate_minutes', meeting_id=meeting.id) }}">
@@ -206,6 +206,10 @@
         <span>{{ item.length }} · {{ item.size_kb }}KB · {{ item.created_at }}{% if item.uploaded_by %} · {{ item.uploaded_by }}{% endif %}</span>
       </div>
       <audio controls preload="none" src="{{ url_for('meeting.serve_recording', meeting_id=meeting.id, recording_id=item.id) }}"></audio>
+      <a class="mt-btn sm" title="내 PC로 내려받기" download="{{ item.filename }}"
+         href="{{ url_for('meeting.serve_recording', meeting_id=meeting.id, recording_id=item.id, download=1) }}">
+        <i class="fa-solid fa-download"></i>
+      </a>
       {% if can_manage %}
       <form method="post" action="{{ url_for('meeting.delete_recording', meeting_id=meeting.id, recording_id=item.id) }}"
             onsubmit="return confirm('{{ item.no }}회차 녹음을 삭제할까요?');">
