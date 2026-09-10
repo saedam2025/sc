@@ -646,23 +646,32 @@ def _mail_senders_for_view(conn) -> list[dict]:
 
 
 def _active_sender_row(conn):
+    """설정에서 지정한 발송계정을 가져온다.
+
+    인증번호·계약완료 메일은 관리자 세션이 없는 계약자(외부인)가 여는 화면에서도
+    발송되므로, 이미 골라 둔 sender_id는 owner_emp_no(로그인 세션)와 무관하게
+    조회해야 한다. owner_emp_no로 제한하면 계약자 쪽 요청에서는 세션이 비어 있어
+    항상 계정을 못 찾거나 엉뚱한 계정으로 새어나간다.
+    """
     _ensure_sender_schema(conn)
     sender_id = _active_sender_id()
     row = None
     if sender_id:
         row = conn.execute(
-            "SELECT * FROM ai_mail_senders WHERE id=? AND owner_emp_no=? AND is_active=1",
-            (sender_id, _owner_emp_no()),
+            "SELECT * FROM ai_mail_senders WHERE id=? AND is_active=1",
+            (sender_id,),
         ).fetchone()
     if not row:
-        row = conn.execute(
-            """
-            SELECT * FROM ai_mail_senders
-            WHERE owner_emp_no=? AND is_active=1
-            ORDER BY updated_at DESC, id DESC LIMIT 1
-            """,
-            (_owner_emp_no(),),
-        ).fetchone()
+        owner = _owner_emp_no()
+        if owner:
+            row = conn.execute(
+                """
+                SELECT * FROM ai_mail_senders
+                WHERE owner_emp_no=? AND is_active=1
+                ORDER BY updated_at DESC, id DESC LIMIT 1
+                """,
+                (owner,),
+            ).fetchone()
     return row
 
 
