@@ -598,7 +598,23 @@ body.mt-live-body { overflow: hidden; }
 .mt-rec-item span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mt-rec-item a { color: #cbd5e1; text-decoration: none; flex: none; }
 .mt-rec-item a:hover { color: #fff; }
+.mt-rec-item.is-pending { border-color: rgba(251, 191, 36, .55); background: rgba(251, 191, 36, .1); }
+.mt-rec-item.is-pending b { color: #fbbf24; }
+.mt-rec-mini {
+  flex: none; padding: 0; border: 0; background: none; cursor: pointer;
+  color: #cbd5e1; font-size: .8rem; line-height: 1;
+}
+.mt-rec-mini:hover { color: #fff; }
+.mt-rec-list h3 small { margin-left: 6px; font-weight: 700; color: #64748b; }
 .mt-rec-empty { font-size: .7rem; font-weight: 700; color: #64748b; }
+
+/* 저장이 막힌 상태를 알리는 줄. 화면 맨 위에 계속 남는다. */
+.mt-live-alert {
+  flex: none; padding: 9px 16px;
+  background: #b91c1c; color: #fff;
+  font-size: .8rem; font-weight: 800; line-height: 1.5;
+}
+.mt-live-alert a { color: #fff; text-decoration: underline; }
 
 /* 오른쪽 : 결정 기록 · 받아쓰기 */
 .mt-live-form { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
