@@ -2873,19 +2873,20 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
     .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
     .terms th,.terms td{{border:1px solid #333;padding:7px}}
     .terms p{{margin:0 0 8px}}
-    .sign{{margin-top:35px;min-height:170px;page-break-inside:avoid}}
-    .party{{width:48%;display:inline-block;vertical-align:top;position:relative}}
+    .sign{{margin-top:35px;min-height:210px;page-break-inside:avoid}}
+    .party{{width:42%;display:inline-block;vertical-align:top;position:relative}}
+    .party+.party{{margin-left:10%}}
     .evidence{{border:1px solid #9fb3c8;background:#f5f8fb;padding:14px;margin-top:25px;font-size:12px}}
     .evidence li{{margin:5px 0}}
     </style></head><body>
       <div style="text-align:center;margin-bottom:14px"><img src="https://www.saedam.org/img/logo01.gif" style="max-width:112px"></div>
       <h1>{escape(row['title_snapshot'])}</h1>
       <table class="info">
-        <tr><th>학교/부서</th><td>{values.get('수탁학교명','')} / {values.get('부서명','')}</td><th>계약자</th><td>{escape(row['signer_name'])}</td></tr>
-        <tr><th>이메일</th><td>{escape(row['signer_email'])}</td><th>연락처</th><td>{values.get('연락처','')}</td></tr>
-        <tr><th>주민번호</th><td>{values.get('주민번호','')}</td><th>은행</th><td>{values.get('은행','')}</td></tr>
-        <tr><th>계좌번호</th><td colspan="3">{values.get('계좌번호','')}</td></tr>
+        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>{values.get('주민번호','')}</td></tr>
+        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
+        <tr><th>연락처</th><td>{values.get('연락처','')}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
         <tr><th>주소</th><td colspan="3">{values.get('거주지','')}</td></tr>
+        <tr><th>은행</th><td>{values.get('은행','')}</td><th>계좌번호</th><td>{values.get('계좌번호','')}</td></tr>
       </table>
       <div class="terms">{content1}</div>
       <div class="sign">
@@ -2894,7 +2895,7 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
           {f'<img src="{stamp}" style="width:85px;position:absolute;right:45px;top:18px">' if stamp else ''}
         </div>
         <div class="party"><b>[계약자]</b><p>성명: {escape(row['signer_name'])}<br>
-          서명: <img src="{signature_uri}" style="width:150px;max-height:70px;border-bottom:1px solid #222;vertical-align:middle"></p>
+          서명: <img src="{signature_uri}" style="width:225px;max-height:105px;border-bottom:1px solid #222;vertical-align:middle"></p>
         </div>
       </div>
       {f'<div style="page-break-before:always"></div><div class="terms">{content2}</div>' if content2.strip() else ''}
