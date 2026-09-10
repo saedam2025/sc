@@ -686,7 +686,9 @@ def _send_mail(to, subject: str, contents, attachments=None) -> None:
         raise RuntimeError(
             "인증전자계약 발송계정이 설정되지 않았습니다. 양식관리 > 발송메일계정에서 계정을 등록·선택해 주세요."
         )
-    sender = _payroll_sender_dict(row)
+    # _payroll_sender_dict()는 화면 표시용으로 암호화된 비밀번호를 일부러 빼고 돌려주므로
+    # 실제 SMTP 로그인에는 쓰면 안 된다(비밀번호가 없어 매번 복호화 실패로 이어진다).
+    sender = dict(row)
     message = MIMEMultipart()
     message["From"] = _sender_from_header(sender)
     message["To"] = to if isinstance(to, str) else ", ".join(to)
@@ -1901,7 +1903,8 @@ def bulk_send_invitations():
                                 "인증전자계약 발송계정이 설정되지 않았습니다. "
                                 "양식관리 > 발송메일계정에서 계정을 등록·선택해 주세요."
                             )
-                        smtp_sender = _payroll_sender_dict(sender_row)
+                        # 표시용 딕셔너리는 비밀번호를 빼고 돌려주므로 로그인에는 원본 row를 그대로 쓴다.
+                        smtp_sender = dict(sender_row)
                         smtp = _smtp_login_for_sender(smtp_sender)
                     except Exception as exc:
                         smtp_setup_error = str(exc)[:500]
