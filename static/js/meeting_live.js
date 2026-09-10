@@ -50,10 +50,13 @@
   const transcriptState = document.getElementById('mtTranscriptState');
   const toast = document.getElementById('mtToast');
 
+  const alertBox = document.getElementById('mtAlert');
+
   let current = null;      // 지금 확대해서 보고 있는 안건
   let frames = [];         // 지금 안건의 자료를 쪽 단위로 펼친 목록
   let framePos = -1;       // 확대해서 보고 있는 쪽 (-1이면 썸네일 목록)
   let toastTimer = null;
+  let sessionLost = false;
 
   function notify(message, duration) {
     if (!toast) return;
@@ -61,6 +64,93 @@
     toast.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.classList.remove('show'), duration || 1800);
+  }
+
+  /* 화면 위쪽에 계속 남는 안내줄. 저장이 막힌 상태를 사용자가 놓치지 않게 한다. */
+  function showAlert(html) {
+    if (!alertBox) { notify(String(html).replace(/<[^>]+>/g, ''), 5000); return; }
+    alertBox.innerHTML = html;
+    alertBox.hidden = false;
+  }
+
+  function clearAlert() {
+    if (!alertBox) return;
+    alertBox.hidden = true;
+    alertBox.innerHTML = '';
+  }
+
+  // ------------------------------------------------------- 서버 통신 공통부
+  /* 로그인이 풀렸을 때를 일반 오류와 구분한다. 예전에는 서버가 로그인 화면을
+     200으로 돌려주어, 실제로는 하나도 저장되지 않았는데도 화면에는 '저장됨'
+     이라고 표시됐다. */
+  class SessionError extends Error {
+    constructor() {
+      super('로그인이 풀려 저장하지 못했습니다.');
+      this.name = 'SessionError';
+    }
+  }
+
+  function markSessionLost() {
+    if (sessionLost) return;
+    sessionLost = true;
+    showAlert(
+      '<b>로그인이 풀려 저장되지 않고 있습니다.</b> '
+      + '<a href="/" target="_blank" rel="noopener">새 창에서 다시 로그인</a>한 뒤 '
+      + '이 화면으로 돌아와 [이 안건 기록 저장]을 눌러 주세요. '
+      + '적어 두신 내용은 이 화면에 그대로 남아 있습니다.'
+    );
+  }
+
+  function markSessionBack() {
+    if (!sessionLost) return;
+    sessionLost = false;
+    clearAlert();
+    notify('연결이 회복되어 다시 저장하고 있습니다.');
+  }
+
+  /* 모든 저장 요청은 이 함수를 통한다.
+     - 스크립트 요청임을 알려(X-Requested-With) 서버가 401을 주도록 한다.
+     - JSON이 아닌 응답(로그인 화면·오류 화면)은 성공으로 보지 않는다. */
+  async function request(url, options) {
+    const config = Object.assign({ credentials: 'same-origin', cache: 'no-store' }, options || {});
+    config.headers = Object.assign({
+      'X-Requested-With': 'XMLHttpRequest',
+      Accept: 'application/json',
+    }, config.headers || {});
+
+    let response;
+    try {
+      response = await fetch(url, config);
+    } catch (error) {
+      throw new Error('서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.');
+    }
+
+    let data = null;
+    if ((response.headers.get('Content-Type') || '').includes('application/json')) {
+      data = await response.json().catch(() => null);
+    }
+    if (response.status === 401 || (data && data.code === 'login_required')) {
+      markSessionLost();
+      throw new SessionError();
+    }
+    if (!response.ok) {
+      throw new Error((data && data.message) || `저장하지 못했습니다. (오류 ${response.status})`);
+    }
+    if (!data) {
+      // 200이지만 JSON이 아니면 로그인 화면 등으로 넘어간 것이다.
+      markSessionLost();
+      throw new SessionError();
+    }
+    markSessionBack();
+    return data;
+  }
+
+  function postJson(url, payload) {
+    return request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
   }
 
   // ---------------------------------------------------------------- 안건 목록
@@ -235,7 +325,7 @@
   }
 
   async function saveDecision(quiet) {
-    if (!current) return;
+    if (!current) return false;
     const agenda = current;
     const payload = {
       minutes: minutesText.value,
@@ -244,30 +334,40 @@
     };
     decisionState.textContent = '저장 중…';
     try {
-      const response = await fetch(decisionUrlBase + agenda.id, {
+      const data = await request(decisionUrlBase + agenda.id, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '저장하지 못했습니다.');
       agenda.minutes = payload.minutes;
       agenda.decision = payload.decision;
       agenda.decision_status = payload.decision_status;
       decisionState.textContent = '저장됨 ' + (data.saved_at || '');
       renderList();
       if (!quiet) notify('안건 기록을 저장했습니다.');
+      return true;
     } catch (error) {
-      decisionState.textContent = '저장 실패';
-      notify(error.message || '저장 중 오류가 발생했습니다.', 2600);
+      decisionState.textContent = error.name === 'SessionError' ? '로그인 필요' : '저장 실패';
+      // 저장에 실패하면 다시 시도한다. 회의 중 잠깐 끊긴 인터넷 때문에
+      // 적어 둔 논의·결정이 사라지지 않게 하기 위함이다.
+      scheduleDecisionRetry();
+      if (!quiet || error.name !== 'SessionError') {
+        notify(error.message || '저장 중 오류가 발생했습니다.', 2600);
+      }
+      return false;
     }
   }
 
   let decisionTimer = null;
+  let decisionRetryTimer = null;
   function scheduleDecisionSave() {
     clearTimeout(decisionTimer);
     decisionState.textContent = '입력 중…';
     decisionTimer = setTimeout(() => saveDecision(true), 1600);
+  }
+  function scheduleDecisionRetry() {
+    clearTimeout(decisionRetryTimer);
+    decisionRetryTimer = setTimeout(() => { if (isDirty()) saveDecision(true); }, 8000);
   }
   [minutesText, decisionText].forEach(node => node.addEventListener('input', scheduleDecisionSave));
   decisionStatus.addEventListener('change', () => saveDecision(true));
@@ -296,13 +396,9 @@
     const submit = addForm.querySelector('button[type=submit]');
     submit.disabled = true;
     try {
-      const response = await fetch(`/meeting/${meetingId}/live/agenda`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, summary: addSummary.value }),
+      const data = await postJson(`/meeting/${meetingId}/live/agenda`, {
+        title, summary: addSummary.value,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '안건을 추가하지 못했습니다.');
       agendas.push(data.agenda);
       if (agendaCount) agendaCount.textContent = agendas.length;
       toggleAddForm(false);
@@ -316,29 +412,89 @@
   });
 
   // ------------------------------------------------------------ 받아쓰기 저장
+  /* 받아쓰기는 한 회의를 여러 참석자가 같이 적을 수 있다. 마지막으로 서버에서
+     받은 판번호(revision)를 같이 보내면, 그 사이 다른 사람이 적은 내용이 있을 때
+     서버가 두 기록을 합쳐 돌려준다(어느 쪽도 지워지지 않는다). */
   let transcriptTimer = null;
+  let transcriptRetryTimer = null;
+  let transcriptSaving = false;
+  let transcriptRevision = Number(root.dataset.transcriptRevision || 0);
+  let savedTranscript = transcript.value;
+
+  function transcriptDirty() {
+    return transcript.value !== savedTranscript;
+  }
+
   async function saveTranscript(quiet) {
+    if (transcriptSaving) return false;
+    if (!transcriptDirty() && quiet) {
+      return true;
+    }
+    transcriptSaving = true;
+    const sending = transcript.value;
     transcriptState.textContent = '저장 중…';
     try {
-      const response = await fetch(transcriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: transcript.value }),
+      const data = await postJson(transcriptUrl, {
+        transcript: sending,
+        base_revision: transcriptRevision,
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || '저장하지 못했습니다.');
+      transcriptRevision = Number(data.revision || transcriptRevision);
+      if (data.merged && typeof data.transcript === 'string') {
+        // 그 사이 다른 참석자가 적은 내용이 있어 서버가 두 기록을 합쳐 주었다.
+        const atBottom = transcript.scrollTop + transcript.clientHeight
+          >= transcript.scrollHeight - 8;
+        // 보내는 동안 내가 더 친 글자는 지우지 않고 뒤에 남긴다.
+        const typedAfter = transcript.value.slice(sending.length);
+        transcript.value = data.transcript + typedAfter;
+        savedTranscript = data.transcript;
+        if (atBottom) transcript.scrollTop = transcript.scrollHeight;
+        notify('다른 참석자의 기록과 합쳤습니다.', 2400);
+      } else {
+        savedTranscript = sending;
+      }
       transcriptState.textContent = '저장됨 ' + (data.saved_at || '') + ' · ' + (data.length || 0) + '자';
+      clearTimeout(transcriptRetryTimer);
       if (!quiet) notify('받아쓰기를 저장했습니다.');
+      return true;
     } catch (error) {
-      transcriptState.textContent = '저장 실패';
+      transcriptState.textContent = error.name === 'SessionError'
+        ? '로그인 필요 · 저장 안 됨' : '저장 실패 · 다시 시도합니다';
+      clearTimeout(transcriptRetryTimer);
+      transcriptRetryTimer = setTimeout(() => saveTranscript(true), 8000);
+      if (!quiet) notify(error.message || '저장 중 오류가 발생했습니다.', 3000);
+      return false;
+    } finally {
+      transcriptSaving = false;
     }
   }
+
   function scheduleTranscriptSave() {
     clearTimeout(transcriptTimer);
     transcriptState.textContent = '입력 중…';
-    transcriptTimer = setTimeout(() => saveTranscript(true), 2500);
+    transcriptTimer = setTimeout(() => saveTranscript(true), 2000);
   }
   transcript.addEventListener('input', scheduleTranscriptSave);
+  // 다른 칸으로 넘어갈 때는 기다리지 않고 바로 저장한다.
+  transcript.addEventListener('blur', () => { if (transcriptDirty()) saveTranscript(true); });
+
+  /* 화면을 닫거나 탭을 옮길 때 마지막 몇 초의 기록이 사라지지 않도록,
+     응답을 기다리지 않는 sendBeacon으로 한 번 더 보낸다. */
+  function flushTranscriptBeacon() {
+    if (!transcriptDirty() || !navigator.sendBeacon) return;
+    try {
+      const body = new Blob([JSON.stringify({
+        transcript: transcript.value,
+        base_revision: transcriptRevision,
+      })], { type: 'application/json' });
+      if (navigator.sendBeacon(transcriptUrl, body)) savedTranscript = transcript.value;
+    } catch (error) { /* 못 보내면 떠나기 전 경고창이 뜬다. */ }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushTranscriptBeacon();
+    else if (transcriptDirty()) saveTranscript(true);
+  });
+  window.addEventListener('pagehide', flushTranscriptBeacon);
 
   function appendTranscript(text) {
     const line = String(text || '').trim();
@@ -416,32 +572,92 @@
   sttBtn.addEventListener('click', () => (sttOn ? stopStt() : startStt()));
 
   // ------------------------------------------------------------ 녹음
+  /* 회의는 길다. 한 번에 다 담아 두었다가 끝날 때 통째로 올리면
+     - 브라우저가 소리 전체를 메모리에 물고 있어야 하고,
+     - 중간에 창이 닫히거나 업로드가 한 번 실패하면 회의 전체가 사라진다.
+     그래서 정해진 시간마다 조각(회차)으로 끊어 그때그때 서버에 올린다.
+     회의센터는 원래 회차별 녹음을 목록으로 보여 주므로 화면 구성은 그대로다. */
+  const REC_SEGMENT_MS = 5 * 60 * 1000;   // 5분마다 한 회차로 끊어 올린다.
+  const REC_CHUNK_MS = 2000;              // 2초마다 한 덩어리씩 받아 둔다.
+
   const recBtn = document.getElementById('mtRecBtn');
   const recLabel = document.getElementById('mtRecLabel');
   const recDot = document.getElementById('mtRecDot');
   const recText = document.getElementById('mtRecText');
   const recItems = document.getElementById('mtRecItems');
   const recCount = document.getElementById('mtRecCount');
-  let recorder = null;
-  let chunks = [];
-  let recStartedAt = 0;
-  let recTimer = null;
+
+  let recorder = null;         // 지금 돌아가는 MediaRecorder
+  let recStream = null;        // 마이크 입력
+  let recStartedAt = 0;        // 이번 조각을 시작한 시각
+  let recTotalSeconds = 0;     // 이번 녹음에서 지금까지 담은 시간
+  let recTimer = null;         // 화면의 경과시간 표시
+  let recRotateTimer = null;   // 조각 나누기 예약
+  let recWanted = false;       // 사용자가 [녹음 시작]을 누른 상태인지
+  let recUploading = 0;        // 올리는 중인 조각 수
   let recordings = [];
+  const recPending = [];       // 올리지 못해 기다리는 조각들
+
   try {
     recordings = JSON.parse(document.getElementById('mtRecData').textContent || '[]');
   } catch (error) {
     recordings = [];
   }
 
-  // 회차마다 쌓인 녹음을 목록으로 보여 준다.
+  /* 브라우저마다 만들 수 있는 형식이 다르다. 크롬·엣지는 webm, 사파리와
+     아이폰은 mp4만 된다. 지원하는 형식을 골라 두고 서버에도 알려 준다. */
+  function pickMimeType() {
+    const candidates = [
+      'audio/webm;codecs=opus', 'audio/webm',
+      'audio/ogg;codecs=opus', 'audio/ogg',
+      'audio/mp4;codecs=mp4a.40.2', 'audio/mp4',
+    ];
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return '';
+    return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  function extensionFor(mimeType) {
+    const base = String(mimeType || '').split(';')[0].toLowerCase();
+    if (base.includes('ogg')) return 'ogg';
+    if (base.includes('mp4')) return 'm4a';
+    if (base.includes('mpeg')) return 'mp3';
+    if (base.includes('wav')) return 'wav';
+    return 'webm';
+  }
+
+  function fmt(seconds) {
+    const value = Math.max(0, Math.floor(seconds));
+    const mm = String(Math.floor(value / 60)).padStart(2, '0');
+    const ss = String(value % 60).padStart(2, '0');
+    return mm + ':' + ss;
+  }
+
+  function recStateText() {
+    if (recWanted) {
+      const live = recTotalSeconds + (recStartedAt ? (Date.now() - recStartedAt) / 1000 : 0);
+      return '녹음 중 ' + fmt(live)
+        + (recUploading ? ' · 저장 중 ' + recUploading + '개' : '')
+        + (recPending.length ? ' · 대기 ' + recPending.length + '개' : '');
+    }
+    if (recUploading) return '녹음 저장 중… (' + recUploading + '개)';
+    if (recPending.length) return '저장 못한 녹음 ' + recPending.length + '개';
+    if (recordings.length) return '녹음 ' + recordings.length + '회차 저장됨';
+    return '녹음 대기';
+  }
+
+  function paintRecState() {
+    if (recText) recText.textContent = recStateText();
+  }
+
+  // 회차마다 쌓인 녹음을 목록으로 보여 준다(바로 듣거나 내려받을 수 있다).
   function renderRecordings() {
     if (!recItems) return;
     recItems.innerHTML = '';
     if (recCount) recCount.textContent = recordings.length;
-    if (!recordings.length) {
+    if (!recordings.length && !recPending.length) {
       const empty = document.createElement('p');
       empty.className = 'mt-rec-empty';
-      empty.textContent = '아직 녹음이 없습니다. [녹음 시작]을 누르면 회차마다 이어서 저장됩니다.';
+      empty.textContent = '아직 녹음이 없습니다. [녹음 시작]을 누르면 5분마다 한 회차씩 자동으로 저장됩니다.';
       recItems.appendChild(empty);
       return;
     }
@@ -451,87 +667,231 @@
       const no = document.createElement('b');
       no.textContent = item.no + '회차';
       const label = document.createElement('span');
-      label.textContent = `${item.length} · ${item.size_kb}KB`;
+      label.textContent = item.length + ' · ' + item.size_kb + 'KB';
       label.title = item.filename;
+
       const play = document.createElement('a');
-      play.href = `/meeting/${meetingId}/recording/${item.id}`;
+      play.href = item.url || ('/meeting/' + meetingId + '/recording/' + item.id);
       play.target = '_blank';
       play.rel = 'noopener';
       play.title = '새 창에서 듣기';
       play.innerHTML = '<i class="fa-solid fa-circle-play"></i>';
-      row.append(no, label, play);
+
+      const save = document.createElement('a');
+      save.href = item.download_url || ('/meeting/' + meetingId + '/recording/' + item.id + '?download=1');
+      save.title = '내 PC로 내려받기';
+      save.setAttribute('download', item.filename || '');
+      save.innerHTML = '<i class="fa-solid fa-download"></i>';
+
+      row.append(no, label, play, save);
+      recItems.appendChild(row);
+    });
+
+    // 아직 서버에 올리지 못한 조각도 눈에 보이게 두고, 직접 내려받아 보관할 수 있게 한다.
+    recPending.forEach((item, index) => {
+      const row = document.createElement('div');
+      row.className = 'mt-rec-item is-pending';
+      const no = document.createElement('b');
+      no.textContent = '대기';
+      const label = document.createElement('span');
+      label.textContent = fmt(item.seconds) + ' · 저장 실패';
+
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'mt-rec-mini';
+      retry.title = '다시 올리기';
+      retry.innerHTML = '<i class="fa-solid fa-rotate-right"></i>';
+      retry.addEventListener('click', () => flushPending(true));
+
+      const save = document.createElement('a');
+      // 목록을 다시 그릴 때마다 새 주소를 만들지 않도록 한 번만 만들어 둔다.
+      if (!item.localUrl) item.localUrl = URL.createObjectURL(item.blob);
+      save.href = item.localUrl;
+      save.download = '회의녹음_' + meetingId + '_' + (index + 1) + '.' + item.extension;
+      save.title = '이 조각을 내 PC에 보관';
+      save.innerHTML = '<i class="fa-solid fa-download"></i>';
+
+      row.append(no, label, retry, save);
       recItems.appendChild(row);
     });
   }
 
-  function recElapsed() {
-    const seconds = Math.floor((Date.now() - recStartedAt) / 1000);
-    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const ss = String(seconds % 60).padStart(2, '0');
-    return { seconds, text: `${mm}:${ss}` };
+  async function uploadSegment(blob, seconds, mimeType) {
+    const extension = extensionFor(mimeType);
+    const form = new FormData();
+    form.append('recording', blob, 'meeting_' + meetingId + '_' + Date.now() + '.' + extension);
+    form.append('seconds', String(Math.round(seconds)));
+    form.append('mime', mimeType || blob.type || '');
+    const data = await request(recordingUrl, { method: 'POST', body: form });
+    recordings = data.recordings || recordings;
+    return data;
   }
 
-  async function startRecording() {
-    if (!navigator.mediaDevices || !window.MediaRecorder) {
-      notify('이 브라우저에서는 녹음을 지원하지 않습니다.', 3000);
-      return;
-    }
-    let stream;
+  /* 조각 하나를 올린다. 실패하면 버리지 않고 대기 목록에 담아 두었다가
+     [다시 올리기]를 누르거나 다음 조각을 저장할 때 함께 다시 시도한다. */
+  async function saveSegment(blob, seconds, mimeType) {
+    if (!blob || !blob.size) return;
+    recUploading += 1;
+    paintRecState();
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const data = await uploadSegment(blob, seconds, mimeType);
+      renderRecordings();
+      notify('녹음 ' + (data.count || recordings.length) + '회차를 저장했습니다.');
+      flushPending(false);
     } catch (error) {
-      notify('마이크 사용을 허용해야 녹음할 수 있습니다.', 3200);
+      recPending.push({ blob, seconds, mimeType, extension: extensionFor(mimeType) });
+      renderRecordings();
+      if (error.name !== 'SessionError') {
+        notify(error.message || '녹음을 저장하지 못했습니다. 대기 목록에 담아 두었습니다.', 4000);
+      }
+    } finally {
+      recUploading -= 1;
+      paintRecState();
+    }
+  }
+
+  async function flushPending(announce) {
+    if (!recPending.length) return;
+    const queue = recPending.splice(0, recPending.length);
+    renderRecordings();
+    for (const item of queue) {
+      recUploading += 1;
+      paintRecState();
+      try {
+        await uploadSegment(item.blob, item.seconds, item.mimeType);
+      } catch (error) {
+        recPending.push(item);
+        if (announce && error.name !== 'SessionError') {
+          notify(error.message || '아직 저장하지 못했습니다.', 3200);
+        }
+      } finally {
+        recUploading -= 1;
+      }
+    }
+    renderRecordings();
+    paintRecState();
+    if (announce && !recPending.length) notify('밀린 녹음을 모두 저장했습니다.');
+  }
+
+  /* MediaRecorder 한 개(=한 회차)를 시작한다. onstop에서 쓰는 값은 모두
+     지역 변수로 붙잡아 둔다. 예전에는 정지 직후 공용 recorder 변수를 비워
+     버려서 onstop이 돌 때 오류가 났고, 그 때문에 녹음이 한 번도 서버로
+     올라가지 못했다. */
+  function startSegment() {
+    if (!recStream) return;
+    const wanted = pickMimeType();
+    let instance;
+    try {
+      instance = wanted
+        ? new MediaRecorder(recStream, { mimeType: wanted, audioBitsPerSecond: 96000 })
+        : new MediaRecorder(recStream);
+    } catch (error) {
+      notify('이 브라우저에서 녹음을 시작하지 못했습니다.', 3200);
+      stopRecording();
       return;
     }
-    chunks = [];
-    recorder = new MediaRecorder(stream);
-    recorder.ondataavailable = event => { if (event.data && event.data.size) chunks.push(event.data); };
-    recorder.onstop = async () => {
-      stream.getTracks().forEach(track => track.stop());
-      const elapsed = recElapsed();
-      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-      chunks = [];
-      if (!blob.size) return;
-      recText.textContent = '업로드 중…';
-      const form = new FormData();
-      const extension = (recorder.mimeType || '').includes('ogg') ? 'ogg' : 'webm';
-      form.append('recording', blob, `meeting_${meetingId}_${Date.now()}.${extension}`);
-      form.append('seconds', String(elapsed.seconds));
-      try {
-        const response = await fetch(recordingUrl, { method: 'POST', body: form });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.message || '업로드하지 못했습니다.');
-        recordings = data.recordings || recordings;
-        renderRecordings();
-        recText.textContent = `녹음 ${data.count || recordings.length}개 저장됨 (마지막 ${elapsed.text})`;
-        notify(`녹음을 ${data.count || recordings.length}번째로 이어 붙였습니다.`);
-      } catch (error) {
-        recText.textContent = '녹음 저장 실패';
-        notify(error.message || '녹음 저장 중 오류가 발생했습니다.', 3000);
-      }
+    const actualMime = instance.mimeType || wanted || 'audio/webm';
+    const startedAt = Date.now();
+    const chunks = [];
+
+    instance.ondataavailable = event => {
+      if (event.data && event.data.size) chunks.push(event.data);
     };
-    recorder.start(1000);
-    recStartedAt = Date.now();
+    instance.onerror = () => {
+      notify('녹음 중 오류가 발생했습니다. [녹음 시작]을 다시 눌러 주세요.', 3600);
+    };
+    instance.onstop = () => {
+      const seconds = (Date.now() - startedAt) / 1000;
+      recTotalSeconds += seconds;
+      const blob = new Blob(chunks, { type: actualMime });
+      chunks.length = 0;
+      if (blob.size) saveSegment(blob, seconds, actualMime);
+      // 사용자가 아직 녹음 중이면 곧바로 다음 회차를 이어서 시작한다.
+      if (recWanted && recStream) startSegment();
+      else stopStream();
+    };
+
+    recorder = instance;
+    recStartedAt = startedAt;
+    instance.start(REC_CHUNK_MS);
+
+    clearTimeout(recRotateTimer);
+    recRotateTimer = setTimeout(() => {
+      if (recorder && recorder.state === 'recording') recorder.stop();
+    }, REC_SEGMENT_MS);
+  }
+
+  function stopStream() {
+    if (recStream) {
+      recStream.getTracks().forEach(track => track.stop());
+      recStream = null;
+    }
+  }
+
+  let recStarting = false;
+
+  async function startRecording() {
+    if (recStarting) return;          // 마이크 허용을 기다리는 동안의 두 번 누름 방지
+    if (!window.isSecureContext) {
+      notify('보안 연결(https)에서만 녹음할 수 있습니다. 주소가 https로 시작하는지 확인해 주세요.', 4200);
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+      notify('이 브라우저에서는 녹음을 지원하지 않습니다. 크롬이나 엣지에서 열어 주세요.', 3600);
+      return;
+    }
+    recStarting = true;
+    try {
+      recStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+    } catch (error) {
+      const denied = error && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
+      notify(denied
+        ? '마이크 사용을 허용해야 녹음할 수 있습니다. 주소창의 자물쇠에서 마이크를 허용해 주세요.'
+        : '마이크를 찾지 못했습니다. 연결 상태를 확인해 주세요.', 4000);
+      recStream = null;
+      return;
+    } finally {
+      recStarting = false;
+    }
+
+    recWanted = true;
+    recTotalSeconds = 0;
+    startSegment();
+    if (!recorder) { recWanted = false; stopStream(); paintRecState(); return; }
+
     recDot.classList.add('is-on');
     recBtn.classList.add('is-on');
     recLabel.textContent = '녹음 정지';
-    recTimer = setInterval(() => { recText.textContent = '녹음 중 ' + recElapsed().text; }, 1000);
-    recText.textContent = '녹음 중 00:00';
+    clearInterval(recTimer);
+    recTimer = setInterval(paintRecState, 1000);
+    paintRecState();
   }
 
   function stopRecording() {
-    if (recorder && recorder.state !== 'inactive') recorder.stop();
-    recorder = null;
+    recWanted = false;
+    clearTimeout(recRotateTimer);
     clearInterval(recTimer);
+    recStartedAt = 0;
+    // 남은 소리는 onstop이 모아 서버로 올린다. 마이크 정리도 거기서 한다.
+    if (recorder && recorder.state !== 'inactive') {
+      try { recorder.stop(); } catch (error) { stopStream(); }
+    } else {
+      stopStream();
+    }
+    recorder = null;
     recDot.classList.remove('is-on');
     recBtn.classList.remove('is-on');
     recLabel.textContent = '녹음 시작';
+    paintRecState();
   }
 
-  recBtn.addEventListener('click', () => {
-    if (recorder && recorder.state === 'recording') stopRecording();
-    else startRecording();
-  });
+  function isRecording() {
+    return recWanted;
+  }
+
+  recBtn.addEventListener('click', () => (isRecording() ? stopRecording() : startRecording()));
 
   // ------------------------------------------------------------ AI 회의록
   const minutesBtn = document.getElementById('mtMinutesBtn');
@@ -539,22 +899,23 @@
     minutesBtn.addEventListener('click', async () => {
       if (!confirm('지금까지 기록한 안건 논의·결정과 받아쓰기 내용으로 AI 회의록을 만들까요?\n실행항목은 메인화면 달력에도 자동으로 등록됩니다.')) return;
       if (sttOn) stopStt();
-      if (recorder && recorder.state === 'recording') stopRecording();
-      if (isDirty()) await saveDecision(true);
-      await saveTranscript(true);
+      if (isRecording()) stopRecording();
+      // 안건 기록과 받아쓰기를 먼저 확실히 저장한 뒤에 회의록을 만든다.
+      if (isDirty() && !(await saveDecision(true))) {
+        notify('안건 기록을 저장하지 못해 회의록 작성을 멈췄습니다.', 4000);
+        return;
+      }
+      if (!(await saveTranscript(true))) {
+        notify('받아쓰기를 저장하지 못해 회의록 작성을 멈췄습니다.', 4000);
+        return;
+      }
 
       minutesBtn.disabled = true;
       const original = minutesBtn.innerHTML;
       minutesBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>회의록 작성 중…</span>';
       notify('AI가 회의록을 작성하고 있습니다. 잠시만 기다려 주세요.', 6000);
       try {
-        const response = await fetch(minutesUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: transcript.value }),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.message || '회의록을 만들지 못했습니다.');
+        const data = await postJson(minutesUrl, { transcript: transcript.value });
         notify(`회의록을 만들었습니다. 실행항목 ${data.tasks_added || 0}건을 달력에 등록했습니다.`, 2600);
         setTimeout(() => { window.location.href = data.redirect; }, 900);
       } catch (error) {
@@ -598,13 +959,27 @@
   }
 
   // 저장하지 않은 기록이 있으면 화면을 떠나기 전에 알린다.
+  // 받아쓰기·올리지 못한 녹음·녹음 중 상태까지 모두 확인한다.
   window.addEventListener('beforeunload', event => {
-    if (!isDirty()) return;
+    if (!isDirty() && !transcriptDirty() && !recPending.length
+        && !isRecording() && !recUploading) return;
     event.preventDefault();
     event.returnValue = '';
   });
 
+  // 인터넷이 다시 붙으면 밀려 있던 저장을 스스로 이어서 끝낸다.
+  window.addEventListener('online', () => {
+    if (transcriptDirty()) saveTranscript(true);
+    if (isDirty()) saveDecision(true);
+    flushPending(true);
+  });
+  window.addEventListener('offline', () => {
+    showAlert('<b>인터넷 연결이 끊겼습니다.</b> 적으신 내용은 화면에 그대로 남아 있고, '
+      + '연결이 돌아오면 자동으로 저장됩니다.');
+  });
+
   renderList();
   renderRecordings();
+  paintRecState();
   if (agendas.length) select(agendas[0].id);
 })();
