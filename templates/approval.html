@@ -112,8 +112,7 @@
     .reject-reason-text { white-space: pre-wrap; color: var(--text-dark, #334155); font-size: 0.9rem; line-height: 1.5; }
     .reject-reason-meta { margin-top: 8px; font-size: 0.8rem; color: var(--text-gray, #64748b); }
 
-    /* 반려 사유 입력 모달 */
-    .reject-reason-modal { z-index: 10000020 !important; }
+    /* 반려 사유 입력 모달 (z-index는 .modal 규칙 뒤에서 다시 올린다) */
     .reject-reason-content {
         width: 440px;
         max-width: 92vw;
@@ -122,7 +121,11 @@
         overflow-y: auto;
         padding: 28px;
     }
-    .reject-reason-modal textarea { width: 100%; min-height: 110px; box-sizing: border-box; padding: 10px 12px; margin-top: 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; font-size: 0.88rem; resize: vertical; background: var(--input-bg, #fff); color: var(--text-dark, #0f172a); }
+    .draft-footer-temp { flex: 1; background: var(--primary-dark, #0f766e); }
+    .tab-btn.temp-tab .count-badge { background: #f59e0b; }
+    .saved-file-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; width:100%; }
+    .reject-reason-modal textarea,
+    .approve-comment-modal textarea { width: 100%; min-height: 110px; box-sizing: border-box; padding: 10px 12px; margin-top: 12px; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; font-size: 0.88rem; resize: vertical; background: var(--input-bg, #fff); color: var(--text-dark, #0f172a); }
 
     /* 모달 기본 스타일 */
     .modal { display: none; position: fixed; z-index: 9999999 !important; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
@@ -178,6 +181,10 @@
     .draft-footer-dark { width: 100%; background: var(--primary-dark, #1e3a8a); }
     .draft-footer-secondary { flex: 1; background: var(--text-gray, #94a3b8); }
 
+    /* 상세창(.modal) 위에 겹쳐 띄우는 모달들.
+       .modal 규칙보다 반드시 아래에 두어야 우선순위 싸움에서 이긴다. */
+    .reject-reason-modal,
+    .approve-comment-modal,
     .submit-review-modal { z-index: 10000020 !important; }
     .submit-review-content {
         width: 560px;
@@ -529,6 +536,9 @@
                 <button class="tab-btn reference-tab" id="tab-reference" onclick="switchTab('reference')" title="내가 참조자로 지정된 최종 완료 문서">
                     <i class="fa-solid fa-user-group"></i> 참조함 <span class="count-badge" id="count-reference">0</span>
                 </button>
+                <button class="tab-btn temp-tab" id="tab-temp" onclick="switchTab('temp')" title="아직 상신하지 않고 보관해 둔 내 문서">
+                    <i class="fa-solid fa-floppy-disk"></i> 임시저장함 <span class="count-badge" id="count-temp">0</span>
+                </button>
                 <button class="tab-btn archive-tab" id="tab-archive" onclick="switchTab('archive')" title="완료된 문서를 모아두는 보관함">
                     <i class="fa-solid fa-box-archive"></i> 완료 문서함 <span class="archive-tab-note">보관함</span> <span class="count-badge" id="count-archive">0</span>
                 </button>
@@ -682,11 +692,16 @@
                 <p id="attachment-help" style="margin:0; font-size:0.85rem; color:var(--text-gray);">이곳에 파일을 드래그하거나 클릭하여 업로드하세요.<br><span style="font-size:0.8rem; font-weight: 500; color:var(--text-gray);">(최대 10개, 총 15MB 이하)</span></p>
                 <input type="file" id="draftFile" multiple style="display:none;">
             </div>
+            <div id="saved-file-list" class="file-list"></div>
             <div id="file-list" class="file-list"></div>
 
             <div class="draft-modal-footer">
                 <button type="button" onclick="goToStep1()" class="draft-footer-btn draft-footer-secondary">
                     <i class="fa-solid fa-arrow-left"></i> 이전설정
+                </button>
+                <button type="button" id="tempSaveBtn" onclick="saveTempDraft()" class="draft-footer-btn draft-footer-temp"
+                        title="상신하지 않고 지금까지 쓴 내용을 임시저장함에 보관합니다">
+                    <i class="fa-solid fa-floppy-disk"></i> 임시저장
                 </button>
                 <button type="button" onclick="submitApproval()" class="draft-footer-btn draft-footer-primary">
                     <i class="fa-solid fa-paper-plane"></i> 최종 결재 상신
@@ -729,6 +744,27 @@
             </button>
             <button type="button" onclick="confirmRejectApproval()" class="draft-footer-btn draft-footer-primary" style="flex:2; background:#dc2626; border-color:#dc2626;">
                 <i class="fa-solid fa-ban"></i> 반려 확정
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="approveCommentModal" class="modal approve-comment-modal">
+    <div class="modal-content reject-reason-content">
+        <span onclick="closeApproveCommentModal()" style="position:absolute; right:22px; top:18px; cursor:pointer; font-size:24px; color:var(--text-gray); line-height:1;">&times;</span>
+        <h3 style="color:var(--primary-dark); margin:0; font-size:1.15rem; display:flex; align-items:center; gap:10px;">
+            <i class="fa-solid fa-check"></i> 결재 승인
+        </h3>
+        <p style="margin:10px 0 0; font-size:0.85rem; color:var(--text-gray, #64748b);">
+            남기실 참조글이 있으면 적어 주세요. 결재가 완료되면 문서 맨 아래에 함께 남습니다. (비워 두어도 승인됩니다.)
+        </p>
+        <textarea id="approveCommentInput" placeholder="예: 예산 범위 안에서 집행 바랍니다."></textarea>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+            <button type="button" onclick="closeApproveCommentModal()" class="draft-footer-btn draft-footer-secondary" style="flex:1;">
+                취소
+            </button>
+            <button type="button" onclick="confirmApproveApproval()" class="draft-footer-btn draft-footer-primary" style="flex:2;">
+                <i class="fa-solid fa-check"></i> 승인 확정
             </button>
         </div>
     </div>
@@ -781,8 +817,10 @@ const docsData = {
     'rejected': {{ rejected_docs | tojson | safe }},
     'completed': {{ completed_docs | tojson | safe }},
     'reference': {{ reference_docs | tojson | safe }},
+    'temp': {{ temp_docs | tojson | safe }},
     'archive': {{ archive_docs | tojson | safe }}
 };
+const TAB_KEYS = ['pending', 'draft', 'rejected', 'completed', 'reference', 'temp', 'archive'];
 const nextDocId = {{ next_id }};
 
 let currentTab = 'pending';
@@ -792,6 +830,13 @@ let searchTerm = '';
 
 let selectedFiles = [];
 let currentDetailDoc = null;
+/* 이어 쓰는 중인 임시저장 문서 번호. 없으면 새 문서다. */
+let currentDraftId = null;
+/* 임시저장 때 서버에 이미 올라가 있는 첨부파일 목록 */
+let savedDraftFiles = [];
+let keptSavedIndexes = new Set();
+/* 임시저장에서 되살릴 본문(상세내용·비고를 그대로 살린다) */
+let restoreDraftBodyHtml = null;
 let referenceDraftContent = '';
 let pendingEditorHeaderContent = '';
 let pendingEditorContent = null;
@@ -818,12 +863,15 @@ function setEditorHeaderContent(html) {
     if (header) header.innerHTML = pendingEditorHeaderContent;
 }
 
-function getEditorContent() {
+function getEditorBodyOnly() {
     const editor = getApprovalEditor();
-    const bodyContent = editor && editor.initialized
+    return editor && editor.initialized
         ? editor.getContent()
         : (pendingEditorContent !== null ? pendingEditorContent : (document.getElementById('approvalEditor').value || ''));
-    return pendingEditorHeaderContent + bodyContent;
+}
+
+function getEditorContent() {
+    return pendingEditorHeaderContent + getEditorBodyOnly();
 }
 
 function getEditorCells(editor) {
@@ -1228,6 +1276,7 @@ function updateCounts() {
     document.getElementById('count-rejected').innerText = docsData['rejected'].length;
     document.getElementById('count-completed').innerText = docsData['completed'].length;
     document.getElementById('count-reference').innerText = docsData['reference'].length;
+    document.getElementById('count-temp').innerText = docsData['temp'].length;
     document.getElementById('count-archive').innerText = docsData['archive'].length;
 }
 
@@ -1261,6 +1310,12 @@ function formatDocDate(value) {
     return value ? String(value).substring(0, 16) : '';
 }
 
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
+}
+
 function getRejectInfo(doc) {
     try {
         const parsed = doc.doc_data ? JSON.parse(doc.doc_data) : {};
@@ -1277,6 +1332,7 @@ function renderTable() {
         'rejected': `<tr><th style="width:12%;">문서종류</th><th style="width:33%;">제목</th><th style="width:13%;">반려자</th><th style="width:27%; text-align:left; padding-left:20px;">반려 사유</th><th style="width:15%;">반려일시</th></tr>`,
         'completed': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
         'reference': `<tr><th style="width:12%;">문서종류</th><th style="width:40%;">제목</th><th style="width:18%;">기안자</th><th style="width:15%;">완료일시</th><th style="width:15%;">결과</th></tr>`,
+        'temp': `<tr><th style="width:12%;">문서종류</th><th style="width:38%;">제목</th><th style="width:18%;">결재/수신자</th><th style="width:17%;">저장일시</th><th style="width:15%;">관리</th></tr>`,
         'archive': `<tr><th style="width:12%;">문서종류</th><th style="width:34%;">제목</th><th style="width:15%;">기안자</th><th style="width:19%;">결재/수신자</th><th style="width:12%;">완료일시</th><th style="width:8%;">상태</th></tr>`
     };
     document.getElementById('thead-data').innerHTML = headers[currentTab];
@@ -1307,7 +1363,7 @@ function renderTable() {
             const approverText = receiverText ? receiverText.substring(0,15) + (receiverText.length > 15 ? '...' : '') : `${approver1} / ${approver2}`;
             const displayCol = currentTab === 'pending' ? doc.drafter :
                                currentTab === 'draft' ? approverText : doc.drafter;
-            const dateCol = ['completed', 'reference', 'archive', 'rejected'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
+            const dateCol = ['completed', 'reference', 'archive', 'rejected', 'temp'].includes(currentTab) ? formatDocDate(doc.updated_at) : formatDocDate(doc.created_at);
 
             const statusCell = currentTab === 'draft' ? renderProgressBar(doc) : `<span class="status-badge st-${doc.status}">${doc.status}</span>`;
 
@@ -1319,6 +1375,23 @@ function renderTable() {
                     <td style="color:var(--text-dark, #475569);">${approverText}</td>
                     <td style="color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
                     <td>${statusCell}</td>
+                </tr>`;
+            } else if (currentTab === 'temp') {
+                const fileNote = (doc.attachments && doc.attachments.length)
+                    ? ` <span style="color:var(--text-gray, #94a3b8); font-weight:600;"><i class="fa-solid fa-paperclip"></i> ${doc.attachments.length}</span>` : '';
+                html += `<tr>
+                    <td onclick="openTempDraft(${doc.id})" style="cursor:pointer;"><span style="font-weight:700; color:var(--text-dark, #475569);">${doc.doc_type || ''}</span></td>
+                    <td onclick="openTempDraft(${doc.id})" style="cursor:pointer; font-weight:600; font-size:0.85rem; text-align:left; padding-left:20px;">${escapeHtml(doc.title || '(제목 없음)')}${fileNote}</td>
+                    <td onclick="openTempDraft(${doc.id})" style="cursor:pointer; color:var(--text-dark, #475569);">${escapeHtml(approverText.trim() === '/' ? '미지정' : approverText)}</td>
+                    <td onclick="openTempDraft(${doc.id})" style="cursor:pointer; color:var(--text-gray, #64748b); font-size:0.75rem;">${dateCol}</td>
+                    <td>
+                        <button type="button" class="action-btn btn-approve" style="padding:6px 12px; font-size:0.78rem; margin:0;" onclick="event.stopPropagation(); openTempDraft(${doc.id});">
+                            <i class="fa-solid fa-pen"></i> 이어쓰기
+                        </button>
+                        <button type="button" class="action-btn btn-reject" style="padding:6px 10px; font-size:0.78rem; margin-left:6px; color:#dc2626; border-color:#fecaca;" onclick="event.stopPropagation(); deleteTempDraft(${doc.id});">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
                 </tr>`;
             } else if (currentTab === 'rejected') {
                 const rejectInfo = getRejectInfo(doc);
@@ -1354,7 +1427,7 @@ function switchTab(tab) {
     currentTab = tab; currentPage = 1;
     document.getElementById('searchInput').value = ''; searchTerm = '';
     
-    ['pending', 'draft', 'rejected', 'completed', 'reference', 'archive'].forEach(t => {
+    TAB_KEYS.forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('active', t === tab);
     });
     renderTable();
@@ -1386,6 +1459,13 @@ function syncVacationDateRange() {
 function openDraftModal(docType = '기안서', keepReferenceContent = false) {
     const modalContent = document.getElementById('draftModalContent');
     modalContent.scrollTop = 0;
+
+    // 새 문서를 여는 것이므로 이어쓰기 상태를 모두 비운다.
+    currentDraftId = null;
+    savedDraftFiles = [];
+    keptSavedIndexes = new Set();
+    restoreDraftBodyHtml = null;
+    renderSavedFileList();
 
     if (!keepReferenceContent) referenceDraftContent = '';
     setEditorHeaderContent('');
@@ -1480,7 +1560,8 @@ function goToStep2() {
 
     const labelDrafter = (type === '보고서') ? '보고자' : '기안자';
     const labelDocNum = (type === '보고서') ? '보고서번호' : '문서번호';
-    const paddedId = String(nextDocId).padStart(4, '0');
+    // 임시저장에서 이어 쓰는 문서는 그때 받아 둔 번호를 그대로 쓴다.
+    const paddedId = String(currentDraftId || nextDocId).padStart(4, '0');
     const expectedDocNum = `${docYear}-${type}-${paddedId}`;
 
     let headerHtml = `<div contenteditable="false">
@@ -1562,7 +1643,8 @@ function goToStep2() {
     </table>`;
 
     setEditorHeaderContent(headerHtml);
-    setEditorContent(bodyHtml);
+    // 임시저장에서 이어 쓰는 중이면 저장해 둔 본문(상세내용·비고)을 그대로 되살린다.
+    setEditorContent(restoreDraftBodyHtml || bodyHtml);
     document.getElementById('draft-step-1').style.display = 'none';
     document.getElementById('draft-step-2').style.display = 'block';
     requestAnimationFrame(() => {
@@ -1574,54 +1656,176 @@ function goToStep2() {
     });
 }
 
-async function submitApproval() {
+/* 상신과 임시저장이 같은 내용을 보내도록 폼을 한 곳에서 만든다.
+   strict=false 이면 결재선이 비어 있어도 그대로 담는다(임시저장용). */
+function buildDraftFormData(strict) {
     const type = document.getElementById('draftType').value;
-    const title = document.getElementById('draftTitle').value;
-    if (!validateParticipantSelection()) return;
-    let formData = new FormData();
+    const title = document.getElementById('draftTitle').value.trim();
+    const formData = new FormData();
     formData.append('doc_type', type);
     formData.append('title', title);
-    
-    const fullContent = getEditorContent();
-    const docData = { "본문": fullContent };
+
+    const docData = { "본문": getEditorContent(), "body_html": getEditorBodyOnly() };
+    const vacationStart = document.getElementById('vacationStartDate').value;
+    const vacationEnd = document.getElementById('vacationEndDate').value;
     if (type === '휴가원') {
-        const vacationStart = document.getElementById('vacationStartDate').value;
-        const vacationEnd = document.getElementById('vacationEndDate').value;
-        if (!vacationStart || !vacationEnd) return alert('휴가 시작일과 종료일을 선택하세요.');
-        if (vacationEnd < vacationStart) return alert('휴가 종료일은 시작일보다 빠를 수 없습니다.');
+        if (strict) {
+            if (!vacationStart || !vacationEnd) { alert('휴가 시작일과 종료일을 선택하세요.'); return null; }
+            if (vacationEnd < vacationStart) { alert('휴가 종료일은 시작일보다 빠를 수 없습니다.'); return null; }
+        }
         docData.vacation_start_date = vacationStart;
         docData.vacation_end_date = vacationEnd;
         formData.append('vacation_start_date', vacationStart);
         formData.append('vacation_end_date', vacationEnd);
     }
     formData.append('doc_data', JSON.stringify(docData));
-    
+
     const ccs = Array.from(document.querySelectorAll('.cc-cb:checked')).map(cb => cb.value);
     formData.append('cc_receivers', ccs.join(','));
 
     if (['보고서', '업무일지', '회의록'].includes(type)) {
         const recs = Array.from(document.querySelectorAll('.recv-cb:checked')).map(cb => cb.value);
+        if (strict && recs.length === 0) { alert('수신자를 최소 1명 이상 지정해주세요.'); return null; }
         formData.append('receivers', recs.join(','));
         formData.append('approver_1', ''); formData.append('approver_2', '');
     } else {
         const app1 = document.getElementById('app1').value;
         const app2 = document.getElementById('app2').value;
-        if (!app1) return alert("1차 결재자는 필수입니다.");
-        if (app2 && app1 === app2) return alert("1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다.");
+        if (strict) {
+            if (!app1) { alert("1차 결재자는 필수입니다."); return null; }
+            if (app2 && app1 === app2) { alert("1차 결재자와 2차 결재자는 같은 사람으로 지정할 수 없습니다."); return null; }
+        }
         formData.append('approver_1', app1);
         formData.append('approver_2', app2);
         formData.append('receivers', '');
     }
 
-    selectedFiles.forEach(file => {
-        formData.append('file', file);
-    });
+    if (currentDraftId) {
+        formData.append('draft_id', currentDraftId);
+        // 이미 서버에 올라가 있는 첨부 중 남길 것만 알려 준다.
+        formData.append('keep_files', Array.from(keptSavedIndexes).sort((a, b) => a - b).join(','));
+    }
+    selectedFiles.forEach(file => formData.append('file', file));
+    return formData;
+}
 
+async function submitApproval() {
+    if (!validateParticipantSelection()) return;
+    const formData = buildDraftFormData(true);
+    if (!formData) return;
     try {
         const res = await fetch('/approval/submit', { method: 'POST', body: formData });
-        const d = await res.json();
-        alert(d.message); if(res.ok) location.reload();
+        const d = await res.json().catch(() => ({}));
+        alert(d.message || (res.ok ? '상신되었습니다.' : '상신하지 못했습니다.'));
+        if (res.ok) location.reload();
     } catch(e) { alert("상신 중 오류가 발생했습니다."); }
+}
+
+/* 상신하지 않고 지금까지 쓴 내용을 임시저장함에 보관한다. */
+async function saveTempDraft() {
+    const title = document.getElementById('draftTitle').value.trim();
+    if (!title) { alert('임시저장하려면 문서 제목을 먼저 입력해주세요.'); return; }
+    const formData = buildDraftFormData(false);
+    if (!formData) return;
+
+    const button = document.getElementById('tempSaveBtn');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 저장 중…';
+    try {
+        const res = await fetch('/approval/draft/save', { method: 'POST', body: formData });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.message || '임시저장하지 못했습니다.'); return; }
+        alert(d.message || '임시저장했습니다.');
+        location.reload();
+    } catch (e) {
+        alert('임시저장 중 오류가 발생했습니다.');
+    } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+    }
+}
+
+/* 임시저장함에서 고른 문서를 기안 작성창에 되살린다. */
+async function openTempDraft(draftId) {
+    let doc;
+    try {
+        const res = await fetch(`/approval/draft/${draftId}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(data.message || '임시저장 문서를 열 수 없습니다.'); return; }
+        doc = data.draft;
+    } catch (e) { alert('임시저장 문서를 불러오지 못했습니다.'); return; }
+
+    let parsed = {};
+    try { parsed = doc.doc_data ? JSON.parse(doc.doc_data) : {}; } catch (e) { parsed = {}; }
+
+    openDraftModal(doc.doc_type || '기안서');
+    currentDraftId = doc.id;
+    document.getElementById('draftTitle').value = doc.title || '';
+
+    if (['보고서', '업무일지', '회의록'].includes(doc.doc_type)) {
+        const recvNames = String(doc.receivers || '').split(',').map(v => v.trim()).filter(Boolean);
+        document.querySelectorAll('.recv-cb').forEach(cb => { cb.checked = recvNames.includes(cb.value); });
+    } else {
+        selectCustomOption('app1', doc.approver_1);
+        selectCustomOption('app2', doc.approver_2);
+    }
+
+    const ccNames = String(doc.cc_receivers || '').split(',').map(v => v.trim()).filter(Boolean);
+    if (ccNames.length) {
+        document.querySelectorAll('.cc-cb').forEach(cb => { cb.checked = ccNames.includes(cb.value); });
+        document.getElementById('cc-box').style.display = 'block';
+        document.getElementById('cc-toggle-icon').style.transform = 'rotate(180deg)';
+    }
+
+    if (doc.doc_type === '휴가원') {
+        document.getElementById('vacationStartDate').value = parsed.vacation_start_date || '';
+        document.getElementById('vacationEndDate').value = parsed.vacation_end_date || '';
+        syncVacationDateRange();
+    }
+
+    restoreDraftBodyHtml = parsed.body_html || null;
+    referenceDraftContent = extractReferenceDetailContent(parsed['본문'] || '');
+    savedDraftFiles = Array.isArray(doc.attachments) ? doc.attachments : [];
+    keptSavedIndexes = new Set(savedDraftFiles.map((_, index) => index));
+    renderSavedFileList();
+    updateApproverOptionStates();
+    document.getElementById('draftModalContent').scrollTop = 0;
+}
+
+async function deleteTempDraft(draftId) {
+    if (!confirm('이 임시저장 문서를 삭제할까요? 첨부한 파일도 함께 지워집니다.')) return;
+    try {
+        const res = await fetch(`/approval/draft/${draftId}/delete`, { method: 'POST' });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.message || '삭제하지 못했습니다.'); return; }
+        location.reload();
+    } catch (e) { alert('삭제 중 오류가 발생했습니다.'); }
+}
+
+/* 이어 쓰는 문서에 이미 올라가 있는 첨부파일 목록 */
+function renderSavedFileList() {
+    const box = document.getElementById('saved-file-list');
+    if (!box) return;
+    box.innerHTML = '';
+    savedDraftFiles.forEach((file, index) => {
+        if (!keptSavedIndexes.has(index)) return;
+        const sizeStr = file.size ? ` <span style="color:var(--text-gray, #94a3b8); font-weight:normal; line-height:1;">(${escapeHtml(file.size)})</span>` : '';
+        box.innerHTML += `
+            <div class="saved-file-row">
+                <div style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:var(--text-dark, #475569);">
+                    <i class="fa-solid fa-paperclip" style="color:var(--text-gray, #64748b); font-size:1rem; line-height:1;"></i>
+                    <span style="font-weight:600; line-height:1;">${escapeHtml(file.name)}</span>${sizeStr}
+                    <span style="color:var(--text-gray, #94a3b8); font-size:0.75rem;">임시저장됨</span>
+                </div>
+                <span class="remove-file" onclick="removeSavedFile(${index})" style="color:#ef4444; cursor:pointer; padding:0 5px;"><i class="fa-solid fa-xmark"></i></span>
+            </div>`;
+    });
+}
+
+function removeSavedFile(index) {
+    keptSavedIndexes.delete(index);
+    renderSavedFileList();
 }
 
 async function openDetailModal(docId) {
@@ -1642,6 +1846,14 @@ async function openDetailModal(docId) {
         document.getElementById('dt_status').className = `status-badge st-${doc.status}`;
 
         let bodyHtml = (parsed['본문'] || "").replace(/자동채번/g, docNumberStr);
+
+        // 참조자 줄이 없는 예전 문서도 지정된 참조자를 볼 수 있게 보완한다.
+        const ccList = Array.isArray(doc.cc_list) ? doc.cc_list : [];
+        if (ccList.length && !/<th[^>]*>\s*참조자\s*<\/th>/i.test(bodyHtml)) {
+            const ccRow = `<tr><th style="background: var(--widget-bg, #f8fafc); padding: 8px;">참조자</th><td style="padding: 8px;">${escapeHtml(ccList.join(', '))}</td></tr>`;
+            const anchor = /(<tr>\s*<th[^>]*>\s*(?:문서번호|보고서번호)\s*<\/th>[\s\S]*?<\/tr>)/i;
+            if (anchor.test(bodyHtml)) bodyHtml = bodyHtml.replace(anchor, `$1${ccRow}`);
+        }
         
         // 🚀 결재 완료 상세창 첨부파일 렌더링
         if(doc.attachments && doc.attachments.length) {
@@ -1847,13 +2059,13 @@ function printCompletedDocument() {
     }
 }
 
-async function sendApprovalAction(actionStr, reason) {
+async function sendApprovalAction(actionStr, reason, comment) {
     const docId = document.getElementById('currentDocId').value;
     try {
         const res = await fetch(`/approval/action/${docId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: actionStr, reason: reason || '' })
+            body: JSON.stringify({ action: actionStr, reason: reason || '', comment: comment || '' })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -1867,8 +2079,27 @@ async function sendApprovalAction(actionStr, reason) {
 
 async function processApproval(actionStr) {
     if (actionStr === 'reject') { openRejectReasonModal(); return; }
-    if (!confirm("결재를 승인하시겠습니까?")) return;
-    await sendApprovalAction('approve');
+    openApproveCommentModal();
+}
+
+function openApproveCommentModal() {
+    document.getElementById('approveCommentInput').value = '';
+    document.getElementById('approveCommentModal').style.display = 'block';
+    document.getElementById('approveCommentInput').focus();
+}
+
+function closeApproveCommentModal() {
+    document.getElementById('approveCommentModal').style.display = 'none';
+}
+
+async function confirmApproveApproval() {
+    const comment = document.getElementById('approveCommentInput').value.trim();
+    const question = comment
+        ? "남기신 참조글과 함께 결재를 승인하시겠습니까?"
+        : "결재를 승인하시겠습니까?";
+    if (!confirm(question)) return;
+    closeApproveCommentModal();
+    await sendApprovalAction('approve', '', comment);
 }
 
 function openRejectReasonModal() {
