@@ -199,6 +199,18 @@ EXEMPT_ROUTES = [
 # 엔드포인트 이름과 무관하게 로그인을 요구하지 않는 공개 경로.
 PUBLIC_PATH_PREFIXES = ('/survey/r/',)
 
+def _is_script_request() -> bool:
+    """브라우저 주소창이 아니라 화면 속 스크립트가 부른 요청인지 판단한다."""
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    if request.is_json:
+        return True
+    if request.accept_mimetypes.best == 'application/json':
+        return True
+    # fetch()는 문서 요청과 달리 Sec-Fetch-Mode: cors 로 온다.
+    return request.headers.get('Sec-Fetch-Mode', '') == 'cors'
+
+
 @app.before_request
 def check_login():
     # 예전 센터장 게시판 정적 첨부 경로는 차단하고, 권한검사를 거치는
@@ -217,6 +229,17 @@ def check_login():
     
     # 2. 세션에 사번(emp_no)이 없으면 로그인 페이지로 이동
     if 'emp_no' not in session:
+        # 화면 속 자동저장(fetch/XHR)까지 로그인 화면으로 넘기면, 브라우저는
+        # 로그인 페이지 HTML을 200으로 받아 '저장 성공'으로 착각한다.
+        # 스크립트가 부른 요청에는 401을 분명히 돌려주어 사용자가 기록을
+        # 잃지 않고 다시 로그인하도록 안내한다.
+        if _is_script_request():
+            return jsonify({
+                'status': 'error',
+                'code': 'login_required',
+                'message': '로그인이 풀렸습니다. 새 창에서 다시 로그인한 뒤 저장해 주세요.',
+                'login_url': url_for('login_page'),
+            }), 401
         return redirect(url_for('login_page'))
     
     _record_usage_log()
