@@ -1522,7 +1522,7 @@ def _approval_boxes(conn, current_user: str, is_master: bool) -> dict[str, list]
     ).fetchall()
     draft_rows = conn.execute(
         """SELECT * FROM approvals
-           WHERE drafter=? AND status NOT IN ('완료','반려')
+           WHERE drafter=? AND status NOT IN ('완료','반려','임시저장')
            ORDER BY created_at DESC""",
         (current_user,),
     ).fetchall()
