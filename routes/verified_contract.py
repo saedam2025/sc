@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 import pdfkit
+from PyPDF2 import PdfReader, PdfWriter
 import pandas as pd
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -89,6 +90,7 @@ from .secure_files import (
     encrypt_upload,
     original_filename,
     read_decrypted,
+    stored_plain_size,
     temporary_decrypted_path,
 )
 
@@ -915,6 +917,11 @@ def _row_for_view(row) -> dict:
         if item.get("invite_channel")
         else item["invite_mail_status_label"]
     )
+    item["invite_sent_display"] = (
+        _format_kst(item["invitation_sent_at"]) if item.get("invitation_sent_at") else ""
+    )
+    if item["invite_sent_display"]:
+        item["invite_delivery_label"] += f" · {item['invite_sent_display']}"
     return item
 
 
@@ -954,18 +961,80 @@ def _invitation_html(row, invitation_url: str) -> str:
     """
 
 
-def _void_notice_html(row, reason_label: str) -> str:
-    return f"""
-    <div style="font-family:Arial,'Malgun Gothic',sans-serif;line-height:1.7;color:#1f2937">
-      <h2 style="color:#a82d2d">계약 {escape(reason_label)} 안내</h2>
-      <p><b>{escape(row['signer_name'])}</b>님, 아래 계약 건이 <b>{escape(reason_label)}</b> 처리되었습니다.</p>
-      <p style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:14px">{escape(row['title_snapshot'])}<br>
-      계약구분: {escape(row['contract_type'])} · 수탁학교: {escape(row['school_name'] or '-')} · 부서: {escape(row['department'] or '-')}</p>
-      <p><b>본 안내 이후로 위 계약서는 더 이상 법적 효력이 없습니다.</b><br>
-      동일한 내용으로 다시 계약이 필요한 경우 새담 담당자로부터 별도의 계약 요청 메일을 받게 됩니다.</p>
-      <p style="font-size:13px;color:#64748b">문의사항은 새담 계약 담당자에게 연락해 주세요.</p>
+def _void_notice_html(row, reason_label: str, has_attachment: bool = False) -> str:
+    """폐기·변경계약 안내메일. 계약완료 안내메일과 같은 남색 문서 톤으로 맞춘다."""
+    name = escape(row["signer_name"])
+    title = escape(row["title_snapshot"])
+    label = escape(reason_label)
+    company = json.loads(row["company_snapshot_json"] or "{}") if "company_snapshot_json" in row.keys() else {}
+    org_name = escape(str(company.get("company_name") or "(사)새담청소년교육문화원"))
+    logo_url = f"{CONTRACT_PUBLIC_ORIGIN}/static/logo01.gif"
+    attachment_line = (
+        "<br>· 첨부된 계약서 파일은 <b>효력을 잃은 계약서</b>이며, 어떤 계약이 처리되었는지"
+        " 확인하실 수 있도록 참고용으로만 함께 보내 드립니다."
+        if has_attachment else ""
+    )
+    return f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:26px 12px 44px;background:#eef1f5;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr><td align="center">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="640"
+       style="width:100%;max-width:640px;border:1px solid #ccd6e2;border-radius:6px;
+              background:#ffffff;">
+
+<tr><td style="height:5px;line-height:5px;font-size:0;background:#a33330;
+               border-radius:5px 5px 0 0;">&nbsp;</td></tr>
+
+<tr><td style="padding:30px 32px 0;color:#33404f;font-size:14px;line-height:1.85;">
+    안녕하세요, {org_name}입니다.<br>
+    <b style="color:#16243a;">{name}</b> 님, 아래 계약 건이 <b style="color:#a33330;">{label}</b> 처리되었음을 알려 드립니다.
+</td></tr>
+
+<tr><td style="padding:26px 32px 0;">
+    <div style="color:#5f7799;font-size:11px;font-weight:700;letter-spacing:.16em;">CONTRACT</div>
+    <h2 style="margin:6px 0 12px;color:#16243a;font-size:17px;font-weight:700;">{label} 처리된 계약</h2>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+           style="border:1px solid #d7e0ea;border-left:3px solid #a33330;background:#f6f8fb;">
+        <tr><td style="padding:13px 16px;color:#16243a;font-size:14px;font-weight:700;">
+            {title}
+            <div style="margin-top:6px;color:#5f6f85;font-size:12.5px;font-weight:500;">
+                계약구분 {escape(row['contract_type'])} · 수탁학교 {escape(row['school_name'] or '-')}
+                · 부서 {escape(row['department'] or '-')}
+            </div>
+        </td></tr>
+    </table>
+</td></tr>
+
+<tr><td style="padding:26px 32px 0;">
+    <div style="color:#5f7799;font-size:11px;font-weight:700;letter-spacing:.16em;">NOTICE</div>
+    <h2 style="margin:6px 0 12px;color:#16243a;font-size:17px;font-weight:700;">안내 사항</h2>
+    <div style="padding:15px 17px;border:1px solid #d7e0ea;background:#f6f8fb;
+                color:#46586e;font-size:12.5px;line-height:1.85;">
+        · <b style="color:#a33330;">본 안내 이후로 위 계약서는 더 이상 유효하지 않으며 법적 효력이 없습니다.</b><br>
+        · 이전에 받으신 계약 링크로는 계약서를 여실 수 없습니다.<br>
+        · 동일한 내용으로 다시 계약이 필요한 경우, 새담 담당자로부터 별도의 계약 요청 메일을 받으시게 됩니다.{attachment_line}
     </div>
-    """
+</td></tr>
+
+<tr><td style="padding:28px 32px 30px;text-align:center;">
+    <div style="color:#33404f;font-size:14px;line-height:1.8;">
+        문의사항은 새담 계약 담당자에게 연락해 주세요.</div>
+</td></tr>
+
+<tr><td style="padding:18px 20px 22px;border-top:1px solid #d7e0ea;text-align:center;
+               background:#f6f8fb;border-radius:0 0 5px 5px;">
+    <img src="{logo_url}" alt="{org_name}"
+         style="display:block;margin:0 auto;height:34px;width:auto;">
+    <div style="margin-top:9px;color:#7b8aa0;font-size:11px;line-height:1.7;">
+        {org_name}<br>
+        본 메일은 새담 인트라넷 인증전자계약에서 발송되었습니다.
+    </div>
+</td></tr>
+
+</table></td></tr></table>
+</body></html>"""
 
 
 def _completion_mail_html(row, pdf_hash: str, company_name: str = "") -> str:
@@ -2163,7 +2232,7 @@ def bulk_void():
                         _send_mail(
                             row["signer_email"],
                             f"[전자계약 {reason_label} 안내] {row['title_snapshot']}",
-                            _void_notice_html(row, reason_label),
+                            _void_notice_html(row, reason_label, has_attachment=True),
                             attachments=mail_pdf_path,
                         )
                 else:
@@ -2184,6 +2253,22 @@ def bulk_void():
     if mail_failed:
         message += f" (안내메일 발송 실패 {len(mail_failed)}건)"
     return jsonify({"status": "success", "message": message, "failed": mail_failed})
+
+
+def _pdf_first_pages(data: bytes, limit: int) -> bytes:
+    """계약서 PDF 앞쪽 몇 장만 잘라 낸다. 실패하면 원본을 그대로 돌려준다."""
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        if len(reader.pages) <= limit:
+            return data
+        writer = PdfWriter()
+        for page in reader.pages[:limit]:
+            writer.add_page(page)
+        sliced = io.BytesIO()
+        writer.write(sliced)
+        return sliced.getvalue()
+    except Exception:
+        return data
 
 
 @verified_contract_bp.route("/admin/download-selected")
@@ -2209,6 +2294,11 @@ def download_selected():
         ).fetchall()
     finally:
         conn.close()
+    if not rows:
+        # 계약자가 아직 서명하지 않아 계약서 파일 자체가 만들어지지 않은 경우.
+        return "아직 계약이 완료되지 않았습니다.", 404
+    # pages=1-2 면 계약서 앞 2장만 담는다(기본값은 전체).
+    page_limit = 2 if request.args.get("pages") == "1-2" else 0
     memory = io.BytesIO()
     count = 0
     with zipfile.ZipFile(memory, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -2217,18 +2307,226 @@ def download_selected():
             if not path.is_file():
                 continue
             safe_signer = re.sub(r'[\\/:*?"<>|]+', "_", str(row["signer_name"]))[:60]
-            archive.writestr(
-                f"{row['id']}_{safe_signer}_{path.name}", read_decrypted(path)
-            )
+            content = read_decrypted(path)
+            name = path.name
+            if page_limit:
+                content = _pdf_first_pages(content, page_limit)
+                name = f"1-2p_{name}"
+            archive.writestr(f"{row['id']}_{safe_signer}_{name}", content)
             count += 1
     if count == 0:
-        return "선택한 항목에 완료된 계약서 파일이 없습니다.", 404
+        return "완료된 계약서 파일을 찾을 수 없습니다. 담당자에게 문의해 주세요.", 404
+    memory.seek(0)
+    response = send_file(
+        memory,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=(
+            f"인증전자계약{'_1-2p' if page_limit else ''}"
+            f"_{datetime.now(KST).strftime('%Y%m%d_%H%M%S')}.zip"
+        ),
+    )
+    # 고른 건수와 실제로 담긴 건수가 다르면 화면에서 알려 줄 수 있게 함께 내려보낸다.
+    response.headers["X-Contract-Requested"] = str(len(ids))
+    response.headers["X-Contract-Included"] = str(count)
+    return response
+
+
+BACKUP_CHUNK_SIZES = (20, 50, 100)
+BACKUP_LIST_FILENAME = "인증전자계약_계약리스트.xlsx"
+
+
+def _backup_rows(conn):
+    """완료된 계약을 번호 순으로 모은다. 파일이 없는 건도 함께 돌려준다."""
+    rows = conn.execute(
+        """
+        SELECT * FROM verified_contracts
+        WHERE status='completed'
+        ORDER BY id
+        """
+    ).fetchall()
+    entries = []
+    for row in rows:
+        filename = os.path.basename(str(row["pdf_filename"] or ""))
+        path = VERIFIED_CONTRACTS_ROOT / filename if filename else None
+        exists = bool(path and path.is_file())
+        entries.append({
+            "row": row,
+            "path": path if exists else None,
+            "size": stored_plain_size(path) if exists else 0,
+            "missing": not exists,
+        })
+    return entries
+
+
+def _backup_chunk_size(value: object) -> int:
+    try:
+        size = int(value)
+    except (TypeError, ValueError):
+        return 50
+    return size if size in BACKUP_CHUNK_SIZES else 50
+
+
+def _human_size(num_bytes: int) -> str:
+    size = float(num_bytes or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.1f}{unit}" if unit != "B" else f"{int(size)}B"
+        size /= 1024
+    return f"{size:.1f}GB"
+
+
+def _build_contract_list_workbook(entries) -> Workbook:
+    """계약리스트 엑셀. 주민번호·계좌번호 같은 식별정보는 담지 않는다."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "계약리스트"
+    headers = [
+        "번호", "계약구분", "연도", "수탁학교명", "부서명", "성명",
+        "연락처", "이메일", "계약기간", "근무시간",
+        "수수료", "보조금", "경력수당", "직책수당", "기타",
+        "비고1", "비고2", "비고3", "비고4",
+        "등록일", "완료일", "계약서 파일명",
+    ]
+    sheet.append(headers)
+    for cell in sheet[1]:
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="1F3A5F")
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    for index, entry in enumerate(entries, start=1):
+        row = entry["row"]
+        item = _row_for_view(row)
+        data = json.loads(row["contract_data_json"] or "{}")
+        sheet.append([
+            index,
+            row["contract_type"],
+            item.get("연도", ""),
+            row["school_name"],
+            row["department"],
+            row["signer_name"],
+            item.get("signer_phone_display", ""),
+            row["signer_email"],
+            str(data.get("계약기간", "")),
+            str(data.get("근무시간", "")),
+            str(data.get("수수료", "")),
+            str(data.get("보조금", "")),
+            str(data.get("경력수당", "")),
+            str(data.get("직책수당", "")),
+            str(data.get("기타", "")),
+            str(data.get("비고1", "")),
+            str(data.get("비고2", "")),
+            str(data.get("비고3", "")),
+            str(data.get("비고4", "")),
+            item.get("created_display", ""),
+            item.get("signed_display", ""),
+            os.path.basename(str(row["pdf_filename"] or "")) or "(파일 없음)",
+        ])
+    widths = [6, 12, 7, 18, 14, 10, 15, 24, 22, 18, 11, 11, 11, 11, 11, 14, 14, 14, 14, 18, 18, 40]
+    for column, width in enumerate(widths, start=1):
+        sheet.column_dimensions[sheet.cell(row=1, column=column).column_letter].width = width
+    sheet.freeze_panes = "A2"
+    return workbook
+
+
+def _contract_list_bytes(entries) -> bytes:
+    memory = io.BytesIO()
+    _build_contract_list_workbook(entries).save(memory)
+    return memory.getvalue()
+
+
+@verified_contract_bp.route("/admin/backup")
+@menu_permission_required("verified_contract_admin")
+def backup_page():
+    """완료 계약서를 한 번에 받으면 파일이 너무 커서, 번호순으로 나눠 받는 화면."""
+    chunk_size = _backup_chunk_size(request.args.get("size"))
+    conn = get_db()
+    try:
+        entries = _backup_rows(conn)
+    finally:
+        conn.close()
+    available = [entry for entry in entries if not entry["missing"]]
+    total_bytes = sum(entry["size"] for entry in available)
+    parts = []
+    for start in range(0, len(available), chunk_size):
+        group = available[start:start + chunk_size]
+        parts.append({
+            "index": len(parts) + 1,
+            "first": start + 1,
+            "last": start + len(group),
+            "count": len(group),
+            "size_text": _human_size(sum(entry["size"] for entry in group)),
+        })
+    return render_template(
+        "verified_contract/backup.html",
+        chunk_size=chunk_size,
+        chunk_sizes=BACKUP_CHUNK_SIZES,
+        parts=parts,
+        file_count=len(available),
+        missing=[
+            {"id": entry["row"]["id"], "name": entry["row"]["signer_name"]}
+            for entry in entries if entry["missing"]
+        ],
+        total_size_text=_human_size(total_bytes),
+        list_count=len(entries),
+        storage_path=str(VERIFIED_CONTRACTS_ROOT),
+    )
+
+
+@verified_contract_bp.route("/admin/backup/list")
+@menu_permission_required("verified_contract_admin")
+def backup_contract_list():
+    conn = get_db()
+    try:
+        entries = _backup_rows(conn)
+    finally:
+        conn.close()
+    if not entries:
+        return "완료된 계약이 없습니다.", 404
+    return send_file(
+        io.BytesIO(_contract_list_bytes(entries)),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=BACKUP_LIST_FILENAME,
+    )
+
+
+@verified_contract_bp.route("/admin/backup/part")
+@menu_permission_required("verified_contract_admin")
+def backup_part():
+    chunk_size = _backup_chunk_size(request.args.get("size"))
+    part = max(1, request.args.get("part", 1, type=int))
+    conn = get_db()
+    try:
+        entries = _backup_rows(conn)
+    finally:
+        conn.close()
+    available = [entry for entry in entries if not entry["missing"]]
+    start = (part - 1) * chunk_size
+    group = available[start:start + chunk_size]
+    if not group:
+        return "해당 구간에 받을 계약서가 없습니다.", 404
+    total_parts = max(1, (len(available) + chunk_size - 1) // chunk_size)
+    memory = io.BytesIO()
+    with zipfile.ZipFile(memory, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        # 계약리스트는 첫 번째 묶음에만 넣어 중복을 피한다.
+        if part == 1:
+            archive.writestr(BACKUP_LIST_FILENAME, _contract_list_bytes(entries))
+        for offset, entry in enumerate(group, start=start + 1):
+            row = entry["row"]
+            safe_signer = re.sub(r'[\\/:*?"<>|]+', "_", str(row["signer_name"]))[:60]
+            archive.writestr(
+                f"{offset:04d}_{row['id']}_{safe_signer}_{entry['path'].name}",
+                read_decrypted(entry["path"]),
+            )
     memory.seek(0)
     return send_file(
         memory,
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"인증전자계약_{datetime.now(KST).strftime('%Y%m%d_%H%M%S')}.zip",
+        download_name=(
+            f"인증전자계약_백업_{part:02d}of{total_parts:02d}"
+            f"_{start + 1}-{start + len(group)}.zip"
+        ),
     )
 
 
