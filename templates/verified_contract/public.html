@@ -200,6 +200,7 @@ function move(e){if(!drawing)return;e.preventDefault();const p=point(e);ctx.line
 function stop(){drawing=false;ctx.closePath()}
 canvas.addEventListener('mousedown',start);canvas.addEventListener('mousemove',move);window.addEventListener('mouseup',stop);canvas.addEventListener('touchstart',start,{passive:false});canvas.addEventListener('touchmove',move,{passive:false});canvas.addEventListener('touchend',stop);resizeCanvas();
 function clearSignature(){ctx.clearRect(0,0,canvas.width,canvas.height);signed=false}
+function signatureDataUrl(){const maxW=1200,maxH=600,scale=Math.min(1,maxW/canvas.width,maxH/canvas.height);if(scale>=1)return canvas.toDataURL('image/png');const out=document.createElement('canvas');out.width=Math.max(1,Math.round(canvas.width*scale));out.height=Math.max(1,Math.round(canvas.height*scale));const octx=out.getContext('2d');octx.imageSmoothingEnabled=true;octx.imageSmoothingQuality='high';octx.drawImage(canvas,0,0,out.width,out.height);return out.toDataURL('image/png')}
 function isValidRrnDate(d6){const mm=parseInt(d6.slice(2,4),10),dd=parseInt(d6.slice(4,6),10);if(mm<1||mm>12)return false;const dim=[31,29,31,30,31,30,31,31,30,31,30,31];return dd>=1&&dd<=dim[mm-1]}
 function rrnError(v){const d=v.replace(/\D/g,'');if(d.length!==13||!'12345678'.includes(d[6]))return'주민등록번호를 13자리로 정확히 입력해 주세요.';if(!isValidRrnDate(d.slice(0,6)))return'주민등록번호 앞자리의 생년월일을 확인해 주세요.';return null}
 document.getElementById('residentNumber').addEventListener('input',function(){const d=this.value.replace(/\D/g,'').slice(0,13);this.value=d.length>6?`${d.slice(0,6)}-${d.slice(6)}`:d;this.classList.remove('invalid')});
@@ -224,7 +225,7 @@ async function completeContract(){
   const agreements={};checks.forEach(c=>agreements[c.dataset.key]=c.checked);
   const addr1=document.getElementById('address').value.trim(),addr2=document.getElementById('address2').value.trim();
   b.disabled=true;b.textContent='계약서 생성 중...';
-  try{const d=await call(`/verified-contract/sign/${TOKEN}/complete`,{agreements,phone:document.getElementById('phone').value.trim(),address:addr2?`${addr1} ${addr2}`:addr1,resident_number:document.getElementById('residentNumber').value.trim(),bank_name:document.getElementById('bankName').value.trim(),account_number:document.getElementById('accountNumber').value.trim(),confirmed_name:document.getElementById('confirmedName').value.trim(),signature:canvas.toDataURL('image/png')});message('completeMessage',d.message);setTimeout(()=>location.reload(),900)}catch(e){message('completeMessage',e.message,true);b.disabled=false;b.textContent='계약완료 및 계약서 받기'}
+  try{const d=await call(`/verified-contract/sign/${TOKEN}/complete`,{agreements,phone:document.getElementById('phone').value.trim(),address:addr2?`${addr1} ${addr2}`:addr1,resident_number:document.getElementById('residentNumber').value.trim(),bank_name:document.getElementById('bankName').value.trim(),account_number:document.getElementById('accountNumber').value.trim(),confirmed_name:document.getElementById('confirmedName').value.trim(),signature:signatureDataUrl()});message('completeMessage',d.message);setTimeout(()=>location.reload(),900)}catch(e){message('completeMessage',e.message,true);b.disabled=false;b.textContent='계약완료 및 계약서 받기'}
 }
 {% endif %}
 </script>
