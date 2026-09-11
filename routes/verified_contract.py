@@ -3123,6 +3123,9 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
                 "enable-local-file-access": None,
                 "print-media-type": None,
                 "page-size": "A4",
+                # wkhtmltopdf 는 CSS px 를 브라우저보다 약 9% 작게 렌더링한다.
+                # 관리자 미리보기 화면과 같은 글자 크기로 맞추기 위한 보정값.
+                "zoom": "1.08",
                 "margin-top": "18mm",
                 "margin-right": "17mm",
                 "margin-bottom": "18mm",
