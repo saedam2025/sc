@@ -2437,7 +2437,8 @@ def admin_preview(contract_id: int):
     <title>계약서 미리보기 - {escape(row['signer_name'])}</title>
     <style>
     *{{box-sizing:border-box}}
-    body{{color:#111;font-size:15px;line-height:1.72;word-break:keep-all;font-family:'Noto Sans KR','Malgun Gothic',Arial,sans-serif;background:#5b6b82;margin:0;padding:24px 0}}
+    {_preview_font_css()}
+    body{{color:#111;font-size:15px;line-height:1.72;word-break:keep-all;font-family:'VerifiedNanum','Malgun Gothic',Arial,sans-serif;background:#5b6b82;margin:0;padding:24px 0}}
     .preview-banner{{max-width:900px;margin:0 auto 16px;padding:12px 18px;background:#fff3cd;border:1px solid #f0c766;border-radius:8px;color:#7a5b00;font-size:.88rem;text-align:center}}
     .sheet{{max-width:900px;margin:0 auto;background:#fff;padding:40px 46px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.25)}}
     h1{{font-size:24px;text-align:center;text-decoration:underline;margin:10px 0 28px}}
@@ -2447,6 +2448,7 @@ def admin_preview(contract_id: int):
     .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
     .terms th,.terms td{{border:1px solid #333;padding:7px}}
     .terms p{{margin:0 0 8px}}
+    .terms h1,.terms h2,.terms h3,.terms h4,.terms h5,.terms h6{{font-size:17px;font-weight:700;margin:16px 0 8px}}
     .terms{{margin-bottom:48px}}
     .sign{{margin-top:48px;min-height:250px}}
     .sign-date{{text-align:center;margin:40px 0 124px}}
@@ -2962,34 +2964,46 @@ def _decode_signature(data_url: str) -> bytes:
 
 
 _PDF_FONT_CSS = None
+# 미리보기 화면과 PDF 가 같은 글꼴로 렌더링되어야 줄바꿈과 글자 크기가 일치한다.
+PDF_FONT_FILES = {
+    "regular": (
+        "NanumGothic-Regular.ttf",
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Regular.ttf",
+    ),
+    "bold": (
+        "NanumGothic-Bold.ttf",
+        "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Bold.ttf",
+    ),
+}
+
+
+def _pdf_font_path(weight: str):
+    """계약서 전용 글꼴을 확보한다. 내려받지 못하면 None 을 돌려준다."""
+    entry = PDF_FONT_FILES.get(weight)
+    if not entry:
+        return None
+    filename, url = entry
+    path = VERIFIED_PDF_FONT_ROOT / filename
+    if not path.is_file():
+        try:
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=30) as response:
+                content = response.read()
+            if len(content) > 100_000:
+                path.write_bytes(content)
+        except Exception:
+            pass
+    return path if path.is_file() else None
 
 
 def _pdf_font_css() -> str:
     global _PDF_FONT_CSS
     if _PDF_FONT_CSS is not None:
         return _PDF_FONT_CSS
-    files = {
-        "regular": (
-            VERIFIED_PDF_FONT_ROOT / "NanumGothic-Regular.ttf",
-            "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Regular.ttf",
-        ),
-        "bold": (
-            VERIFIED_PDF_FONT_ROOT / "NanumGothic-Bold.ttf",
-            "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/nanumgothic/NanumGothic-Bold.ttf",
-        ),
-    }
     encoded = {}
-    for weight, (path, url) in files.items():
-        if not path.is_file():
-            try:
-                req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-                with urlopen(req, timeout=30) as response:
-                    content = response.read()
-                if len(content) > 100_000:
-                    path.write_bytes(content)
-            except Exception:
-                pass
-        if path.is_file():
+    for weight in PDF_FONT_FILES:
+        path = _pdf_font_path(weight)
+        if path:
             encoded[weight] = base64.b64encode(path.read_bytes()).decode("ascii")
     rules = []
     if encoded.get("regular"):
@@ -3005,6 +3019,31 @@ def _pdf_font_css() -> str:
     rules.append("html,body,body *{font-family:'VerifiedNanum','Malgun Gothic',sans-serif!important;}")
     _PDF_FONT_CSS = "\n".join(rules)
     return _PDF_FONT_CSS
+
+
+def _preview_font_css() -> str:
+    """미리보기 화면이 PDF 와 같은 글꼴을 쓰도록 @font-face 를 심는다."""
+    rules = []
+    for weight, css_weight in (("regular", 400), ("bold", 700)):
+        if not _pdf_font_path(weight):
+            continue
+        url = url_for("verified_contract.pdf_font_file", weight=weight)
+        rules.append(
+            f"@font-face{{font-family:'VerifiedNanum';font-weight:{css_weight};"
+            f"font-display:swap;src:url('{url}') format('truetype');}}"
+        )
+    return "\n".join(rules)
+
+
+@verified_contract_bp.route("/admin/pdf-font/<string:weight>")
+@menu_permission_required("verified_contract_admin")
+def pdf_font_file(weight: str):
+    path = _pdf_font_path(weight)
+    if not path:
+        return "글꼴을 찾을 수 없습니다.", 404
+    response = send_file(path, mimetype="font/ttf", conditional=True)
+    response.headers["Cache-Control"] = "private, max-age=604800"
+    return response
 
 
 def _pdf_configuration():
@@ -3073,6 +3112,7 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
     .terms table{{width:100%;border-collapse:collapse;margin:12px 0}}
     .terms th,.terms td{{border:1px solid #333;padding:7px}}
     .terms p{{margin:0 0 8px}}
+    .terms h1,.terms h2,.terms h3,.terms h4,.terms h5,.terms h6{{font-size:17px;font-weight:700;margin:16px 0 8px}}
     .terms{{margin-bottom:48px}}
     .sign{{margin-top:48px;min-height:250px;page-break-inside:avoid}}
     .sign-date{{text-align:center;margin:40px 0 124px}}
@@ -3123,9 +3163,8 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
                 "enable-local-file-access": None,
                 "print-media-type": None,
                 "page-size": "A4",
-                # wkhtmltopdf 는 CSS px 를 브라우저보다 약 9% 작게 렌더링한다.
-                # 관리자 미리보기 화면과 같은 글자 크기로 맞추기 위한 보정값.
-                "zoom": "1.08",
+                # zoom 은 지정하지 않는다. 기본값(1.0)에서 wkhtmltopdf 가 CSS px 를
+                # 미리보기 화면과 동일한 크기로 렌더링한다(본문 15px, 제목 24px).
                 "margin-top": "18mm",
                 "margin-right": "17mm",
                 "margin-bottom": "18mm",
