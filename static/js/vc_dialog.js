@@ -39,6 +39,8 @@
     '.vcd-btn:focus-visible{outline:2px solid #1f3a5f;outline-offset:2px}',
     '.vcd-btn.vcd-primary{background:#1f3a5f;color:#fff}',
     '.vcd-btn.vcd-ghost{background:var(--vcd-ghost,#eef1f6);color:var(--vcd-ghost-text,#44526b)}',
+    '.vcd-foot.vcd-stack{flex-direction:column;gap:8px}',
+    '.vcd-foot.vcd-stack .vcd-btn{flex:none;width:100%}',
     '@media(max-width:480px){.vcd-body{padding:22px 20px 4px}.vcd-foot{padding:18px 20px 20px}}',
     '@media(prefers-color-scheme:dark){.vcd-backdrop{--vcd-card:#1b2433;--vcd-text:#e8edf5;--vcd-muted:#9fb0c6;',
     '--vcd-border:#3a4759;--vcd-input:#131b27;--vcd-ghost:#2b3849;--vcd-ghost-text:#cdd8e6}}',
@@ -62,9 +64,11 @@
   }
 
   // 오류·완료처럼 뻔한 문구는 아이콘을 알아서 골라 준다.
+  // '완료되지 않았습니다' 처럼 부정문이 성공으로 읽히지 않도록 부정 표현을 먼저 본다.
   function guessTone(text) {
     var value = String(text || '');
-    if (/실패|오류|없습니다|올바르지|초과|잘못|불가|에러/.test(value)) return 'error';
+    if (/실패|오류|에러|불가/.test(value)) return 'error';
+    if (/않|아직|없습니다|없음|올바르지|초과|잘못/.test(value)) return 'warning';
     if (/완료|저장|성공|등록되었|발송했|삭제했|변경되었/.test(value)) return 'success';
     return 'info';
   }
@@ -148,7 +152,7 @@
       return options.type === 'alert' ? true : true;
     }
 
-    if (options.type !== 'alert') {
+    if (options.type !== 'alert' && options.type !== 'choice') {
       var cancel = document.createElement('button');
       cancel.type = 'button';
       cancel.className = 'vcd-btn vcd-ghost';
@@ -159,27 +163,47 @@
       foot.appendChild(cancel);
     }
 
-    var ok = document.createElement('button');
-    ok.type = 'button';
-    ok.className = 'vcd-btn vcd-primary';
-    ok.textContent = options.confirmText || '확인';
-    if (options.danger) ok.style.background = '#a32b28';
-    ok.addEventListener('click', function () { close(confirmValue()); });
-    foot.appendChild(ok);
+    var ok = null;
+    if (options.type === 'choice') {
+      foot.className = 'vcd-foot vcd-stack';
+      (options.choices || []).forEach(function (choice, index) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'vcd-btn ' + (index === 0 ? 'vcd-primary' : 'vcd-ghost');
+        button.textContent = choice.label;
+        button.addEventListener('click', function () { close(choice.value); });
+        foot.appendChild(button);
+        if (index === 0) ok = button;
+      });
+      var giveUp = document.createElement('button');
+      giveUp.type = 'button';
+      giveUp.className = 'vcd-btn vcd-ghost';
+      giveUp.textContent = options.cancelText || '취소';
+      giveUp.addEventListener('click', function () { close(null); });
+      foot.appendChild(giveUp);
+    } else {
+      ok = document.createElement('button');
+      ok.type = 'button';
+      ok.className = 'vcd-btn vcd-primary';
+      ok.textContent = options.confirmText || '확인';
+      if (options.danger) ok.style.background = '#a32b28';
+      ok.addEventListener('click', function () { close(confirmValue()); });
+      foot.appendChild(ok);
+    }
 
     function onKey(event) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        close(options.type === 'prompt' ? null : options.type === 'alert' ? true : false);
+        close(options.type === 'alert' ? true : options.type === 'confirm' ? false : null);
       } else if (event.key === 'Enter' && (options.type !== 'prompt' || event.target === input)) {
         event.preventDefault();
-        close(confirmValue());
+        if (ok) ok.click(); else close(confirmValue());
       }
     }
     document.addEventListener('keydown', onKey, true);
     backdrop.addEventListener('mousedown', function (event) {
       if (event.target !== backdrop) return;
-      close(options.type === 'prompt' ? null : options.type === 'alert' ? true : false);
+      close(options.type === 'alert' ? true : options.type === 'confirm' ? false : null);
     });
 
     document.body.appendChild(backdrop);
@@ -212,6 +236,22 @@
       confirmText: options.confirmText || '확인',
       cancelText: options.cancelText || '취소',
       danger: options.danger
+    });
+  };
+
+  /**
+   * 여러 갈래 중 하나를 고르게 한다. 고른 항목의 value 를, 취소하면 null 을 돌려준다.
+   *   await vcChoice('범위 선택', [{label:'전체', value:'all'}, {label:'1~2쪽', value:'1-2'}])
+   */
+  global.vcChoice = function (message, choices, options) {
+    options = options || {};
+    return open({
+      type: 'choice',
+      message: message,
+      choices: choices || [],
+      title: options.title,
+      tone: options.tone || 'ask',
+      cancelText: options.cancelText || '취소'
     });
   };
 

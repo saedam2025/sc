@@ -842,37 +842,51 @@
     }
   }
 
-  function replaceSectionsFromTxt(data){
+  function confirmReplaceBeforeImport(){
     const currentHasContent = sectionEls().some(s => {
       const body = s.querySelector(".saedam-rich-editor").innerText.trim();
       return body || s.querySelector(".section-title-input").value.trim() !== "1. 새 목차";
     });
+    if (!currentHasContent) return true;
+    return confirm("현재 작성 내용을 불러온 파일 내용으로 바꿀까요?");
+  }
 
-    if (currentHasContent && !confirm("현재 작성 내용을 TXT 내용으로 바꿀까요?")){
-      return;
-    }
-
+  function replaceSectionsFromFile(data){
     sectionContainer.innerHTML = "";
     tocList.innerHTML = "";
 
     if (data.title) titleInput.value = data.title;
+    if (data.description) descInput.value = data.description;
     (data.sections || []).forEach(sec => createSection(sec));
     if (!sectionEls().length) createSection();
 
     renumber();
     syncTocTitles();
     markDirty();
-    showToast("TXT 내용을 불러왔습니다.");
+
+    const imageCount = Number(data.image_count || 0);
+    showToast(imageCount
+      ? `파일 내용을 불러왔습니다. (이미지 ${imageCount}개 포함) 임시저장을 눌러 저장하세요.`
+      : "파일 내용을 불러왔습니다. 임시저장을 눌러 저장하세요.");
+    return true;
   }
 
-  async function importTxt(file){
+  async function importFile(file){
+    // 서버에 파일을 보내기 전에 먼저 확인받아, 취소한 경우 이미지가 불필요하게 저장되지 않도록 합니다.
+    if (!confirmReplaceBeforeImport()){
+      txtInput.value = "";
+      return;
+    }
+
     const form = new FormData();
     form.append("file", file);
+    form.append("manual_id", cfg.manualId);
     try{
-      const res = await fetch(cfg.uploadTxtUrl, {method:"POST", body:form});
+      showToast("파일을 읽고 있습니다.");
+      const res = await fetch(cfg.importFileUrl || cfg.uploadTxtUrl, {method:"POST", body:form});
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.message || "TXT 불러오기에 실패했습니다.");
-      replaceSectionsFromTxt(data);
+      if (!res.ok || !data.ok) throw new Error(data.message || "파일 불러오기에 실패했습니다.");
+      replaceSectionsFromFile(data);
     }catch(err){
       showToast(err.message, true);
     }finally{
@@ -952,7 +966,7 @@
 
   txtInput.addEventListener("change", () => {
     const file = txtInput.files?.[0];
-    if (file) importTxt(file);
+    if (file) importFile(file);
   });
 
   thumbnailInput?.addEventListener("change", async () => {
