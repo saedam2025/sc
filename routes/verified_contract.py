@@ -110,6 +110,11 @@ DEFAULT_CATEGORIES = [
     "원어민사업자",
 ]
 MAX_COMPANY_PROFILES = 20
+# 이메일 인증번호 유효시간. 화면 안내·메일 본문·만료 판정이 모두 이 값을 따른다.
+OTP_VALID_MINUTES = 3
+OTP_VALID_SECONDS = OTP_VALID_MINUTES * 60
+# 인증번호 재발송 대기시간. 주소를 잘못 입력했을 때 너무 오래 묶이지 않도록 짧게 둔다.
+OTP_RESEND_COOLDOWN_SECONDS = 60
 # 계약서 양식 편집기에서 선택 삽입할 수 있는 치환 변수 목록 (샘플엑셀 열 + 회사정보)
 TEMPLATE_VARIABLES = (
     "계약구분",
@@ -892,6 +897,24 @@ def _row_for_view(row) -> dict:
     item["invite_channel_label"] = channel_labels.get(
         item.get("invite_channel"), item.get("invite_channel") or "미발송"
     )
+    # 발송 상태를 화면에 그대로 노출하지 않고 우리말로 풀어서 보여준다.
+    mail_status_labels = {
+        "sent": "발송 됨",
+        "not_sent": "발송 전",
+        "sending": "발송 중",
+        "waiting": "발송 대기",
+        "failed": "발송 실패",
+    }
+    mail_status = str(item.get("invite_mail_status") or "")
+    item["invite_mail_status_label"] = mail_status_labels.get(
+        mail_status, mail_status or "발송 전"
+    )
+    # 발송 수단을 모르는 예전 기록은 상태만 보여준다.
+    item["invite_delivery_label"] = (
+        f"{item['invite_channel_label']} {item['invite_mail_status_label']}"
+        if item.get("invite_channel")
+        else item["invite_mail_status_label"]
+    )
     return item
 
 
@@ -946,72 +969,59 @@ def _void_notice_html(row, reason_label: str) -> str:
 
 
 def _completion_mail_html(row, pdf_hash: str, company_name: str = "") -> str:
-    """계약완료 안내메일. 면접 합격 안내메일과 같은 금테두리·한지 배경·캐릭터 결로 꾸민다."""
+    """계약완료 안내메일. 합격 안내메일(금색 한지 결)과 구분되도록 남색 문서 톤으로 꾸민다."""
     name = escape(row["signer_name"])
     title = escape(row["title_snapshot"])
     org_name = escape(str(company_name or "(사)새담청소년교육문화원"))
-    character_url = f"{CONTRACT_PUBLIC_ORIGIN}/static/girl_wel.png"
     logo_url = f"{CONTRACT_PUBLIC_ORIGIN}/static/logo01.gif"
     return f"""<!DOCTYPE html>
 <html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:26px 12px 44px;background:#eceff2;">
+<body style="margin:0;padding:26px 12px 44px;background:#eef1f5;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
 <tr><td align="center">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="640"
-       style="width:100%;max-width:640px;">
-<tr><td style="padding:13px;border-radius:20px;background:#f5eee0;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-       style="border:1px solid #ddd2b6;border-radius:14px;background:#fffdf6;">
+       style="width:100%;max-width:640px;border:1px solid #ccd6e2;border-radius:6px;
+              background:#ffffff;">
 
-<tr><td style="padding:30px 30px 22px;text-align:center;border-bottom:3px double #e3d3a8;">
-    <div style="width:46px;height:46px;line-height:46px;margin:0 auto 12px;border-radius:50%;
-                border:1px solid #e3d3a8;background:#ffffff;color:#b99a55;font-size:19px;">✓</div>
-    <div style="color:#0b7a63;font-size:11px;font-weight:800;letter-spacing:.2em;">SAEDAM CONTRACT COMPLETE</div>
-    <h1 style="margin:9px 0 0;color:#182231;font-size:23px;font-weight:800;letter-spacing:-.02em;">
-        계약 체결이 완료되었습니다</h1>
-    <img src="{character_url}" alt="" width="150"
-         style="display:block;margin:0 auto 6px;width:150px;max-width:46%;height:auto;">
-    <div style="display:inline-block;margin-top:10px;padding:10px 22px;border-radius:11px;
-                background:#eef8f5;color:#0b7a63;font-size:14px;font-weight:700;">
-        <b>{name}</b> 님의 인증전자계약이 정상적으로 완료되었습니다.</div>
-</td></tr>
+<tr><td style="height:5px;line-height:5px;font-size:0;background:#1f3a5f;
+               border-radius:5px 5px 0 0;">&nbsp;</td></tr>
 
-<tr><td style="padding:24px 30px 0;color:#3b4757;font-size:14px;line-height:1.85;">
+<tr><td style="padding:30px 32px 0;color:#33404f;font-size:14px;line-height:1.85;">
     안녕하세요, {org_name}입니다.<br>
-    <b>{name}</b> 님, 계약서 확인과 전자서명까지 모두 마쳐주셔서 감사합니다.<br>
+    <b style="color:#16243a;">{name}</b> 님, 계약서 확인과 전자서명까지 모두 마쳐주셔서 감사합니다.<br>
     첨부해 드린 최종 계약서(PDF)는 아래 안내를 참고하시어 안전하게 보관해 주시기 바랍니다.
 </td></tr>
 
-<tr><td style="padding:20px 30px 0;">
-    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">CONTRACT</div>
-    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">체결 계약서</h2>
+<tr><td style="padding:26px 32px 0;">
+    <div style="color:#5f7799;font-size:11px;font-weight:700;letter-spacing:.16em;">CONTRACT</div>
+    <h2 style="margin:6px 0 12px;color:#16243a;font-size:17px;font-weight:700;">체결 계약서</h2>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-           style="border:1px solid #efe6cf;border-radius:12px;overflow:hidden;">
-        <tr><td style="padding:11px 16px;color:#182231;font-size:14px;font-weight:700;background:#fbf7ec;">
+           style="border:1px solid #d7e0ea;border-left:3px solid #1f3a5f;background:#f6f8fb;">
+        <tr><td style="padding:13px 16px;color:#16243a;font-size:14px;font-weight:700;">
             {title}</td></tr>
     </table>
 </td></tr>
 
-<tr><td style="padding:24px 30px 0;">
-    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">KEEP SAFE</div>
-    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">계약서 보관 안내</h2>
-    <div style="padding:14px 16px;border:1px dashed #e3d3a8;border-radius:11px;background:#fffaf0;
-                color:#7c6a44;font-size:12px;line-height:1.85;">
-        · 첨부된 계약서 PDF는 근로·수수료 관련 분쟁이 생겼을 때 중요한 증빙자료이니 별도 폴더에 안전하게 보관해 주세요.<br>
+<tr><td style="padding:26px 32px 0;">
+    <div style="color:#5f7799;font-size:11px;font-weight:700;letter-spacing:.16em;">KEEP SAFE</div>
+    <h2 style="margin:6px 0 12px;color:#16243a;font-size:17px;font-weight:700;">계약서 보관 안내</h2>
+    <div style="padding:15px 17px;border:1px solid #d7e0ea;background:#f6f8fb;
+                color:#46586e;font-size:12px;line-height:1.85;">
+        · 첨부된 계약서 PDF는 다운로드 후 별도 폴더에 안전하게 보관해 주세요. 보관의 책임은 계약자에게 있습니다.<br>
         · 계약서 원문과 서명 이미지에는 개인정보가 담겨 있으니, 계약 당사자 외의 사람에게 전달하거나 공개된 장소에 올리지 말아 주세요.<br>
         · 컴퓨터가 아닌 클라우드(이메일, 개인 드라이브 등)에도 사본을 하나 더 남겨 두시면 분실을 예방할 수 있습니다.
     </div>
 </td></tr>
 
-<tr><td style="padding:24px 30px 0;">
-    <div style="color:#b99a55;font-size:11px;font-weight:800;letter-spacing:.16em;">VERIFICATION</div>
-    <h2 style="margin:6px 0 12px;color:#182231;font-size:17px;font-weight:800;">위변조 확인용 고유번호</h2>
+<tr><td style="padding:26px 32px 0;">
+    <div style="color:#5f7799;font-size:11px;font-weight:700;letter-spacing:.16em;">VERIFICATION</div>
+    <h2 style="margin:6px 0 12px;color:#16243a;font-size:17px;font-weight:700;">위변조 확인용 고유번호</h2>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-           style="border:1px solid #efe6cf;border-radius:12px;overflow:hidden;">
-        <tr><td style="padding:14px 16px;background:#fbf7ec;">
-            <div style="color:#7c6a44;font-size:12px;font-weight:700;margin-bottom:6px;">SHA-256</div>
-            <div style="color:#0b7a63;font-size:13px;font-weight:700;font-family:'Consolas',monospace;
+           style="border:1px solid #d7e0ea;border-left:3px solid #1f3a5f;background:#f6f8fb;">
+        <tr><td style="padding:14px 16px;">
+            <div style="color:#5f7799;font-size:12px;font-weight:700;margin-bottom:6px;">SHA-256</div>
+            <div style="color:#1f3a5f;font-size:13px;font-weight:700;font-family:'Consolas',monospace;
                         word-break:break-all;line-height:1.6;">{escape(pdf_hash)}</div>
         </td></tr>
     </table>
@@ -1021,23 +1031,22 @@ def _completion_mail_html(row, pdf_hash: str, company_name: str = "") -> str:
     </div>
 </td></tr>
 
-<tr><td style="padding:26px 30px 30px;text-align:center;">
-    <div style="color:#3b4757;font-size:14px;line-height:1.8;">
+<tr><td style="padding:28px 32px 30px;text-align:center;">
+    <div style="color:#33404f;font-size:14px;line-height:1.8;">
         함께해 주셔서 감사합니다. 앞으로도 잘 부탁드립니다.</div>
 </td></tr>
 
-<tr><td style="padding:18px 20px 22px;border-top:1px solid #e3d3a8;text-align:center;
-               background:#fffaf0;border-radius:0 0 14px 14px;">
+<tr><td style="padding:18px 20px 22px;border-top:1px solid #d7e0ea;text-align:center;
+               background:#f6f8fb;border-radius:0 0 5px 5px;">
     <img src="{logo_url}" alt="{org_name}"
          style="display:block;margin:0 auto;height:34px;width:auto;">
-    <div style="margin-top:9px;color:#9a8a66;font-size:11px;line-height:1.7;">
+    <div style="margin-top:9px;color:#7b8aa0;font-size:11px;line-height:1.7;">
         {org_name}<br>
         본 메일은 새담 인트라넷 인증전자계약에서 발송되었습니다.
     </div>
 </td></tr>
 
 </table></td></tr></table>
-</td></tr></table>
 </body></html>"""
 
 
@@ -2430,6 +2439,16 @@ def admin_preview(contract_id: int):
         </div>
       </div>
     """
+    header_block = f"""
+      <h1>{escape(row['title_snapshot'])}</h1>
+      <table class="info">
+        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>(서명 시 입력)</td></tr>
+        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
+        <tr><th>연락처</th><td>{values.get('연락처','') or '(서명 시 입력)'}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
+        <tr><th>주소</th><td colspan="3">{values.get('거주지','') or '(서명 시 입력)'}</td></tr>
+        <tr><th>은행</th><td>(서명 시 입력)</td><th>계좌번호</th><td>(서명 시 입력)</td></tr>
+      </table>
+    """
     html = f"""
     <!doctype html><html lang="ko"><head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -2463,18 +2482,10 @@ def admin_preview(contract_id: int):
     </style></head><body>
       <div class="preview-banner">⚠ 미리보기 화면입니다. 실제 발송·서명되는 계약서가 아니며 법적 효력이 없습니다.</div>
       <div class="sheet">
-      <div style="text-align:center;margin-bottom:14px"><img src="https://www.saedam.org/img/logo01.gif" style="max-width:112px"></div>
-      <h1>{escape(row['title_snapshot'])}</h1>
-      <table class="info">
-        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>(서명 시 입력)</td></tr>
-        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
-        <tr><th>연락처</th><td>{values.get('연락처','') or '(서명 시 입력)'}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
-        <tr><th>주소</th><td colspan="3">{values.get('거주지','') or '(서명 시 입력)'}</td></tr>
-        <tr><th>은행</th><td>(서명 시 입력)</td><th>계좌번호</th><td>(서명 시 입력)</td></tr>
-      </table>
+      {header_block}
       <div class="terms">{content1}</div>
       {sign_block}
-      {f'<div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
+      {f'{header_block}<div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
       </div>
     </body></html>
     """
@@ -2762,6 +2773,8 @@ def public_contract(token: str):
             registered_email=str(row["signer_email"] or "").strip().lower(),
             token=token,
             csrf_token=_csrf_token(),
+            otp_valid_seconds=OTP_VALID_SECONDS,
+            otp_resend_seconds=OTP_RESEND_COOLDOWN_SECONDS,
         )
     contract_data = json.loads(row["contract_data_json"] or "{}")
     company = json.loads(row["company_snapshot_json"] or "{}")
@@ -2797,8 +2810,11 @@ def send_otp(token: str):
         if not available or row["status"] not in {"pending", "completed"}:
             return jsonify({"status": "error", "message": message or "인증할 수 없는 계약입니다."}), 410
         sent_at = _parse_iso(row["otp_sent_at"])
-        if sent_at and (_now() - sent_at).total_seconds() < 60:
-            return jsonify({"status": "error", "message": "인증번호는 1분 후 다시 요청할 수 있습니다."}), 429
+        if sent_at and (_now() - sent_at).total_seconds() < OTP_RESEND_COOLDOWN_SECONDS:
+            return jsonify({
+                "status": "error",
+                "message": f"인증번호는 {OTP_RESEND_COOLDOWN_SECONDS}초 후 다시 요청할 수 있습니다.",
+            }), 429
         masked_recipient = _mask_email(entered_email)
         code = f"{secrets.randbelow(900000) + 100000:06d}"
         update_verified_contract(
@@ -2806,7 +2822,7 @@ def send_otp(token: str):
             row["id"],
             {
                 "otp_hash": generate_password_hash(code),
-                "otp_expires_at": _iso(_now() + timedelta(minutes=5)),
+                "otp_expires_at": _iso(_now() + timedelta(minutes=OTP_VALID_MINUTES)),
                 "otp_attempts": 0,
                 "otp_sent_at": _iso(),
             },
@@ -2824,7 +2840,7 @@ def send_otp(token: str):
               <h2>이메일 인증번호</h2>
               <p>{escape(row['signer_name'])}님의 인증번호는 다음과 같습니다.</p>
               <div style="font-size:30px;font-weight:bold;letter-spacing:8px;color:#123b6d">{code}</div>
-              <p>5분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
+              <p>{OTP_VALID_MINUTES}분 안에 계약 화면에 입력해 주세요. 타인에게 알려주지 마세요.</p>
               <p>계약을 마치면 서명된 계약서 원본도 이 주소로 발송됩니다.</p>
             </div>
             """,
@@ -2868,7 +2884,11 @@ def send_otp(token: str):
         pending = {}
     pending[str(row["id"])] = entered_email
     session["verified_contract_email"] = pending
-    return jsonify({"status": "success", "message": f"{masked_recipient}로 인증번호를 보냈습니다."})
+    return jsonify({
+        "status": "success",
+        "message": f"{masked_recipient}로 인증번호를 보냈습니다. {OTP_VALID_MINUTES}분 안에 입력해 주세요.",
+        "valid_seconds": OTP_VALID_SECONDS,
+    })
 
 
 @verified_contract_bp.route("/sign/<string:token>/verify-code", methods=["POST"])
@@ -2883,7 +2903,7 @@ def verify_otp(token: str):
             return jsonify({"status": "error", "message": message or "인증할 수 없는 계약입니다."}), 410
         expiry = _parse_iso(row["otp_expires_at"])
         if not row["otp_hash"] or not expiry or expiry < _now():
-            return jsonify({"status": "error", "message": "인증번호가 만료되었습니다. 새로 받아주세요."}), 400
+            return jsonify({"status": "error", "message": f"인증번호가 만료되었습니다({OTP_VALID_MINUTES}분 경과). 새로 받아주세요."}), 400
         attempts = int(row["otp_attempts"] or 0)
         if attempts >= 5:
             return jsonify({"status": "error", "message": "입력 횟수를 초과했습니다. 인증번호를 새로 받아주세요."}), 429
@@ -3060,6 +3080,22 @@ def _pdf_configuration():
     return pdfkit.configuration(wkhtmltopdf=path) if path else None
 
 
+_LOGO_DATA_URI = None
+
+
+def _logo_data_uri() -> str:
+    """계약서에 넣는 새담 로고. 외부 주소 대신 앱에 포함된 파일을 쓴다."""
+    global _LOGO_DATA_URI
+    if _LOGO_DATA_URI is None:
+        path = APP_ROOT / "static" / "logo01.gif"
+        if path.is_file():
+            encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+            _LOGO_DATA_URI = f"data:image/gif;base64,{encoded}"
+        else:
+            _LOGO_DATA_URI = f"{CONTRACT_PUBLIC_ORIGIN}/static/logo01.gif"
+    return _LOGO_DATA_URI
+
+
 def _stamp_data_uri(company: dict) -> str:
     filename = os.path.basename(str(company.get("stamp_filename", "")))
     path = VERIFIED_STAMP_ROOT / filename if filename else VERIFIED_STAMP_ROOT / "verified_default_stamp.png"
@@ -3101,10 +3137,20 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
         </div>
       </div>
     """
+    header_block = f"""
+      <h1>{escape(row['title_snapshot'])}</h1>
+      <table class="info">
+        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>{values.get('주민번호','')}</td></tr>
+        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
+        <tr><th>연락처</th><td>{values.get('연락처','')}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
+        <tr><th>주소</th><td colspan="3">{values.get('거주지','')}</td></tr>
+        <tr><th>은행</th><td>{values.get('은행','')}</td><th>계좌번호</th><td>{values.get('계좌번호','')}</td></tr>
+      </table>
+    """
     html = f"""
     <!doctype html><html><head><meta charset="utf-8"><style>
     {_pdf_font_css()}
-    body{{color:#111;font-size:15px;line-height:1.72;word-break:keep-all}}
+    body{{color:#111;font-size:16px;line-height:1.72;word-break:keep-all}}
     h1{{font-size:24px;text-align:center;text-decoration:underline;margin:10px 0 28px}}
     .info{{width:100%;border-collapse:collapse;margin-bottom:24px;table-layout:fixed}}
     .info th,.info td{{border-bottom:1px solid #ccc;padding:8px;text-align:left}}
@@ -3124,26 +3170,20 @@ def _build_pdf(row, contract_data: dict, company: dict, signature_uri: str, sign
     .sign-label{{vertical-align:bottom;padding:0 6px 5px 0;white-space:nowrap}}
     .sign-cell{{width:225px;border-bottom:1px solid #222;padding:14px 0 5px}}
     .sign-img{{display:block;width:225px;height:auto;max-height:100px}}
-    .evidence{{border:1px solid #9fb3c8;background:#f5f8fb;padding:14px;margin-top:25px;font-size:12px}}
+    .evidence{{border:1px solid #9fb3c8;background:#f5f8fb;padding:14px;margin-top:25px;font-size:12px;page-break-inside:avoid}}
     .evidence li{{margin:5px 0}}
+    .footer-logo{{text-align:center;margin-top:34px;page-break-inside:avoid}}
+    .footer-logo img{{width:112px;height:auto}}
     </style></head><body>
-      <div style="text-align:center;margin-bottom:14px"><img src="https://www.saedam.org/img/logo01.gif" style="max-width:112px"></div>
-      <h1>{escape(row['title_snapshot'])}</h1>
-      <table class="info">
-        <tr><th>계약자</th><td>{escape(row['signer_name'])}</td><th>주민번호</th><td>{values.get('주민번호','')}</td></tr>
-        <tr><th>학교</th><td>{values.get('수탁학교명','')}</td><th>부서</th><td>{values.get('부서명','')}</td></tr>
-        <tr><th>연락처</th><td>{values.get('연락처','')}</td><th>이메일</th><td>{escape(row['signer_email'])}</td></tr>
-        <tr><th>주소</th><td colspan="3">{values.get('거주지','')}</td></tr>
-        <tr><th>은행</th><td>{values.get('은행','')}</td><th>계좌번호</th><td>{values.get('계좌번호','')}</td></tr>
-      </table>
+      {header_block}
       <div class="terms">{content1}</div>
       {sign_block}
-      {f'<div style="page-break-before:always"></div><div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
+      {f'<div style="page-break-before:always"></div>{header_block}<div class="terms">{content2}</div>{sign_block}' if content2.strip() else ''}
       <div class="evidence"><b>전자계약 확인기록</b><ul>{agreement_html}</ul>
         <p>본인 인증 완료: {escape(_format_kst(row['verified_at']))}<br>
-        전자서명 완료: {signed_at.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S KST')}<br>
-        계약서 버전: {int(row['version'])}</p>
+        전자서명 완료: {signed_at.astimezone(KST).strftime('%Y-%m-%d %H:%M:%S KST')}</p>
       </div>
+      <div class="footer-logo"><img src="{_logo_data_uri()}" alt="새담청소년교육문화원"></div>
     </body></html>
     """
     configuration = _pdf_configuration()
