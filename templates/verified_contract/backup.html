@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/vc_ui.css">
+<style>
+    .vcb-wrap{width:100%;max-width:960px;margin:20px auto;background:var(--card-bg,#fff);padding:26px 28px 24px;
+        border:1px solid var(--card-border,#d1d8e0);border-top:5px solid #1f3a5f;border-radius:12px;
+        box-shadow:var(--card-shadow,0 4px 20px rgba(0,0,0,.06));color:var(--text-dark,#333);box-sizing:border-box}
+    .vcb-head h2{margin:0 0 6px;font-size:1.35rem;font-weight:800;color:var(--saedam-navy,#1f3a5f);display:flex;align-items:center;gap:9px}
+    .vcb-head p{margin:0;font-size:.86rem;line-height:1.75;color:var(--text-gray,#64748b)}
+    .vcb-stats{display:flex;flex-wrap:wrap;gap:22px;margin:18px 0 20px;padding:15px 18px;
+        background:var(--widget-bg,#f5f8fb);border:1px solid var(--border-color,#dce4ef);border-radius:9px;font-size:.86rem}
+    .vcb-stats b{color:#1f3a5f;font-size:1rem}
+    .vcb-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+    .vcb-tools .label{font-size:.8rem;font-weight:700;color:var(--text-gray,#64748b);margin-right:2px}
+    .vcb-size{height:34px;padding:0 15px;border-radius:9px;border:1px solid var(--border-color,#cfd8e4);
+        background:var(--input-bg,#fff);color:var(--text-dark,#41506a);font-family:inherit;font-size:.82rem;
+        font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;transition:.15s}
+    .vcb-size:hover{border-color:#94a7c2;color:#1f3a5f}
+    .vcb-size.on{background:#1f3a5f;border-color:#1f3a5f;color:#fff}
+    .vcb-table{width:100%;border-collapse:collapse;font-size:.86rem}
+    .vcb-table th{padding:11px 12px;text-align:left;font-size:.76rem;font-weight:700;color:var(--text-gray,#64748b);
+        border-bottom:1px solid var(--border-color,#dce4ef);background:var(--widget-bg,#f5f8fb)}
+    .vcb-table td{padding:13px 12px;border-bottom:1px solid var(--border-color,#e7edf5);vertical-align:middle}
+    .vcb-table tr:last-child td{border-bottom:0}
+    .vcb-part{font-weight:700;color:#1f3a5f}
+    .vcb-tag{display:inline-block;margin-left:6px;padding:2px 7px;border-radius:6px;background:rgba(31,58,95,.09);
+        color:#1f3a5f;font-size:.72rem;font-weight:700}
+    .vcb-foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--border-color,#e7edf5)}
+    .vcb-empty{padding:40px 0;text-align:center;color:var(--text-gray,#94a3b8);font-size:.9rem}
+    .vcb-diag{display:none;margin-top:14px;padding:14px 16px;border:1px solid var(--border-color,#dce4ef);
+        border-radius:9px;background:var(--widget-bg,#f5f8fb);font-size:.8rem;line-height:1.8;color:var(--text-gray,#5b6b81)}
+    .vcb-diag.open{display:block}
+    .vcb-diag code{word-break:break-all}
+    @media(max-width:640px){.vcb-wrap{padding:20px 16px}.vcb-stats{gap:12px}.vcb-table th:nth-child(3),.vcb-table td:nth-child(3){display:none}}
+</style>
+
+<div class="vcb-wrap">
+    <div class="vcb-head">
+        <h2><i class="fa-solid fa-box-archive"></i>전체 백업 나눠받기</h2>
+        <p>한 번에 받으면 파일이 커서 네트워크가 끊길 수 있어, <b>{{ chunk_size }}개씩</b> 나누어 내려받습니다.<br>
+        아래 링크를 위에서부터 하나씩 눌러 저장하세요. 계약리스트(엑셀)는 1부에 함께 들어 있고, 따로 받으실 수도 있습니다.</p>
+    </div>
+
+    <div class="vcb-stats">
+        <span>계약서 파일 <b>{{ file_count }}</b>개</span>
+        <span>전체 용량 <b>{{ total_size_text }}</b></span>
+        <span>분할 <b>{{ parts|length }}</b>개</span>
+        <span>계약리스트 <b>{{ list_count }}</b>건</span>
+    </div>
+
+    <div class="vcb-tools">
+        <span class="label">분할 크기</span>
+        {% for size in chunk_sizes %}
+        <a class="vcb-size {% if size==chunk_size %}on{% endif %}" href="?size={{ size }}">{{ size }}개씩</a>
+        {% endfor %}
+        <a class="vcbtn vcbtn--solid" style="margin-left:auto;text-decoration:none" href="/verified-contract/admin/backup/list">
+            <i class="fa-solid fa-file-excel"></i>계약리스트만 받기</a>
+    </div>
+
+    {% if parts %}
+    <table class="vcb-table">
+        <thead><tr><th>구분</th><th>범위</th><th>파일 수</th><th>용량</th><th>다운로드</th></tr></thead>
+        <tbody>
+        {% for part in parts %}
+            <tr>
+                <td class="vcb-part">{{ part.index }} / {{ parts|length }}</td>
+                <td>{{ part.first }} ~ {{ part.last }}번</td>
+                <td>{{ part.count }}개{% if part.index==1 %}<span class="vcb-tag">+ 계약리스트</span>{% endif %}</td>
+                <td>{{ part.size_text }}</td>
+                <td><a class="vcbtn vcbtn--solid" style="text-decoration:none"
+                       href="/verified-contract/admin/backup/part?size={{ chunk_size }}&part={{ part.index }}">
+                    <i class="fa-solid fa-download"></i>내려받기</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="vcb-empty">내려받을 완료 계약서가 아직 없습니다.</div>
+    {% endif %}
+
+    <div class="vcb-foot">
+        <a class="vcbtn vcbtn--solid" style="text-decoration:none" href="/verified-contract/admin">
+            <i class="fa-solid fa-arrow-left"></i>관리자 페이지로 돌아가기</a>
+        <button type="button" class="vcbtn vcbtn--line" onclick="toggleDiagnostics()">진단 정보 보기</button>
+    </div>
+
+    <div class="vcb-diag" id="vcb-diag">
+        <div>보관 위치 : <code>{{ storage_path }}</code></div>
+        <div>완료 계약 {{ list_count }}건 중 파일이 확인된 계약 {{ file_count }}건, 파일을 찾지 못한 계약 {{ missing|length }}건</div>
+        {% if missing %}
+        <div style="margin-top:6px;color:#a33330">파일 없는 계약 : {% for item in missing %}#{{ item.id }} {{ item.name }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+        <div>위 계약은 묶음에서 제외됩니다. 계약리스트 엑셀에는 <b>(파일 없음)</b>으로 표시됩니다.</div>
+        {% endif %}
+        <div style="margin-top:6px">계약리스트에는 개인 식별정보(주민번호·계좌번호)를 담지 않습니다. 해당 정보는 계약서 PDF 안에 있습니다.</div>
+    </div>
+</div>
+
+<script>
+function toggleDiagnostics(){document.getElementById('vcb-diag').classList.toggle('open')}
+</script>
+{% endblock %}
