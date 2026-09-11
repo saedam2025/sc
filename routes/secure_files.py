@@ -214,6 +214,21 @@ def read_decrypted(path: str | os.PathLike[str], max_bytes: int | None = None) -
     return b"".join(chunks)
 
 
+def stored_plain_size(path: str | os.PathLike[str]) -> int:
+    """복호화하지 않고 원본 크기를 알아낸다. 헤더에 원본 길이가 들어 있다."""
+    target = Path(path)
+    try:
+        with target.open("rb") as source:
+            header = source.read(HEADER.size)
+        if len(header) == HEADER.size:
+            magic, plain_size, _ = HEADER.unpack(header)
+            if magic == MAGIC:
+                return int(plain_size)
+        return target.stat().st_size          # 암호화 전 평문 파일
+    except OSError:
+        return 0
+
+
 def encrypted_file_is_readable(path: str | os.PathLike[str]) -> bool:
     """응답 스트리밍 전에 현재 키로 파일의 첫 청크를 열 수 있는지 확인한다."""
     try:
